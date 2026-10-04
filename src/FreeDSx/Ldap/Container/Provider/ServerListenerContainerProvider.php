@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
@@ -88,19 +89,14 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
         $this->assertRunnerExtensionsAreLoaded($options);
-        $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
-        $applyReload = $container->get(ListenerContributorInterface::class)->applyReload(...);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
             $this->assertClientCertificatesAreNotExpected($options);
             $workers = $this->resolveWorkerCount($container);
             $workerFactory = new WorkerFactory(
-                serverProtocolFactory: $protocolFactoryProvider($options),
-                options: $options,
+                configuration: $this->makeRunnerConfiguration($container),
                 socketServerFactory: $container->get(SocketServerFactory::class),
-                protocolFactoryProvider: $protocolFactoryProvider,
-                applyReload: $applyReload,
                 metricsRecorder: $metricsRecorder,
                 backgroundTasks: $container->get(BackgroundTasksInterface::class),
             );
@@ -115,11 +111,8 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         }
 
         return new PcntlServerRunner(
-            serverProtocolFactory: $protocolFactoryProvider($options),
-            options: $options,
+            configuration: $this->makeRunnerConfiguration($container),
             socketServerFactory: $container->get(SocketServerFactory::class),
-            protocolFactoryProvider: $protocolFactoryProvider,
-            applyReload: $applyReload,
             metrics: new MetricsRelay(
                 $metricsRecorder,
                 $this->makeSnapshotPublisher($container),
@@ -128,6 +121,19 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             ),
             resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
             backgroundTasks: $container->get(BackgroundTasksInterface::class),
+        );
+    }
+
+    private function makeRunnerConfiguration(Container $container): RunnerConfiguration
+    {
+        $options = $container->get(ServerListenerOptionsInterface::class);
+        $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
+
+        return new RunnerConfiguration(
+            $options,
+            $protocolFactoryProvider($options),
+            $protocolFactoryProvider,
+            $container->get(ListenerContributorInterface::class)->applyReload(...),
         );
     }
 

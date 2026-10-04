@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
@@ -34,11 +35,13 @@ final class ServerRunnerTest extends TestCase
         $factory = $this->createMock(ServerProtocolFactory::class);
 
         $this->workers = new WorkerFactory(
-            serverProtocolFactory: $factory,
-            options: TestServerOptions::defaults(),
+            configuration: new RunnerConfiguration(
+                TestServerOptions::defaults(),
+                $factory,
+                static fn(ServerListenerOptionsInterface $options) => $factory,
+                static function (ServerListenerOptionsInterface $options): void {},
+            ),
             socketServerFactory: $this->createMock(SocketServerFactory::class),
-            protocolFactoryProvider: static fn(ServerListenerOptionsInterface $options) => $factory,
-            applyReload: static function (ServerListenerOptionsInterface $options): void {},
         );
     }
 

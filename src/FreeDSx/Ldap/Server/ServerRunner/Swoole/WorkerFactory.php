@@ -13,15 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
-use Closure;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
-use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\Server\SocketServerFactory;
-use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
  * Builds the coroutine workers a runner serves on, after any fork so nothing is inherited.
@@ -33,15 +31,11 @@ use FreeDSx\Ldap\ServerListenerOptionsInterface;
 final readonly class WorkerFactory
 {
     /**
-     * @param Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface $protocolFactoryProvider
-     * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
+     * @param RunnerConfiguration $configuration Each worker process changes only its own copy, made by the fork.
      */
     public function __construct(
-        private ServerProtocolFactoryInterface $serverProtocolFactory,
-        private ServerListenerOptionsInterface $options,
+        private RunnerConfiguration $configuration,
         private SocketServerFactory $socketServerFactory,
-        private Closure $protocolFactoryProvider,
-        private Closure $applyReload,
         private MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private ?BackgroundTasksInterface $backgroundTasks = null,
     ) {}
@@ -60,10 +54,7 @@ final readonly class WorkerFactory
     ): Worker {
         return new Worker(
             new WorkerConfiguration(
-                $this->options,
-                $this->serverProtocolFactory,
-                $this->protocolFactoryProvider,
-                $this->applyReload,
+                $this->configuration,
                 $reloadState,
             ),
             $this->socketServerFactory,

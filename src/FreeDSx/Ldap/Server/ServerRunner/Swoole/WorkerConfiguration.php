@@ -13,39 +13,33 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
-use Closure;
-use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
+ * A worker's configuration. Keeps up to date with reloads its pool has applied.
+ *
  * @internal
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class WorkerConfiguration
+readonly class WorkerConfiguration
 {
-    /**
-     * @param Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface $protocolFactoryProvider
-     * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
-     */
     public function __construct(
-        private ServerListenerOptionsInterface $options,
-        private ServerProtocolFactoryInterface $protocolFactory,
-        private readonly Closure $protocolFactoryProvider,
-        private readonly Closure $applyReload,
-        private readonly ReloadState $reloadState,
+        private RunnerConfiguration $configuration,
+        private ReloadState $reloadState,
     ) {}
 
     public function options(): ServerListenerOptionsInterface
     {
-        return $this->options;
+        return $this->configuration->options();
     }
 
     public function protocolFactory(): ServerProtocolFactoryInterface
     {
-        return $this->protocolFactory;
+        return $this->configuration->protocolFactory();
     }
 
     /**
@@ -56,11 +50,11 @@ class WorkerConfiguration
      */
     public function adoptOnStart(array $context): bool
     {
-        if (!$this->reloadState->hasReloaded() || $this->replace($context)) {
+        if (!$this->reloadState->hasReloaded() || $this->configuration->reload($context)) {
             return true;
         }
 
-        $this->options->getLogger()?->error(
+        $this->options()->getLogger()?->error(
             'The reloaded configuration could not be adopted on start; accepting no connections until a reload succeeds.',
             $context,
         );
@@ -76,31 +70,10 @@ class WorkerConfiguration
      */
     public function reload(array $context): bool
     {
-        if (!$this->replace($context)) {
+        if (!$this->configuration->reload($context)) {
             return false;
         }
         $this->reloadState->markReloaded();
-
-        return true;
-    }
-
-    /**
-     * @param array<string, scalar> $context
-     */
-    private function replace(array $context): bool
-    {
-        $result = (new ReloadCoordinator())->reload(
-            $this->options,
-            $this->protocolFactoryProvider,
-            $context,
-        );
-        if ($result === null) {
-            return false;
-        }
-
-        $this->options = $result->options;
-        $this->protocolFactory = $result->protocolFactory;
-        ($this->applyReload)($this->options);
 
         return true;
     }
