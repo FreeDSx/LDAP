@@ -317,8 +317,9 @@ in the accept loop.
 ------------------
 #### setMaxConnections
 
-The most concurrent client connections to accept. Once reached, further connections are closed without being served,
-and `connectionsRejected` in [cn=monitor](Monitoring.md) counts them. Set `0` for no limit.
+The most concurrent client connections the whole server accepts, on every runner. Once reached, further connections
+are closed without being served, and `connectionsRejected` in [cn=monitor](Monitoring.md) counts them. Set `0` for no
+limit.
 
 ```php
 $options->getNetworkConfig()->setMaxConnections(4096);

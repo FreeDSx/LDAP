@@ -126,6 +126,13 @@ final class LdapServerCommand extends Command
                 '0',
             )
             ->addOption(
+                'max-connections',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Concurrent connections the whole server accepts (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'ssl-handshake-timeout',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -337,6 +344,11 @@ final class LdapServerCommand extends Command
             ->setSocketAcceptTimeout(0.1)
             ->setSslHandshakeTimeout((int) $this->getStringOption($input, 'ssl-handshake-timeout'))
             ->setShutdownTimeout((int) $this->getStringOption($input, 'shutdown-timeout'));
+
+        $maxConnections = $this->getStringOption($input, 'max-connections');
+        if ($maxConnections !== '') {
+            $network->setMaxConnections((int) $maxConnections);
+        }
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
             ->setRunnerConfig(new RunnerConfig(

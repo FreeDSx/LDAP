@@ -49,6 +49,7 @@ class Worker
 
     /**
      * @param ?BackgroundTasksInterface $backgroundTasks Null for a worker that does not run them, since they must run once.
+     * @param int $workerId The pool's id for this worker. 0 for a single process.
      */
     public function __construct(
         ServerProtocolFactoryInterface $serverProtocolFactory,
@@ -57,6 +58,8 @@ class Worker
         Closure $protocolFactoryProvider,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
+        private readonly ConnectionSlotsInterface $connectionSlots = new LocalConnectionSlots(),
+        private readonly int $workerId = 0,
     ) {
         $this->serverProtocolFactory = $serverProtocolFactory;
         $this->options = $options;
@@ -65,14 +68,15 @@ class Worker
 
     /**
      * Serves connections until a shutdown signal, then drains what is still in flight.
-     *
-     * @param array<string, scalar> $context Added to this worker's lifecycle log entries.
      */
-    public function run(array $context = []): void
+    public function run(): void
     {
+        $context = ['worker_id' => $this->workerId];
+
         Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
         $this->adoptCurrentConfiguration($context);
-        $this->claimWorkerMetrics($context);
+        $this->claimWorkerMetrics();
+        $this->connectionSlots->claimWorker($this->workerId);
 
         $acceptor = new ConnectionAcceptor(
             $this->serverProtocolFactory,
@@ -80,6 +84,7 @@ class Worker
             $this->socketServerFactory->isTlsHandshakeDeferred(),
             $this->metricsRecorder,
             $this->backgroundTasks,
+            $this->connectionSlots,
         );
         $this->acceptor = $acceptor;
 
@@ -96,16 +101,14 @@ class Worker
 
     /**
      * A worker the pool restarts reuses its id, so claiming it here discards what its predecessor left behind.
-     *
-     * @param array<string, scalar> $context
      */
-    private function claimWorkerMetrics(array $context): void
+    private function claimWorkerMetrics(): void
     {
         if (!$this->metricsRecorder instanceof WorkerScopedMetricsInterface) {
             return;
         }
 
-        $this->metricsRecorder->beginWorker((int) ($context['worker_id'] ?? 0));
+        $this->metricsRecorder->beginWorker($this->workerId);
     }
 
     /**

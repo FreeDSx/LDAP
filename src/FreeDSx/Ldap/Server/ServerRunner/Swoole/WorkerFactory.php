@@ -40,13 +40,17 @@ final readonly class WorkerFactory
         private Closure $protocolFactoryProvider,
         private MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private ?BackgroundTasksInterface $backgroundTasks = null,
+        private ConnectionSlotsInterface $connectionSlots = new LocalConnectionSlots(),
     ) {}
 
     /**
+     * @param int $workerId The pool's id for the worker; 0 for a single process.
      * @param bool $withBackgroundTasks Only one worker may run them, since they must run once per server.
      */
-    public function make(bool $withBackgroundTasks = true): Worker
-    {
+    public function make(
+        int $workerId = 0,
+        bool $withBackgroundTasks = true,
+    ): Worker {
         return new Worker(
             $this->serverProtocolFactory,
             $this->options,
@@ -56,6 +60,8 @@ final readonly class WorkerFactory
             $withBackgroundTasks
                 ? $this->backgroundTasks
                 : null,
+            $this->connectionSlots,
+            $workerId,
         );
     }
 }
