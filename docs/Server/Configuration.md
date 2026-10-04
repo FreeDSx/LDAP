@@ -918,8 +918,9 @@ Whether to serve the server-generated `cn=monitor` entry. When off, the route is
 ------------------
 #### setMonitorSnapshotPath
 
-PCNTL only. Path to the JSON file the parent publishes for `cn=monitor` to read. When unset, a path under the system temp
-directory keyed by listen port is used. Set this to avoid collisions when running several instances on one host.
+PCNTL only. Path to the JSON file the parent publishes for `cn=monitor` to read. When unset, the parent creates a uniquely
+named file in the system temp directory at startup and removes it on shutdown. A configured file that already exists must
+belong to the server's user, or the server refuses to start.
 
 **Default**: `null`
 

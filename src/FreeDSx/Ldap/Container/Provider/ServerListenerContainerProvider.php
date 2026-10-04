@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
+use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
@@ -55,12 +56,12 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
-            // A singleton, so the shared table is allocated once and every forked worker inherits that one mapping.
             SwooleTableMetricsRecorder::class => static fn(): SwooleTableMetricsRecorder => new SwooleTableMetricsRecorder(
                 SwooleTableMetricsRecorder::createTable(),
             ),
             MetricsRecorderInterface::class => $this->makeMetricsRecorder(...),
             MetricsSnapshotProvider::class => $this->makeMetricsSnapshotProvider(...),
+            SnapshotFile::class => $this->makeSnapshotFile(...),
             OperationRollupCoordinator::class => $this->makeOperationRollupCoordinator(...),
         ];
     }
@@ -241,8 +242,17 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
 
         return new SnapshotPublisher(
             $container->get(InMemoryMetricsRecorder::class),
-            new FileSnapshotWriter($options->getMonitorSnapshotPath()),
+            new FileSnapshotWriter($container->get(SnapshotFile::class)),
         );
+    }
+
+    private function makeSnapshotFile(Container $container): SnapshotFile
+    {
+        $path = $container->get(ServerListenerOptionsInterface::class)->getMonitorSnapshotPath();
+
+        return $path === null
+            ? SnapshotFile::inTempDirectory()
+            : SnapshotFile::at($path);
     }
 
     /**
@@ -281,7 +291,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         $options = $container->get(ServerListenerOptionsInterface::class);
 
         if (!$options->isRunnerMode(RunnerMode::Swoole)) {
-            return new FileSnapshotProvider($options->getMonitorSnapshotPath());
+            return new FileSnapshotProvider($container->get(SnapshotFile::class));
         }
 
         return $container->get(SwooleTableMetricsRecorder::class);

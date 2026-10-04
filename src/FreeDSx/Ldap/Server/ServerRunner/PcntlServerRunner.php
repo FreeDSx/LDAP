@@ -139,6 +139,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     public function run(): void
     {
+        $this->snapshotPublisher?->prepare();
         $this->server = $this->socketServerFactory->makeAndBind();
 
         try {

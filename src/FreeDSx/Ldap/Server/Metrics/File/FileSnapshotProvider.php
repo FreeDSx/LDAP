@@ -29,19 +29,20 @@ use function sprintf;
  */
 final readonly class FileSnapshotProvider implements MetricsSnapshotProvider
 {
-    public function __construct(private string $path) {}
+    public function __construct(private SnapshotFile $file) {}
 
     /**
      * @throws MetricsSnapshotException when no snapshot can be read.
      */
     public function snapshot(): MetricsSnapshot
     {
-        $contents = @file_get_contents($this->path);
+        $path = $this->file->path();
+        $contents = @file_get_contents($path);
 
         if ($contents === false) {
             throw new MetricsSnapshotException(sprintf(
                 'The metrics snapshot at "%s" could not be read.',
-                $this->path,
+                $path,
             ));
         }
         $data = json_decode(
@@ -51,7 +52,7 @@ final readonly class FileSnapshotProvider implements MetricsSnapshotProvider
         if (!is_array($data)) {
             throw new MetricsSnapshotException(sprintf(
                 'The metrics snapshot at "%s" could not be decoded.',
-                $this->path,
+                $path,
             ));
         }
 

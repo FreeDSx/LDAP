@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Metrics\File;
 
 use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
+use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\ConnectionMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
@@ -29,7 +30,7 @@ final class FileSnapshotProviderTest extends TestCase
     protected function setUp(): void
     {
         $this->path = sys_get_temp_dir() . '/freedsx_metrics_' . uniqid('', true) . '.json';
-        $this->subject = new FileSnapshotProvider($this->path);
+        $this->subject = new FileSnapshotProvider(SnapshotFile::at($this->path));
     }
 
     protected function tearDown(): void

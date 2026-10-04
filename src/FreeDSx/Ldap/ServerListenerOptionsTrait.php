@@ -162,12 +162,11 @@ trait ServerListenerOptionsTrait
     }
 
     /**
-     * The configured cn=monitor snapshot path, or a per-port default under the system temp directory.
+     * The configured cn=monitor snapshot path; null publishes it to a file created for each run in the temp directory.
      */
-    public function getMonitorSnapshotPath(): string
+    public function getMonitorSnapshotPath(): ?string
     {
-        return $this->monitorSnapshotPath
-            ?? sys_get_temp_dir() . '/freedsx_ldap_monitor_' . $this->networkConfig->getPort() . '.json';
+        return $this->monitorSnapshotPath;
     }
 
     public function setMonitorSnapshotPath(?string $monitorSnapshotPath): self
