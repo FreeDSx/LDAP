@@ -15,17 +15,15 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
-use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
-use FreeDSx\Ldap\Server\Process\Child\ChildExitCode;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcesses;
 use FreeDSx\Ldap\Server\Process\Child\ReapedChild;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\ChildReporter;
+use FreeDSx\Ldap\Server\ServerRunner\Pcntl\ConnectionChild;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
@@ -56,7 +54,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     private readonly int $ownerPid;
 
     /**
-     * @var int[] These are the POSIX signals we handle for shutdown purposes.
+     * @var list<int> These are the POSIX signals we handle for shutdown purposes.
      */
     private array $handledSignals;
 
@@ -223,9 +221,8 @@ class PcntlServerRunner implements ServerRunnerInterface
                 );
             } elseif ($pid === 0) {
                 // This is the child's thread of execution...
-                $this->runChildProcessThenExit(
+                $this->runConnectionChild(
                     $socket,
-                    posix_getpid(),
                     $reporter,
                 );
             } else {
@@ -239,87 +236,6 @@ class PcntlServerRunner implements ServerRunnerInterface
             }
             // Use the shutdown flag, not the socket state (not reliable after forking)
         } while (!$this->isShuttingDown);
-    }
-
-    /**
-     * Install signal handlers responsible for sending a notice of disconnect to the client and stopping the queue.
-     *
-     * @param array<string, scalar> $context
-     */
-    private function installChildSignalHandlers(
-        ServerProtocolHandler $protocolHandler,
-        array $context,
-    ): void {
-        foreach ($this->handledSignals as $signal) {
-            $context = array_merge(
-                $context,
-                ['signal' => $signal],
-            );
-            pcntl_signal(
-                $signal,
-                function () use ($protocolHandler, $context) {
-                    // Ignore it if a signal was already acknowledged...
-                    if ($this->isShuttingDown) {
-                        return;
-                    }
-                    $this->isShuttingDown = true;
-                    $this->logInfo(
-                        'The child process has received a signal to stop.',
-                        $context,
-                    );
-                    try {
-                        $protocolHandler->shutdown();
-                    } catch (Throwable $e) {
-                        $this->logShutdownNotifyError($e, $context);
-                    }
-                },
-            );
-        }
-        // Children ignore SIGHUP so terminal hangups don't kill them; the parent asks them to reload with SIGUSR1.
-        pcntl_signal(
-            SIGHUP,
-            SIG_IGN,
-        );
-        pcntl_signal(
-            SIGUSR1,
-            fn() => $this->reloadInChild(
-                $protocolHandler,
-                array_merge(
-                    $context,
-                    ['signal' => SIGUSR1],
-                ),
-            ),
-        );
-    }
-
-    /**
-     * The parent already reloaded, so a child that cannot follow ends its session rather than keep the old policy.
-     *
-     * @param array<string, scalar> $context
-     */
-    private function reloadInChild(
-        ServerProtocolHandler $protocolHandler,
-        array $context,
-    ): void {
-        if ($this->isShuttingDown) {
-            return;
-        }
-
-        if ($this->configuration->follow($context)) {
-            $this->logInfo(
-                'The child process applied the reloaded configuration.',
-                $context,
-            );
-
-            return;
-        }
-
-        $this->isShuttingDown = true;
-        try {
-            $protocolHandler->endAsUnavailable();
-        } catch (Throwable $e) {
-            $this->logShutdownNotifyError($e, $context);
-        }
     }
 
     private function isOwnerProcess(): bool
@@ -344,7 +260,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * @return int[]
+     * @return list<int>
      */
     private function blockableSignals(): array
     {
@@ -469,62 +385,29 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * In the child process we install a different set of signal handlers. Then we run the protocol handler and exit
-     * with a zero error code.
+     * Drops what the fork inherited from the parent, then serves the connection and exits.
      *
      * @throws EncoderException
      */
-    private function runChildProcessThenExit(
+    private function runConnectionChild(
         Socket $socket,
-        int $pid,
         ?ChildReporter $reporter,
     ): never {
-        // Cleanup the inherited FD copies without disturbing the accept loop or the connections still in flight.
+        // Without disturbing the accept loop or the connections still in flight.
         $this->server->close(shutdown: false);
         $this->childProcesses->releaseInherited();
-        $reporter?->inChild();
-
-        $context = ['pid' => $pid];
         $this->isMainProcess = false;
 
-        $this->resettable->reset();
-
-        if (!$this->encryptConnectionIfDeferred($socket, $context)) {
-            $socket->close();
-
-            exit(0);
-        }
-
-        $serverProtocolHandler = $this->configuration->protocolFactory()->make(
+        (new ConnectionChild(
+            $this->configuration,
+            $this->resettable,
+            $this->socketServerFactory->isTlsHandshakeDeferred(),
+            $this->handledSignals,
+            $this->blockableSignals(),
+        ))->run(
             $socket,
-            new ConnectionContext(pid: $pid),
+            $reporter,
         );
-
-        $this->installChildSignalHandlers(
-            $serverProtocolHandler,
-            $context,
-        );
-        $this->unblockSignals();
-
-        $this->logInfo(
-            'Handling LDAP connection in new child process.',
-            $context,
-        );
-
-        $closeReason = null;
-        try {
-            $closeReason = $serverProtocolHandler->handle();
-        } finally {
-            $reporter?->finish();
-        }
-
-        $this->logInfo(
-            'The child process is ending.',
-            $context,
-        );
-
-        // Convey a timeout close to the parent through the exit code.
-        exit(ChildExitCode::forCloseReason($closeReason));
     }
 
     /**
@@ -550,30 +433,6 @@ class PcntlServerRunner implements ServerRunnerInterface
         );
 
         $this->resettable->reset();
-    }
-
-    /**
-     * Negotiate TLS for connections whose handshake the listener left to the handler.
-     *
-     * @param array<string, mixed> $context
-     */
-    private function encryptConnectionIfDeferred(
-        Socket $socket,
-        array $context,
-    ): bool {
-        if (!$this->socketServerFactory->isTlsHandshakeDeferred()) {
-            return true;
-        }
-
-        try {
-            $socket->encrypt(true);
-        } catch (Throwable $e) {
-            $this->logTlsHandshakeError($e, $context);
-
-            return false;
-        }
-
-        return true;
     }
 
     /**
