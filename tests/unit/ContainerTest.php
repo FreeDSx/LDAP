@@ -566,6 +566,35 @@ class ContainerTest extends TestCase
         );
     }
 
+    public function test_the_swoole_runner_is_refused_without_the_swoole_extension(): void
+    {
+        $this->requireMissingExtension('swoole');
+
+        $container = $this->containerFor(
+            (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Swoole extension/');
+
+        $container->get(ServerRunnerInterface::class);
+    }
+
+    public function test_the_pcntl_runner_is_refused_without_process_control(): void
+    {
+        $this->requireMissingExtension(
+            'pcntl',
+            'posix',
+        );
+
+        $container = $this->containerFor(TestServerOptions::defaults());
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/pcntl and posix extensions/');
+
+        $container->get(ServerRunnerInterface::class);
+    }
+
     public function test_the_swoole_runner_is_refused_when_client_certificate_validation_is_on(): void
     {
         $this->requireSwoole();

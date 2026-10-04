@@ -14,26 +14,21 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
-use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
-use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
-use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
-use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
-use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
-use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use FreeDSx\Ldap\Server\Process\Child\ChildExitCode;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcesses;
 use FreeDSx\Ldap\Server\Process\Child\ReapedChild;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Pcntl\ChildReporter;
+use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
@@ -67,11 +62,9 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @var int[] These are the POSIX signals we handle for shutdown purposes.
      */
-    private array $handledSignals = [];
+    private array $handledSignals;
 
     private bool $isShuttingDown = false;
-
-    private bool $isSnapshotFailing = false;
 
     private readonly BackgroundTasksInterface $backgroundTasks;
 
@@ -82,7 +75,6 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     /**
      * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
-     * @throws RuntimeException
      */
     public function __construct(
         ServerProtocolFactoryInterface $serverProtocolFactory,
@@ -90,21 +82,13 @@ class PcntlServerRunner implements ServerRunnerInterface
         private readonly SocketServerFactory $socketServerFactory,
         Closure $protocolFactoryProvider,
         private readonly Closure $applyReload,
-        private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
-        private readonly ?SnapshotPublisher $snapshotPublisher = null,
-        private readonly ?OperationRollupCoordinator $operationRollup = null,
+        private readonly MetricsRelay $metrics = new MetricsRelay(),
         private readonly ResettableInterface $resettable = new NonResettable(),
         BackgroundTasksInterface $backgroundTasks = new PcntlBackgroundTasks(
             periodicTasks: [],
             longLivedTasks: [],
         ),
     ) {
-        if (!extension_loaded('pcntl') || !extension_loaded('posix')) {
-            throw new RuntimeException(
-                'The pcntl and posix extensions are required to fork and manage child processes (Linux only).',
-            );
-        }
-
         $this->serverProtocolFactory = $serverProtocolFactory;
         $this->options = $options;
         $this->protocolFactoryProvider = $protocolFactoryProvider;
@@ -132,7 +116,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     public function run(): void
     {
-        $this->snapshotPublisher?->prepare();
+        $this->metrics->prepare();
         $this->server = $this->socketServerFactory->makeAndBind();
 
         try {
@@ -163,104 +147,31 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function cleanUpChildProcesses(): void
     {
-        foreach ($this->childProcesses->reapExited() as $reaped) {
-            $this->finishReapedChild($reaped);
+        $reaped = $this->childProcesses->reapExited();
+
+        foreach ($reaped as $child) {
+            $this->releaseReapedChild($child);
         }
 
-        foreach ($this->childProcesses->all() as $childProcess) {
-            $this->collectOperationDelta($childProcess);
-        }
-
-        $this->publishMetricsSnapshot();
+        $this->metrics->sweep(
+            $reaped,
+            $this->childProcesses->all(),
+        );
     }
 
-    private function finishReapedChild(ReapedChild $reaped): void
+    private function releaseReapedChild(ReapedChild $reaped): void
     {
-        $childProcess = $reaped->process;
-        $this->drainOperationDelta($childProcess);
-
-        $socket = $childProcess->getSocket();
+        $socket = $reaped->process->getSocket();
         $this->server->removeClient($socket);
         $socket->close();
-
-        $this->metricsRecorder->connectionObserved(ConnectionObservation::Closed);
-        if ($reaped->closeReason !== null) {
-            $this->metricsRecorder->connectionObserved($reaped->closeReason);
-        }
 
         $this->logInfo(
             'The child process has ended.',
             array_merge(
                 $this->defaultContext,
-                ['child_pid' => $childProcess->getPid()],
+                ['child_pid' => $reaped->process->getPid()],
             ),
         );
-    }
-
-    private function publishMetricsSnapshot(): void
-    {
-        if ($this->snapshotPublisher === null) {
-            return;
-        }
-
-        try {
-            $this->snapshotPublisher->publish();
-        } catch (MetricsSnapshotException $e) {
-            $this->reportSnapshotFailed($e);
-
-            return;
-        }
-
-        $this->reportSnapshotRecovered();
-    }
-
-    private function reportSnapshotFailed(MetricsSnapshotException $e): void
-    {
-        if ($this->isSnapshotFailing) {
-            return;
-        }
-
-        $this->isSnapshotFailing = true;
-        $this->logWarning(
-            $e->getMessage(),
-            $this->defaultContext,
-        );
-    }
-
-    private function reportSnapshotRecovered(): void
-    {
-        if (!$this->isSnapshotFailing) {
-            return;
-        }
-
-        $this->isSnapshotFailing = false;
-        $this->logInfo(
-            'Publishing the metrics snapshot recovered.',
-            $this->defaultContext,
-        );
-    }
-
-    /**
-     * Fold the operation deltas available on a live child's channel into the parent totals.
-     */
-    private function collectOperationDelta(ChildProcess $childProcess): void
-    {
-        $channel = $childProcess->getChannel();
-
-        if ($channel === null || $this->operationRollup === null) {
-            return;
-        }
-
-        $this->operationRollup->collect($channel);
-    }
-
-    /**
-     * Fold a reaped child's final operation metrics into the parent totals, then close its channel.
-     */
-    private function drainOperationDelta(ChildProcess $childProcess): void
-    {
-        $this->collectOperationDelta($childProcess);
-        $childProcess->getChannel()?->close();
     }
 
     /**
@@ -271,8 +182,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     {
         $this->installServerSignalHandlers();
         $this->logServerStarted($this->defaultContext);
-        $this->metricsRecorder->serverStarted(time());
-        $this->publishMetricsSnapshot();
+        $this->metrics->serverStarted();
         $this->options->getOnServerReady()?->__invoke();
         $this->backgroundTasks->start();
 
@@ -302,8 +212,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             if ($this->isConnectionLimitReached()) {
                 $this->logConnectionLimitReached($this->defaultContext);
-                $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);
-                $this->publishMetricsSnapshot();
+                $this->metrics->connectionRejected();
 
                 $this->server->removeClient($socket);
                 $socket->close();
@@ -311,7 +220,7 @@ class PcntlServerRunner implements ServerRunnerInterface
                 continue;
             }
 
-            $channel = $this->makeChildChannel();
+            $reporter = $this->metrics->openChildReporter();
 
             // A child inherits the parent's handlers. Block them until it has installed its own.
             $this->blockSignals();
@@ -320,7 +229,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             if ($pid == -1) {
                 // In parent process, but could not fork...
                 $this->unblockSignals();
-                $channel?->close();
+                $reporter?->close();
                 $this->logAndThrow(
                     'Unable to fork process.',
                     $this->defaultContext,
@@ -330,14 +239,14 @@ class PcntlServerRunner implements ServerRunnerInterface
                 $this->runChildProcessThenExit(
                     $socket,
                     posix_getpid(),
-                    $channel,
+                    $reporter,
                 );
             } else {
                 // We are in the parent; the PID is the child process. It is tracked before signals are unblocked, so
                 $this->runAfterChildStarted(
                     $pid,
                     $socket,
-                    $channel,
+                    $reporter,
                 );
                 $this->unblockSignals();
             }
@@ -490,8 +399,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
                 ($this->applyReload)($this->options);
                 $this->signalChildProcessesToReload();
-                $this->metricsRecorder->serverReloaded(time());
-                $this->publishMetricsSnapshot();
+                $this->metrics->serverReloaded();
             },
         );
     }
@@ -540,7 +448,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         }
 
         $this->server->close();
-        $this->snapshotPublisher?->remove();
+        $this->metrics->remove();
         $this->logShutdownCompleted($this->defaultContext);
     }
 
@@ -588,15 +496,12 @@ class PcntlServerRunner implements ServerRunnerInterface
     private function runChildProcessThenExit(
         Socket $socket,
         int $pid,
-        ?ChildChannel $channel,
+        ?ChildReporter $reporter,
     ): never {
         // Cleanup the inherited FD copies without disturbing the accept loop or the connections still in flight.
         $this->server->close(shutdown: false);
         $this->childProcesses->releaseInherited();
-        $channel?->childKeepWrite();
-        if ($channel !== null) {
-            $this->operationRollup?->enterChild($channel);
-        }
+        $reporter?->inChild();
 
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
@@ -629,7 +534,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         try {
             $closeReason = $serverProtocolHandler->handle();
         } finally {
-            $this->operationRollup?->finish();
+            $reporter?->finish();
         }
 
         $this->logInfo(
@@ -690,27 +595,6 @@ class PcntlServerRunner implements ServerRunnerInterface
         return true;
     }
 
-    private function makeChildChannel(): ?ChildChannel
-    {
-        if ($this->operationRollup === null) {
-            return null;
-        }
-
-        try {
-            return $this->operationRollup->openChannel();
-        } catch (RuntimeException $e) {
-            $this->logInfo(
-                'Unable to create a child metrics channel; continuing without operation rollup.',
-                array_merge(
-                    $this->defaultContext,
-                    ['error' => $e->getMessage()],
-                ),
-            );
-
-            return null;
-        }
-    }
-
     /**
      * When a new Socket is received, we do the following:
      *
@@ -720,15 +604,15 @@ class PcntlServerRunner implements ServerRunnerInterface
     private function runAfterChildStarted(
         int $pid,
         Socket $socket,
-        ?ChildChannel $channel,
+        ?ChildReporter $reporter,
     ): void {
-        $channel?->parentKeepRead();
+        $reporter?->inParent();
         $this->childProcesses->add(new ChildProcess(
             $pid,
             $socket,
-            $channel,
+            $reporter?->channel(),
         ));
-        $this->metricsRecorder->connectionObserved(ConnectionObservation::Opened);
+        $this->metrics->childStarted();
         $this->logClientConnected(
             array_merge(
                 ['child_pid' => $pid],
@@ -774,20 +658,6 @@ class PcntlServerRunner implements ServerRunnerInterface
     ): void {
         $this->options->getLogger()?->log(
             LogLevel::INFO,
-            $message,
-            $context,
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function logWarning(
-        string $message,
-        array $context = [],
-    ): void {
-        $this->options->getLogger()?->log(
-            LogLevel::WARNING,
             $message,
             $context,
         );

@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\SwooleTableMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
@@ -86,6 +87,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     private function makeServerRunner(Container $container): ServerRunnerInterface
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
+        $this->assertRunnerExtensionsAreLoaded($options);
         $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
         $applyReload = $container->get(ListenerContributorInterface::class)->applyReload(...);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
@@ -118,9 +120,12 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             socketServerFactory: $container->get(SocketServerFactory::class),
             protocolFactoryProvider: $protocolFactoryProvider,
             applyReload: $applyReload,
-            metricsRecorder: $metricsRecorder,
-            snapshotPublisher: $this->makeSnapshotPublisher($container),
-            operationRollup: $this->makeOperationRollup($container),
+            metrics: new MetricsRelay(
+                $metricsRecorder,
+                $this->makeSnapshotPublisher($container),
+                $this->makeOperationRollup($container),
+                $options->getLogger(),
+            ),
             resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
             backgroundTasks: $container->get(BackgroundTasksInterface::class),
         );
@@ -145,6 +150,21 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         if (in_array(ServerOptions::SASL_EXTERNAL, $options->getSaslMechanisms(), true)) {
             throw new RuntimeException(
                 'The Swoole runner cannot support the EXTERNAL SASL mechanism. Remove it or use the PCNTL runner.',
+            );
+        }
+    }
+
+    private function assertRunnerExtensionsAreLoaded(ServerListenerOptionsInterface $options): void
+    {
+        $isSwoole = $options->isRunnerMode(RunnerMode::Swoole);
+
+        if ($isSwoole && !extension_loaded('swoole')) {
+            throw new RuntimeException('The Swoole extension is required to use the Swoole runner.');
+        }
+
+        if (!$isSwoole && (!extension_loaded('pcntl') || !extension_loaded('posix'))) {
+            throw new RuntimeException(
+                'The pcntl and posix extensions are required to fork and manage child processes (Linux only).',
             );
         }
     }

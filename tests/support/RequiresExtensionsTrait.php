@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap;
 
 use function extension_loaded;
+use function implode;
 use function sprintf;
 
 /**
@@ -34,6 +35,20 @@ trait RequiresExtensionsTrait
     protected function requirePosix(): void
     {
         $this->requireExtension('posix');
+    }
+
+    protected function requireMissingExtension(string ...$extensions): void
+    {
+        foreach ($extensions as $extension) {
+            if (!extension_loaded($extension)) {
+                return;
+            }
+        }
+
+        self::markTestSkipped(sprintf(
+            'This test requires one of these extensions to be missing: %s.',
+            implode(', ', $extensions),
+        ));
     }
 
     private function requireExtension(string $extension): void
