@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Metrics\Rollup;
 
-use FreeDSx\Ldap\Server\Process\ChannelMessageFactory;
-use FreeDSx\Ldap\Server\Process\ChildChannel;
+use FreeDSx\Ldap\Server\Process\Channel\ChannelMessageFactory;
+use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 
 /**
  * Moves child operation metrics to the parent over a ChildChannel.

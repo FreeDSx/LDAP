@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Process;
+namespace FreeDSx\Ldap\Server\Process\Channel;
 
 /**
  * Reconstructs a ChannelMessage from its wire form on the receiving end of a ChildChannel.

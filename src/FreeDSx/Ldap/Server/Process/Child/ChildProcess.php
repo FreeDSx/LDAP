@@ -11,9 +11,12 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Process;
+namespace FreeDSx\Ldap\Server\Process\Child;
 
+use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use FreeDSx\Socket\Socket;
+
+use function posix_kill;
 
 readonly class ChildProcess
 {
@@ -41,6 +44,14 @@ readonly class ChildProcess
     public function closeSocket(): void
     {
         $this->socket->close();
+    }
+
+    public function signal(int $signal): void
+    {
+        posix_kill(
+            $this->pid,
+            $signal,
+        );
     }
 
     /**

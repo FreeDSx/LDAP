@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Metrics\Rollup;
 
-use FreeDSx\Ldap\Server\Process\ChannelMessage;
+use FreeDSx\Ldap\Server\Process\Channel\ChannelMessage;
 
 /**
  * Carries a child process's metrics delta to the parent over a ChildChannel.
