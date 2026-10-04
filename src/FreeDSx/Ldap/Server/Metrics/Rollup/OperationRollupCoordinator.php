@@ -24,11 +24,16 @@ use FreeDSx\Ldap\Server\Process\ChildChannel;
 final class OperationRollupCoordinator
 {
     /**
-     * Batch sends by op count and elapsed time so a fast workload does not backpressure on the blocking channel.
+     * Batch sends by op count and elapsed time to keep the frame rate low.
      */
     private const FLUSH_OPS = 256;
 
     private const FLUSH_INTERVAL_SECONDS = 0.1;
+
+    /**
+     * How long an exiting child waits for a stalled parent to take its last frames.
+     */
+    private const FINISH_TIMEOUT_SECONDS = 1.0;
 
     private ?ChildChannel $boundChannel = null;
 
@@ -74,8 +79,13 @@ final class OperationRollupCoordinator
      */
     public function finish(): void
     {
-        $this->sendDelta();
-        $this->boundChannel?->closeWrite();
+        if ($this->boundChannel === null) {
+            return;
+        }
+
+        $this->boundChannel->send(new MetricsDeltaMessage($this->recorder->takeDelta()));
+        $this->boundChannel->drain(self::FINISH_TIMEOUT_SECONDS);
+        $this->boundChannel->closeWrite();
     }
 
     /**
@@ -101,7 +111,11 @@ final class OperationRollupCoordinator
 
     private function sendDelta(): void
     {
-        $this->boundChannel?->send(new MetricsDeltaMessage($this->recorder->takeDelta()));
+        if ($this->boundChannel === null || !$this->boundChannel->flush()) {
+            return;
+        }
+
+        $this->boundChannel->send(new MetricsDeltaMessage($this->recorder->takeDelta()));
         $this->opsSinceSend = 0;
         $this->lastSendAt = microtime(true);
     }

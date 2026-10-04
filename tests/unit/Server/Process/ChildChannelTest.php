@@ -89,6 +89,52 @@ final class ChildChannelTest extends TestCase
         );
     }
 
+    public function test_sending_to_a_full_channel_returns_rather_than_blocking(): void
+    {
+        $sends = 0;
+        while ($this->subject->send(new FakeChannelMessage(['fill' => str_repeat('x', 1024)]))) {
+            $sends++;
+        }
+
+        self::assertFalse($this->subject->flush());
+        self::assertGreaterThan(
+            0,
+            $sends,
+        );
+    }
+
+    public function test_a_frame_written_in_parts_arrives_whole_once_the_parent_reads(): void
+    {
+        $payload = str_repeat('y', 256 * 1024);
+        $received = [];
+
+        $this->subject->send(new FakeChannelMessage(['big' => $payload]));
+        while ($received === []) {
+            $received = $this->subject->receive();
+            $this->subject->flush();
+        }
+
+        self::assertSame(
+            ['big' => $payload],
+            $received[0]->toArray(),
+        );
+    }
+
+    public function test_draining_a_channel_nobody_reads_gives_up_at_its_timeout(): void
+    {
+        while ($this->subject->send(new FakeChannelMessage(['fill' => str_repeat('x', 1024)]))) {
+        }
+        $startedAt = microtime(true);
+
+        $drained = $this->subject->drain(0.2);
+
+        self::assertFalse($drained);
+        self::assertLessThan(
+            1.0,
+            microtime(true) - $startedAt,
+        );
+    }
+
     public function test_remaining_messages_are_drained_after_the_write_end_closes(): void
     {
         $this->subject->send(new FakeChannelMessage(['final' => true]));
