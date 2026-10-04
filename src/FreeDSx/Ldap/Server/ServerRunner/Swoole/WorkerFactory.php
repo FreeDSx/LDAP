@@ -57,12 +57,14 @@ final readonly class WorkerFactory
         bool $withBackgroundTasks = true,
     ): Worker {
         return new Worker(
-            $this->serverProtocolFactory,
-            $this->options,
+            new WorkerConfiguration(
+                $this->options,
+                $this->serverProtocolFactory,
+                $this->protocolFactoryProvider,
+                $reloadState,
+            ),
             $this->socketServerFactory,
-            $this->protocolFactoryProvider,
             $connectionSlots,
-            $reloadState,
             $this->metricsRecorder,
             $withBackgroundTasks
                 ? $this->backgroundTasks
