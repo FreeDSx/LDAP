@@ -21,11 +21,13 @@ use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ReloadsConfigurationTrait;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
-use FreeDSx\Ldap\ServerOptions;
 use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
+use Swoole\Coroutine\Channel;
 use Swoole\Process;
 use Swoole\Runtime;
 
@@ -43,9 +45,16 @@ class Worker
     use ServerRunnerLoggerTrait;
     use ReloadsConfigurationTrait;
 
+    private const AWAIT_RELOAD_POLL_SECONDS = 1.0;
+
     private ?ConnectionAcceptor $acceptor = null;
 
     private bool $isShuttingDown = false;
+
+    /**
+     * @var ?Channel<bool>
+     */
+    private ?Channel $awaitingReload = null;
 
     /**
      * @param ?BackgroundTasksInterface $backgroundTasks Null for a worker that does not run them, since they must run once.
@@ -56,9 +65,10 @@ class Worker
         ServerListenerOptionsInterface $options,
         private readonly SocketServerFactory $socketServerFactory,
         Closure $protocolFactoryProvider,
+        private readonly ConnectionSlots $connectionSlots,
+        private readonly ReloadState $reloadState,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
-        private readonly ConnectionSlotsInterface $connectionSlots = new LocalConnectionSlots(),
         private readonly int $workerId = 0,
     ) {
         $this->serverProtocolFactory = $serverProtocolFactory;
@@ -74,29 +84,76 @@ class Worker
         $context = ['worker_id' => $this->workerId];
 
         Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
-        $this->adoptCurrentConfiguration($context);
+        $isAdopted = $this->adoptCurrentConfiguration($context);
         $this->claimWorkerMetrics();
         $this->connectionSlots->claimWorker($this->workerId);
+
+        Coroutine\run(function () use ($isAdopted, $context): void {
+            $this->registerShutdownSignals($context);
+
+            if ($isAdopted || $this->awaitReload()) {
+                $this->serve();
+            }
+        });
+
+        $this->logShutdownCompleted($context);
+    }
+
+    /**
+     * Nothing yields between publishing the acceptor and accepting, so a shutdown signal always finds it listening.
+     */
+    private function serve(): void
+    {
+        if ($this->isShuttingDown) {
+            return;
+        }
 
         $acceptor = new ConnectionAcceptor(
             $this->serverProtocolFactory,
             $this->options,
             $this->socketServerFactory->isTlsHandshakeDeferred(),
+            $this->connectionSlots,
             $this->metricsRecorder,
             $this->backgroundTasks,
-            $this->connectionSlots,
         );
-        $this->acceptor = $acceptor;
 
         // The socket must be bound inside the coroutine for Swoole to hook stream_socket_accept() as yielding.
-        Coroutine\run(function () use ($acceptor, $context): void {
-            $server = $this->socketServerFactory->makeAndBind();
-            $this->registerShutdownSignals($context);
-            $this->backgroundTasks?->start();
-            $acceptor->accept($server);
-        });
+        $server = $this->socketServerFactory->makeAndBind();
+        $this->backgroundTasks?->start();
+        $this->acceptor = $acceptor;
+        $acceptor->accept($server);
+    }
 
-        $this->logShutdownCompleted($context);
+    /**
+     * Waits unbound, so the pool sends this worker no connections, until a reload succeeds or a shutdown ends the wait.
+     */
+    private function awaitReload(): bool
+    {
+        $this->awaitingReload = new Channel(1);
+
+        // A bounded pop keeps a timer pending, so Swoole never mistakes the wait for a deadlock.
+        while (!$this->isShuttingDown) {
+            if ($this->awaitingReload->pop(self::AWAIT_RELOAD_POLL_SECONDS) === true) {
+                $this->awaitingReload = null;
+
+                return true;
+            }
+        }
+        $this->awaitingReload = null;
+
+        return false;
+    }
+
+    private function resumeAwaitingReload(bool $isAdopted): void
+    {
+        $channel = $this->awaitingReload;
+        if ($channel === null) {
+            return;
+        }
+
+        Coroutine::create(static function () use ($channel, $isAdopted): void {
+            $channel->push($isAdopted);
+        });
     }
 
     /**
@@ -112,17 +169,23 @@ class Worker
     }
 
     /**
-     * Keeps a worker respawned after a crash on the configuration its siblings already reloaded.
+     * The startup options are current only until a reload, after which a starting worker must adopt one to serve.
      *
      * @param array<string, scalar> $context
+     * @return bool whether the worker may serve
      */
-    private function adoptCurrentConfiguration(array $context): void
+    private function adoptCurrentConfiguration(array $context): bool
     {
-        if (!$this->options instanceof ServerOptions || $this->options->getConfigReloader() === null) {
-            return;
+        if (!$this->reloadState->hasReloaded() || $this->reloadConfiguration($context)) {
+            return true;
         }
 
-        $this->reloadConfiguration($context);
+        $this->getRunnerLogger()?->error(
+            'The reloaded configuration could not be adopted on start; accepting no connections until a reload succeeds.',
+            $context,
+        );
+
+        return false;
     }
 
     private function getRunnerLogger(): ?LoggerInterface
@@ -166,11 +229,13 @@ class Worker
             return null;
         }
 
+        $this->reloadState->markReloaded();
         $this->metricsRecorder->serverReloaded(time());
         $this->acceptor?->useConfiguration(
             $this->options,
             $this->serverProtocolFactory,
         );
+        $this->resumeAwaitingReload(true);
 
         return null;
     }
@@ -187,6 +252,7 @@ class Worker
         }
 
         $this->isShuttingDown = true;
+        $this->resumeAwaitingReload(false);
         $this->backgroundTasks?->stop();
         $this->logShutdownStarted($context + ['signal' => $signal]);
 

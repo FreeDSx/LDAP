@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
@@ -40,14 +42,17 @@ final readonly class WorkerFactory
         private Closure $protocolFactoryProvider,
         private MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private ?BackgroundTasksInterface $backgroundTasks = null,
-        private ConnectionSlotsInterface $connectionSlots = new LocalConnectionSlots(),
     ) {}
 
     /**
+     * @param ConnectionSlots $connectionSlots Shared by every worker of the server.
+     * @param ReloadState $reloadState Shared by every worker of the server.
      * @param int $workerId The pool's id for the worker; 0 for a single process.
      * @param bool $withBackgroundTasks Only one worker may run them, since they must run once per server.
      */
     public function make(
+        ConnectionSlots $connectionSlots,
+        ReloadState $reloadState,
         int $workerId = 0,
         bool $withBackgroundTasks = true,
     ): Worker {
@@ -56,11 +61,12 @@ final readonly class WorkerFactory
             $this->options,
             $this->socketServerFactory,
             $this->protocolFactoryProvider,
+            $connectionSlots,
+            $reloadState,
             $this->metricsRecorder,
             $withBackgroundTasks
                 ? $this->backgroundTasks
                 : null,
-            $this->connectionSlots,
             $workerId,
         );
     }

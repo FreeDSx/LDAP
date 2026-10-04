@@ -148,7 +148,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
             && extension_loaded('posix');
     }
 
-    private function bindsUser(LdapClient $client): bool
+    protected function bindsUser(LdapClient $client): bool
     {
         try {
             $client->sendAndReceive(Operations::bind(

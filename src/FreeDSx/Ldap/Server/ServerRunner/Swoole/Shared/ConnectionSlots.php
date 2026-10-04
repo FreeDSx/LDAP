@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
+namespace FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use Swoole\Atomic\Long;
@@ -19,13 +19,13 @@ use Swoole\Atomic\Long;
 use function sprintf;
 
 /**
- * Connection slots counted in shared memory.
+ * Connection slots counted in shared memory, against the server's connection limit.
  *
  * @internal
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SharedConnectionSlots implements ConnectionSlotsInterface
+class ConnectionSlots
 {
     private readonly Long $total;
 
@@ -38,7 +38,10 @@ class SharedConnectionSlots implements ConnectionSlotsInterface
 
     private int $workerId = 0;
 
-    public function __construct(int $workers)
+    /**
+     * Must be built before a pool forks, so every worker shares the same counters.
+     */
+    public function __construct(int $workers = 1)
     {
         $this->total = new Long();
 
@@ -50,14 +53,17 @@ class SharedConnectionSlots implements ConnectionSlotsInterface
     }
 
     /**
+     * Takes a slot unless the limit is already reached; a limit of zero or less is no limit.
+     *
      * Adds first and backs out when over.
      */
     public function tryAcquire(int $maxConnections): bool
     {
         $held = $this->heldByThisWorker();
         $held->add(1);
+        $total = $this->total->add(1);
 
-        if ($maxConnections <= 0 || $this->total->add(1) <= $maxConnections) {
+        if ($maxConnections <= 0 || $total <= $maxConnections) {
             return true;
         }
 
