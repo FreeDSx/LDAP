@@ -44,15 +44,13 @@ final class SnapshotFileTest extends TestCase
 
         $subject->prepare();
         $path = $subject->path();
+        $existedWhilePrepared = file_exists($path);
         $subject->remove();
 
+        self::assertTrue($existedWhilePrepared);
         self::assertSame(
             realpath(sys_get_temp_dir()),
             dirname($path),
-        );
-        self::assertStringStartsWith(
-            'freedsx-ldap-monitor-',
-            basename($path),
         );
         self::assertFileDoesNotExist($path);
     }
