@@ -70,6 +70,7 @@ class ConnectionAcceptor
         private readonly bool $isTlsHandshakeDeferred,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
+        private readonly ConnectionSlotsInterface $connectionSlots = new LocalConnectionSlots(),
     ) {
         $this->waitGroup = new WaitGroup();
     }
@@ -99,7 +100,7 @@ class ConnectionAcceptor
                 continue;
             }
 
-            if ($this->isOverConnectionLimit()) {
+            if (!$this->acquireConnectionSlot()) {
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);
                 $socket->close();
                 continue;
@@ -142,16 +143,15 @@ class ConnectionAcceptor
         return $this->options->getLogger();
     }
 
-    private function isOverConnectionLimit(): bool
+    private function acquireConnectionSlot(): bool
     {
         $maxConnections = $this->options->getNetworkConfig()->getMaxConnections();
-        if ($maxConnections <= 0 || count($this->activeSockets) < $maxConnections) {
-            return false;
+        if ($this->connectionSlots->tryAcquire($maxConnections)) {
+            return true;
         }
-
         $this->logConnectionLimitReached(['max_connections' => $maxConnections]);
 
-        return true;
+        return false;
     }
 
     private function handleInCoroutine(Socket $socket): void
@@ -170,6 +170,7 @@ class ConnectionAcceptor
                 unset($this->activeSockets[$socketId]);
                 unset($this->activeHandlers[$socketId]);
 
+                $this->connectionSlots->release();
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Closed);
                 $this->waitGroup->done();
             }

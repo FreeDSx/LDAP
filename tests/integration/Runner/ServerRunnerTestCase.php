@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -90,6 +93,27 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
     }
 
+    public function testTheConnectionLimitHoldsAcrossTheWholeServer(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--max-connections=2'],
+        );
+
+        $bound = [];
+        for ($i = 0; $i < 6; $i++) {
+            $client = $this->buildClient('tcp');
+            if ($this->bindsUser($client)) {
+                $bound[] = $client;
+            }
+        }
+
+        self::assertCount(
+            2,
+            $bound,
+        );
+    }
+
     /**
      * Appends the runner selection to every server this suite starts, including the per-test ones.
      *
@@ -122,5 +146,19 @@ abstract class ServerRunnerTestCase extends ServerTestCase
     {
         return extension_loaded('pcntl')
             && extension_loaded('posix');
+    }
+
+    private function bindsUser(LdapClient $client): bool
+    {
+        try {
+            $client->sendAndReceive(Operations::bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ));
+        } catch (ConnectionException) {
+            return false;
+        }
+
+        return true;
     }
 }

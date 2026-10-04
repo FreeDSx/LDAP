@@ -35,8 +35,10 @@ use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\LocalConnectionSlots;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\SharedConnectionSlots;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
@@ -99,6 +101,9 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 protocolFactoryProvider: $protocolFactoryProvider,
                 metricsRecorder: $metricsRecorder,
                 backgroundTasks: $container->get(BackgroundTasksInterface::class),
+                connectionSlots: $workers > 1
+                    ? new SharedConnectionSlots($workers)
+                    : new LocalConnectionSlots(),
             );
 
             return $workers > 1

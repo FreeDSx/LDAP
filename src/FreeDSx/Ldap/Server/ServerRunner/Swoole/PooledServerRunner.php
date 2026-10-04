@@ -77,8 +77,11 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
         $this->resettable->reset();
 
         $this->workerFactory
-            ->make($workerId === self::OWNER_WORKER_ID)
-            ->run(['worker_id' => $workerId]);
+            ->make(
+                $workerId,
+                $workerId === self::OWNER_WORKER_ID,
+            )
+            ->run();
 
         return null;
     }
