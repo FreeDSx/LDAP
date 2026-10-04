@@ -13,18 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
-use Closure;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\WorkerScopedMetricsInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
-use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\Server\ServerRunner\ReloadsConfigurationTrait;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
-use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\Server\SocketServerFactory;
-use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
@@ -43,7 +38,6 @@ use Swoole\Runtime;
 class Worker
 {
     use ServerRunnerLoggerTrait;
-    use ReloadsConfigurationTrait;
 
     private const AWAIT_RELOAD_POLL_SECONDS = 1.0;
 
@@ -61,20 +55,13 @@ class Worker
      * @param int $workerId The pool's id for this worker. 0 for a single process.
      */
     public function __construct(
-        ServerProtocolFactoryInterface $serverProtocolFactory,
-        ServerListenerOptionsInterface $options,
+        private readonly WorkerConfiguration $configuration,
         private readonly SocketServerFactory $socketServerFactory,
-        Closure $protocolFactoryProvider,
         private readonly ConnectionSlots $connectionSlots,
-        private readonly ReloadState $reloadState,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
         private readonly int $workerId = 0,
-    ) {
-        $this->serverProtocolFactory = $serverProtocolFactory;
-        $this->options = $options;
-        $this->protocolFactoryProvider = $protocolFactoryProvider;
-    }
+    ) {}
 
     /**
      * Serves connections until a shutdown signal, then drains what is still in flight.
@@ -84,7 +71,7 @@ class Worker
         $context = ['worker_id' => $this->workerId];
 
         Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
-        $isAdopted = $this->adoptCurrentConfiguration($context);
+        $isAdopted = $this->configuration->adoptOnStart($context);
         $this->claimWorkerMetrics();
         $this->connectionSlots->claimWorker($this->workerId);
 
@@ -109,8 +96,8 @@ class Worker
         }
 
         $acceptor = new ConnectionAcceptor(
-            $this->serverProtocolFactory,
-            $this->options,
+            $this->configuration->protocolFactory(),
+            $this->configuration->options(),
             $this->socketServerFactory->isTlsHandshakeDeferred(),
             $this->connectionSlots,
             $this->metricsRecorder,
@@ -168,29 +155,9 @@ class Worker
         $this->metricsRecorder->beginWorker($this->workerId);
     }
 
-    /**
-     * The startup options are current only until a reload, after which a starting worker must adopt one to serve.
-     *
-     * @param array<string, scalar> $context
-     * @return bool whether the worker may serve
-     */
-    private function adoptCurrentConfiguration(array $context): bool
-    {
-        if (!$this->reloadState->hasReloaded() || $this->reloadConfiguration($context)) {
-            return true;
-        }
-
-        $this->getRunnerLogger()?->error(
-            'The reloaded configuration could not be adopted on start; accepting no connections until a reload succeeds.',
-            $context,
-        );
-
-        return false;
-    }
-
     private function getRunnerLogger(): ?LoggerInterface
     {
-        return $this->options->getLogger();
+        return $this->configuration->options()->getLogger();
     }
 
     /**
@@ -225,15 +192,14 @@ class Worker
         int $signal,
         array $context,
     ): null {
-        if (!$this->reloadConfiguration($context + ['signal' => $signal])) {
+        if (!$this->configuration->reload($context + ['signal' => $signal])) {
             return null;
         }
 
-        $this->reloadState->markReloaded();
         $this->metricsRecorder->serverReloaded(time());
         $this->acceptor?->useConfiguration(
-            $this->options,
-            $this->serverProtocolFactory,
+            $this->configuration->options(),
+            $this->configuration->protocolFactory(),
         );
         $this->resumeAwaitingReload(true);
 
