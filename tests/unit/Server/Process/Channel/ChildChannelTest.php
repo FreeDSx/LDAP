@@ -135,6 +135,25 @@ final class ChildChannelTest extends TestCase
         );
     }
 
+    public function test_a_channel_whose_reader_is_gone_gives_up_at_once_rather_than_at_its_timeout(): void
+    {
+        $this->subject->childKeepWrite();
+        $startedAt = microtime(true);
+
+        $sent = $this->subject->send(new FakeChannelMessage(['seq' => 1]));
+        $nothingPending = $this->subject->drain(1.0);
+
+        self::assertSame(
+            [false, true],
+            [$sent, $nothingPending],
+        );
+        self::assertLessThan(
+            0.5,
+            microtime(true) - $startedAt,
+        );
+        self::assertFalse($this->subject->send(new FakeChannelMessage(['seq' => 2])));
+    }
+
     public function test_remaining_messages_are_drained_after_the_write_end_closes(): void
     {
         $this->subject->send(new FakeChannelMessage(['final' => true]));

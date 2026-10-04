@@ -149,12 +149,18 @@ final class ChildChannel
     public function flush(): bool
     {
         while ($this->writeBuffer !== '' && is_resource($this->writeEnd)) {
-            $written = fwrite(
+            $written = @fwrite(
                 $this->writeEnd,
                 $this->writeBuffer,
             );
 
-            if ($written === false || $written === 0) {
+            // a failed write means the reader is gone and nothing will arrive.
+            if ($written === 0) {
+                return false;
+            }
+            if ($written === false) {
+                $this->abandonWrites();
+
                 return false;
             }
 
@@ -270,6 +276,12 @@ final class ChildChannel
 
             $this->readBuffer .= $chunk;
         }
+    }
+
+    private function abandonWrites(): void
+    {
+        $this->writeBuffer = '';
+        $this->closeWrite();
     }
 
     private function awaitWritable(float $seconds): void
