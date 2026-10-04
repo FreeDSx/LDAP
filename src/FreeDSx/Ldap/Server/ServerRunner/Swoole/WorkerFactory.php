@@ -34,12 +34,14 @@ final readonly class WorkerFactory
 {
     /**
      * @param Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface $protocolFactoryProvider
+     * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
      */
     public function __construct(
         private ServerProtocolFactoryInterface $serverProtocolFactory,
         private ServerListenerOptionsInterface $options,
         private SocketServerFactory $socketServerFactory,
         private Closure $protocolFactoryProvider,
+        private Closure $applyReload,
         private MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private ?BackgroundTasksInterface $backgroundTasks = null,
     ) {}
@@ -61,6 +63,7 @@ final readonly class WorkerFactory
                 $this->options,
                 $this->serverProtocolFactory,
                 $this->protocolFactoryProvider,
+                $this->applyReload,
                 $reloadState,
             ),
             $this->socketServerFactory,

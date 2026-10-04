@@ -28,11 +28,13 @@ class WorkerConfiguration
 {
     /**
      * @param Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface $protocolFactoryProvider
+     * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
      */
     public function __construct(
         private ServerListenerOptionsInterface $options,
         private ServerProtocolFactoryInterface $protocolFactory,
         private readonly Closure $protocolFactoryProvider,
+        private readonly Closure $applyReload,
         private readonly ReloadState $reloadState,
     ) {}
 
@@ -98,6 +100,7 @@ class WorkerConfiguration
 
         $this->options = $result->options;
         $this->protocolFactory = $result->protocolFactory;
+        ($this->applyReload)($this->options);
 
         return true;
     }

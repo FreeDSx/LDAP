@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
  * Server-type-specific pieces the shared listener provider cannot derive itself: a per-fork resettable and the live
@@ -39,4 +40,9 @@ interface ListenerContributorInterface
      * @return array<class-string, object>
      */
     public function reloadInstances(): array;
+
+    /**
+     * Applies the parts of a reloaded configuration that connections already open must follow too.
+     */
+    public function applyReload(ServerListenerOptionsInterface $reloaded): void;
 }

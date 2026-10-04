@@ -104,6 +104,19 @@ readonly class SessionEndPolicy
     }
 
     /**
+     * Ends the session because the server can no longer serve it.
+     *
+     * @throws EncoderException
+     */
+    public function unavailable(): void
+    {
+        $this->disconnectSender->send(
+            'The server is unavailable.',
+            ResultCode::UNAVAILABLE,
+        );
+    }
+
+    /**
      * @throws EncoderException
      */
     private function disconnect(

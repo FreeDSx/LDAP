@@ -225,8 +225,7 @@ master cannot forward signals:
 kill -HUP -$(ps -o pgid= -p "$MASTER_PID" | tr -d ' ')
 ```
 
-Each worker adopts the new configuration for subsequent connections while in-flight ones finish under the old one, so
-nothing is dropped. A worker that dies is respawned by the pool.
+Each worker adopts the new configuration in place, so nothing is dropped. A worker that dies is respawned by the pool.
 
 ## Network Configuration
 

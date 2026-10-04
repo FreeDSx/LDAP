@@ -76,6 +76,17 @@ readonly class ServerProtocolHandler
     }
 
     /**
+     * Used asynchronously to end a client session the server can no longer serve.
+     *
+     * @throws EncoderException
+     */
+    public function endAsUnavailable(): void
+    {
+        $this->sessionEndPolicy->unavailable();
+        $this->queue->close();
+    }
+
+    /**
      * Reads and dispatches messages until the session ends, reporting whatever about the close is worth counting.
      *
      * @throws EncoderException

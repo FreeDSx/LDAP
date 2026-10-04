@@ -13,16 +13,26 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Server\Configuration;
 
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\ServerOptions;
 use RuntimeException;
 
 /**
- * Reloads from a flag file: anonymous bind is enabled when it contains "allow-anonymous", and "invalid" fails the reload.
+ * Reloads from a flag file: "allow-anonymous" enables anonymous bind, "deny-sn" withholds sn, and "invalid" fails.
+ *
+ * "deny-sn-parent-only" withholds sn in the process that built the reloader and fails in any process forked from it.
  */
 final readonly class FileFlagConfigReloader implements ConfigReloaderInterface
 {
-    public function __construct(private string $flagFile) {}
+    private int $ownerPid;
+
+    public function __construct(private string $flagFile)
+    {
+        $this->ownerPid = (int) getmypid();
+    }
 
     public function reload(ServerOptions $current): ServerOptions
     {
@@ -30,12 +40,23 @@ final readonly class FileFlagConfigReloader implements ConfigReloaderInterface
             ? trim((string) file_get_contents($this->flagFile))
             : '';
 
-        if ($flag === 'invalid') {
+        if ($flag === 'invalid' || ($flag === 'deny-sn-parent-only' && getmypid() !== $this->ownerPid)) {
             throw new RuntimeException('The configuration flag file is invalid.');
         }
 
         fwrite(STDOUT, 'configuration reloaded...' . PHP_EOL);
+        $reloaded = (clone $current)->setAllowAnonymous($flag === 'allow-anonymous');
 
-        return (clone $current)->setAllowAnonymous($flag === 'allow-anonymous');
+        if ($flag !== 'deny-sn' && $flag !== 'deny-sn-parent-only') {
+            return $reloaded;
+        }
+
+        return $reloaded->setAclRules($current->getAclRules()->prependAttributeRules(
+            AttributeRule::deny(
+                Subject::anyone(),
+                new AnyTargetMatcher(),
+                'sn',
+            )->forRead(),
+        ));
     }
 }

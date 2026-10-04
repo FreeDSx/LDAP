@@ -87,6 +87,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
         $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
+        $applyReload = $container->get(ListenerContributorInterface::class)->applyReload(...);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
@@ -97,6 +98,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 options: $options,
                 socketServerFactory: $container->get(SocketServerFactory::class),
                 protocolFactoryProvider: $protocolFactoryProvider,
+                applyReload: $applyReload,
                 metricsRecorder: $metricsRecorder,
                 backgroundTasks: $container->get(BackgroundTasksInterface::class),
             );
@@ -115,6 +117,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             options: $options,
             socketServerFactory: $container->get(SocketServerFactory::class),
             protocolFactoryProvider: $protocolFactoryProvider,
+            applyReload: $applyReload,
             metricsRecorder: $metricsRecorder,
             snapshotPublisher: $this->makeSnapshotPublisher($container),
             operationRollup: $this->makeOperationRollup($container),

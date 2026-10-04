@@ -94,6 +94,14 @@ final class ServerRunnerSwoolePooledTest extends ServerRunnerTestCase
         }
     }
 
+    protected function reloadServer(): void
+    {
+        $this->signalEachWorker(
+            SIGHUP,
+            'Server configuration reloaded',
+        );
+    }
+
     protected static function runnerArgs(): array
     {
         return [

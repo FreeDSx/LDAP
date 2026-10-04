@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
@@ -91,6 +92,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     private array $defaultContext = [];
 
     /**
+     * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
      * @throws RuntimeException
      */
     public function __construct(
@@ -98,6 +100,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         ServerListenerOptionsInterface $options,
         private readonly SocketServerFactory $socketServerFactory,
         Closure $protocolFactoryProvider,
+        private readonly Closure $applyReload,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?SnapshotPublisher $snapshotPublisher = null,
         private readonly ?OperationRollupCoordinator $operationRollup = null,
@@ -382,13 +385,13 @@ class PcntlServerRunner implements ServerRunnerInterface
                     $channel,
                 );
             } else {
-                // We are in the parent; the PID is the child process.
-                $this->unblockSignals();
+                // We are in the parent; the PID is the child process. It is tracked before signals are unblocked, so
                 $this->runAfterChildStarted(
                     $pid,
                     $socket,
                     $channel,
                 );
+                $this->unblockSignals();
             }
             // Use the shutdown flag, not the socket state (not reliable after forking)
         } while (!$this->isShuttingDown);
@@ -428,11 +431,56 @@ class PcntlServerRunner implements ServerRunnerInterface
                 },
             );
         }
-        // Children don't reload config; ignore SIGHUP so terminal hangups don't kill them.
+        // Children ignore SIGHUP so terminal hangups don't kill them; the parent asks them to reload with SIGUSR1.
         pcntl_signal(
             SIGHUP,
             SIG_IGN,
         );
+        pcntl_signal(
+            SIGUSR1,
+            fn() => $this->reloadInChild(
+                $protocolHandler,
+                array_merge(
+                    $context,
+                    ['signal' => SIGUSR1],
+                ),
+            ),
+        );
+    }
+
+    /**
+     * The parent already reloaded, so a child that cannot follow ends its session rather than keep the old policy.
+     *
+     * @param array<string, scalar> $context
+     */
+    private function reloadInChild(
+        ServerProtocolHandler $protocolHandler,
+        array $context,
+    ): void {
+        if ($this->isShuttingDown) {
+            return;
+        }
+
+        $reloaded = (new ReloadCoordinator())->reloadOptions(
+            $this->options,
+            $context,
+        );
+        if ($reloaded !== null) {
+            ($this->applyReload)($reloaded);
+            $this->logInfo(
+                'The child process applied the reloaded configuration.',
+                $context,
+            );
+
+            return;
+        }
+
+        $this->isShuttingDown = true;
+        try {
+            $protocolHandler->endAsUnavailable();
+        } catch (Throwable $e) {
+            $this->logShutdownNotifyError($e, $context);
+        }
     }
 
     private function isOwnerProcess(): bool
@@ -464,6 +512,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         return [
             ...$this->handledSignals,
             SIGHUP,
+            SIGUSR1,
         ];
     }
 
@@ -491,6 +540,8 @@ class PcntlServerRunner implements ServerRunnerInterface
                     return;
                 }
 
+                ($this->applyReload)($this->options);
+                $this->signalChildProcessesToReload();
                 $this->metricsRecorder->serverReloaded(time());
                 $this->publishMetricsSnapshot();
             },
@@ -543,6 +594,16 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->server->close();
         $this->snapshotPublisher?->remove();
         $this->logShutdownCompleted($this->defaultContext);
+    }
+
+    private function signalChildProcessesToReload(): void
+    {
+        foreach ($this->childProcesses as $childProcess) {
+            posix_kill(
+                $childProcess->getPid(),
+                SIGUSR1,
+            );
+        }
     }
 
     /**

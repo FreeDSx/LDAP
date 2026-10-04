@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\ReloadableAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -153,6 +154,11 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             AclRuleNames::class => static fn(Container $c): AclRuleNames => new AclRuleNames(
                 $c->get(ServerOptions::class)->getSchema(),
             ),
+            ReloadableAccessControl::class => static fn(Container $c): ReloadableAccessControl => new ReloadableAccessControl(
+                new RuleBasedAccessControl($c->get(AclRuleNames::class)->canonicalize(
+                    $c->get(ServerOptions::class)->getAclRules(),
+                )),
+            ),
             AccessControlInterface::class => $this->makeAccessControl(...),
             BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
@@ -231,16 +237,13 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
      */
     private function makeAccessControl(Container $container): AccessControlInterface
     {
-        $options = $container->get(ServerOptions::class);
-        $configured = new RuleBasedAccessControl(
-            $container->get(AclRuleNames::class)->canonicalize($options->getAclRules()),
-        );
+        $configured = $container->get(ReloadableAccessControl::class);
 
         $acl = new PrivilegedBypassAccessControl(new ConfidentialAttributeAccessControl(
             $configured,
             new WithheldAttributePolicy(
                 $configured,
-                $options->getSchema(),
+                $container->get(ServerOptions::class)->getSchema(),
             ),
         ));
 
@@ -650,10 +653,15 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $instances[ChangeJournalInterface::class] = $journal;
         }
 
+        $accessControl = $container->get(ReloadableAccessControl::class);
+        $instances[ReloadableAccessControl::class] = $accessControl;
+
         return new DirectoryListenerContributor(
             $resettable,
             $instances,
             $container->get(ServerOptions::class)->getStorageConfig(),
+            $accessControl,
+            $container->get(AclRuleNames::class),
         );
     }
 
