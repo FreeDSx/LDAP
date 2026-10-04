@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use Swoole\Process;
 use Swoole\Process\Pool;
 
@@ -36,6 +38,10 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
      */
     private const OWNER_WORKER_ID = 0;
 
+    private readonly ConnectionSlots $connectionSlots;
+
+    private readonly ReloadState $reloadState;
+
     /**
      * @param ResettableInterface $resettable Dropped in each worker, so none keeps a connection made before the fork.
      */
@@ -51,6 +57,9 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
         if ($this->workers < 2) {
             throw new RuntimeException('A worker pool needs more than one worker.');
         }
+
+        $this->connectionSlots = new ConnectionSlots($this->workers);
+        $this->reloadState = new ReloadState();
     }
 
     public function run(): void
@@ -78,6 +87,8 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
 
         $this->workerFactory
             ->make(
+                $this->connectionSlots,
+                $this->reloadState,
                 $workerId,
                 $workerId === self::OWNER_WORKER_ID,
             )

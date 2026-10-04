@@ -191,19 +191,18 @@ class ServerTestCase extends LdapTestCase
 
     protected function sendServerSignal(int $signal): void
     {
+        posix_kill(
+            $this->serverPid(),
+            $signal,
+        );
+    }
+
+    protected function serverPid(): int
+    {
         $process = $this->overrideProcess ?? self::$sharedProcess
             ?? throw new RuntimeException('No server process is running.');
 
-        $pid = $process->getPid();
-
-        if ($pid === null) {
-            throw new RuntimeException('The server process has no PID.');
-        }
-
-        posix_kill(
-            $pid,
-            $signal,
-        );
+        return $process->getPid() ?? throw new RuntimeException('The server process has no PID.');
     }
 
     protected function isServerRunning(): bool

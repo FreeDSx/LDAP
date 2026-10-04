@@ -15,9 +15,10 @@ namespace Tests\Support\FreeDSx\Ldap\Server\Configuration;
 
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\ServerOptions;
+use RuntimeException;
 
 /**
- * Reloads from a flag file: anonymous bind is enabled when the file contains "allow-anonymous".
+ * Reloads from a flag file: anonymous bind is enabled when it contains "allow-anonymous", and "invalid" fails the reload.
  */
 final readonly class FileFlagConfigReloader implements ConfigReloaderInterface
 {
@@ -25,11 +26,16 @@ final readonly class FileFlagConfigReloader implements ConfigReloaderInterface
 
     public function reload(ServerOptions $current): ServerOptions
     {
-        $enabled = is_file($this->flagFile)
-            && trim((string) file_get_contents($this->flagFile)) === 'allow-anonymous';
+        $flag = is_file($this->flagFile)
+            ? trim((string) file_get_contents($this->flagFile))
+            : '';
+
+        if ($flag === 'invalid') {
+            throw new RuntimeException('The configuration flag file is invalid.');
+        }
 
         fwrite(STDOUT, 'configuration reloaded...' . PHP_EOL);
 
-        return (clone $current)->setAllowAnonymous($enabled);
+        return (clone $current)->setAllowAnonymous($flag === 'allow-anonymous');
     }
 }

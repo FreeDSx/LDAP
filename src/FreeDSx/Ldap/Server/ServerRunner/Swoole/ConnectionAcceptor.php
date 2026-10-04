@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
@@ -68,9 +69,9 @@ class ConnectionAcceptor
         private ServerProtocolFactoryInterface $serverProtocolFactory,
         private ServerListenerOptionsInterface $options,
         private readonly bool $isTlsHandshakeDeferred,
+        private readonly ConnectionSlots $connectionSlots,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
-        private readonly ConnectionSlotsInterface $connectionSlots = new LocalConnectionSlots(),
     ) {
         $this->waitGroup = new WaitGroup();
     }

@@ -11,24 +11,33 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole;
+namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\ServerRunner\Swoole\SharedConnectionSlots;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
-final class SharedConnectionSlotsTest extends TestCase
+final class ConnectionSlotsTest extends TestCase
 {
     use RequiresExtensionsTrait;
 
-    private SharedConnectionSlots $subject;
+    private ConnectionSlots $subject;
 
     protected function setUp(): void
     {
         $this->requireSwoole();
 
-        $this->subject = new SharedConnectionSlots(2);
+        $this->subject = new ConnectionSlots(2);
+    }
+
+    public function test_slots_taken_without_a_limit_count_once_one_is_set(): void
+    {
+        $this->subject->claimWorker(0);
+        $this->subject->tryAcquire(0);
+        $this->subject->tryAcquire(0);
+
+        self::assertFalse($this->subject->tryAcquire(2));
     }
 
     public function test_the_limit_counts_the_slots_every_worker_holds(): void
