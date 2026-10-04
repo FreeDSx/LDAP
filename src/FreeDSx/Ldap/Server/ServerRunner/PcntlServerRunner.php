@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
-use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
@@ -26,14 +25,12 @@ use FreeDSx\Ldap\Server\Process\Child\ChildExitCode;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcesses;
 use FreeDSx\Ldap\Server\Process\Child\ReapedChild;
-use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\ChildReporter;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
-use Closure;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Throwable;
@@ -46,7 +43,6 @@ use Throwable;
 class PcntlServerRunner implements ServerRunnerInterface
 {
     use ServerRunnerLoggerTrait;
-    use ReloadsConfigurationTrait;
 
     private SocketServer $server;
 
@@ -73,15 +69,9 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private array $defaultContext = [];
 
-    /**
-     * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
-     */
     public function __construct(
-        ServerProtocolFactoryInterface $serverProtocolFactory,
-        ServerListenerOptionsInterface $options,
+        private readonly RunnerConfiguration $configuration,
         private readonly SocketServerFactory $socketServerFactory,
-        Closure $protocolFactoryProvider,
-        private readonly Closure $applyReload,
         private readonly MetricsRelay $metrics = new MetricsRelay(),
         private readonly ResettableInterface $resettable = new NonResettable(),
         BackgroundTasksInterface $backgroundTasks = new PcntlBackgroundTasks(
@@ -89,9 +79,6 @@ class PcntlServerRunner implements ServerRunnerInterface
             longLivedTasks: [],
         ),
     ) {
-        $this->serverProtocolFactory = $serverProtocolFactory;
-        $this->options = $options;
-        $this->protocolFactoryProvider = $protocolFactoryProvider;
         $this->childProcesses = new ChildProcesses();
 
         // We need to be able to handle signals as they come in, regardless of what is going on...
@@ -134,7 +121,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     private function isConnectionLimitReached(): bool
     {
-        $maxConnections = $this->options
+        $maxConnections = $this->options()
             ->getNetworkConfig()
             ->getMaxConnections();
 
@@ -183,12 +170,12 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->installServerSignalHandlers();
         $this->logServerStarted($this->defaultContext);
         $this->metrics->serverStarted();
-        $this->options->getOnServerReady()?->__invoke();
+        $this->options()->getOnServerReady()?->__invoke();
         $this->backgroundTasks->start();
 
         do {
             $this->backgroundTasks->tick();
-            $socket = $this->server->accept($this->options->getNetworkConfig()->getSocketAcceptTimeout());
+            $socket = $this->server->accept($this->options()->getNetworkConfig()->getSocketAcceptTimeout());
 
             if ($this->isShuttingDown) {
                 if ($socket) {
@@ -318,12 +305,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             return;
         }
 
-        $reloaded = (new ReloadCoordinator())->reloadOptions(
-            $this->options,
-            $context,
-        );
-        if ($reloaded !== null) {
-            ($this->applyReload)($reloaded);
+        if ($this->configuration->follow($context)) {
             $this->logInfo(
                 'The child process applied the reloaded configuration.',
                 $context,
@@ -393,11 +375,10 @@ class PcntlServerRunner implements ServerRunnerInterface
                     return;
                 }
 
-                if (!$this->reloadConfiguration($this->defaultContext)) {
+                if (!$this->configuration->reload($this->defaultContext)) {
                     return;
                 }
 
-                ($this->applyReload)($this->options);
                 $this->signalChildProcessesToReload();
                 $this->metrics->serverReloaded();
             },
@@ -433,7 +414,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $waitTime = 0;
         while (!$this->childProcesses->isEmpty()) {
             // If we reach the shutdown timeout, attempt to force end them and then stop.
-            if ($waitTime >= $this->options->getNetworkConfig()->getShutdownTimeout()) {
+            if ($waitTime >= $this->options()->getNetworkConfig()->getShutdownTimeout()) {
                 $this->forceEndChildProcesses();
 
                 break;
@@ -514,7 +495,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             exit(0);
         }
 
-        $serverProtocolHandler = $this->serverProtocolFactory->make(
+        $serverProtocolHandler = $this->configuration->protocolFactory()->make(
             $socket,
             new ConnectionContext(pid: $pid),
         );
@@ -646,7 +627,12 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     private function getRunnerLogger(): ?LoggerInterface
     {
-        return $this->options->getLogger();
+        return $this->options()->getLogger();
+    }
+
+    private function options(): ServerListenerOptionsInterface
+    {
+        return $this->configuration->options();
     }
 
     /**
@@ -656,7 +642,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         string $message,
         array $context = [],
     ): void {
-        $this->options->getLogger()?->log(
+        $this->options()->getLogger()?->log(
             LogLevel::INFO,
             $message,
             $context,
@@ -671,7 +657,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         string $message,
         array $context = [],
     ): never {
-        $this->options->getLogger()?->log(LogLevel::ERROR, $message, $context);
+        $this->options()->getLogger()?->log(LogLevel::ERROR, $message, $context);
 
         throw new RuntimeException($message);
     }

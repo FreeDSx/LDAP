@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerConfiguration;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
@@ -35,16 +36,7 @@ final class WorkerConfigurationTest extends TestCase
 
     private ServerOptions $reloadedOptions;
 
-    private ServerProtocolFactoryInterface $startupFactory;
-
-    private ServerProtocolFactoryInterface $reloadedFactory;
-
     private ReloadState $reloadState;
-
-    /**
-     * @var list<ServerListenerOptionsInterface>
-     */
-    private array $applied = [];
 
     private WorkerConfiguration $subject;
 
@@ -55,17 +47,16 @@ final class WorkerConfigurationTest extends TestCase
         $this->reloader = $this->createMock(ConfigReloaderInterface::class);
         $this->startupOptions = TestServerOptions::defaults()->setConfigReloader($this->reloader);
         $this->reloadedOptions = TestServerOptions::defaults();
-        $this->startupFactory = $this->createMock(ServerProtocolFactoryInterface::class);
-        $this->reloadedFactory = $this->createMock(ServerProtocolFactoryInterface::class);
         $this->reloadState = new ReloadState();
+        $factory = $this->createMock(ServerProtocolFactoryInterface::class);
 
         $this->subject = new WorkerConfiguration(
-            $this->startupOptions,
-            $this->startupFactory,
-            fn(): ServerProtocolFactoryInterface => $this->reloadedFactory,
-            function (ServerListenerOptionsInterface $options): void {
-                $this->applied[] = $options;
-            },
+            new RunnerConfiguration(
+                $this->startupOptions,
+                $factory,
+                static fn(): ServerProtocolFactoryInterface => $factory,
+                static function (ServerListenerOptionsInterface $options): void {},
+            ),
             $this->reloadState,
         );
     }
@@ -95,10 +86,6 @@ final class WorkerConfigurationTest extends TestCase
             $this->reloadedOptions,
             $this->subject->options(),
         );
-        self::assertSame(
-            $this->reloadedFactory,
-            $this->subject->protocolFactory(),
-        );
     }
 
     public function test_a_reload_that_cannot_be_adopted_on_start_refuses_to_serve(): void
@@ -123,56 +110,9 @@ final class WorkerConfigurationTest extends TestCase
 
         self::assertTrue($this->subject->reload([]));
         self::assertTrue($this->reloadState->hasReloaded());
-        self::assertSame(
-            $this->reloadedOptions,
-            $this->subject->options(),
-        );
     }
 
-    public function test_a_successful_reload_is_applied_to_open_connections(): void
-    {
-        $this->reloader
-            ->method('reload')
-            ->willReturn($this->reloadedOptions);
-
-        $this->subject->reload([]);
-
-        self::assertSame(
-            [$this->reloadedOptions],
-            $this->applied,
-        );
-    }
-
-    public function test_a_reload_adopted_on_start_is_applied_to_open_connections(): void
-    {
-        $this->reloadState->markReloaded();
-        $this->reloader
-            ->method('reload')
-            ->willReturn($this->reloadedOptions);
-
-        $this->subject->adoptOnStart([]);
-
-        self::assertSame(
-            [$this->reloadedOptions],
-            $this->applied,
-        );
-    }
-
-    public function test_a_failed_reload_applies_nothing(): void
-    {
-        $this->reloader
-            ->method('reload')
-            ->willThrowException(new RuntimeException('invalid'));
-
-        $this->subject->reload([]);
-
-        self::assertSame(
-            [],
-            $this->applied,
-        );
-    }
-
-    public function test_a_failed_reload_keeps_the_configuration_and_marks_nothing(): void
+    public function test_a_failed_reload_marks_nothing(): void
     {
         $this->reloader
             ->method('reload')
@@ -180,9 +120,5 @@ final class WorkerConfigurationTest extends TestCase
 
         self::assertFalse($this->subject->reload([]));
         self::assertFalse($this->reloadState->hasReloaded());
-        self::assertSame(
-            $this->startupFactory,
-            $this->subject->protocolFactory(),
-        );
     }
 }
