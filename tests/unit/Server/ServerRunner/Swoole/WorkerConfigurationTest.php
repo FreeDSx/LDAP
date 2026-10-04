@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerConfiguration;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -40,6 +41,11 @@ final class WorkerConfigurationTest extends TestCase
 
     private ReloadState $reloadState;
 
+    /**
+     * @var list<ServerListenerOptionsInterface>
+     */
+    private array $applied = [];
+
     private WorkerConfiguration $subject;
 
     protected function setUp(): void
@@ -57,6 +63,9 @@ final class WorkerConfigurationTest extends TestCase
             $this->startupOptions,
             $this->startupFactory,
             fn(): ServerProtocolFactoryInterface => $this->reloadedFactory,
+            function (ServerListenerOptionsInterface $options): void {
+                $this->applied[] = $options;
+            },
             $this->reloadState,
         );
     }
@@ -117,6 +126,49 @@ final class WorkerConfigurationTest extends TestCase
         self::assertSame(
             $this->reloadedOptions,
             $this->subject->options(),
+        );
+    }
+
+    public function test_a_successful_reload_is_applied_to_open_connections(): void
+    {
+        $this->reloader
+            ->method('reload')
+            ->willReturn($this->reloadedOptions);
+
+        $this->subject->reload([]);
+
+        self::assertSame(
+            [$this->reloadedOptions],
+            $this->applied,
+        );
+    }
+
+    public function test_a_reload_adopted_on_start_is_applied_to_open_connections(): void
+    {
+        $this->reloadState->markReloaded();
+        $this->reloader
+            ->method('reload')
+            ->willReturn($this->reloadedOptions);
+
+        $this->subject->adoptOnStart([]);
+
+        self::assertSame(
+            [$this->reloadedOptions],
+            $this->applied,
+        );
+    }
+
+    public function test_a_failed_reload_applies_nothing(): void
+    {
+        $this->reloader
+            ->method('reload')
+            ->willThrowException(new RuntimeException('invalid'));
+
+        $this->subject->reload([]);
+
+        self::assertSame(
+            [],
+            $this->applied,
         );
     }
 

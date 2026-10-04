@@ -199,8 +199,9 @@ $server->run();
 ## Reloading Configuration on SIGHUP
 
 A running server can reload its configuration on a `SIGHUP` signal without dropping connections. New connections
-accepted after the reload use the updated configuration. Connections already in flight keep the configuration they
-started with. This works on both the PCNTL and Swoole runners.
+accepted after the reload use the updated configuration. Connections already open switch to the reloaded access control
+rules immediately, so a revoked grant stops working everywhere. Every other setting applies only to new connections.
+This works on both the PCNTL and Swoole runners.
 
 By default `SIGHUP` is a logged no-op. To opt in, register a reloader via `ServerOptions::setConfigReloader()`. The
 reloader is invoked on each `SIGHUP` and returns the `ServerOptions` the server should adopt going forward:

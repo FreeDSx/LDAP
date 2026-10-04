@@ -39,6 +39,7 @@ final class ServerRunnerTest extends TestCase
             options: TestServerOptions::defaults(),
             socketServerFactory: $this->createMock(SocketServerFactory::class),
             protocolFactoryProvider: static fn(ServerListenerOptionsInterface $options) => $factory,
+            applyReload: static function (ServerListenerOptionsInterface $options): void {},
         );
     }
 

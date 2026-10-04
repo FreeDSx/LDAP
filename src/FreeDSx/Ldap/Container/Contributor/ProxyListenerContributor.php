@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
  * A proxy serves no local directory, so it has nothing to reset per fork and carries nothing across a reload.
@@ -40,4 +41,6 @@ final class ProxyListenerContributor implements ListenerContributorInterface
     {
         return [];
     }
+
+    public function applyReload(ServerListenerOptionsInterface $reloaded): void {}
 }

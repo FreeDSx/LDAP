@@ -13,8 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Container\Contributor;
 
+use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
+use FreeDSx\Ldap\Server\AccessControl\ReloadableAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * A directory server's contribution: whatever it holds open is dropped per fork and carried across a reload.
@@ -31,6 +36,8 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
         private ResettableInterface $resettable,
         private array $reloadInstances,
         private StorageConfigInterface $storageConfig,
+        private ReloadableAccessControl $accessControl,
+        private AclRuleNames $aclRuleNames,
     ) {}
 
     public function forkResettable(): ResettableInterface
@@ -46,5 +53,16 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
     public function reloadInstances(): array
     {
         return $this->reloadInstances;
+    }
+
+    public function applyReload(ServerListenerOptionsInterface $reloaded): void
+    {
+        if (!$reloaded instanceof ServerOptions) {
+            return;
+        }
+
+        $this->accessControl->replace(new RuleBasedAccessControl(
+            $this->aclRuleNames->canonicalize($reloaded->getAclRules()),
+        ));
     }
 }

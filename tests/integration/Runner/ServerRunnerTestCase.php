@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
@@ -20,6 +21,7 @@ use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
@@ -114,6 +116,76 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         );
     }
 
+    public function testAReloadedAccessPolicyReachesASessionAlreadyOpen(): void
+    {
+        $this->requirePosix();
+        $flagFile = $this->makeFlagFile();
+        $this->createServerProcess(
+            'tcp',
+            ['--log', '--reload-flag-file=' . $flagFile],
+        );
+        $session = $this->buildClient('tcp');
+        $session->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        try {
+            $before = $session->read('cn=user,dc=foo,dc=bar');
+            file_put_contents(
+                $flagFile,
+                'deny-sn',
+            );
+            $this->reloadServer();
+            $after = $session->read('cn=user,dc=foo,dc=bar');
+
+            self::assertTrue($before?->has('sn'));
+            self::assertFalse($after?->has('sn'));
+        } finally {
+            @unlink($flagFile);
+        }
+    }
+
+    public function testAPagedSearchContinuesUnderTheReloadedAccessPolicy(): void
+    {
+        $this->requirePosix();
+        $flagFile = $this->makeFlagFile();
+        $this->createServerProcess(
+            'tcp',
+            ['--log', '--reload-flag-file=' . $flagFile, '--entries=10'],
+        );
+        $session = $this->buildClient('tcp');
+        $session->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $paging = $session->paging(
+            Operations::search(Filters::startsWith('cn', 'entry-'))->base('dc=foo,dc=bar'),
+            5,
+        );
+
+        try {
+            $before = $paging->getEntries()->toArray();
+            file_put_contents(
+                $flagFile,
+                'deny-sn',
+            );
+            $this->reloadServer();
+            $after = $paging->getEntries()->toArray();
+
+            self::assertSame(
+                [5, 5],
+                [count($before), count($this->withSn($before))],
+            );
+            self::assertSame(
+                [5, 0],
+                [count($after), count($this->withSn($after))],
+            );
+        } finally {
+            @unlink($flagFile);
+        }
+    }
+
     /**
      * Appends the runner selection to every server this suite starts, including the per-test ones.
      *
@@ -127,6 +199,23 @@ abstract class ServerRunnerTestCase extends ServerTestCase
             $transport,
             [...$extraArgs, ...static::runnerArgs()],
         );
+    }
+
+    protected function reloadServer(): void
+    {
+        $this->sendServerSignal(SIGHUP);
+        $this->waitForServerOutput('Server configuration reloaded');
+    }
+
+    protected function makeFlagFile(): string
+    {
+        $flagFile = sys_get_temp_dir() . '/freedsx_runner_reload_' . uniqid('', true);
+        file_put_contents(
+            $flagFile,
+            '',
+        );
+
+        return $flagFile;
     }
 
     /**
@@ -160,5 +249,17 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         return true;
+    }
+
+    /**
+     * @param Entry[] $entries
+     * @return Entry[]
+     */
+    private function withSn(array $entries): array
+    {
+        return array_filter(
+            $entries,
+            static fn(Entry $entry): bool => $entry->has('sn'),
+        );
     }
 }

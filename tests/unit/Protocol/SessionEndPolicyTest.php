@@ -155,6 +155,16 @@ final class SessionEndPolicyTest extends TestCase
         );
     }
 
+    public function test_a_session_the_server_can_no_longer_serve_is_ended_as_unavailable_without_its_reason(): void
+    {
+        $this->subject->unavailable();
+
+        self::assertSame(
+            [ResultCode::UNAVAILABLE, 'The server is unavailable.'],
+            [$this->resultCodeOfOnlyNotice(), $this->diagnosticOfOnlyNotice()],
+        );
+    }
+
     public function test_it_answers_every_other_disconnect_as_a_protocol_error(): void
     {
         $this->subject->end(new RequestSizeExceededException('too big'));
