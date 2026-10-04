@@ -26,6 +26,8 @@ class SyncRequest extends SearchRequest
 
     private ?Closure $refreshDoneHandler = null;
 
+    private ?Closure $refreshRequiredHandler = null;
+
     /**
      * A replica wants a faithful copy, so both attribute classes are requested unless told otherwise.
      */
@@ -73,5 +75,17 @@ class SyncRequest extends SearchRequest
     public function getRefreshDoneHandler(): ?Closure
     {
         return $this->refreshDoneHandler;
+    }
+
+    public function useRefreshRequiredHandler(?Closure $refreshRequiredHandler): self
+    {
+        $this->refreshRequiredHandler = $refreshRequiredHandler;
+
+        return $this;
+    }
+
+    public function getRefreshRequiredHandler(): ?Closure
+    {
+        return $this->refreshRequiredHandler;
     }
 }

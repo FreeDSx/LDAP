@@ -403,6 +403,135 @@ final class ClientSyncHandlerTest extends TestCase
         self::assertTrue($capturedSession->hasRefreshDeletes());
     }
 
+    public function test_the_refresh_required_handler_fires_before_the_reissued_sync_is_processed(): void
+    {
+        $events = [];
+        $messageTo = new LdapMessageRequest(
+            1,
+            (new SyncRequest())
+                ->useRefreshRequiredHandler(function (?string $cookie) use (&$events): void {
+                    $events[] = 'refresh-required:' . var_export($cookie, true);
+                })
+                ->useEntryHandler(function (SyncEntryResult $result) use (&$events): void {
+                    $events[] = 'entry:' . $result->getEntry()->getDn()->toString();
+                }),
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->method('generateId')
+            ->willReturn(2);
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->willReturnSelf();
+        $this->mockQueue
+            ->expects($this->exactly(3))
+            ->method('getMessage')
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED),
+                    new SyncDoneControl(
+                        null,
+                        true,
+                    ),
+                ),
+                new LdapMessageResponse(
+                    2,
+                    new SearchResultEntry(new Entry('cn=bar')),
+                    new SyncStateControl(
+                        SyncStateControl::STATE_ADD,
+                        'bar',
+                    ),
+                ),
+                new LdapMessageResponse(
+                    2,
+                    new SearchResultDone(0),
+                    new SyncDoneControl(),
+                ),
+            );
+
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+                new SyncStateControl(
+                    SyncStateControl::STATE_ADD,
+                    'foo',
+                ),
+            ),
+        );
+
+        self::assertSame(
+            [
+                'entry:cn=foo',
+                'refresh-required:NULL',
+                'entry:cn=bar',
+            ],
+            $events,
+        );
+    }
+
+    public function test_the_refresh_required_handler_receives_the_retry_cookie_before_the_cookie_handler(): void
+    {
+        $events = [];
+        $messageTo = new LdapMessageRequest(
+            1,
+            (new SyncRequest())
+                ->useCookieHandler(function (?string $cookie) use (&$events): void {
+                    $events[] = 'cookie:' . $cookie;
+                })
+                ->useRefreshRequiredHandler(function (?string $cookie) use (&$events): void {
+                    $events[] = 'refresh-required:' . $cookie;
+                }),
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->method('generateId')
+            ->willReturn(2);
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnSelf();
+        $this->mockQueue
+            ->expects($this->exactly(2))
+            ->method('getMessage')
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED),
+                    new SyncDoneControl('retry'),
+                ),
+                new LdapMessageResponse(
+                    2,
+                    new SearchResultDone(0),
+                    new SyncDoneControl(),
+                ),
+            );
+
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+                new SyncStateControl(
+                    SyncStateControl::STATE_ADD,
+                    'foo',
+                ),
+            ),
+        );
+
+        self::assertSame(
+            [
+                'refresh-required:retry',
+                'cookie:retry',
+            ],
+            $events,
+        );
+    }
+
     public function test_a_refresh_present_in_progress_sets_phase_present_and_refresh_is_not_complete(): void
     {
         $capturedSession = null;

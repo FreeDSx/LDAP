@@ -52,6 +52,8 @@ final class LdapReplicaTest extends TestCase
 
     private Closure $refreshDoneHandler;
 
+    private Closure $refreshRequiredHandler;
+
     private Closure $cookieHandler;
 
     private Closure $idSetHandler;
@@ -63,6 +65,7 @@ final class LdapReplicaTest extends TestCase
         $noop = static function (): void {};
         $this->shutdown = $noop;
         $this->refreshDoneHandler = $noop;
+        $this->refreshRequiredHandler = $noop;
         $this->cookieHandler = $noop;
         $this->idSetHandler = $noop;
 
@@ -100,12 +103,89 @@ final class LdapReplicaTest extends TestCase
 
                 return $this->syncRepl;
             });
+        $this->syncRepl->method('useRefreshRequiredHandler')
+            ->willReturnCallback(function (Closure $handler): SyncRepl {
+                $this->refreshRequiredHandler = $handler;
+
+                return $this->syncRepl;
+            });
 
         $this->connectionFactory = $this->createMock(PrimaryConnectionFactory::class);
         $this->connectionFactory->method('connectSyncRepl')
             ->willReturn($this->syncRepl);
 
         $this->subject = $this->replica();
+    }
+
+    public function test_a_refresh_the_primary_requires_again_holds_its_cookie_until_it_is_reconciled(): void
+    {
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $checkpointsAtReconcile = [];
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-1');
+                ($this->refreshDoneHandler)($session);
+                ($this->refreshRequiredHandler)(null);
+                ($this->cookieHandler)('cookie-2');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->expects(self::exactly(2))
+            ->method('beginRefresh');
+        $this->applier->method('reconcile')
+            ->willReturnCallback(function () use (&$checkpointsAtReconcile): void {
+                $checkpointsAtReconcile[] = $this->checkpoint->read();
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            [null, 'cookie-1'],
+            $checkpointsAtReconcile,
+        );
+        self::assertSame(
+            'cookie-2',
+            $this->checkpoint->read(),
+        );
+    }
+
+    public function test_a_failed_reconcile_of_a_required_refresh_keeps_the_previous_checkpoint(): void
+    {
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $reconciles = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-1');
+                ($this->refreshDoneHandler)($session);
+                ($this->refreshRequiredHandler)(null);
+                ($this->cookieHandler)('cookie-2');
+                ($this->refreshDoneHandler)($session);
+            });
+        $this->applier->method('reconcile')
+            ->willReturnCallback(function () use (&$reconciles): void {
+                if (++$reconciles === 2) {
+                    throw new RuntimeException('reconcile failed');
+                }
+            });
+        $this->sleeper->method('sleep')
+            ->willReturnCallback(function (): void {
+                ($this->shutdown)();
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            'cookie-1',
+            $this->checkpoint->read(),
+        );
     }
 
     public function test_held_back_moves_are_settled_before_a_persist_checkpoint(): void
