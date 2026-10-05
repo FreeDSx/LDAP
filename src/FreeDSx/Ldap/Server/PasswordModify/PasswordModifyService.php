@@ -63,6 +63,16 @@ final readonly class PasswordModifyService
             $request,
             $token,
         );
+        $isSelf = $found !== null && $this->isSelf(
+            $token,
+            $found->getDn(),
+        );
+
+        // Checked first, so a session that must change its own password learns nothing about other entries.
+        $this->assertSelfChangeWhenMustChange(
+            $token,
+            $isSelf,
+        );
 
         // Authorized ahead of reporting the absence, so a missing entry cannot be told from a forbidden one.
         $this->authorizeRequest(
@@ -83,6 +93,7 @@ final readonly class PasswordModifyService
         $this->verifyOldPassword(
             $request,
             $entry,
+            $isSelf,
         );
 
         $newPassword = $request->getNewPassword();
@@ -93,14 +104,6 @@ final readonly class PasswordModifyService
             $newPassword = $generated;
         }
 
-        $isSelf = $this->isSelf(
-            $token,
-            $targetDn,
-        );
-        $this->assertSelfChangeWhenMustChange(
-            $token,
-            $isSelf,
-        );
         $hashed = $this->hashService->hash($newPassword);
         $deltas = $this->changeGuard?->enforce(new PasswordModifyAttempt(
             target: $entry,
@@ -189,11 +192,19 @@ final readonly class PasswordModifyService
     private function verifyOldPassword(
         PasswordModifyRequest $request,
         Entry $entry,
+        bool $isSelf,
     ): void {
         $oldPassword = $request->getOldPassword();
 
         if ($oldPassword === null) {
             return;
+        }
+
+        if (!$isSelf) {
+            throw new OperationException(
+                'The old password can only be verified for your own entry.',
+                ResultCode::UNWILLING_TO_PERFORM,
+            );
         }
 
         foreach ($entry->get('userPassword')?->getValues() ?? [] as $stored) {

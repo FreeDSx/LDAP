@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -213,6 +214,63 @@ final class PasswordModifyServiceTest extends TestCase
                 'newpass',
             ),
             $this->userToken,
+            new ControlBag(),
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function anotherUsersOldPassword(): array
+    {
+        return [
+            'the right password' => ['12345'],
+            'a wrong password' => ['guess'],
+        ];
+    }
+
+    #[DataProvider('anotherUsersOldPassword')]
+    public function test_another_users_old_password_is_refused_whatever_its_value(string $oldPassword): void
+    {
+        $this->resolver
+            ->method('resolve')
+            ->willReturn($this->userEntry);
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                self::USER_DN,
+                $oldPassword,
+                'newpass',
+            ),
+            BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
+            new ControlBag(),
+        );
+    }
+
+    public function test_must_change_identity_is_refused_before_the_target_is_authorized_or_reported_missing(): void
+    {
+        $this->resolver
+            ->method('resolve')
+            ->willReturn(null);
+        $this->accessControl
+            ->expects(self::never())
+            ->method('authorizeOperation');
+        $token = BindToken::fromDn('cn=other,dc=foo,dc=bar');
+        $token->markMustChangePassword();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                'cn=ghost,dc=foo,dc=bar',
+                'guess',
+                'newpass',
+            ),
+            $token,
             new ControlBag(),
         );
     }
