@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\OperationAuditor;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -86,7 +87,7 @@ final class OperationAuditorTest extends TestCase
         $record = $this->onlyRecord();
         self::assertSame(
             $expectedEvent,
-            $record['message'],
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             self::MESSAGE_ID,
@@ -124,7 +125,7 @@ final class OperationAuditorTest extends TestCase
                     new Dn(self::TARGET_DN),
                     new Attribute('cn', 'Bob'),
                 )),
-                'entry.added',
+                ServerEvent::EntryAdded->value,
                 'add',
                 [EventContext::DN => self::TARGET_DN],
             ],
@@ -133,13 +134,13 @@ final class OperationAuditorTest extends TestCase
                     self::TARGET_DN,
                     Change::replace('cn', 'Bob'),
                 ),
-                'entry.modified',
+                ServerEvent::EntryModified->value,
                 'modify',
                 [EventContext::DN => self::TARGET_DN],
             ],
             'delete' => [
                 new DeleteRequest(self::TARGET_DN),
-                'entry.deleted',
+                ServerEvent::EntryDeleted->value,
                 'delete',
                 [EventContext::DN => self::TARGET_DN],
             ],
@@ -149,7 +150,7 @@ final class OperationAuditorTest extends TestCase
                     'cn=Robert',
                     true,
                 ),
-                'entry.renamed',
+                ServerEvent::EntryRenamed->value,
                 'modify_dn',
                 [
                     EventContext::DN => self::TARGET_DN,
@@ -198,8 +199,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'compare.completed',
-            $record['message'],
+            ServerEvent::CompareCompleted->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertTrue($record['context'][EventContext::MATCH]);
         self::assertSame(
@@ -223,8 +224,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'search.authorized',
-            $record['message'],
+            ServerEvent::SearchAuthorized->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             42,
@@ -254,8 +255,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'authz.denied.read',
-            $record['message'],
+            ServerEvent::AuthorizationDeniedRead->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
@@ -281,8 +282,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'authz.denied.read',
-            $record['message'],
+            ServerEvent::AuthorizationDeniedRead->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             [
@@ -303,8 +304,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'password_modify.success',
-            $record['message'],
+            ServerEvent::PasswordModifySuccess->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             [EventContext::DN => self::TARGET_DN],
@@ -326,8 +327,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'password_modify.failed',
-            $record['message'],
+            ServerEvent::PasswordModifyFailed->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             [EventContext::DN => self::TARGET_DN],
@@ -391,8 +392,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'authz.denied.write',
-            $record['message'],
+            ServerEvent::AuthorizationDeniedWrite->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             self::MESSAGE_ID,
@@ -431,8 +432,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'control.critical.rejected',
-            $record['message'],
+            ServerEvent::CriticalControlRejected->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             ['1.2.3.4'],
@@ -529,8 +530,8 @@ final class OperationAuditorTest extends TestCase
 
         $record = $this->onlyRecord();
         self::assertSame(
-            'schema.violation',
-            $record['message'],
+            ServerEvent::SchemaViolation->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             $expectedMode,

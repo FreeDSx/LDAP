@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\OperationAuditor;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\FailedOperationResult;
@@ -72,8 +73,8 @@ final class OperationAuditMiddlewareTest extends TestCase
         );
 
         self::assertSame(
-            'entry.added',
-            $this->logger->records[0]['message'],
+            ServerEvent::EntryAdded->value,
+            $this->logger->records[0]['context']['event'],
         );
     }
 
@@ -113,7 +114,7 @@ final class OperationAuditMiddlewareTest extends TestCase
             ),
         );
 
-        self::assertTrue($this->wasLogged('authz.denied.write'));
+        self::assertTrue($this->wasLogged(ServerEvent::AuthorizationDeniedWrite));
     }
 
     public function test_it_audits_a_search_authorization_denial(): void
@@ -128,7 +129,7 @@ final class OperationAuditMiddlewareTest extends TestCase
             ),
         );
 
-        self::assertTrue($this->wasLogged('authz.denied.read'));
+        self::assertTrue($this->wasLogged(ServerEvent::AuthorizationDeniedRead));
     }
 
     public function test_it_audits_a_critical_control_rejection(): void
@@ -141,7 +142,7 @@ final class OperationAuditMiddlewareTest extends TestCase
             ),
         );
 
-        self::assertTrue($this->wasLogged('control.critical.rejected'));
+        self::assertTrue($this->wasLogged(ServerEvent::CriticalControlRejected));
     }
 
     public function test_it_records_schema_violations_from_a_schema_rule_exception(): void
@@ -164,7 +165,7 @@ final class OperationAuditMiddlewareTest extends TestCase
 
         $this->auditFailure($this->context, $exception);
 
-        self::assertTrue($this->wasLogged('schema.violation'));
+        self::assertTrue($this->wasLogged(ServerEvent::SchemaViolation));
     }
 
     public function test_it_lets_an_exception_from_the_next_handler_propagate(): void
@@ -195,10 +196,10 @@ final class OperationAuditMiddlewareTest extends TestCase
         );
     }
 
-    private function wasLogged(string $event): bool
+    private function wasLogged(ServerEvent $event): bool
     {
         foreach ($this->logger->records as $record) {
-            if ($record['message'] === $event) {
+            if (($record['context']['event'] ?? null) === $event->value) {
                 return true;
             }
         }

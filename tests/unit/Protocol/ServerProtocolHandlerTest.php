@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
@@ -225,7 +226,7 @@ final class ServerProtocolHandlerTest extends TestCase
             ConnectionObservation::RequestSizeExceeded,
             $closeReason,
         );
-        $record = $this->findRecord($recordingLogger, 'session.disconnect_notice');
+        $record = $this->findRecord($recordingLogger, ServerEvent::NoticeOfDisconnectSent);
         self::assertSame(
             RequestSizeExceededException::class,
             $record['context']['exception_class'],
@@ -286,7 +287,7 @@ final class ServerProtocolHandlerTest extends TestCase
             ConnectionObservation::WriteTimeout,
             $closeReason,
         );
-        $record = $this->findRecord($recordingLogger, 'session.write_timeout');
+        $record = $this->findRecord($recordingLogger, ServerEvent::WriteTimeout);
         self::assertSame(
             'The write operation timed out after 600 seconds.',
             $record['context']['reason_message'],
@@ -315,7 +316,7 @@ final class ServerProtocolHandlerTest extends TestCase
             ConnectionObservation::IdleTimeout,
             $closeReason,
         );
-        $record = $this->findRecord($recordingLogger, 'session.idle_timeout');
+        $record = $this->findRecord($recordingLogger, ServerEvent::IdleTimeout);
         self::assertSame(
             'The connection was idle for longer than the read timeout of 600 seconds.',
             $record['context'][EventContext::REASON_MESSAGE],
@@ -323,8 +324,8 @@ final class ServerProtocolHandlerTest extends TestCase
 
         foreach ($recordingLogger->records as $logged) {
             self::assertNotSame(
-                'session.disconnect_notice',
-                $logged['message'],
+                ServerEvent::NoticeOfDisconnectSent->value,
+                $logged['context'][EventContext::EVENT] ?? null,
                 'An idle client must not be sent a Notice of Disconnection.',
             );
         }
@@ -362,7 +363,7 @@ final class ServerProtocolHandlerTest extends TestCase
             new EventLogger($recordingLogger, EventLogPolicy::default()),
         )->handle();
 
-        $record = $this->findRecord($recordingLogger, 'session.disconnect_notice');
+        $record = $this->findRecord($recordingLogger, ServerEvent::NoticeOfDisconnectSent);
         self::assertSame(
             RuntimeException::class,
             $record['context']['exception_class'],
@@ -390,7 +391,7 @@ final class ServerProtocolHandlerTest extends TestCase
             new EventLogger($recordingLogger, EventLogPolicy::default()->withExceptionTraces()),
         )->handle();
 
-        $record = $this->findRecord($recordingLogger, 'session.disconnect_notice');
+        $record = $this->findRecord($recordingLogger, ServerEvent::NoticeOfDisconnectSent);
         self::assertNotEmpty($record['context']['exception_trace']);
     }
 
@@ -406,7 +407,7 @@ final class ServerProtocolHandlerTest extends TestCase
             new EventLogger($recordingLogger, EventLogPolicy::default()),
         )->handle();
 
-        $record = $this->findRecord($recordingLogger, 'session.write_timeout');
+        $record = $this->findRecord($recordingLogger, ServerEvent::WriteTimeout);
         self::assertSame(
             'The write operation timed out after 600 seconds.',
             $record['context'][EventContext::REASON_MESSAGE],
@@ -414,8 +415,8 @@ final class ServerProtocolHandlerTest extends TestCase
 
         foreach ($recordingLogger->records as $logged) {
             self::assertNotSame(
-                'session.disconnect_notice',
-                $logged['message'],
+                ServerEvent::NoticeOfDisconnectSent->value,
+                $logged['context'][EventContext::EVENT] ?? null,
                 'A stalled reader must not be sent a Notice of Disconnection.',
             );
         }
@@ -480,14 +481,14 @@ final class ServerProtocolHandlerTest extends TestCase
      */
     private function findRecord(
         RecordingLogger $logger,
-        string $event,
+        ServerEvent $event,
     ): array {
         foreach ($logger->records as $record) {
-            if ($record['message'] === $event) {
+            if (($record['context'][EventContext::EVENT] ?? null) === $event->value) {
                 return $record;
             }
         }
 
-        self::fail(sprintf('No record found for event "%s".', $event));
+        self::fail(sprintf('No record found for event "%s".', $event->value));
     }
 }

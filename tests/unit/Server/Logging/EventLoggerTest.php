@@ -71,11 +71,11 @@ final class EventLoggerTest extends TestCase
             ->method('log')
             ->with(
                 LogLevel::INFO,
-                'bind.success',
+                ServerEvent::BindSuccess->messageTemplate(),
                 [
                     'pid' => 4242,
                     'username' => 'alice',
-                    'event' => 'bind.success',
+                    'event' => ServerEvent::BindSuccess->value,
                 ],
             );
 
@@ -168,7 +168,7 @@ final class EventLoggerTest extends TestCase
                 self::anything(),
                 self::callback(
                     static fn(array $context): bool => $context['pid'] === 999
-                        && $context['event'] === 'bind.success',
+                        && $context['event'] === ServerEvent::BindSuccess->value,
                 ),
             );
 
@@ -207,16 +207,16 @@ final class EventLoggerTest extends TestCase
                     $context,
                 );
 
-                if ($context['event'] === 'bind.anonymous') {
+                if ($context['event'] === ServerEvent::BindAnonymous->value) {
                     self::assertSame(
-                        ['pid' => 4242, 'version' => 3, 'event' => 'bind.anonymous'],
+                        ['pid' => 4242, 'version' => 3, 'event' => ServerEvent::BindAnonymous->value],
                         $context,
                     );
                     return;
                 }
 
                 self::assertSame(
-                    ['pid' => 4242, 'conn_id' => 7, 'username' => 'alice', 'event' => 'bind.success'],
+                    ['pid' => 4242, 'conn_id' => 7, 'username' => 'alice', 'event' => ServerEvent::BindSuccess->value],
                     $context,
                 );
             });
@@ -259,7 +259,7 @@ final class EventLoggerTest extends TestCase
             ->method('log')
             ->with(
                 LogLevel::NOTICE,
-                'bind.failure',
+                ServerEvent::BindFailure->messageTemplate(),
                 self::anything(),
             );
 

@@ -25,43 +25,43 @@ use Psr\Log\LogLevel;
  */
 enum ServerEvent: string
 {
-    case BindSuccess                    = 'bind.success';
-    case BindFailure                    = 'bind.failure';
-    case BindAnonymous                  = 'bind.anonymous';
-    case StartTlsSucceeded              = 'starttls.succeeded';
-    case StartTlsFailed                 = 'starttls.failed';
-    case StartTlsBufferDiscarded        = 'starttls.buffer_discarded';
-    case EntryAdded                     = 'entry.added';
-    case EntryModified                  = 'entry.modified';
-    case EntryDeleted                   = 'entry.deleted';
-    case EntryRenamed                   = 'entry.renamed';
-    case EntrySkipped                   = 'entry.skipped';
-    case BulkImportCompleted            = 'import.completed';
-    case BulkImportFailed               = 'import.failed';
-    case SearchAuthorized               = 'search.authorized';
-    case CompareCompleted               = 'compare.completed';
-    case PasswordModifySuccess          = 'password_modify.success';
-    case PasswordModifyFailed           = 'password_modify.failed';
-    case AuthorizationDeniedWrite       = 'authz.denied.write';
-    case AuthorizationDeniedRead        = 'authz.denied.read';
-    case ProxyAuthorizationDenied       = 'authz.denied.proxy';
-    case CriticalControlRejected        = 'control.critical.rejected';
-    case OperationRefused               = 'operation.refused';
-    case SchemaViolation                = 'schema.violation';
-    case SyncEntrySkipped               = 'sync.entry_skipped';
-    case PagingSessionEvicted           = 'paging.session_evicted';
-    case JournalPruned                  = 'journal.pruned';
-    case JournalPruneFailed             = 'journal.prune_failed';
-    case MessageDecodeFailed            = 'message.decode_failed';
-    case NoticeOfDisconnectSent         = 'session.disconnect_notice';
-    case WriteTimeout                   = 'session.write_timeout';
-    case IdleTimeout                    = 'session.idle_timeout';
-    case PasswordPolicyAccountLocked    = 'password_policy.account_locked';
-    case PasswordPolicyAccountUnlocked  = 'password_policy.account_unlocked';
-    case PasswordPolicyExpired          = 'password_policy.expired';
-    case PasswordPolicyMustChange       = 'password_policy.must_change';
-    case PasswordPolicyGraceLogin       = 'password_policy.grace_login';
-    case PasswordPolicyChangeRejected   = 'password_policy.change_rejected';
+    case BindSuccess                    = 'ldap.bind.success';
+    case BindFailure                    = 'ldap.bind.failure';
+    case BindAnonymous                  = 'ldap.bind.anonymous';
+    case StartTlsSucceeded              = 'ldap.starttls.succeeded';
+    case StartTlsFailed                 = 'ldap.starttls.failed';
+    case StartTlsBufferDiscarded        = 'ldap.starttls.buffer_discarded';
+    case EntryAdded                     = 'ldap.entry.added';
+    case EntryModified                  = 'ldap.entry.modified';
+    case EntryDeleted                   = 'ldap.entry.deleted';
+    case EntryRenamed                   = 'ldap.entry.renamed';
+    case SearchAuthorized               = 'ldap.search.authorized';
+    case CompareCompleted               = 'ldap.compare.completed';
+    case PasswordModifySuccess          = 'ldap.password_modify.success';
+    case PasswordModifyFailed           = 'ldap.password_modify.failed';
+    case AuthorizationDeniedWrite       = 'ldap.authz.denied.write';
+    case AuthorizationDeniedRead        = 'ldap.authz.denied.read';
+    case ProxyAuthorizationDenied       = 'ldap.authz.denied.proxy';
+    case CriticalControlRejected        = 'ldap.control.critical.rejected';
+    case OperationRefused               = 'ldap.operation.refused';
+    case SchemaViolation                = 'ldap.schema.violation';
+    case SyncEntrySkipped               = 'ldap.sync.entry_skipped';
+    case PagingSessionEvicted           = 'ldap.paging.session_evicted';
+    case MessageDecodeFailed            = 'ldap.message.decode_failed';
+    case NoticeOfDisconnectSent         = 'ldap.session.disconnect_notice';
+    case PasswordPolicyAccountLocked    = 'ldap.password_policy.account_locked';
+    case PasswordPolicyAccountUnlocked  = 'ldap.password_policy.account_unlocked';
+    case PasswordPolicyExpired          = 'ldap.password_policy.expired';
+    case PasswordPolicyMustChange       = 'ldap.password_policy.must_change';
+    case PasswordPolicyGraceLogin       = 'ldap.password_policy.grace_login';
+    case PasswordPolicyChangeRejected   = 'ldap.password_policy.change_rejected';
+    case EntrySkipped                   = 'storage.import.entry_skipped';
+    case BulkImportCompleted            = 'storage.import.completed';
+    case BulkImportFailed               = 'storage.import.failed';
+    case JournalPruned                  = 'storage.journal.pruned';
+    case JournalPruneFailed             = 'storage.journal.prune_failed';
+    case WriteTimeout                   = 'server.client.write_timeout';
+    case IdleTimeout                    = 'server.client.idle_timeout';
 
     public function level(): string
     {
@@ -91,9 +91,50 @@ enum ServerEvent: string
         };
     }
 
+    /**
+     * What happened. Meant for a person reading the log. The event's name is in the record's context.
+     */
     public function messageTemplate(): string
     {
-        return $this->value;
+        return match ($this) {
+            self::BindSuccess => 'A bind authenticated a user.',
+            self::BindFailure => 'A bind failed to authenticate.',
+            self::BindAnonymous => 'An anonymous bind was performed.',
+            self::StartTlsSucceeded => 'TLS was negotiated on the connection.',
+            self::StartTlsFailed => 'A StartTLS request was rejected.',
+            self::StartTlsBufferDiscarded => 'Plaintext sent behind a StartTLS request was discarded unread.',
+            self::EntryAdded => 'An entry was added.',
+            self::EntryModified => 'An entry was modified.',
+            self::EntryDeleted => 'An entry was deleted.',
+            self::EntryRenamed => 'An entry was renamed or moved.',
+            self::SearchAuthorized => 'A search completed after authorization.',
+            self::CompareCompleted => 'A compare completed.',
+            self::PasswordModifySuccess => 'A password was modified.',
+            self::PasswordModifyFailed => 'A password modify was rejected.',
+            self::AuthorizationDeniedWrite => 'Access control denied a write.',
+            self::AuthorizationDeniedRead => 'Access control denied a read.',
+            self::ProxyAuthorizationDenied => 'Proxied authorization was denied.',
+            self::CriticalControlRejected => 'A critical control the server does not support was rejected.',
+            self::OperationRefused => 'An operation was refused before it was processed.',
+            self::SchemaViolation => 'An add or modify violated the schema.',
+            self::SyncEntrySkipped => 'An entry was left out of a content synchronization.',
+            self::PagingSessionEvicted => 'The least recently started paged search was discarded to make room for another.',
+            self::MessageDecodeFailed => 'A message could not be decoded.',
+            self::NoticeOfDisconnectSent => 'A notice of disconnection was sent to the client.',
+            self::PasswordPolicyAccountLocked => 'An account was locked by the password policy.',
+            self::PasswordPolicyAccountUnlocked => 'A locked account was unlocked once its lockout expired.',
+            self::PasswordPolicyExpired => 'A bind was refused because the password has expired.',
+            self::PasswordPolicyMustChange => 'The password was reset and must be changed before anything else.',
+            self::PasswordPolicyGraceLogin => 'A bind used one of an expired password\'s grace logins.',
+            self::PasswordPolicyChangeRejected => 'A password change was rejected by the password policy.',
+            self::EntrySkipped => 'Seeding left an entry that already exists untouched.',
+            self::BulkImportCompleted => 'Seeding committed.',
+            self::BulkImportFailed => 'Seeding failed and was rolled back.',
+            self::JournalPruned => 'The change journal was pruned.',
+            self::JournalPruneFailed => 'Pruning the change journal failed.',
+            self::WriteTimeout => 'The connection was closed because the client stopped reading.',
+            self::IdleTimeout => 'The connection was closed after being idle too long.',
+        };
     }
 
     /**

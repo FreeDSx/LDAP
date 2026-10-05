@@ -106,7 +106,7 @@ $options->setLogger($logger);
 Tune which catalogued events the server emits. By default, security-relevant events are on
 (bind outcomes, ACL denials, schema violations, StartTLS, Notice of Disconnect); high-volume
 per-operation success events are off and opt-in via `withAuditTrail()`. Full exception traces
-on `session.disconnect_notice` events are also opt-in via `withExceptionTraces()`.
+on `ldap.session.disconnect_notice` events are also opt-in via `withExceptionTraces()`.
 
 ```php
 use FreeDSx\Ldap\ServerOptions;
@@ -736,7 +736,7 @@ search, so this raises the cap for paging without loosening `setMaxSearchLookthr
 
 Cap how many paged searches one connection may leave unfinished, since each holds its place in the result until the
 connection closes. Starting one past the cap discards the least recently started session, logged as
-`paging.session_evicted`. A client resuming a discarded session is refused with an invalid cookie. A value of `0`
+`ldap.paging.session_evicted`. A client resuming a discarded session is refused with an invalid cookie. A value of `0`
 removes the cap.
 
 **Default**: `25`

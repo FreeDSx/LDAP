@@ -44,11 +44,27 @@ final class ServerEventTest extends TestCase
         }
     }
 
-    public function test_every_case_has_a_non_empty_message_template(): void
+    public function test_every_case_has_a_readable_message_rather_than_its_name(): void
     {
         foreach (ServerEvent::cases() as $event) {
-            self::assertNotEmpty(
+            self::assertNotSame(
+                $event->value,
                 $event->messageTemplate(),
+                $event->value,
+            );
+            self::assertStringEndsWith(
+                '.',
+                $event->messageTemplate(),
+                $event->value,
+            );
+        }
+    }
+
+    public function test_every_case_is_named_within_a_group(): void
+    {
+        foreach (ServerEvent::cases() as $event) {
+            self::assertMatchesRegularExpression(
+                '/^(ldap|storage|server)\.[a-z_]+(\.[a-z_]+)*$/',
                 $event->value,
             );
         }
