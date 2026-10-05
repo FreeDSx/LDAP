@@ -15,7 +15,8 @@ namespace FreeDSx\Ldap\Server\ServerRunner\Pcntl;
 
 use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
@@ -23,7 +24,6 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ReapedChild;
-use Psr\Log\LoggerInterface;
 
 use function getmypid;
 use function time;
@@ -48,7 +48,7 @@ class MetricsRelay
         private readonly MetricsRecorderInterface $recorder = new NullMetricsRecorder(),
         private readonly ?SnapshotPublisher $snapshotPublisher = null,
         private readonly ?OperationRollupCoordinator $operationRollup = null,
-        private readonly ?LoggerInterface $logger = null,
+        private readonly EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
     /**
@@ -97,9 +97,10 @@ class MetricsRelay
                 $this->operationRollup,
             );
         } catch (RuntimeException $e) {
-            $this->logger?->info(
-                'Unable to create a child metrics channel; continuing without operation rollup.',
-                ['pid' => getmypid()] + ExceptionLogging::makeLogContext($e),
+            $this->eventLogger->record(
+                ServerEvent::MetricsChannelUnavailable,
+                ['pid' => getmypid()],
+                cause: $e,
             );
 
             return null;
@@ -181,9 +182,10 @@ class MetricsRelay
         }
 
         $this->isSnapshotFailing = true;
-        $this->logger?->warning(
-            'Publishing the metrics snapshot failed.',
-            ['pid' => getmypid()] + ExceptionLogging::makeLogContext($e),
+        $this->eventLogger->record(
+            ServerEvent::MetricsSnapshotFailed,
+            ['pid' => getmypid()],
+            cause: $e,
         );
     }
 
@@ -194,8 +196,8 @@ class MetricsRelay
         }
 
         $this->isSnapshotFailing = false;
-        $this->logger?->info(
-            'Publishing the metrics snapshot recovered.',
+        $this->eventLogger->record(
+            ServerEvent::MetricsSnapshotRecovered,
             ['pid' => getmypid()],
         );
     }

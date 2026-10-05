@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Logging;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -65,6 +66,22 @@ final class ServerEventTest extends TestCase
         foreach (ServerEvent::cases() as $event) {
             self::assertMatchesRegularExpression(
                 '/^(ldap|storage|server)\.[a-z_]+(\.[a-z_]+)*$/',
+                $event->value,
+            );
+        }
+    }
+
+    public function test_every_server_case_is_enabled_by_default(): void
+    {
+        $policy = EventLogPolicy::default();
+
+        foreach (ServerEvent::cases() as $event) {
+            if (!str_starts_with($event->value, 'server.')) {
+                continue;
+            }
+
+            self::assertTrue(
+                $policy->isEnabled($event),
                 $event->value,
             );
         }

@@ -97,12 +97,14 @@ final readonly class EventLogger
      * @param array<string, mixed> $context Event-scope context merged on top of connection-scope context.
      * @param TokenInterface|array<string, mixed>|null $subject Default `subject` sub-array.
      * @param ?LdapMessageRequest $message When supplied, auto-injects message_id and control_oids (if non-empty).
+     * @param ?Throwable $cause When supplied, adds what threw, and its trace when the policy includes traces.
      */
     public function record(
         ServerEvent $event,
         array $context = [],
         TokenInterface|array|null $subject = null,
         ?LdapMessageRequest $message = null,
+        ?Throwable $cause = null,
     ): void {
         if (!$this->isEnabled($event)) {
             return;
@@ -112,7 +114,7 @@ final readonly class EventLogger
             $event->level(),
             $event->messageTemplate(),
             $this->composeContext(
-                $context + self::messageContext($message),
+                $context + self::messageContext($message) + $this->exceptionContextFor($cause),
                 $subject,
                 [EventContext::EVENT => $event->value],
             ),

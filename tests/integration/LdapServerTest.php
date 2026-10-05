@@ -979,7 +979,7 @@ final class LdapServerTest extends ServerTestCase
         $this->sendServerSignal(SIGHUP);
 
         // Waiting for the server to say it handled the signal beats sleeping and hoping that it did.
-        $this->waitForServerOutput('no configuration reloader is configured');
+        $this->waitForServerOutput('there is nothing to reload');
 
         $this->assertSame(
             ['0'],

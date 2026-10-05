@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
@@ -117,7 +118,10 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $metricsRecorder,
                 $this->makeSnapshotPublisher($container),
                 $this->makeOperationRollup($container),
-                $options->getLogger(),
+                new EventLogger(
+                    $options->getLogger(),
+                    $options->getEventLogPolicy(),
+                ),
             ),
             resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
             backgroundTasks: $container->get(BackgroundTasksInterface::class),

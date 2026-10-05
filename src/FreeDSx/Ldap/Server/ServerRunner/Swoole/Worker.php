@@ -13,14 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\WorkerScopedMetricsInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
-use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\Server\SocketServerFactory;
-use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Process;
@@ -37,8 +37,6 @@ use Swoole\Runtime;
  */
 class Worker
 {
-    use ServerRunnerLoggerTrait;
-
     private const AWAIT_RELOAD_POLL_SECONDS = 1.0;
 
     private ?ConnectionAcceptor $acceptor = null;
@@ -83,7 +81,7 @@ class Worker
             }
         });
 
-        $this->logShutdownCompleted($context);
+        $this->events()->record(ServerEvent::ShutdownCompleted);
     }
 
     /**
@@ -98,6 +96,7 @@ class Worker
         $acceptor = new ConnectionAcceptor(
             $this->configuration->protocolFactory(),
             $this->configuration->options(),
+            $this->events(),
             $this->socketServerFactory->isTlsHandshakeDeferred(),
             $this->connectionSlots,
             $this->metricsRecorder,
@@ -155,9 +154,9 @@ class Worker
         $this->metricsRecorder->beginWorker($this->workerId);
     }
 
-    private function getRunnerLogger(): ?LoggerInterface
+    private function events(): EventLogger
     {
-        return $this->configuration->options()->getLogger();
+        return $this->configuration->events()->withContext(['worker_id' => $this->workerId]);
     }
 
     /**
@@ -200,6 +199,7 @@ class Worker
         $this->acceptor?->useConfiguration(
             $this->configuration->options(),
             $this->configuration->protocolFactory(),
+            $this->events(),
         );
         $this->resumeAwaitingReload(true);
 
@@ -220,7 +220,10 @@ class Worker
         $this->isShuttingDown = true;
         $this->resumeAwaitingReload(false);
         $this->backgroundTasks?->stop();
-        $this->logShutdownStarted($context + ['signal' => $signal]);
+        $this->events()->record(
+            ServerEvent::ShutdownStarted,
+            ['signal' => $signal],
+        );
 
         // Notifying clients writes through hooked I/O, which Swoole refuses outside a coroutine, and a pool
         // worker runs this callback without one.

@@ -87,10 +87,38 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 
 ### Server Events
 
-| Event                         | Default | Level  | Fires when                                                |
-|-------------------------------|---------|--------|-----------------------------------------------------------|
-| `server.client.write_timeout` | on      | notice | A client stopped reading and its connection was closed    |
-| `server.client.idle_timeout`  | on      | notice | A client was idle past the read timeout and its connection was closed |
+| Event                                | Default | Level   | Fires when                                                |
+|--------------------------------------|---------|---------|-----------------------------------------------------------|
+| `server.started`                     | on      | info    | The server is listening and accepting clients             |
+| `server.accept_failed`               | on      | error   | Accepting a connection failed and the accept loop ended   |
+| `server.shutdown.started`            | on      | info    | A shutdown signal was received                            |
+| `server.shutdown.draining`           | on      | info    | The server stopped accepting and is waiting on open connections (Swoole) |
+| `server.shutdown.forced`             | on      | warning | Connections still open past the shutdown timeout were closed (Swoole) |
+| `server.shutdown.completed`          | on      | info    | The server has stopped                                    |
+| `server.client.connected`            | on      | info    | A client connected                                        |
+| `server.client.rejected`             | on      | warning | A client was turned away, because the connection limit was reached or the server is shutting down |
+| `server.client.tls_failed`           | on      | warning | TLS could not be negotiated with an LDAPS client          |
+| `server.client.spawn_failed`         | on      | error   | A process could not be forked for a client (PCNTL)        |
+| `server.client.started`              | on      | info    | A forked process began serving its client (PCNTL)         |
+| `server.client.error`                | on      | error   | An unhandled error ended a client connection (Swoole)     |
+| `server.client.stopping`             | on      | info    | A client's process was asked to stop (PCNTL)              |
+| `server.client.notify_failed`        | on      | warning | Telling a client that the server is going away failed     |
+| `server.client.closed`               | on      | info    | A client connection closed                                |
+| `server.client.reaped`               | on      | info    | A client's process ended (PCNTL)                          |
+| `server.client.stop_requested`       | on      | info    | The server asked a client's process to stop (PCNTL)       |
+| `server.client.killed`               | on      | info    | The server force ended a client's process past the shutdown timeout (PCNTL) |
+| `server.client.reload_followed`      | on      | info    | A client's process applied a reloaded configuration (PCNTL) |
+| `server.client.write_timeout`        | on      | notice  | A client stopped reading and its connection was closed    |
+| `server.client.idle_timeout`         | on      | notice  | A client was idle past the read timeout and its connection was closed |
+| `server.reload.applied`              | on      | info    | A reload signal replaced the configuration                |
+| `server.reload.failed`               | on      | error   | A reload failed and the current configuration was kept    |
+| `server.reload.ignored`              | on      | info    | A reload signal arrived with nothing configured to reload |
+| `server.reload.adopt_failed`         | on      | error   | A restarted worker could not adopt the reloaded configuration and accepts nothing until a reload succeeds (Swoole) |
+| `server.metrics.snapshot_failed`     | on      | warning | Publishing the cn=monitor snapshot started failing (PCNTL) |
+| `server.metrics.snapshot_recovered`  | on      | info    | Publishing the cn=monitor snapshot works again (PCNTL)    |
+| `server.metrics.channel_unavailable` | on      | info    | A client's process could not report its operations to cn=monitor (PCNTL) |
+
+Events marked PCNTL or Swoole only come from that runner.
 
 The audit-trail events are opt-in because they fire on every successful write or read; enable them when full auditing is
 needed, otherwise the default set covers security-relevant events without an overwhelming amount of noise.
@@ -109,6 +137,9 @@ Every event carries a structured `context` array with a stable shape:
 | `operation`                                                | write / compare events                                             | One of `add`, `modify`, `delete`, `modify_dn`, `compare`.                                          |
 | `result_code`                                              | failure events                                                     | LDAP result code from the caught `OperationException`.                                             |
 | `reason`                                                   | failure events, `ldap.starttls.buffer_discarded`                   | Human-readable diagnostic. Taken from the exception on failure events.                             |
+| `reason`                                                   | `server.client.rejected`, `server.reload.ignored`                  | `connection_limit` or `shutting_down` for a rejection; `no_reloader` or `unsupported` for a reload. |
+| `worker_id`, `child_pid`, `signal`                         | `server.*` events                                                  | The Swoole worker, the PCNTL client process, and the signal that caused the event.                 |
+| `max_connections`, `active_connections`                    | `server.client.rejected`, `server.shutdown.forced`                 | The connection limit reached, and the connections force closed.                                    |
 | `validation_mode`                                          | `ldap.schema.violation`                                            | How it was handled: `strict` (rejected), `lenient` (allowed by policy), or `relaxed` (Relax control). |
 | `mechanism`, `version`                                     | bind events                                                        | SASL mechanism name (or `simple`) and LDAP protocol version.                                       |
 | `entries_added`, `entries_skipped`                         | `storage.import.completed`, `storage.import.failed`                | Counts for the batch. On a failure they say how far it got before the rollback.                    |

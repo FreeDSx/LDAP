@@ -16,6 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Configuration;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -82,8 +84,9 @@ final class ReloadCoordinatorTest extends TestCase
             ->method('log')
             ->with(
                 LogLevel::INFO,
-                self::stringContains('no configuration reloader'),
                 self::anything(),
+                self::callback(static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::ReloadIgnored->value
+                    && $context[EventContext::REASON] === 'no_reloader'),
             );
 
         $result = $this->subject->reload(
@@ -102,8 +105,9 @@ final class ReloadCoordinatorTest extends TestCase
             ->method('log')
             ->with(
                 LogLevel::ERROR,
-                self::stringContains('reload failed'),
                 self::anything(),
+                self::callback(static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::ReloadFailed->value
+                    && $context[EventContext::EXCEPTION_CLASS] === RuntimeException::class),
             );
 
         $reloader = $this->createMock(ConfigReloaderInterface::class);
