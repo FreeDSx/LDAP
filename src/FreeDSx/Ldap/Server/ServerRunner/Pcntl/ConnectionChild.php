@@ -82,22 +82,19 @@ class ConnectionChild
             SIG_UNBLOCK,
             $this->blockedSignals,
         );
-        $this->configuration->events()->record(
-            ServerEvent::ClientStarted,
-            $context,
-        );
 
         $closeReason = null;
         try {
             $closeReason = $protocolHandler->handle();
+        } catch (Throwable $e) {
+            $this->configuration->events()->record(
+                ServerEvent::ClientError,
+                $context,
+                cause: $e,
+            );
         } finally {
             $reporter?->finish();
         }
-
-        $this->configuration->events()->record(
-            ServerEvent::ClientClosed,
-            $context,
-        );
 
         // Convey a timeout close to the parent through the exit code.
         exit(ChildExitCode::forCloseReason($closeReason));
@@ -179,10 +176,6 @@ class ConnectionChild
         }
 
         $this->isShuttingDown = true;
-        $this->configuration->events()->record(
-            ServerEvent::ClientStopping,
-            $context,
-        );
         try {
             $protocolHandler->shutdown();
         } catch (Throwable $e) {

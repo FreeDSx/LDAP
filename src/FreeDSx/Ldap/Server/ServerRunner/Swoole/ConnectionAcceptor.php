@@ -188,17 +188,18 @@ class ConnectionAcceptor
         Socket $socket,
         int $socketId,
     ): void {
-        if (!$this->encryptConnectionIfDeferred($socket)) {
-            return;
-        }
+        $this->events->record(ServerEvent::ClientConnected);
 
         try {
+            if (!$this->encryptConnectionIfDeferred($socket)) {
+                return;
+            }
+
             $handler = $this->serverProtocolFactory->make(
                 $socket,
                 new ConnectionContext(connId: $socketId),
             );
             $this->activeHandlers[$socketId] = $handler;
-            $this->events->record(ServerEvent::ClientConnected);
             $closeReason = $handler->handle();
 
             if ($closeReason !== null) {
@@ -231,7 +232,6 @@ class ConnectionAcceptor
                 ServerEvent::ClientTlsFailed,
                 cause: $e,
             );
-            $socket->close();
 
             return false;
         }
