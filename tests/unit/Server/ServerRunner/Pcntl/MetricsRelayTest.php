@@ -15,6 +15,10 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Pcntl;
 
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
@@ -63,7 +67,10 @@ final class MetricsRelayTest extends TestCase
                 new FileSnapshotWriter($this->snapshotFile),
             ),
             new OperationRollupCoordinator($this->recorder),
-            $this->logger,
+            new EventLogger(
+                $this->logger,
+                EventLogPolicy::default(),
+            ),
         );
     }
 
@@ -103,13 +110,12 @@ final class MetricsRelayTest extends TestCase
 
     public function test_a_failing_snapshot_is_reported_once_and_so_is_its_recovery(): void
     {
+        $events = [];
         $this->logger
-            ->expects(self::once())
-            ->method('warning');
-        $this->logger
-            ->expects(self::once())
-            ->method('info')
-            ->with('Publishing the metrics snapshot recovered.');
+            ->method('log')
+            ->willReturnCallback(static function (string $level, string $message, array $context) use (&$events): void {
+                $events[] = $context[EventContext::EVENT];
+            });
         $this->subject->prepare();
         $path = $this->snapshotFile->path();
 
@@ -126,6 +132,14 @@ final class MetricsRelayTest extends TestCase
             @rmdir($path);
             $this->subject->remove();
         }
+
+        self::assertSame(
+            [
+                ServerEvent::MetricsSnapshotFailed->value,
+                ServerEvent::MetricsSnapshotRecovered->value,
+            ],
+            $events,
+        );
     }
 
     public function test_no_child_reporter_is_opened_when_nothing_collects_operations(): void

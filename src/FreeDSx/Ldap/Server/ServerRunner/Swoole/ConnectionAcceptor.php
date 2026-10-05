@@ -15,17 +15,18 @@ namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
-use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Coroutine\WaitGroup;
 use Throwable;
@@ -39,8 +40,6 @@ use Throwable;
  */
 class ConnectionAcceptor
 {
-    use ServerRunnerLoggerTrait;
-
     private SocketServer $server;
 
     private bool $isShuttingDown = false;
@@ -68,6 +67,7 @@ class ConnectionAcceptor
     public function __construct(
         private ServerProtocolFactoryInterface $serverProtocolFactory,
         private ServerListenerOptionsInterface $options,
+        private EventLogger $events,
         private readonly bool $isTlsHandshakeDeferred,
         private readonly ConnectionSlots $connectionSlots,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
@@ -82,7 +82,7 @@ class ConnectionAcceptor
     public function accept(SocketServer $server): void
     {
         $this->server = $server;
-        $this->logServerStarted();
+        $this->events->record(ServerEvent::ServerStarted);
         $this->metricsRecorder->serverStarted(time());
         $this->options->getOnServerReady()?->__invoke();
 
@@ -92,7 +92,10 @@ class ConnectionAcceptor
             try {
                 $socket = $this->server->accept($this->options->getNetworkConfig()->getSocketAcceptTimeout());
             } catch (Throwable $e) {
-                $this->logAcceptError($e);
+                $this->events->record(
+                    ServerEvent::ServerAcceptFailed,
+                    cause: $e,
+                );
 
                 break;
             }
@@ -110,7 +113,7 @@ class ConnectionAcceptor
             $this->handleInCoroutine($socket);
         }
 
-        $this->getRunnerLogger()?->info('Accept loop ended, draining active connections.');
+        $this->events->record(ServerEvent::ShutdownDraining);
     }
 
     /**
@@ -134,14 +137,11 @@ class ConnectionAcceptor
     public function useConfiguration(
         ServerListenerOptionsInterface $options,
         ServerProtocolFactoryInterface $serverProtocolFactory,
+        EventLogger $events,
     ): void {
         $this->options = $options;
         $this->serverProtocolFactory = $serverProtocolFactory;
-    }
-
-    private function getRunnerLogger(): ?LoggerInterface
-    {
-        return $this->options->getLogger();
+        $this->events = $events;
     }
 
     private function acquireConnectionSlot(): bool
@@ -150,7 +150,13 @@ class ConnectionAcceptor
         if ($this->connectionSlots->tryAcquire($maxConnections)) {
             return true;
         }
-        $this->logConnectionLimitReached(['max_connections' => $maxConnections]);
+        $this->events->record(
+            ServerEvent::ClientRejected,
+            [
+                EventContext::REASON => 'connection_limit',
+                'max_connections' => $maxConnections,
+            ],
+        );
 
         return false;
     }
@@ -192,16 +198,19 @@ class ConnectionAcceptor
                 new ConnectionContext(connId: $socketId),
             );
             $this->activeHandlers[$socketId] = $handler;
-            $this->logClientConnected();
+            $this->events->record(ServerEvent::ClientConnected);
             $closeReason = $handler->handle();
 
             if ($closeReason !== null) {
                 $this->metricsRecorder->connectionObserved($closeReason);
             }
         } catch (Throwable $e) {
-            $this->logClientError($e);
+            $this->events->record(
+                ServerEvent::ClientError,
+                cause: $e,
+            );
         } finally {
-            $this->logClientClosed();
+            $this->events->record(ServerEvent::ClientClosed);
             $socket->close();
         }
     }
@@ -218,7 +227,10 @@ class ConnectionAcceptor
         try {
             $socket->encrypt(true);
         } catch (Throwable $e) {
-            $this->logTlsHandshakeError($e);
+            $this->events->record(
+                ServerEvent::ClientTlsFailed,
+                cause: $e,
+            );
             $socket->close();
 
             return false;
@@ -233,7 +245,10 @@ class ConnectionAcceptor
             try {
                 $handler->shutdown();
             } catch (Throwable $e) {
-                $this->logShutdownNotifyError($e);
+                $this->events->record(
+                    ServerEvent::ClientNotifyFailed,
+                    cause: $e,
+                );
             }
         }
     }
@@ -250,7 +265,10 @@ class ConnectionAcceptor
                 return;
             }
 
-            $this->logShutdownForceClose(count($this->activeSockets));
+            $this->events->record(
+                ServerEvent::ShutdownForced,
+                ['active_connections' => count($this->activeSockets)],
+            );
             foreach ($this->activeSockets as $socket) {
                 $socket->close();
             }

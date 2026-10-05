@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use Closure;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
@@ -27,6 +28,8 @@ use FreeDSx\Ldap\ServerListenerOptionsInterface;
  */
 class RunnerConfiguration
 {
+    private EventLogger $events;
+
     /**
      * @param Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface $protocolFactoryProvider
      * @param Closure(ServerListenerOptionsInterface): void $applyReload Applies what open connections must follow.
@@ -36,7 +39,9 @@ class RunnerConfiguration
         private ServerProtocolFactoryInterface $protocolFactory,
         private readonly Closure $protocolFactoryProvider,
         private readonly Closure $applyReload,
-    ) {}
+    ) {
+        $this->events = self::eventLoggerFor($options);
+    }
 
     public function options(): ServerListenerOptionsInterface
     {
@@ -46,6 +51,14 @@ class RunnerConfiguration
     public function protocolFactory(): ServerProtocolFactoryInterface
     {
         return $this->protocolFactory;
+    }
+
+    /**
+     * Rebuilt by a reload, so a reloaded logger or event log policy reaches the runner's own events.
+     */
+    public function events(): EventLogger
+    {
+        return $this->events;
     }
 
     /**
@@ -67,6 +80,7 @@ class RunnerConfiguration
 
         $this->options = $result->options;
         $this->protocolFactory = $result->protocolFactory;
+        $this->events = self::eventLoggerFor($this->options);
         ($this->applyReload)($this->options);
 
         return true;
@@ -91,5 +105,13 @@ class RunnerConfiguration
         ($this->applyReload)($reloaded);
 
         return true;
+    }
+
+    private static function eventLoggerFor(ServerListenerOptionsInterface $options): EventLogger
+    {
+        return new EventLogger(
+            $options->getLogger(),
+            $options->getEventLogPolicy(),
+        );
     }
 }

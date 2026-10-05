@@ -17,6 +17,9 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
@@ -29,8 +32,6 @@ use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
-use Psr\Log\LoggerInterface;
-use Psr\Log\LogLevel;
 use Throwable;
 
 /**
@@ -40,8 +41,6 @@ use Throwable;
  */
 class PcntlServerRunner implements ServerRunnerInterface
 {
-    use ServerRunnerLoggerTrait;
-
     private SocketServer $server;
 
     private ChildProcesses $childProcesses;
@@ -107,7 +106,10 @@ class PcntlServerRunner implements ServerRunnerInterface
         try {
             $this->acceptClients();
         } catch (Throwable $e) {
-            $this->logAcceptError($e, $this->defaultContext);
+            $this->events()->record(
+                ServerEvent::ServerAcceptFailed,
+                cause: $e,
+            );
 
             throw $e;
         } finally {
@@ -150,12 +152,9 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->server->removeClient($socket);
         $socket->close();
 
-        $this->logInfo(
-            'The child process has ended.',
-            array_merge(
-                $this->defaultContext,
-                ['child_pid' => $reaped->process->getPid()],
-            ),
+        $this->events()->record(
+            ServerEvent::ClientReaped,
+            ['child_pid' => $reaped->process->getPid()],
         );
     }
 
@@ -166,7 +165,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     private function acceptClients(): void
     {
         $this->installServerSignalHandlers();
-        $this->logServerStarted($this->defaultContext);
+        $this->events()->record(ServerEvent::ServerStarted);
         $this->metrics->serverStarted();
         $this->options()->getOnServerReady()?->__invoke();
         $this->backgroundTasks->start();
@@ -177,7 +176,10 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             if ($this->isShuttingDown) {
                 if ($socket) {
-                    $this->logClientRejectedDuringShutdown($this->defaultContext);
+                    $this->events()->record(
+                        ServerEvent::ClientRejected,
+                        [EventContext::REASON => 'shutting_down'],
+                    );
                     $socket->close();
                 }
 
@@ -196,7 +198,10 @@ class PcntlServerRunner implements ServerRunnerInterface
             }
 
             if ($this->isConnectionLimitReached()) {
-                $this->logConnectionLimitReached($this->defaultContext);
+                $this->events()->record(
+                    ServerEvent::ClientRejected,
+                    [EventContext::REASON => 'connection_limit'],
+                );
                 $this->metrics->connectionRejected();
 
                 $this->server->removeClient($socket);
@@ -215,10 +220,9 @@ class PcntlServerRunner implements ServerRunnerInterface
                 // In parent process, but could not fork...
                 $this->unblockSignals();
                 $reporter?->close();
-                $this->logAndThrow(
-                    'Unable to fork process.',
-                    $this->defaultContext,
-                );
+                $this->events()->record(ServerEvent::ClientSpawnFailed);
+
+                throw new RuntimeException('Unable to fork process.');
             } elseif ($pid === 0) {
                 // This is the child's thread of execution...
                 $this->runConnectionChild(
@@ -321,7 +325,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             return;
         }
         $this->isShuttingDown = true;
-        $this->logShutdownStarted($this->defaultContext);
+        $this->events()->record(ServerEvent::ShutdownStarted);
 
         // Ask nicely first...
         $this->backgroundTasks->stop();
@@ -346,7 +350,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         $this->server->close();
         $this->metrics->remove();
-        $this->logShutdownCompleted($this->defaultContext);
+        $this->events()->record(ServerEvent::ShutdownCompleted);
     }
 
     private function signalChildProcessesToReload(): void
@@ -363,18 +367,14 @@ class PcntlServerRunner implements ServerRunnerInterface
         int $signal,
         bool $closeSocket = false,
     ): void {
-        foreach ($this->childProcesses->all() as $childProcess) {
-            $context = array_merge(
-                $this->defaultContext,
-                ['child_pid' => $childProcess->getPid()],
-            );
+        $event = ($signal === SIGKILL)
+            ? ServerEvent::ClientKilled
+            : ServerEvent::ClientStopRequested;
 
-            $message = ($signal === SIGKILL)
-                ? 'Force ending child process.'
-                : 'Sending graceful signal to end child process.';
-            $this->logInfo(
-                $message,
-                $context,
+        foreach ($this->childProcesses->all() as $childProcess) {
+            $this->events()->record(
+                $event,
+                ['child_pid' => $childProcess->getPid()],
             );
 
             $childProcess->signal($signal);
@@ -453,11 +453,9 @@ class PcntlServerRunner implements ServerRunnerInterface
             $reporter?->channel(),
         ));
         $this->metrics->childStarted();
-        $this->logClientConnected(
-            array_merge(
-                ['child_pid' => $pid],
-                $this->defaultContext,
-            ),
+        $this->events()->record(
+            ServerEvent::ClientConnected,
+            ['child_pid' => $pid],
         );
         $this->cleanUpChildProcesses();
     }
@@ -484,40 +482,13 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->cleanUpChildProcesses();
     }
 
-    private function getRunnerLogger(): ?LoggerInterface
-    {
-        return $this->options()->getLogger();
-    }
-
     private function options(): ServerListenerOptionsInterface
     {
         return $this->configuration->options();
     }
 
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function logInfo(
-        string $message,
-        array $context = [],
-    ): void {
-        $this->options()->getLogger()?->log(
-            LogLevel::INFO,
-            $message,
-            $context,
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $context
-     * @throws RuntimeException
-     */
-    private function logAndThrow(
-        string $message,
-        array $context = [],
-    ): never {
-        $this->options()->getLogger()?->log(LogLevel::ERROR, $message, $context);
-
-        throw new RuntimeException($message);
+    private function events(): EventLogger
+    {
+        return $this->configuration->events()->withContext($this->defaultContext);
     }
 }

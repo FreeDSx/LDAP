@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
@@ -42,6 +44,11 @@ readonly class WorkerConfiguration
         return $this->configuration->protocolFactory();
     }
 
+    public function events(): EventLogger
+    {
+        return $this->configuration->events();
+    }
+
     /**
      * The startup options are current only until a reload.
      *
@@ -54,8 +61,8 @@ readonly class WorkerConfiguration
             return true;
         }
 
-        $this->options()->getLogger()?->error(
-            'The reloaded configuration could not be adopted on start; accepting no connections until a reload succeeds.',
+        $this->events()->record(
+            ServerEvent::ReloadAdoptFailed,
             $context,
         );
 

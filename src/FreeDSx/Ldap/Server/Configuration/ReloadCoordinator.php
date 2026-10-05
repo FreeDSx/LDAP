@@ -14,11 +14,12 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Configuration;
 
 use Closure;
-use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
-use Psr\Log\LogLevel;
 use Throwable;
 
 /**
@@ -51,18 +52,17 @@ final class ReloadCoordinator
         try {
             $protocolFactory = $protocolFactoryProvider($newOptions);
         } catch (Throwable $e) {
-            $this->logFailure(
-                $current,
-                $e,
+            self::events($current)->record(
+                ServerEvent::ReloadFailed,
                 $context,
+                cause: $e,
             );
 
             return null;
         }
 
-        $current->getLogger()?->log(
-            LogLevel::INFO,
-            'Server configuration reloaded. New connections will use the updated configuration.',
+        self::events($current)->record(
+            ServerEvent::ReloadApplied,
             $context,
         );
 
@@ -82,10 +82,9 @@ final class ReloadCoordinator
         array $context = [],
     ): ?ServerOptions {
         if (!$current instanceof ServerOptions) {
-            $current->getLogger()?->log(
-                LogLevel::INFO,
-                'Received a reload signal, but the current server type does not support reloading. Ignoring.',
-                $context,
+            self::events($current)->record(
+                ServerEvent::ReloadIgnored,
+                $context + [EventContext::REASON => 'unsupported'],
             );
 
             return null;
@@ -94,10 +93,9 @@ final class ReloadCoordinator
         $reloader = $current->getConfigReloader();
 
         if ($reloader === null) {
-            $current->getLogger()?->log(
-                LogLevel::INFO,
-                'Received a reload signal, but no configuration reloader is configured. Ignoring.',
-                $context,
+            self::events($current)->record(
+                ServerEvent::ReloadIgnored,
+                $context + [EventContext::REASON => 'no_reloader'],
             );
 
             return null;
@@ -106,28 +104,21 @@ final class ReloadCoordinator
         try {
             return $reloader->reload($current);
         } catch (Throwable $e) {
-            $this->logFailure(
-                $current,
-                $e,
+            self::events($current)->record(
+                ServerEvent::ReloadFailed,
                 $context,
+                cause: $e,
             );
 
             return null;
         }
     }
 
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function logFailure(
-        ServerListenerOptionsInterface $current,
-        Throwable $exception,
-        array $context,
-    ): void {
-        $current->getLogger()?->log(
-            LogLevel::ERROR,
-            'Configuration reload failed. Keeping the current configuration.',
-            $context + ExceptionLogging::makeLogContext($exception),
+    private static function events(ServerListenerOptionsInterface $current): EventLogger
+    {
+        return new EventLogger(
+            $current->getLogger(),
+            $current->getEventLogPolicy(),
         );
     }
 }

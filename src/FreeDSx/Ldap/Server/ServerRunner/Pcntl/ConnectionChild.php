@@ -17,11 +17,10 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Process\Child\ChildExitCode;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
-use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
 use FreeDSx\Socket\Socket;
-use Psr\Log\LoggerInterface;
 use Throwable;
 
 use function array_merge;
@@ -38,8 +37,6 @@ use function posix_getpid;
  */
 class ConnectionChild
 {
-    use ServerRunnerLoggerTrait;
-
     private bool $isShuttingDown = false;
 
     /**
@@ -85,8 +82,8 @@ class ConnectionChild
             SIG_UNBLOCK,
             $this->blockedSignals,
         );
-        $this->getRunnerLogger()?->info(
-            'Handling LDAP connection in new child process.',
+        $this->configuration->events()->record(
+            ServerEvent::ClientStarted,
             $context,
         );
 
@@ -97,18 +94,13 @@ class ConnectionChild
             $reporter?->finish();
         }
 
-        $this->getRunnerLogger()?->info(
-            'The child process is ending.',
+        $this->configuration->events()->record(
+            ServerEvent::ClientClosed,
             $context,
         );
 
         // Convey a timeout close to the parent through the exit code.
         exit(ChildExitCode::forCloseReason($closeReason));
-    }
-
-    private function getRunnerLogger(): ?LoggerInterface
-    {
-        return $this->configuration->options()->getLogger();
     }
 
     /**
@@ -127,7 +119,11 @@ class ConnectionChild
         try {
             $socket->encrypt(true);
         } catch (Throwable $e) {
-            $this->logTlsHandshakeError($e, $context);
+            $this->configuration->events()->record(
+                ServerEvent::ClientTlsFailed,
+                $context,
+                cause: $e,
+            );
 
             return false;
         }
@@ -183,14 +179,17 @@ class ConnectionChild
         }
 
         $this->isShuttingDown = true;
-        $this->getRunnerLogger()?->info(
-            'The child process has received a signal to stop.',
+        $this->configuration->events()->record(
+            ServerEvent::ClientStopping,
             $context,
         );
         try {
             $protocolHandler->shutdown();
         } catch (Throwable $e) {
-            $this->logShutdownNotifyError($e, $context);
+            $this->recordNotifyFailed(
+                $e,
+                $context,
+            );
         }
     }
 
@@ -208,8 +207,8 @@ class ConnectionChild
         }
 
         if ($this->configuration->follow($context)) {
-            $this->getRunnerLogger()?->info(
-                'The child process applied the reloaded configuration.',
+            $this->configuration->events()->record(
+                ServerEvent::ClientReloadFollowed,
                 $context,
             );
 
@@ -220,7 +219,24 @@ class ConnectionChild
         try {
             $protocolHandler->endAsUnavailable();
         } catch (Throwable $e) {
-            $this->logShutdownNotifyError($e, $context);
+            $this->recordNotifyFailed(
+                $e,
+                $context,
+            );
         }
+    }
+
+    /**
+     * @param array<string, scalar> $context
+     */
+    private function recordNotifyFailed(
+        Throwable $e,
+        array $context,
+    ): void {
+        $this->configuration->events()->record(
+            ServerEvent::ClientNotifyFailed,
+            $context,
+            cause: $e,
+        );
     }
 }

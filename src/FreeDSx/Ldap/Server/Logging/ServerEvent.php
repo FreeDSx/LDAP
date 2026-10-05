@@ -62,15 +62,51 @@ enum ServerEvent: string
     case JournalPruneFailed             = 'storage.journal.prune_failed';
     case WriteTimeout                   = 'server.client.write_timeout';
     case IdleTimeout                    = 'server.client.idle_timeout';
+    case ServerStarted                  = 'server.started';
+    case ServerAcceptFailed             = 'server.accept_failed';
+    case ShutdownStarted                = 'server.shutdown.started';
+    case ShutdownDraining               = 'server.shutdown.draining';
+    case ShutdownForced                 = 'server.shutdown.forced';
+    case ShutdownCompleted              = 'server.shutdown.completed';
+    case ClientConnected                = 'server.client.connected';
+    case ClientRejected                 = 'server.client.rejected';
+    case ClientTlsFailed                = 'server.client.tls_failed';
+    case ClientSpawnFailed              = 'server.client.spawn_failed';
+    case ClientStarted                  = 'server.client.started';
+    case ClientError                    = 'server.client.error';
+    case ClientStopping                 = 'server.client.stopping';
+    case ClientNotifyFailed             = 'server.client.notify_failed';
+    case ClientClosed                   = 'server.client.closed';
+    case ClientReaped                   = 'server.client.reaped';
+    case ClientStopRequested            = 'server.client.stop_requested';
+    case ClientKilled                   = 'server.client.killed';
+    case ClientReloadFollowed           = 'server.client.reload_followed';
+    case ReloadApplied                  = 'server.reload.applied';
+    case ReloadFailed                   = 'server.reload.failed';
+    case ReloadIgnored                  = 'server.reload.ignored';
+    case ReloadAdoptFailed              = 'server.reload.adopt_failed';
+    case MetricsSnapshotFailed          = 'server.metrics.snapshot_failed';
+    case MetricsSnapshotRecovered       = 'server.metrics.snapshot_recovered';
+    case MetricsChannelUnavailable      = 'server.metrics.channel_unavailable';
 
     public function level(): string
     {
         return match ($this) {
+            self::ServerAcceptFailed,
+            self::ClientSpawnFailed,
+            self::ClientError,
+            self::ReloadFailed,
+            self::ReloadAdoptFailed => LogLevel::ERROR,
             self::PasswordPolicyAccountLocked,
             self::StartTlsBufferDiscarded,
             self::SyncEntrySkipped,
             self::BulkImportFailed,
-            self::JournalPruneFailed => LogLevel::WARNING,
+            self::JournalPruneFailed,
+            self::ShutdownForced,
+            self::ClientRejected,
+            self::ClientTlsFailed,
+            self::ClientNotifyFailed,
+            self::MetricsSnapshotFailed => LogLevel::WARNING,
             self::BindFailure,
             self::StartTlsFailed,
             self::PasswordModifyFailed,
@@ -134,6 +170,32 @@ enum ServerEvent: string
             self::JournalPruneFailed => 'Pruning the change journal failed.',
             self::WriteTimeout => 'The connection was closed because the client stopped reading.',
             self::IdleTimeout => 'The connection was closed after being idle too long.',
+            self::ServerStarted => 'The server process has started and is now accepting clients.',
+            self::ServerAcceptFailed => 'Failed to accept incoming connection.',
+            self::ShutdownStarted => 'The server shutdown process has started.',
+            self::ShutdownDraining => 'Accept loop ended, draining active connections.',
+            self::ShutdownForced => 'Shutdown timeout exceeded, forcing close of active connections.',
+            self::ShutdownCompleted => 'The server shutdown process has completed.',
+            self::ClientConnected => 'A new client has connected.',
+            self::ClientRejected => 'A client connection was rejected.',
+            self::ClientTlsFailed => 'Unable to negotiate TLS with the client. Closing connection.',
+            self::ClientSpawnFailed => 'Unable to fork process.',
+            self::ClientStarted => 'Handling LDAP connection in new child process.',
+            self::ClientError => 'Unhandled error while handling client connection.',
+            self::ClientStopping => 'The child process has received a signal to stop.',
+            self::ClientNotifyFailed => 'Unexpected error while notifying client of shutdown.',
+            self::ClientClosed => 'The client connection has closed.',
+            self::ClientReaped => 'The child process has ended.',
+            self::ClientStopRequested => 'Sending graceful signal to end child process.',
+            self::ClientKilled => 'Force ending child process.',
+            self::ClientReloadFollowed => 'The child process applied the reloaded configuration.',
+            self::ReloadApplied => 'Server configuration reloaded. New connections will use the updated configuration.',
+            self::ReloadFailed => 'Configuration reload failed. Keeping the current configuration.',
+            self::ReloadIgnored => 'Received a reload signal, but there is nothing to reload. Ignoring.',
+            self::ReloadAdoptFailed => 'The reloaded configuration could not be adopted on start; accepting no connections until a reload succeeds.',
+            self::MetricsSnapshotFailed => 'Publishing the metrics snapshot failed.',
+            self::MetricsSnapshotRecovered => 'Publishing the metrics snapshot recovered.',
+            self::MetricsChannelUnavailable => 'Unable to create a child metrics channel; continuing without operation rollup.',
         };
     }
 
