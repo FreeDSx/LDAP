@@ -98,6 +98,28 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         }
     }
 
+    public function testAPasswordModifyUnderResetNamingAnotherEntryIsRefusedWhetherItExistsOrNot(): void
+    {
+        $client = $this->ldapClient();
+        $client->bind('cn=reset-user,dc=foo,dc=bar', self::PASSWORD);
+
+        foreach ([self::ADMIN_DN, 'cn=nobody,dc=foo,dc=bar'] as $target) {
+            try {
+                $client->send(Operations::passwordModify(
+                    $target,
+                    self::WRONG_PASSWORD,
+                    'a-fresh-password',
+                ));
+                $this->fail('Expected the reset gate to refuse a password modify naming another entry.');
+            } catch (OperationException $e) {
+                $this->assertSame(
+                    ResultCode::UNWILLING_TO_PERFORM,
+                    $e->getCode(),
+                );
+            }
+        }
+    }
+
     /**
      * draft-behera-11 §8.1.2.2 names StartTLS among the operations a pwdReset identity may still perform.
      */

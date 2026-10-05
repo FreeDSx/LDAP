@@ -198,6 +198,35 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         );
     }
 
+    public function testAnotherUsersOldPasswordIsRefusedWhetherRightOrWrong(): void
+    {
+        $this->ldapClient()->bind(
+            LdapBackendStorageCommand::MANAGER_DN,
+            LdapBackendStorageCommand::MANAGER_PASSWORD,
+        );
+
+        foreach ([self::USER_PASSWORD, 'guess'] as $oldPassword) {
+            try {
+                $this->ldapClient()->sendAndReceive(
+                    new PasswordModifyRequest(self::USER_DN, $oldPassword, $oldPassword),
+                );
+                $this->fail('Another user\'s old password should have been refused.');
+            } catch (OperationException $e) {
+                $this->assertSame(
+                    ResultCode::UNWILLING_TO_PERFORM,
+                    $e->getCode(),
+                );
+            }
+        }
+
+        $verifyClient = $this->buildClient('tcp');
+        $verifyClient->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+        $verifyClient->unbind();
+    }
+
     public function testAFailedPasswordModifyNamesNoResponseOid(): void
     {
         $queue = $this->rawQueue();
