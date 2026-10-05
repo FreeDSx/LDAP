@@ -69,15 +69,17 @@ jobs:
         run: composer run-script --timeout=0 test-coverage
 
       - name: Upload Unit Coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage-unit.xml
+          files: ./coverage-unit.xml
           name: FreeDSx-LDAP-Unit
+          fail_ci_if_error: false
 
       - name: Upload Integration Coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage-integration.xml
+          files: ./coverage-integration.xml
           name: FreeDSx-LDAP-Integration
+          fail_ci_if_error: false
