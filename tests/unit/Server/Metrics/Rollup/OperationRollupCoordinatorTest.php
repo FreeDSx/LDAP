@@ -22,9 +22,12 @@ use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsDeltaMessage;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 
 final class OperationRollupCoordinatorTest extends TestCase
 {
+    use RequiresOperatingSystemTrait;
+
     private InMemoryMetricsRecorder $childRecorder;
 
     private InMemoryMetricsRecorder $parentRecorder;
@@ -35,9 +38,7 @@ final class OperationRollupCoordinatorTest extends TestCase
 
     protected function setUp(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            self::markTestSkipped('The rollup uses a UNIX socket pair, unavailable on Windows; it is Linux/PCNTL-only.');
-        }
+        $this->requireUnix('The rollup uses a UNIX socket pair, unavailable on Windows; it is Linux/PCNTL-only.');
 
         $this->childRecorder = new InMemoryMetricsRecorder();
         $this->parentRecorder = new InMemoryMetricsRecorder();

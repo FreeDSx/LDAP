@@ -88,6 +88,9 @@ enum ServerEvent: string
     case MetricsSnapshotFailed          = 'server.metrics.snapshot_failed';
     case MetricsSnapshotRecovered       = 'server.metrics.snapshot_recovered';
     case MetricsChannelUnavailable      = 'server.metrics.channel_unavailable';
+    case TaskFailed                     = 'server.task.failed';
+    case SocketUnusable                 = 'server.socket.unusable';
+    case WorkersClamped                 = 'server.workers_clamped';
 
     public function level(): string
     {
@@ -96,7 +99,9 @@ enum ServerEvent: string
             self::ClientSpawnFailed,
             self::ClientError,
             self::ReloadFailed,
-            self::ReloadAdoptFailed => LogLevel::ERROR,
+            self::ReloadAdoptFailed,
+            self::TaskFailed,
+            self::SocketUnusable => LogLevel::ERROR,
             self::PasswordPolicyAccountLocked,
             self::StartTlsBufferDiscarded,
             self::SyncEntrySkipped,
@@ -106,7 +111,8 @@ enum ServerEvent: string
             self::ClientRejected,
             self::ClientTlsFailed,
             self::ClientNotifyFailed,
-            self::MetricsSnapshotFailed => LogLevel::WARNING,
+            self::MetricsSnapshotFailed,
+            self::WorkersClamped => LogLevel::WARNING,
             self::BindFailure,
             self::StartTlsFailed,
             self::PasswordModifyFailed,
@@ -196,6 +202,9 @@ enum ServerEvent: string
             self::MetricsSnapshotFailed => 'Publishing the metrics snapshot failed.',
             self::MetricsSnapshotRecovered => 'Publishing the metrics snapshot recovered.',
             self::MetricsChannelUnavailable => 'Unable to create a child metrics channel; continuing without operation rollup.',
+            self::TaskFailed => 'A background task failed.',
+            self::SocketUnusable => 'The existing socket cannot be used. To run the LDAP server, you must remove the existing socket.',
+            self::WorkersClamped => 'The configured storage cannot be shared between processes; accepting on a single worker.',
         };
     }
 

@@ -14,13 +14,12 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Process\BackgroundTask;
 
 use Closure;
-use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
-use Psr\Log\LoggerInterface;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Throwable;
-
-use function sprintf;
 
 /**
  * Runs periodic and long-lived background tasks as background coroutines under Swoole.
@@ -43,7 +42,7 @@ final class SwooleBackgroundTasks implements BackgroundTasksInterface
     public function __construct(
         private readonly array $periodicTasks,
         private readonly array $longLivedTasks,
-        private readonly ?LoggerInterface $logger = null,
+        private readonly EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
     public function onChildStart(Closure $onStart): void
@@ -57,7 +56,7 @@ final class SwooleBackgroundTasks implements BackgroundTasksInterface
             $this->startPeriodic($task);
         }
         foreach ($this->longLivedTasks as $task) {
-            Coroutine::create(fn(): null => $this->guard($task->name, $task->run));
+            Coroutine::create(fn() => $this->runLongLived($task));
         }
     }
 
@@ -97,22 +96,46 @@ final class SwooleBackgroundTasks implements BackgroundTasksInterface
         });
     }
 
+    private function runLongLived(LongLivedTask $task): void
+    {
+        if (!$this->guard($task->name, $task->run) || $this->stopping) {
+            return;
+        }
+
+        $this->eventLogger->record(
+            ServerEvent::TaskFailed,
+            [
+                'task' => $task->name,
+                EventContext::REASON => 'exited',
+            ],
+        );
+    }
+
     /**
      * Run a task body, logging any failure by name so an unhandled exception does not silently kill the coroutine.
      *
      * @param Closure(): void $run
+     * @return bool whether the task returned without an error
      */
     private function guard(
         string $name,
         Closure $run,
-    ): void {
+    ): bool {
         try {
             $run();
         } catch (Throwable $e) {
-            $this->logger?->error(
-                sprintf('The "%s" background task failed.', $name),
-                ExceptionLogging::makeLogContext($e),
+            $this->eventLogger->record(
+                ServerEvent::TaskFailed,
+                [
+                    'task' => $name,
+                    EventContext::REASON => 'error',
+                ],
+                cause: $e,
             );
+
+            return false;
         }
+
+        return true;
     }
 }

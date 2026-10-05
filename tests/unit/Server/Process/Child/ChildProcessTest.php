@@ -18,10 +18,13 @@ use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Process\Channel\FakeChannelMessageFactory;
 
 final class ChildProcessTest extends TestCase
 {
+    use RequiresOperatingSystemTrait;
+
     private ChildProcess $subject;
 
     private Socket&MockObject $mockSocket;
@@ -78,9 +81,7 @@ final class ChildProcessTest extends TestCase
 
     public function test_it_should_get_the_channel_when_present(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            self::markTestSkipped('UNIX socket pairs are unavailable on Windows; the channel is Linux/PCNTL-only.');
-        }
+        $this->requireUnix('UNIX socket pairs are unavailable on Windows; the channel is Linux/PCNTL-only.');
 
         $channel = ChildChannel::create(new FakeChannelMessageFactory());
 

@@ -753,10 +753,15 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             );
         }
 
+        $options = $container->get(ServerOptions::class);
+
         return new SwooleBackgroundTasks(
             $periodicTasks,
             $longLivedTasks,
-            $container->get(ServerOptions::class)->getLogger(),
+            new EventLogger(
+                $options->getLogger(),
+                $options->getEventLogPolicy(),
+            ),
         );
     }
 
@@ -796,7 +801,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new PcntlBackgroundTasks(
             periodicTasks: $periodicTasks,
             longLivedTasks: $longLivedTasks,
-            logger: $options->getLogger(),
+            eventLogger: new EventLogger(
+                $options->getLogger(),
+                $options->getEventLogPolicy(),
+            ),
             gracefulStopSeconds: $options->getNetworkConfig()->getShutdownTimeout(),
         );
     }

@@ -102,6 +102,9 @@ final readonly class EventLogPolicy
             ServerEvent::MetricsSnapshotFailed,
             ServerEvent::MetricsSnapshotRecovered,
             ServerEvent::MetricsChannelUnavailable,
+            ServerEvent::TaskFailed,
+            ServerEvent::SocketUnusable,
+            ServerEvent::WorkersClamped,
         );
     }
 

@@ -117,6 +117,9 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | `server.metrics.snapshot_failed`     | on      | warning | Publishing the cn=monitor snapshot started failing (PCNTL) |
 | `server.metrics.snapshot_recovered`  | on      | info    | Publishing the cn=monitor snapshot works again (PCNTL)    |
 | `server.metrics.channel_unavailable` | on      | info    | A client's process could not report its operations to cn=monitor (PCNTL) |
+| `server.task.failed`                 | on      | error   | A background task, such as the replica sync daemon or journal retention, threw an error, could not be started, or ended before shutdown |
+| `server.socket.unusable`             | on      | error   | A file already at the unix socket path could not be removed, so the server did not start |
+| `server.workers_clamped`             | on      | warning | Several workers were configured, but the storage cannot be shared between processes, so one is used (Swoole) |
 
 Events marked PCNTL or Swoole only come from that runner.
 
@@ -137,7 +140,9 @@ Every event carries a structured `context` array with a stable shape:
 | `operation`                                                | write / compare events                                             | One of `add`, `modify`, `delete`, `modify_dn`, `compare`.                                          |
 | `result_code`                                              | failure events                                                     | LDAP result code from the caught `OperationException`.                                             |
 | `reason`                                                   | failure events, `ldap.starttls.buffer_discarded`                   | Human-readable diagnostic. Taken from the exception on failure events.                             |
-| `reason`                                                   | `server.client.rejected`, `server.reload.ignored`                  | `connection_limit` or `shutting_down` for a rejection; `no_reloader` or `unsupported` for a reload. |
+| `reason`                                                   | `server.client.rejected`, `server.reload.ignored`, `server.socket.unusable`, `server.task.failed` | `connection_limit` or `shutting_down` for a rejection; `no_reloader` or `unsupported` for a reload; `not_writeable` or `not_removable` for a socket; `error`, `not_started` or `exited` for a task. |
+| `task`                                                     | `server.task.failed`                                               | The background task's name.                                                                        |
+| `socket`, `requested_workers`                              | `server.socket.unusable`, `server.workers_clamped`                 | The unix socket path, and the worker count that was configured.                                    |
 | `worker_id`, `child_pid`, `signal`                         | `server.*` events                                                  | The Swoole worker, the PCNTL client process, and the signal that caused the event.                 |
 | `max_connections`, `active_connections`                    | `server.client.rejected`, `server.shutdown.forced`                 | The connection limit reached, and the connections force closed.                                    |
 | `validation_mode`                                          | `ldap.schema.violation`                                            | How it was handled: `strict` (rejected), `lenient` (allowed by policy), or `relaxed` (Relax control). |

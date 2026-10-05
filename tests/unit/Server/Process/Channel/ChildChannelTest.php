@@ -16,17 +16,18 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Process\Channel;
 use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Process\Channel\FakeChannelMessage;
+use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Process\Channel\FakeChannelMessageFactory;
 
 final class ChildChannelTest extends TestCase
 {
+    use RequiresOperatingSystemTrait;
+
     private ChildChannel $subject;
 
     protected function setUp(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            self::markTestSkipped('UNIX socket pairs are unavailable on Windows; the channel is Linux/PCNTL-only.');
-        }
+        $this->requireUnix('UNIX socket pairs are unavailable on Windows; the channel is Linux/PCNTL-only.');
 
         $this->subject = ChildChannel::create(new FakeChannelMessageFactory());
     }
