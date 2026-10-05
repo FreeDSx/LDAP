@@ -71,15 +71,9 @@ enum ServerEvent: string
     case ClientConnected                = 'server.client.connected';
     case ClientRejected                 = 'server.client.rejected';
     case ClientTlsFailed                = 'server.client.tls_failed';
-    case ClientSpawnFailed              = 'server.client.spawn_failed';
-    case ClientStarted                  = 'server.client.started';
     case ClientError                    = 'server.client.error';
-    case ClientStopping                 = 'server.client.stopping';
     case ClientNotifyFailed             = 'server.client.notify_failed';
     case ClientClosed                   = 'server.client.closed';
-    case ClientReaped                   = 'server.client.reaped';
-    case ClientStopRequested            = 'server.client.stop_requested';
-    case ClientKilled                   = 'server.client.killed';
     case ClientReloadFollowed           = 'server.client.reload_followed';
     case ReloadApplied                  = 'server.reload.applied';
     case ReloadFailed                   = 'server.reload.failed';
@@ -96,7 +90,6 @@ enum ServerEvent: string
     {
         return match ($this) {
             self::ServerAcceptFailed,
-            self::ClientSpawnFailed,
             self::ClientError,
             self::ReloadFailed,
             self::ReloadAdoptFailed,
@@ -185,16 +178,10 @@ enum ServerEvent: string
             self::ClientConnected => 'A new client has connected.',
             self::ClientRejected => 'A client connection was rejected.',
             self::ClientTlsFailed => 'Unable to negotiate TLS with the client. Closing connection.',
-            self::ClientSpawnFailed => 'Unable to fork process.',
-            self::ClientStarted => 'Handling LDAP connection in new child process.',
             self::ClientError => 'Unhandled error while handling client connection.',
-            self::ClientStopping => 'The child process has received a signal to stop.',
             self::ClientNotifyFailed => 'Unexpected error while notifying client of shutdown.',
             self::ClientClosed => 'The client connection has closed.',
-            self::ClientReaped => 'The child process has ended.',
-            self::ClientStopRequested => 'Sending graceful signal to end child process.',
-            self::ClientKilled => 'Force ending child process.',
-            self::ClientReloadFollowed => 'The child process applied the reloaded configuration.',
+            self::ClientReloadFollowed => 'A client connection applied the reloaded configuration.',
             self::ReloadApplied => 'Server configuration reloaded. New connections will use the updated configuration.',
             self::ReloadFailed => 'Configuration reload failed. Keeping the current configuration.',
             self::ReloadIgnored => 'Received a reload signal, but there is nothing to reload. Ignoring.',

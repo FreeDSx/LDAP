@@ -153,7 +153,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $socket->close();
 
         $this->events()->record(
-            ServerEvent::ClientReaped,
+            ServerEvent::ClientClosed,
             ['child_pid' => $reaped->process->getPid()],
         );
     }
@@ -200,7 +200,10 @@ class PcntlServerRunner implements ServerRunnerInterface
             if ($this->isConnectionLimitReached()) {
                 $this->events()->record(
                     ServerEvent::ClientRejected,
-                    [EventContext::REASON => 'connection_limit'],
+                    [
+                        EventContext::REASON => 'connection_limit',
+                        'max_connections' => $this->options()->getNetworkConfig()->getMaxConnections(),
+                    ],
                 );
                 $this->metrics->connectionRejected();
 
@@ -220,7 +223,10 @@ class PcntlServerRunner implements ServerRunnerInterface
                 // In parent process, but could not fork...
                 $this->unblockSignals();
                 $reporter?->close();
-                $this->events()->record(ServerEvent::ClientSpawnFailed);
+                $this->events()->record(
+                    ServerEvent::ClientRejected,
+                    [EventContext::REASON => 'not_started'],
+                );
 
                 throw new RuntimeException('Unable to fork process.');
             } elseif ($pid === 0) {
@@ -330,6 +336,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         // Ask nicely first...
         $this->backgroundTasks->stop();
         $this->endChildProcesses(SIGTERM);
+        $this->events()->record(ServerEvent::ShutdownDraining);
 
         $waitTime = 0;
         while (!$this->childProcesses->isEmpty()) {
@@ -367,16 +374,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         int $signal,
         bool $closeSocket = false,
     ): void {
-        $event = ($signal === SIGKILL)
-            ? ServerEvent::ClientKilled
-            : ServerEvent::ClientStopRequested;
-
         foreach ($this->childProcesses->all() as $childProcess) {
-            $this->events()->record(
-                $event,
-                ['child_pid' => $childProcess->getPid()],
-            );
-
             $childProcess->signal($signal);
             if ($closeSocket) {
                 $childProcess->closeSocket();
@@ -475,6 +473,10 @@ class PcntlServerRunner implements ServerRunnerInterface
             return;
         }
 
+        $this->events()->record(
+            ServerEvent::ShutdownForced,
+            ['active_connections' => count($this->childProcesses)],
+        );
         $this->endChildProcesses(
             SIGKILL,
             true,

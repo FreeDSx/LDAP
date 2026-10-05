@@ -74,6 +74,6 @@ final class ServerRunnerPcntlTest extends ServerRunnerTestCase
     protected function reloadServer(): void
     {
         $this->sendServerSignal(SIGHUP);
-        $this->waitForServerOutput('The child process applied the reloaded configuration.');
+        $this->waitForServerOutput('A client connection applied the reloaded configuration.');
     }
 }

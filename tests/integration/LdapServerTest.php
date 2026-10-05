@@ -1027,7 +1027,7 @@ final class LdapServerTest extends ServerTestCase
         $session->read('cn=user,dc=foo,dc=bar');
 
         $session->unbind();
-        $this->waitForServerOutput('The child process has ended.');
+        $this->waitForServerOutput('The client connection has closed.');
         $this->authenticateAdmin();
 
         $this->assertContains(
