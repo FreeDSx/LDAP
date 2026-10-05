@@ -15,22 +15,23 @@ namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Socket\SocketServerOptions;
 use FreeDSx\Socket\Timeout\BlockingSelectEnforcer;
 use FreeDSx\Socket\Timeout\SwooleTimerEnforcer;
 use FreeDSx\Socket\Transport;
-use Psr\Log\LoggerInterface;
-use Psr\Log\LogLevel;
 
-class SocketServerFactory
+readonly class SocketServerFactory
 {
     public function __construct(
-        private readonly NetworkConfig $network,
-        private readonly RunnerMode $runner,
-        private readonly ?LoggerInterface $logger,
-        private readonly bool $reusePort = false,
+        private NetworkConfig $network,
+        private RunnerMode $runner,
+        private EventLogger $eventLogger = new EventLogger(null),
+        private bool $reusePort = false,
     ) {}
 
     /**
@@ -92,23 +93,41 @@ class SocketServerFactory
         }
 
         if (!is_writeable($socket)) {
-            $message = sprintf(
-                'The socket "%s" already exists and is not writeable. To run the LDAP server, you must remove the existing socket.',
+            $this->refuseExistingSocket(
                 $socket,
+                'not_writeable',
+                sprintf(
+                    'The socket "%s" already exists and is not writeable. To run the LDAP server, you must remove the existing socket.',
+                    $socket,
+                ),
             );
-            $this->logger?->log(LogLevel::ERROR, $message);
-
-            throw new RuntimeException($message);
         }
 
         if (!unlink($socket)) {
-            $message = sprintf(
-                'The existing socket "%s" could not be removed. To run the LDAP server, you must remove the existing socket.',
+            $this->refuseExistingSocket(
                 $socket,
+                'not_removable',
+                sprintf(
+                    'The existing socket "%s" could not be removed. To run the LDAP server, you must remove the existing socket.',
+                    $socket,
+                ),
             );
-            $this->logger?->log(LogLevel::ERROR, $message);
-
-            throw new RuntimeException($message);
         }
+    }
+
+    private function refuseExistingSocket(
+        string $socket,
+        string $reason,
+        string $message,
+    ): never {
+        $this->eventLogger->record(
+            ServerEvent::SocketUnusable,
+            [
+                'socket' => $socket,
+                EventContext::REASON => $reason,
+            ],
+        );
+
+        throw new RuntimeException($message);
     }
 }

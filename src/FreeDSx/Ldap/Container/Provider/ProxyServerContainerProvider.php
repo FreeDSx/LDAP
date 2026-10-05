@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
@@ -68,19 +69,23 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
     {
         $options = $container->get(ProxyServerOptions::class);
+        $eventLogger = new EventLogger(
+            $options->getLogger(),
+            $options->getEventLogPolicy(),
+        );
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
             return new SwooleBackgroundTasks(
                 [],
                 [],
-                $options->getLogger(),
+                $eventLogger,
             );
         }
 
         return new PcntlBackgroundTasks(
             periodicTasks: [],
             longLivedTasks: [],
-            logger: $options->getLogger(),
+            eventLogger: $eventLogger,
             gracefulStopSeconds: $options->getNetworkConfig()->getShutdownTimeout(),
         );
     }

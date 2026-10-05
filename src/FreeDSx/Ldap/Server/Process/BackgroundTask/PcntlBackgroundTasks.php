@@ -14,14 +14,15 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Process\BackgroundTask;
 
 use Closure;
-use Psr\Log\LoggerInterface;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 
 use function microtime;
 use function pcntl_fork;
 use function pcntl_waitpid;
 use function posix_getpid;
 use function posix_kill;
-use function sprintf;
 use function usleep;
 
 use const SIGTERM;
@@ -58,7 +59,7 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
     public function __construct(
         private readonly array $periodicTasks,
         private readonly array $longLivedTasks,
-        private readonly ?LoggerInterface $logger = null,
+        private readonly EventLogger $eventLogger = new EventLogger(null),
         private readonly int $gracefulStopSeconds = 0,
     ) {
         $this->childStart = static function (): void {};
@@ -77,7 +78,10 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
         }
 
         foreach ($this->longLivedTasks as $index => $task) {
-            $this->longLivedPids[$index] = $this->fork($task->run);
+            $this->longLivedPids[$index] = $this->fork(
+                $task->name,
+                $task->run,
+            );
         }
     }
 
@@ -192,7 +196,10 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
             }
 
             $state->lastRunAt = $now;
-            $state->pid = $this->fork($task->run);
+            $state->pid = $this->fork(
+                $task->name,
+                $task->run,
+            );
         }
     }
 
@@ -205,22 +212,33 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
             }
 
             $this->longLivedPids[$index] = null;
-            $this->logger?->warning(sprintf(
-                'The "%s" background task exited unexpectedly.',
-                $task->name,
-            ));
+            $this->eventLogger->record(
+                ServerEvent::TaskFailed,
+                [
+                    'task' => $task->name,
+                    EventContext::REASON => 'exited',
+                ],
+            );
         }
     }
 
     /**
      * @param Closure(): void $childBody
      */
-    private function fork(Closure $childBody): ?int
-    {
+    private function fork(
+        string $name,
+        Closure $childBody,
+    ): ?int {
         $pid = pcntl_fork();
 
         if ($pid === -1) {
-            $this->logger?->warning('Unable to fork a background task.');
+            $this->eventLogger->record(
+                ServerEvent::TaskFailed,
+                [
+                    'task' => $name,
+                    EventContext::REASON => 'not_started',
+                ],
+            );
 
             return null;
         }

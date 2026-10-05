@@ -33,9 +33,12 @@ use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallbackMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Middleware\StubMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Middleware\ThrowingMiddlewareHandler;
+use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 
 final class MetricsMiddlewareTest extends TestCase
 {
+    use RequiresOperatingSystemTrait;
+
     private InMemoryMetricsRecorder $recorder;
 
     private MetricsMiddleware $subject;
@@ -242,9 +245,7 @@ final class MetricsMiddlewareTest extends TestCase
 
     public function test_it_streams_each_recorded_operation_to_the_rollup_coordinator(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            self::markTestSkipped('The rollup uses a UNIX socket pair, unavailable on Windows; it is Linux/PCNTL-only.');
-        }
+        $this->requireUnix('The rollup uses a UNIX socket pair, unavailable on Windows; it is Linux/PCNTL-only.');
 
         $coordinator = new OperationRollupCoordinator($this->recorder);
         $channel = $coordinator->openChannel();

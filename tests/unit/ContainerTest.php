@@ -85,12 +85,16 @@ use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Socket\SocketPool;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 class ContainerTest extends TestCase
@@ -665,12 +669,24 @@ class ContainerTest extends TestCase
     public function test_several_workers_are_clamped_to_one_process_for_in_memory_storage(): void
     {
         $this->requireSwoole();
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger
+            ->expects(self::once())
+            ->method('log')
+            ->with(
+                LogLevel::WARNING,
+                self::anything(),
+                self::callback(static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::WorkersClamped->value
+                    && $context['requested_workers'] === 4),
+            );
 
         $container = $this->containerFor(
-            (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(
-                RunnerMode::Swoole,
-                4,
-            )),
+            (TestServerOptions::defaults())
+                ->setLogger($logger)
+                ->setRunnerConfig(new RunnerConfig(
+                    RunnerMode::Swoole,
+                    4,
+                )),
         );
 
         self::assertInstanceOf(

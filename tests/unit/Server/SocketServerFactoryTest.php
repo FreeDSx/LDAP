@@ -13,19 +13,27 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Exception\RuntimeException as LdapRuntimeException;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\Server\TlsVersion;
 use FreeDSx\Socket\Timeout\BlockingSelectEnforcer;
 use FreeDSx\Socket\Timeout\SwooleTimerEnforcer;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 
 final class SocketServerFactoryTest extends TestCase
 {
+    use RequiresOperatingSystemTrait;
+
     /**
      * @var resource
      */
@@ -35,19 +43,14 @@ final class SocketServerFactoryTest extends TestCase
 
     private SocketServerFactory $subject;
 
-    private LoggerInterface&MockObject $mockLogger;
-
     protected function setUp(): void
     {
         $this->tmpUnixSocketResource = $this->makeTempFile();
-        ;
         $this->tmpUnixSocketFilePath = stream_get_meta_data($this->tmpUnixSocketResource)['uri'] ?? throw new RuntimeException('Unable to get temp file path for unix socket.');
-        $this->mockLogger = $this->createMock(LoggerInterface::class);
 
         $this->subject = new SocketServerFactory(
             NetworkConfig::withPort(3390),
             RunnerMode::Pcntl,
-            $this->mockLogger,
         );
     }
 
@@ -70,7 +73,6 @@ final class SocketServerFactoryTest extends TestCase
                 ->setPort(3391)
                 ->setWriteTimeout(45),
             RunnerMode::Pcntl,
-            $this->mockLogger,
         );
 
         $options = $subject->makeAndBind()->getOptions();
@@ -92,7 +94,6 @@ final class SocketServerFactoryTest extends TestCase
                 ->setPort(3392)
                 ->setWriteTimeout(45),
             RunnerMode::Swoole,
-            $this->mockLogger,
         );
 
         $options = $subject->makeAndBind()->getOptions();
@@ -118,7 +119,6 @@ final class SocketServerFactoryTest extends TestCase
                 ->setSslAllowSelfSigned(true)
                 ->setSslCaCert('/path/to/ca.pem'),
             RunnerMode::Pcntl,
-            $this->mockLogger,
         );
 
         $options = $subject->makeAndBind()->getOptions();
@@ -146,7 +146,6 @@ final class SocketServerFactoryTest extends TestCase
                 ->setPort(3394)
                 ->setUseSsl(true),
             RunnerMode::Pcntl,
-            $this->mockLogger,
         );
 
         self::assertTrue($subject->isTlsHandshakeDeferred());
@@ -160,7 +159,6 @@ final class SocketServerFactoryTest extends TestCase
                 ->setPort(3395)
                 ->setUseSsl(true),
             RunnerMode::Swoole,
-            $this->mockLogger,
         );
 
         self::assertTrue($subject->isTlsHandshakeDeferred());
@@ -174,9 +172,7 @@ final class SocketServerFactoryTest extends TestCase
 
     public function test_it_should_make_a_unix_based_socket_server(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            $this->markTestSkipped('Cannot construct unix based socket on Windows.');
-        }
+        $this->requireUnix('Cannot construct unix based socket on Windows.');
         self::expectNotToPerformAssertions();
 
         $this->subject = new SocketServerFactory(
@@ -184,10 +180,48 @@ final class SocketServerFactoryTest extends TestCase
                 ->setUnixSocket($this->tmpUnixSocketFilePath)
                 ->setTransport('unix'),
             RunnerMode::Pcntl,
-            $this->mockLogger,
         );
 
         $this->subject->makeAndBind();
+    }
+
+    public function test_an_existing_socket_that_is_not_writeable_is_recorded_and_refused(): void
+    {
+        $this->requireUnix('Cannot construct unix based socket on Windows.');
+        chmod(
+            $this->tmpUnixSocketFilePath,
+            0444,
+        );
+        clearstatcache();
+        if (is_writable($this->tmpUnixSocketFilePath)) {
+            $this->markTestSkipped('The file stays writeable for this user.');
+        }
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger
+            ->expects(self::once())
+            ->method('log')
+            ->with(
+                LogLevel::ERROR,
+                self::anything(),
+                self::callback(fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::SocketUnusable->value
+                    && $context['socket'] === $this->tmpUnixSocketFilePath
+                    && $context[EventContext::REASON] === 'not_writeable'),
+            );
+        $subject = new SocketServerFactory(
+            (new NetworkConfig())
+                ->setUnixSocket($this->tmpUnixSocketFilePath)
+                ->setTransport('unix'),
+            RunnerMode::Pcntl,
+            new EventLogger(
+                $logger,
+                EventLogPolicy::default(),
+            ),
+        );
+
+        $this->expectException(LdapRuntimeException::class);
+
+        $subject->makeAndBind();
     }
 
     /**

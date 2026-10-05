@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
@@ -76,7 +77,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         return new SocketServerFactory(
             $options->getNetworkConfig(),
             $options->getRunnerConfig()->getMode(),
-            $options->getLogger(),
+            $this->makeEventLogger($options),
             $this->resolveWorkerCount($container) > 1,
         );
     }
@@ -95,6 +96,10 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
             $this->assertClientCertificatesAreNotExpected($options);
             $workers = $this->resolveWorkerCount($container);
+            $this->recordWorkersClamped(
+                $options,
+                $workers,
+            );
             $workerFactory = new WorkerFactory(
                 configuration: $this->makeRunnerConfiguration($container),
                 socketServerFactory: $container->get(SocketServerFactory::class),
@@ -118,10 +123,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $metricsRecorder,
                 $this->makeSnapshotPublisher($container),
                 $this->makeOperationRollup($container),
-                new EventLogger(
-                    $options->getLogger(),
-                    $options->getEventLogPolicy(),
-                ),
+                $this->makeEventLogger($options),
             ),
             resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
             backgroundTasks: $container->get(BackgroundTasksInterface::class),
@@ -195,12 +197,30 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             return $workers;
         }
 
-        $options->getLogger()?->warning(
-            'The configured storage cannot be shared between processes; accepting on a single worker.',
-            ['requested_workers' => $workers],
-        );
-
         return 1;
+    }
+
+    private function recordWorkersClamped(
+        ServerListenerOptionsInterface $options,
+        int $workers,
+    ): void {
+        $requestedWorkers = $options->getRunnerConfig()->resolvedWorkers();
+        if ($requestedWorkers === $workers) {
+            return;
+        }
+
+        $this->makeEventLogger($options)->record(
+            ServerEvent::WorkersClamped,
+            ['requested_workers' => $requestedWorkers],
+        );
+    }
+
+    private function makeEventLogger(ServerListenerOptionsInterface $options): EventLogger
+    {
+        return new EventLogger(
+            $options->getLogger(),
+            $options->getEventLogPolicy(),
+        );
     }
 
     /**
