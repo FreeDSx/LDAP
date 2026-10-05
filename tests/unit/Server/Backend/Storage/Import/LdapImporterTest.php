@@ -359,10 +359,15 @@ final class LdapImporterTest extends TestCase
      */
     private function loggedEvents(RecordingLogger $logger): array
     {
-        return array_map(
-            static fn(array $record): string => $record['message'],
-            $logger->records,
-        );
+        $events = [];
+        foreach ($logger->records as $record) {
+            $event = $record['context']['event'] ?? null;
+            if (is_string($event)) {
+                $events[] = $event;
+            }
+        }
+
+        return $events;
     }
 
     private function importer(): LdapImporter

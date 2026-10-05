@@ -127,7 +127,7 @@ fails either limit.
 
 When a policy sets at least one limit, a retention sweep runs about every sixty seconds on both runners, and prunes off
 to the side so it does not block new connections. It runs as a short-lived forked child under PCNTL, or a background
-coroutine under Swoole. A prune that removes records writes a `journal.pruned` entry to the event log with the count and
+coroutine under Swoole. A prune that removes records writes a `storage.journal.pruned` entry to the event log with the count and
 duration. See [Logging](Logging.md).
 
 There is a sizing trade-off. Pruning moves the oldest point the journal can still serve. A consumer whose saved cookie

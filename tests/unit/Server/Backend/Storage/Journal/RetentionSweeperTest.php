@@ -265,7 +265,7 @@ final class RetentionSweeperTest extends TestCase
     {
         return array_values(array_filter(
             $this->logger->records,
-            static fn(array $record): bool => $record['message'] === $event->value,
+            static fn(array $record): bool => ($record['context']['event'] ?? null) === $event->value,
         ));
     }
 

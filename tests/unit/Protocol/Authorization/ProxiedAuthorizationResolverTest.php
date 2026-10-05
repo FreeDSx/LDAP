@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -390,8 +391,8 @@ final class ProxiedAuthorizationResolverTest extends TestCase
         );
         $record = $this->recordingLogger->records[0];
         self::assertSame(
-            'authz.denied.proxy',
-            $record['message'],
+            ServerEvent::ProxyAuthorizationDenied->value,
+            $record['context'][EventContext::EVENT],
         );
         self::assertSame(
             'notice',

@@ -294,7 +294,7 @@ final class SyncResultProjectorTest extends TestCase
             ->method('log')
             ->with(
                 LogLevel::WARNING,
-                ServerEvent::SyncEntrySkipped->value,
+                ServerEvent::SyncEntrySkipped->messageTemplate(),
                 self::callback(fn(array $context): bool => ($context['dn'] ?? null) === 'cn=a,dc=example,dc=com'),
             );
 

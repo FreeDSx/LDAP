@@ -120,7 +120,7 @@ $entry = Entry::fromArray(
 | `Lenient` | Most violations are logged and the write is allowed.          |
 | `Off`     | All writes pass through without checks (and without logging). |
 
-`Lenient` logs each relaxed violation as a `schema.violation` event with `validation_mode: lenient` (see
+`Lenient` logs each relaxed violation as a `ldap.schema.violation` event with `validation_mode: lenient` (see
 [Server Logging](Logging.md)). Useful for migrations or editing legacy entries a changed schema would
 otherwise make unmodifiable.
 
