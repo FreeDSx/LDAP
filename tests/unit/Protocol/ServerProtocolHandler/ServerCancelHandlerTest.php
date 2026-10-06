@@ -51,4 +51,20 @@ final class ServerCancelHandlerTest extends TestCase
             [...$stream->messages],
         );
     }
+
+    public function test_it_sends_cannot_cancel_when_a_cancel_names_itself(): void
+    {
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(3, new CancelRequest(3)),
+            $this->mockToken,
+        );
+
+        $this->assertEquals(
+            [new LdapMessageResponse(
+                3,
+                new ExtendedResponse(new LdapResult(ResultCode::CANNOT_CANCEL)),
+            )],
+            [...$stream->messages],
+        );
+    }
 }
