@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnsupportedExtendedHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -222,6 +223,8 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         HandlerContext $context,
     ): ServerDispatchHandler {
         $backend = $container->get(ReadBackendInterface::class);
+        $accessControl = $container->get(AccessControlInterface::class);
+        $schema = $container->get(ServerOptions::class)->getSchema();
 
         return new ServerDispatchHandler(
             backend: $backend,
@@ -231,9 +234,13 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                     $context->passwordPolicyContext,
                 ),
             ),
-            accessControl: $container->get(AccessControlInterface::class),
+            accessControl: $accessControl,
             assertions: $container->get(AssertionEvaluator::class),
-            schema: $container->get(ServerOptions::class)->getSchema(),
+            withheld: new WithheldAttributePolicy(
+                $accessControl,
+                $schema,
+            ),
+            schema: $schema,
         );
     }
 

@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -46,6 +47,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         private WriteRequestRouter $router,
         private AccessControlInterface $accessControl,
         private AssertionEvaluator $assertions,
+        private WithheldAttributePolicy $withheld,
         Schema $schema,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {
@@ -97,9 +99,11 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
             $message->controls(),
             $token,
         );
-        $match = $this->backend->compare(
+
+        $filter = $request->getFilter();
+        $match = !$this->withheld->isWithheldFromFilter($filter->getAttribute(), $token) && $this->backend->compare(
             $entry,
-            $request->getFilter(),
+            $filter,
         );
 
         return ResponseStream::of(
