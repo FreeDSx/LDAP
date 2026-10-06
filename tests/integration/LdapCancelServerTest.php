@@ -15,14 +15,19 @@ namespace Tests\Integration\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Result\EntryResult;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class LdapCancelServerTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     public function setUp(): void
     {
         parent::setUp();
@@ -73,5 +78,31 @@ final class LdapCancelServerTest extends ServerTestCase
         $this->expectExceptionCode(ResultCode::NO_SUCH_OPERATION);
 
         $this->ldapClient()->sendAndReceive(Operations::cancel(999));
+    }
+
+    public function testACancelNamingItselfCannotBeCanceled(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::bind('cn=user,dc=foo,dc=bar', '12345'),
+        ));
+        $queue->getMessage(1);
+        $queue->sendMessage(new LdapMessageRequest(
+            2,
+            Operations::cancel(2),
+        ));
+
+        $response = $queue->getMessage(2)->getResponse();
+        $queue->close();
+
+        self::assertInstanceOf(
+            ExtendedResponse::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::CANNOT_CANCEL,
+            $response->getResultCode(),
+        );
     }
 }
