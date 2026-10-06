@@ -400,7 +400,10 @@ final class LdapServerTest extends ServerTestCase
     {
         $output = $this->ldapClient()->whoami();
 
-        $this->assertNull($output);
+        $this->assertSame(
+            '',
+            $output,
+        );
     }
 
     public function testItCanHandlingPaging(): void

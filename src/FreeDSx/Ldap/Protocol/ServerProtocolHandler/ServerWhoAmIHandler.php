@@ -33,7 +33,8 @@ class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {
-        $userId = null;
+        // RFC 4532 §3: an anonymous identity gets a response field that is present but empty.
+        $userId = '';
 
         if ($token instanceof AuthenticatedTokenInterface) {
             $userId = $token->getAuthzId()->toString();

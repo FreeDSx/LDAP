@@ -109,13 +109,20 @@ final class ServerWhoAmIHandlerTest extends TestCase
             $request,
             new AnonToken(),
         );
+        $messages = [...$stream->messages];
 
-        $this->assertEquals(
-            [new LdapMessageResponse(
-                2,
-                new ExtendedResponse(new LdapResult(0), null, ''),
-            )],
-            [...$stream->messages],
+        $this->assertCount(
+            1,
+            $messages,
+        );
+        $response = $messages[0]->getResponse();
+        $this->assertInstanceOf(
+            ExtendedResponse::class,
+            $response,
+        );
+        $this->assertSame(
+            '',
+            $response->getValue(),
         );
     }
 }

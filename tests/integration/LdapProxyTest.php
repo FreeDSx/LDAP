@@ -222,7 +222,10 @@ final class LdapProxyTest extends ServerTestCase
         } catch (BindException) {
         }
 
-        self::assertNull($this->ldapClient()->whoami());
+        self::assertSame(
+            '',
+            $this->ldapClient()->whoami(),
+        );
     }
 
     public function testLosingTheUpstreamEndsTheProxiedSession(): void
@@ -275,7 +278,10 @@ final class LdapProxyTest extends ServerTestCase
         );
 
         // The upstream refuses every unprotected operation, so an answer at all proves the hop was upgraded first.
-        self::assertNull($this->ldapClient()->whoami());
+        self::assertSame(
+            '',
+            $this->ldapClient()->whoami(),
+        );
     }
 
     public function testItProtectsTheUpstreamHopForABindThatFollowsNoOtherOperation(): void
