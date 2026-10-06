@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
-use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
@@ -26,11 +25,10 @@ use FreeDSx\Ldap\Server\AccessControl\WithheldValueModifyGuard;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
-use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 
 /**
- * Withholds attributes from search and compare assertions, sort keys, and value-level modifies, before storage.
+ * Withholds attributes from search assertions, sort keys, and value-level modifies, before storage.
  *
  * @internal
  *
@@ -53,9 +51,6 @@ final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
 
         if ($request instanceof SearchRequest) {
             return $this->processSearch($context, $next, $request);
-        }
-        if ($request instanceof CompareRequest) {
-            return $this->processCompare($context, $next, $request);
         }
         if ($request instanceof ModifyRequest) {
             $this->valueModify->assertAllowed(
@@ -96,35 +91,5 @@ final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
         $request->setFilter($rewritten);
 
         return $next->handle($context);
-    }
-
-    /**
-     * Compare is the same disclosure by another name, and RFC 4511 folds Undefined into compareFalse.
-     */
-    private function processCompare(
-        ServerRequestContext $context,
-        MiddlewareHandlerInterface $next,
-        CompareRequest $request,
-    ): ResponseStream {
-        $rewritten = $this->rewriter->rewrite(
-            $request->getFilter(),
-            $context->tokenOrFail(),
-        );
-
-        if (!$this->rewriter->isAbsoluteFalse($rewritten)) {
-            return $next->handle($context);
-        }
-        $result = CompareOperationResult::completed(
-            $context->message,
-            false,
-        );
-
-        return ResponseStream::of(
-            [$this->responseFactory->getStandardResponse(
-                $context->message,
-                $result->resultCode(),
-            )],
-            $result,
-        );
     }
 }

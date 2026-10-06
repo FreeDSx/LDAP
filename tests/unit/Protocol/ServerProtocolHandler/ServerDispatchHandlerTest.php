@@ -41,6 +41,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
@@ -71,6 +72,9 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
+        $this->mockAccessControl
+            ->method('mayFilterOnAttribute')
+            ->willReturnCallback(static fn(TokenInterface $token, string $attribute): bool => $attribute !== 'secret');
 
         $this->subject = new ServerDispatchHandler(
             backend: $this->mockBackend,
@@ -85,6 +89,7 @@ final class ServerDispatchHandlerTest extends TestCase
                     new LinkedAttributes(new Schema()),
                 ),
             ),
+            withheld: new WithheldAttributePolicy($this->mockAccessControl),
             schema: new Schema(),
         );
     }
@@ -241,6 +246,63 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::never())
             ->method('compare');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->subject->handleRequest($compare, $this->mockToken);
+    }
+
+    public function test_a_compare_on_a_withheld_attribute_answers_false_without_comparing(): void
+    {
+        $this->mockBackend
+            ->method('getOrFail')
+            ->willReturn(Entry::fromArray(
+                'cn=foo,dc=bar',
+                ['secret' => ['bar']],
+            ));
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('compare');
+
+        $outcome = $this->subject->handleRequest(
+            new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('secret', 'bar'))),
+            $this->mockToken,
+        )->outcome();
+
+        self::assertInstanceOf(
+            CompareOperationResult::class,
+            $outcome,
+        );
+        self::assertSame(
+            ResultCode::COMPARE_FALSE,
+            $outcome->resultCode(),
+        );
+    }
+
+    public function test_a_failing_assertion_refuses_a_compare_on_a_withheld_attribute(): void
+    {
+        $compare = new LdapMessageRequest(
+            1,
+            new CompareRequest('cn=foo,dc=bar', Filters::equal('secret', 'bar')),
+            Controls::assertion(Filters::equal('foo', 'nope')),
+        );
+
+        $this->mockBackend
+            ->method('getOrFail')
+            ->willReturn(Entry::fromArray(
+                'cn=foo,dc=bar',
+                [
+                    'foo' => ['bar'],
+                    'secret' => ['bar'],
+                ],
+            ));
+        $this->mockAccessControl
+            ->method('stripUnreadableAttributes')
+            ->willReturnArgument(1);
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(false);
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);

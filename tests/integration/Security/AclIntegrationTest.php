@@ -971,6 +971,33 @@ final class AclIntegrationTest extends ServerTestCase
         ));
     }
 
+    public function testComparingAConfidentialAttributeUnderAFalseAssertionAnswersAssertionFailed(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'secretCode',
+            LdapAclCommand::SECRET_CODE,
+            Controls::assertion(Filters::equal('cn', 'nope')),
+        );
+    }
+
+    public function testComparingAConfidentialAttributeUnderATrueAssertionIsFalse(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'secretCode',
+            LdapAclCommand::SECRET_CODE,
+            Controls::assertion(Filters::equal('cn', 'alice')),
+        ));
+    }
+
     public function testComparingAnotherUsersPasswordIsDenied(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');

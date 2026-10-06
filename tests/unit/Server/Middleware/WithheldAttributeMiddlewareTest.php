@@ -137,32 +137,7 @@ final class WithheldAttributeMiddlewareTest extends TestCase
         );
     }
 
-    public function test_a_compare_on_a_withheld_attribute_answers_compare_false(): void
-    {
-        $this->next
-            ->expects(self::never())
-            ->method('handle');
-
-        $stream = $this->subject->process(
-            $this->context(Operations::compare(
-                'cn=alice,dc=foo,dc=bar',
-                'userPassword',
-                'secret',
-            )),
-            $this->next,
-        );
-
-        self::assertSame(
-            OperationOutcome::Succeeded,
-            $stream->outcome()->outcome(),
-        );
-        self::assertSame(
-            ResultCode::COMPARE_FALSE,
-            $stream->outcome()->resultCode(),
-        );
-    }
-
-    public function test_a_compare_on_an_ordinary_attribute_is_passed_on(): void
+    public function test_a_compare_on_a_withheld_attribute_is_passed_on_to_its_handler(): void
     {
         $this->next
             ->expects(self::once())
@@ -172,8 +147,8 @@ final class WithheldAttributeMiddlewareTest extends TestCase
         $this->subject->process(
             $this->context(Operations::compare(
                 'cn=alice,dc=foo,dc=bar',
-                'cn',
-                'alice',
+                'userPassword',
+                'secret',
             )),
             $this->next,
         );
