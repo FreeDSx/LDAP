@@ -16,46 +16,30 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
-use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
- * Handles generic requests that are dispatched to the backend.
+ * Handles the write requests that are dispatched to the backend.
  *
-     * @author Chad Sikorra <Chad.Sikorra@gmail.com>
+ * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
 {
-    private ReadEntryControlHandler $readEntryControlHandler;
-
     public function __construct(
-        private ReadBackendInterface $backend,
         private WriteRequestRouter $router,
-        private AccessControlInterface $accessControl,
         private AssertionEvaluator $assertions,
-        private WithheldAttributePolicy $withheld,
-        Schema $schema,
+        private ReadEntryControlHandler $readEntryControlHandler,
         private ResponseFactory $responseFactory = new ResponseFactory(),
-    ) {
-        $this->readEntryControlHandler = new ReadEntryControlHandler(
-            $schema,
-            $this->accessControl,
-        );
-    }
+    ) {}
 
     /**
      * {@inheritDoc}
@@ -64,67 +48,6 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
      * @throws OperationException
      */
     public function handleRequest(
-        LdapMessageRequest $message,
-        TokenInterface $token,
-    ): ResponseStream {
-        $request = $message->getRequest();
-
-        if ($request instanceof Request\CompareRequest) {
-            return $this->handleCompare(
-                $message,
-                $request,
-                $token,
-            );
-        }
-
-        return $this->handleWrite(
-            $message,
-            $token,
-        );
-    }
-
-    /**
-     * @throws OperationException
-     * @throws EncoderException
-     */
-    private function handleCompare(
-        LdapMessageRequest $message,
-        Request\CompareRequest $request,
-        TokenInterface $token,
-    ): ResponseStream {
-        // The assertion and the comparison are answered from one read of the entry (RFC 4528 §3).
-        $entry = $this->backend->getOrFail($request->getDn());
-        $this->assertions->assertSatisfiedBy(
-            $entry,
-            $message->controls(),
-            $token,
-        );
-
-        $filter = $request->getFilter();
-        $match = !$this->withheld->isWithheldFromFilter($filter->getAttribute(), $token) && $this->backend->compare(
-            $entry,
-            $filter,
-        );
-
-        return ResponseStream::of(
-            [$this->responseFactory->getStandardResponse(
-                $message,
-                $match
-                    ? ResultCode::COMPARE_TRUE
-                    : ResultCode::COMPARE_FALSE,
-            )],
-            CompareOperationResult::completed(
-                $message,
-                $match,
-            ),
-        );
-    }
-
-    /**
-     * @throws OperationException
-     * @throws EncoderException
-     */
-    private function handleWrite(
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {

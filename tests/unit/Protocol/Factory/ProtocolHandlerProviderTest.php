@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCompareHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordModifyHandler;
@@ -170,10 +171,6 @@ final class ProtocolHandlerProviderTest extends TestCase
         );
         self::assertInstanceOf(
             ServerDispatchHandler::class,
-            $this->subject->get(Operations::compare('cn=foo', 'foo', 'bar'), new ControlBag()),
-        );
-        self::assertInstanceOf(
-            ServerDispatchHandler::class,
             $this->subject->get(Operations::modify('cn=foo'), new ControlBag()),
         );
         self::assertInstanceOf(
@@ -183,6 +180,14 @@ final class ProtocolHandlerProviderTest extends TestCase
         self::assertInstanceOf(
             ServerDispatchHandler::class,
             $this->subject->get(Operations::rename('cn=foo', 'cn=foo'), new ControlBag()),
+        );
+    }
+
+    public function test_it_should_get_the_compare_handler_for_a_compare_request(): void
+    {
+        self::assertInstanceOf(
+            ServerCompareHandler::class,
+            $this->subject->get(Operations::compare('cn=foo', 'foo', 'bar'), new ControlBag()),
         );
     }
 

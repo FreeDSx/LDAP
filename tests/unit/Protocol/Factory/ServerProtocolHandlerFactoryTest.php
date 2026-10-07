@@ -83,6 +83,7 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
         yield 'paging' => [Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag(new PagingControl(10)), HandlerId::Paging];
         yield 'search' => [Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag(), HandlerId::Search];
         yield 'unbind' => [Operations::unbind(), new ControlBag(), HandlerId::Unbind];
+        yield 'compare' => [Operations::compare('cn=foo', 'cn', 'foo'), new ControlBag(), HandlerId::Compare];
         yield 'delete dispatch' => [Operations::delete('cn=foo'), new ControlBag(), HandlerId::Dispatch];
     }
 }

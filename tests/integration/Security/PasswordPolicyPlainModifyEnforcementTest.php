@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\PasswordPolicyResponseInterceptor;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -37,6 +36,7 @@ use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
@@ -421,15 +421,13 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
             $guard,
         );
 
-        $accessControl = $this->createMock(AccessControlInterface::class);
-
         return new ServerDispatchHandler(
-            backend: $this->backend,
             router: new WriteRequestRouter($policyWriteHandler),
-            accessControl: $accessControl,
             assertions: $container->get(AssertionEvaluator::class),
-            withheld: new WithheldAttributePolicy($accessControl),
-            schema: new Schema(),
+            readEntryControlHandler: new ReadEntryControlHandler(
+                new Schema(),
+                $this->createMock(AccessControlInterface::class),
+            ),
         );
     }
 

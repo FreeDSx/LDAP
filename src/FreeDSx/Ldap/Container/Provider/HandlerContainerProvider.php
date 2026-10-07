@@ -18,7 +18,9 @@ use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAbandonHandler;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCancelHandler;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCompareHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
@@ -115,6 +117,8 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 => $this->makeSearchHandler($container, $limits),
             HandlerId::Unbind->value => static fn(): ServerProtocolHandlerInterface
                 => new ServerUnbindHandler(),
+            HandlerId::Compare->value => fn(): ServerProtocolHandlerInterface
+                => $this->makeCompareHandler($container),
             HandlerId::Dispatch->value => fn(HandlerContext $context): ServerProtocolHandlerInterface
                 => $this->makeDispatchHandler($container, $context),
         ]);
@@ -222,25 +226,30 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         Container $container,
         HandlerContext $context,
     ): ServerDispatchHandler {
-        $backend = $container->get(ReadBackendInterface::class);
-        $accessControl = $container->get(AccessControlInterface::class);
-        $schema = $container->get(ServerOptions::class)->getSchema();
-
         return new ServerDispatchHandler(
-            backend: $backend,
             router: new WriteRequestRouter(
                 $container->get(PasswordPolicyComponentFactory::class)->makeWriteDispatcher(
                     $context->eventLogger,
                     $context->passwordPolicyContext,
                 ),
             ),
-            accessControl: $accessControl,
+            assertions: $container->get(AssertionEvaluator::class),
+            readEntryControlHandler: new ReadEntryControlHandler(
+                $container->get(ServerOptions::class)->getSchema(),
+                $container->get(AccessControlInterface::class),
+            ),
+        );
+    }
+
+    private function makeCompareHandler(Container $container): ServerCompareHandler
+    {
+        return new ServerCompareHandler(
+            backend: $container->get(ReadBackendInterface::class),
             assertions: $container->get(AssertionEvaluator::class),
             withheld: new WithheldAttributePolicy(
-                $accessControl,
-                $schema,
+                $container->get(AccessControlInterface::class),
+                $container->get(ServerOptions::class)->getSchema(),
             ),
-            schema: $schema,
         );
     }
 

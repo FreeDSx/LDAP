@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
+use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -53,6 +54,7 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
             $this->isPagingSearch($request, $controls) => HandlerId::Paging,
             $request instanceof SearchRequest => HandlerId::Search,
             $request instanceof UnbindRequest => HandlerId::Unbind,
+            $request instanceof CompareRequest => HandlerId::Compare,
             default => HandlerId::Dispatch,
         };
     }

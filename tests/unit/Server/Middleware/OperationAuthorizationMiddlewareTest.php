@@ -373,9 +373,9 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNull($this->next->received);
     }
 
-    public function test_dispatch_route_compare_attribute_denial_blocks_dispatch(): void
+    public function test_compare_route_attribute_denial_blocks_the_compare(): void
     {
-        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->routeResolvesTo(HandlerId::Compare);
         $this->accessControl
             ->method('authorizeAttribute')
             ->willThrowException($this->denied());
@@ -394,9 +394,9 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNull($this->next->received);
     }
 
-    public function test_dispatch_route_compare_normalizes_attribute_options_for_authorization(): void
+    public function test_compare_route_normalizes_attribute_options_for_authorization(): void
     {
-        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->routeResolvesTo(HandlerId::Compare);
         $this->accessControl
             ->expects(self::once())
             ->method('authorizeAttribute')
@@ -777,7 +777,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
     public static function routesCarryingAPrivilegedControl(): array
     {
         return [
-            'compare' => [HandlerId::Dispatch, new CompareRequest('cn=foo,dc=bar', Filters::equal('cn', 'foo'))],
+            'compare' => [HandlerId::Compare, new CompareRequest('cn=foo,dc=bar', Filters::equal('cn', 'foo'))],
             'extended' => [HandlerId::UnsupportedExtended, new ExtendedRequest('1.2.3.4')],
             'search' => [HandlerId::Search, (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar')],
             'paging' => [HandlerId::Paging, (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar')],

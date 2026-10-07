@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Server\Middleware;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
@@ -175,13 +174,14 @@ final class ServerControlRegistry
             HandlerId::Search => self::SEARCH_CONTROLS,
             HandlerId::Paging => self::PAGING_CONTROLS,
             HandlerId::Dispatch => $this->dispatchControlsFor($request, $controls),
+            HandlerId::Compare => self::COMPARE_CONTROLS,
             HandlerId::Sync => self::SYNC_CONTROLS,
             default => [],
         };
     }
 
     /**
-     * One handler serves five operations whose control vocabularies differ, so the request decides rather than
+     * One handler serves four operations whose control vocabularies differ, so the request decides rather than
      * the route it took (RFC 4511 §4.1.11, RFC 4527 §3.1 and §3.2).
      *
      * @return list<string>
@@ -197,7 +197,6 @@ final class ServerControlRegistry
             $request instanceof DeleteRequest
                 && $controls->has(Control::OID_SUBTREE_DELETE) => self::SUBTREE_DELETE_CONTROLS,
             $request instanceof DeleteRequest => self::DELETE_CONTROLS,
-            $request instanceof CompareRequest => self::COMPARE_CONTROLS,
             default => [],
         };
     }
