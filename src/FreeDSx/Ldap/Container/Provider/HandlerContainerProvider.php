@@ -41,6 +41,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -234,6 +235,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 ),
             ),
             assertions: $container->get(AssertionEvaluator::class),
+            derived: $container->get(DerivedResolver::class),
             readEntryControlHandler: new ReadEntryControlHandler(
                 $container->get(ServerOptions::class)->getSchema(),
                 $container->get(AccessControlInterface::class),

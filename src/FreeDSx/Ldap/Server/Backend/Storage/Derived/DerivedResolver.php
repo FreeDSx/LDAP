@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Derived;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
@@ -26,7 +27,41 @@ use FreeDSx\Ldap\Server\GeneratedEntry;
  */
 final readonly class DerivedResolver
 {
+    use DerivedAttributeTrait;
+
     public function __construct(private ReadEntryInterface $storage) {}
+
+    /**
+     * A copy carrying each derived attribute the request names or selects with "+", or the entry when it asks for none.
+     *
+     * @param array<Attribute> $requested
+     * @param ?Entry $subordinatesOf The entry whose children decide hasSubordinates, when it is not the one given.
+     */
+    public function injectRequested(
+        Entry $entry,
+        array $requested,
+        ?Entry $subordinatesOf = null,
+    ): Entry {
+        $names = self::derivedTypesRequested($requested);
+        if ($names === []) {
+            return $entry;
+        }
+        $copy = $entry->makeCopy();
+
+        foreach ($names as $name) {
+            $copy->set(
+                $name,
+                $this->resolve(
+                    $name,
+                    $name === AttributeTypeOid::NAME_HAS_SUBORDINATES
+                        ? $subordinatesOf ?? $entry
+                        : $entry,
+                ),
+            );
+        }
+
+        return $copy;
+    }
 
     /**
      * @param string $name A canonical type name, which callers get from {@see DerivedAttributeTrait}.

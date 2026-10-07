@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
@@ -36,8 +35,6 @@ use Generator;
  */
 final readonly class SearchStreamBuilder
 {
-    use DerivedAttributeTrait;
-
     /**
      * @param FilterEvaluatorInterface $filterEvaluator Must know the configured schema, or matching rules are ignored.
      */
@@ -113,40 +110,15 @@ final readonly class SearchStreamBuilder
     ): Generator {
         foreach ($generator as $fetched) {
             yield new FetchedEntry(
-                $this->injectDerived($fetched->entry, $request),
+                $this->derivedResolver->injectRequested(
+                    $fetched->entry,
+                    $request->getAttributes(),
+                ),
                 $fetched->cursor,
             );
         }
 
         return $generator->getReturn();
-    }
-
-    /**
-     * Operational attributes held by nothing in storage, so they are computed per read and only when asked for.
-     */
-    private function injectDerived(
-        Entry $entry,
-        SearchRequest $request,
-    ): Entry {
-        $requested = self::derivedTypesRequested($request->getAttributes());
-
-        if ($requested === []) {
-            return $entry;
-        }
-
-        $copy = $entry->makeCopy();
-
-        foreach ($requested as $name) {
-            $copy->set(
-                $name,
-                $this->derivedResolver->resolve(
-                    $name,
-                    $entry,
-                ),
-            );
-        }
-
-        return $copy;
     }
 
     /**

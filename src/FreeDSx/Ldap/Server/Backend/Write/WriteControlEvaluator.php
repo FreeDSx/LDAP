@@ -15,9 +15,12 @@ namespace FreeDSx\Ldap\Server\Backend\Write;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Control\ReadEntry\ReadEntryControl;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -40,14 +43,20 @@ class WriteControlEvaluator
         Control::OID_POST_READ,
     ];
 
+    private ?Entry $target = null;
+
     private ?Entry $preReadEntry = null;
 
     private ?Entry $postReadEntry = null;
 
+    /**
+     * @param ?DerivedResolver $derived Adds the derived attributes a read-entry control asks for; none when null.
+     */
     public function __construct(
         private readonly AssertionEvaluator $assertions,
         private readonly TokenInterface $token,
         private readonly ControlBag $controls,
+        private readonly ?DerivedResolver $derived = null,
     ) {}
 
     /**
@@ -62,6 +71,7 @@ class WriteControlEvaluator
             $this->controls,
             $this->token,
         );
+        $this->target = $current;
         $this->preReadEntry = $this->keptFor(
             Control::OID_PRE_READ,
             $current,
@@ -125,8 +135,24 @@ class WriteControlEvaluator
         string $oid,
         Entry $entry,
     ): ?Entry {
-        return $this->controls->has($oid)
-            ? $entry->makeCopy()
-            : null;
+        $control = $this->controls->get($oid);
+        if (!$control instanceof ReadEntryControl) {
+            return null;
+        }
+        $kept = $entry->makeCopy();
+
+        if ($this->derived === null) {
+            return $kept;
+        }
+
+        // Subordinates are counted on the target, as a write only ever moves them along with it.
+        return $this->derived->injectRequested(
+            $kept,
+            array_map(
+                static fn(string $name): Attribute => new Attribute($name),
+                $control->getAttributes(),
+            ),
+            $this->target,
+        );
     }
 }

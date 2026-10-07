@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -26,10 +27,13 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -39,10 +43,13 @@ final class WriteControlEvaluatorTest extends TestCase
 
     private AssertionEvaluator $assertions;
 
+    private ReadEntryInterface&MockObject $storage;
+
     private Entry $entry;
 
     protected function setUp(): void
     {
+        $this->storage = $this->createMock(ReadEntryInterface::class);
         $this->assertions = new AssertionEvaluator(
             $this->fromContainer(FilterEvaluatorInterface::class),
             $this->createMock(ReadBackendInterface::class),
@@ -150,12 +157,76 @@ final class WriteControlEvaluatorTest extends TestCase
         );
     }
 
+    public function test_a_post_read_carries_the_derived_attributes_it_names(): void
+    {
+        $subject = $this->evaluatorFor(new PostReadControl('entryDN', 'subschemaSubentry'));
+
+        $subject->captureResult($this->entry);
+        $kept = $subject->postReadEntry();
+
+        self::assertNotNull($kept);
+        self::assertSame(
+            ['cn=foo,dc=ex,dc=com'],
+            $kept->get('entryDN')?->getValues(),
+        );
+        self::assertSame(
+            ['cn=Subschema'],
+            $kept->get('subschemaSubentry')?->getValues(),
+        );
+    }
+
+    public function test_a_pre_read_selects_the_derived_attributes_with_the_operational_wildcard(): void
+    {
+        $subject = $this->evaluatorFor(new PreReadControl('+'));
+
+        $subject->evaluateTarget($this->entry);
+
+        self::assertSame(
+            ['cn=foo,dc=ex,dc=com'],
+            $subject->preReadEntry()?->get('entryDN')?->getValues(),
+        );
+    }
+
+    public function test_a_read_control_naming_no_derived_attribute_adds_none(): void
+    {
+        $this->storage
+            ->expects(self::never())
+            ->method('hasChildren');
+        $subject = $this->evaluatorFor(new PostReadControl('sn'));
+
+        $subject->captureResult($this->entry);
+
+        self::assertNull($subject->postReadEntry()?->get('entryDN'));
+    }
+
+    public function test_a_post_read_counts_subordinates_on_the_entry_the_write_found(): void
+    {
+        $this->storage
+            ->expects(self::once())
+            ->method('hasChildren')
+            ->with(self::callback(static fn(Dn $dn): bool => $dn->toString() === 'cn=foo,dc=ex,dc=com'))
+            ->willReturn(true);
+        $subject = $this->evaluatorFor(new PostReadControl('hasSubordinates'));
+
+        $subject->evaluateTarget($this->entry);
+        $subject->captureResult(Entry::fromArray(
+            'cn=renamed,dc=ex,dc=com',
+            ['cn' => ['renamed']],
+        ));
+
+        self::assertSame(
+            ['TRUE'],
+            $subject->postReadEntry()?->get('hasSubordinates')?->getValues(),
+        );
+    }
+
     private function evaluatorFor(Control ...$controls): WriteControlEvaluator
     {
         return new WriteControlEvaluator(
             $this->assertions,
             BindToken::fromDn('cn=foo,dc=ex,dc=com'),
             new ControlBag(...$controls),
+            new DerivedResolver($this->storage),
         );
     }
 }
