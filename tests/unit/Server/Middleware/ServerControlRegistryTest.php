@@ -116,11 +116,23 @@ final class ServerControlRegistryTest extends TestCase
                 Control::OID_SUBTREE_DELETE,
             ],
         ];
-        // A compare reads rather than updates, so it takes neither the read-entry pair nor relax.
-        yield 'compare' => [
-            Operations::compare('cn=foo,dc=foo,dc=bar', 'cn', 'foo'),
-            [Control::OID_ASSERTION],
-        ];
+    }
+
+    public function test_a_compare_supports_the_assertion_but_neither_the_read_entry_pair_nor_relax(): void
+    {
+        self::assertSame(
+            [
+                Control::OID_PROXY_AUTHORIZATION,
+                Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
+                Control::OID_ASSERTION,
+            ],
+            $this->subject->supportedControlsFor(
+                HandlerId::Compare,
+                Operations::compare('cn=foo,dc=foo,dc=bar', 'cn', 'foo'),
+                new ControlBag(),
+            ),
+        );
     }
 
     /**
@@ -237,6 +249,7 @@ final class ServerControlRegistryTest extends TestCase
         yield 'search' => [HandlerId::Search];
         yield 'paging' => [HandlerId::Paging];
         yield 'dispatch' => [HandlerId::Dispatch];
+        yield 'compare' => [HandlerId::Compare];
         yield 'whoami' => [HandlerId::WhoAmI];
         yield 'root dse' => [HandlerId::RootDse];
         yield 'cancel' => [HandlerId::Cancel];

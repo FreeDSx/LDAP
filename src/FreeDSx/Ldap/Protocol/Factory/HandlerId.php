@@ -35,5 +35,6 @@ enum HandlerId: string
     case Sync = 'sync';
     case Search = 'search';
     case Unbind = 'unbind';
+    case Compare = 'compare';
     case Dispatch = 'dispatch';
 }

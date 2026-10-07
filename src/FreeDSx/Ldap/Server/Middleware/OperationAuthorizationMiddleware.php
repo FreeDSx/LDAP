@@ -112,6 +112,11 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             // Left ungated on purpose. RFC 4513 section 5.2.1.5 has servers allow all clients, including anonymous
             // ones, to read supportedSASLMechanisms before authenticating, and comparing that list before and after a
             // SASL exchange is how a client detects a downgrade attack. Per-attribute read rules still apply.
+        } elseif ($routeId === HandlerId::Compare) {
+            $this->authorizeCompare(
+                $context->message,
+                $context->tokenOrFail(),
+            );
         } elseif ($routeId === HandlerId::Dispatch) {
             $this->authorizeDispatch(
                 $context->message,
@@ -298,16 +303,33 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             $request,
             $token,
         );
+    }
 
-        if ($request instanceof CompareRequest) {
-            // Normalize away attribute options so a rule on the base type still applies.
-            $this->accessControl->authorizeAttribute(
-                $token,
-                $request->getDn(),
-                $this->attributeFromString($request->getFilter()->getAttribute())->getName(),
-                AttributeAccess::Read,
-            );
+    /**
+     * @throws OperationException
+     */
+    private function authorizeCompare(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+    ): void {
+        $request = $message->getRequest();
+
+        $this->authorizeRequest(
+            $request,
+            $token,
+        );
+
+        if (!$request instanceof CompareRequest) {
+            return;
         }
+
+        // Normalize away attribute options so a rule on the base type still applies.
+        $this->accessControl->authorizeAttribute(
+            $token,
+            $request->getDn(),
+            $this->attributeFromString($request->getFilter()->getAttribute())->getName(),
+            AttributeAccess::Read,
+        );
     }
 
     /**
