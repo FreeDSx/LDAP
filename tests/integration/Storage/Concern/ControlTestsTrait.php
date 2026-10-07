@@ -518,6 +518,107 @@ trait ControlTestsTrait
         );
     }
 
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function derivedAttributeSelections(): iterable
+    {
+        yield 'named' => [[
+            'entryDN',
+            'subschemaSubentry',
+            'hasSubordinates',
+        ]];
+        yield 'operational wildcard' => [[
+            '+',
+        ]];
+    }
+
+    /**
+     * @param list<string> $attributes
+     */
+    #[DataProvider('derivedAttributeSelections')]
+    public function testAPostReadCarriesTheDerivedAttributesItSelects(array $attributes): void
+    {
+        $this->authenticateAdmin();
+        $dn = 'cn=post-read-derived,dc=foo,dc=bar';
+        $this->ldapClient()->create(Entry::fromArray($dn, [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['post-read-derived'],
+            'sn' => ['Before'],
+        ]));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::modify(
+                $dn,
+                Change::replace('sn', 'After'),
+            ),
+            Controls::postRead(...$attributes),
+        );
+        $this->ldapClient()->delete($dn);
+
+        $postRead = $response->controls()->get(Control::OID_POST_READ);
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertSame(
+            [$dn],
+            $postRead->getEntry()->get('entryDN')?->getValues(),
+        );
+        self::assertSame(
+            ['cn=Subschema'],
+            $postRead->getEntry()->get('subschemaSubentry')?->getValues(),
+        );
+        self::assertSame(
+            ['FALSE'],
+            $postRead->getEntry()->get('hasSubordinates')?->getValues(),
+        );
+    }
+
+    public function testThePreReadAndPostReadOfARenamedParentReportItsSubordinates(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray('ou=before-parent,dc=foo,dc=bar', [
+            'objectClass' => ['organizationalUnit'],
+            'ou' => ['before-parent'],
+        ]));
+        $this->ldapClient()->create(Entry::fromArray('cn=child,ou=before-parent,dc=foo,dc=bar', [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['child'],
+            'sn' => ['Child'],
+        ]));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::rename(
+                'ou=before-parent,dc=foo,dc=bar',
+                'ou=after-parent',
+            ),
+            Controls::preRead('hasSubordinates'),
+            Controls::postRead('hasSubordinates'),
+        );
+        $this->ldapClient()->delete('cn=child,ou=after-parent,dc=foo,dc=bar');
+        $this->ldapClient()->delete('ou=after-parent,dc=foo,dc=bar');
+
+        $preRead = $response->controls()->get(Control::OID_PRE_READ);
+        $postRead = $response->controls()->get(Control::OID_POST_READ);
+        self::assertInstanceOf(
+            PreReadResponseControl::class,
+            $preRead,
+        );
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertSame(
+            ['TRUE'],
+            $preRead->getEntry()->get('hasSubordinates')?->getValues(),
+        );
+        self::assertSame(
+            ['TRUE'],
+            $postRead->getEntry()->get('hasSubordinates')?->getValues(),
+        );
+    }
+
     public function testAnAssertionMatchingTheSearchBaseLetsTheSearchRun(): void
     {
         $this->authenticateUser();
