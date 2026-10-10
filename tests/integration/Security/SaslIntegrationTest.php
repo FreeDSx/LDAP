@@ -294,6 +294,39 @@ final class SaslIntegrationTest extends ServerTestCase
         }
     }
 
+    public function testAFailedReplacementBindIsAnsweredOnce(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new SaslBindRequest('PLAIN', "\x00user\x00wrong"),
+            ));
+            self::assertSame(
+                ResultCode::INVALID_CREDENTIALS,
+                $this->resultCodeOf($queue->getMessage(2)),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                3,
+                new SaslBindRequest('PLAIN', "\x00user\x0012345"),
+            ));
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $this->resultCodeOf($queue->getMessage(3)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     /**
      * RFC 4513 5.2.1.2: server-final data rides out with the success rather than costing another round trip.
      */
