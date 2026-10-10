@@ -129,7 +129,11 @@ final class LdifLineCursor
     {
         $startLine = $this->lineNumber;
         $startSource = $this->current;
-        $line = $this->current ?? '';
+        $this->advance();
+
+        // RFC 2849 note 2: a fold may land anywhere.
+        // The logical line is joined before any of it is parsed.
+        $line = $this->readFolded($startSource ?? '');
         $colon = strpos($line, self::SEPARATOR);
 
         if ($colon === false || $colon === 0) {
@@ -142,31 +146,30 @@ final class LdifLineCursor
 
         $name = substr($line, 0, $colon);
         $marker = $line[$colon + 1] ?? '';
-        $this->advance();
 
         if ($marker === self::SEPARATOR) {
             $value = $this->decodeBase64(
-                $this->readFolded(ltrim(
-                    substr($line, $colon + 2),
-                    ' ',
-                )),
+                self::valueFrom(
+                    $line,
+                    $colon + 2,
+                ),
                 $startLine,
                 $startSource,
             );
         } elseif ($marker === self::URL_MARKER) {
             $value = $this->resolveUrl(
-                $this->readFolded(ltrim(
-                    substr($line, $colon + 2),
-                    ' ',
-                )),
+                self::valueFrom(
+                    $line,
+                    $colon + 2,
+                ),
                 $startLine,
                 $startSource,
             );
         } else {
-            $value = $this->readFolded(ltrim(
-                substr($line, $colon + 1),
-                ' ',
-            ));
+            $value = self::valueFrom(
+                $line,
+                $colon + 1,
+            );
         }
 
         return new LdifDirective(
@@ -223,7 +226,10 @@ final class LdifLineCursor
         string $spec,
         LdifDirective $directive,
     ): string {
-        $payload = ltrim(substr($spec, 1), ' ');
+        $payload = self::valueFrom(
+            $spec,
+            1,
+        );
 
         return match ($spec[0] ?? '') {
             self::SEPARATOR => $this->decodeBase64(
@@ -236,7 +242,10 @@ final class LdifLineCursor
                 $directive->position,
                 $directive->sourceLine,
             ),
-            default => ltrim($spec, ' '),
+            default => self::valueFrom(
+                $spec,
+                0,
+            ),
         };
     }
 
@@ -287,6 +296,19 @@ final class LdifLineCursor
             $directive->position,
             $directive->sourceLine,
             $message,
+        );
+    }
+
+    /**
+     * The value starting at the offset, without the FILL spaces that may precede it (RFC 2849 value-spec).
+     */
+    private static function valueFrom(
+        string $spec,
+        int $offset,
+    ): string {
+        return ltrim(
+            substr($spec, $offset),
+            ' ',
         );
     }
 
