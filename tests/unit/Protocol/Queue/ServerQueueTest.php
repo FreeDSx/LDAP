@@ -615,6 +615,28 @@ final class ServerQueueTest extends TestCase
         );
     }
 
+    public function test_a_requeued_message_is_read_before_anything_already_pending(): void
+    {
+        $queue = $this->makeQueueWithEncodedRequest(
+            new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')),
+        );
+        $queue->peekForCancelSignal(2);
+
+        $queue->requeue(new LdapMessageRequest(
+            6,
+            new UnbindRequest(),
+        ));
+
+        self::assertSame(
+            6,
+            $queue->getMessage()->getMessageId(),
+        );
+        self::assertSame(
+            5,
+            $queue->getMessage()->getMessageId(),
+        );
+    }
+
     public function test_it_should_reject_a_request_whose_declared_length_exceeds_the_max_receive_size(): void
     {
         $socket = $this->createMock(Socket::class);

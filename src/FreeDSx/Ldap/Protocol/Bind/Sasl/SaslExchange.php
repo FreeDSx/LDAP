@@ -22,8 +22,10 @@ use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
@@ -50,6 +52,8 @@ use Throwable;
  */
 final class SaslExchange
 {
+    private const BIND_IN_PROGRESS = 'A SASL bind is in progress.';
+
     public function __construct(
         private readonly ServerQueue $queue,
         private readonly ResponseFactory $responseFactory,
@@ -116,6 +120,8 @@ final class SaslExchange
                 $resolvedDn = $effective->getResolvedDn();
                 $authorizingDn = $effective->getAuthorizingDn();
             }
+        } catch (ResponseAlreadySentException $e) {
+            throw $e;
         } catch (OperationException $e) {
             // Once $message is a continuation, the outer ServerProtocolHandler holds a stale
             // initial-bind ID. Send the error here with the correct ID before re-throwing.
@@ -266,7 +272,7 @@ final class SaslExchange
             );
 
             // Update $message so the correct ID is available if an error occurs in a later step.
-            $message = $this->queue->getMessage();
+            $message = $this->nextMessage();
             $received = $this->requireSaslContinuation($message, $mechName)->getCredentials();
 
             if ($usernameCredentials === null && $received !== null) {
@@ -352,22 +358,46 @@ final class SaslExchange
     }
 
     /**
+     * Reads the next message of the exchange, passing over an abandon since RFC 4511 4.11 makes a bind unabandonable.
+     *
+     * @throws RequestValidationException if a message carries an unusable message ID.
+     */
+    private function nextMessage(): LdapMessageRequest
+    {
+        do {
+            $message = $this->queue->getMessage();
+
+            // Continuations skip the validation middleware, and the challenge echoes back whatever ID arrives.
+            if ($message->getMessageId() === 0) {
+                throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
+            }
+        } while ($message->getRequest() instanceof AbandonRequest);
+
+        return $message;
+    }
+
+    /**
      * The message received mid-exchange, as a continuation of the mechanism currently running.
      *
      * @throws OperationException when an empty mechanism aborts, or the message is not a bind at all.
      * @throws SaslNegotiationAbortedException when another bind replaces the one in progress.
-     * @throws RequestValidationException if the continuation carries an unusable message ID.
+     * @throws ResponseAlreadySentException when an unbind ends the session, leaving the bind unanswered.
      */
     private function requireSaslContinuation(
         LdapMessageRequest $message,
         MechanismName $mechName,
     ): SaslBindRequest {
-        // Continuations skip the validation middleware, and the challenge echoes back whatever ID arrives.
-        if ($message->getMessageId() === 0) {
-            throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
-        }
-
         $request = $message->getRequest();
+
+        // RFC 4511 4.3 ends the session, so the bind goes unanswered and the unbind is handled as it normally is.
+        if ($request instanceof UnbindRequest) {
+            $this->queue->requeue($message);
+
+            throw new ResponseAlreadySentException(
+                self::BIND_IN_PROGRESS,
+                ResultCode::OPERATIONS_ERROR,
+            );
+        }
 
         // RFC 4511 4.2.1 gives a client three ways to abandon a negotiation, and an empty mechanism is the
         // one the server answers itself rather than treating as a replacement bind.

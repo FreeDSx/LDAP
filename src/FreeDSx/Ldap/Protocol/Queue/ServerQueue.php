@@ -105,6 +105,17 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     }
 
     /**
+     * Returns a message to the front of the queue, so the next read hands it to the dispatcher as usual.
+     */
+    public function requeue(LdapMessageRequest $message): void
+    {
+        array_unshift(
+            $this->pendingMessages,
+            $message,
+        );
+    }
+
+    /**
      * Checks whether an Abandon or Cancel targeting a message ID has arrived.
      *
      * Other messages received while peeking are buffered.
