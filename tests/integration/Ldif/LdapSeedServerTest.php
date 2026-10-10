@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RecordRefusedException;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -190,5 +191,65 @@ final class LdapSeedServerTest extends TestCase
 
         self::assertNull($this->storage->find(new Dn('dc=example,dc=com')));
         self::assertNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
+    }
+
+    public function test_an_entry_refused_by_seeding_names_its_dn_and_ldif_line(): void
+    {
+        try {
+            $this->subject->seed(new StringLdifLoader(self::SEED_LDIF . <<<LDIF
+
+
+                dn: cn=orphan,ou=missing,dc=example,dc=com
+                objectClass: top
+                objectClass: person
+                cn: orphan
+                sn: Orphan
+                LDIF));
+            self::fail('The entry whose parent is missing should have been refused.');
+        } catch (RecordRefusedException $e) {
+            self::assertSame(
+                'cn=orphan,ou=missing,dc=example,dc=com',
+                $e->getDn()->toString(),
+            );
+            self::assertSame(
+                12,
+                $e->getLdifLine(),
+            );
+            self::assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_a_reference_the_batch_leaves_unresolved_is_not_blamed_on_its_last_entry(): void
+    {
+        try {
+            $this->subject->seed(new StringLdifLoader(self::SEED_LDIF . <<<LDIF
+
+
+                dn: cn=group,dc=example,dc=com
+                objectClass: top
+                objectClass: groupOfNames
+                cn: group
+                member: cn=ghost,dc=example,dc=com
+
+                dn: cn=last,dc=example,dc=com
+                objectClass: top
+                objectClass: person
+                cn: last
+                sn: Last
+                LDIF));
+            self::fail('The unresolved member should have refused the batch.');
+        } catch (OperationException $e) {
+            self::assertNotInstanceOf(
+                RecordRefusedException::class,
+                $e,
+            );
+            self::assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
     }
 }

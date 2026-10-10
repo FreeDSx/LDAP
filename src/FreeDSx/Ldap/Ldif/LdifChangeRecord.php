@@ -32,9 +32,14 @@ final readonly class LdifChangeRecord
      */
     public array $controls;
 
+    /**
+     * @param array<Control> $controls
+     * @param ?int $line The LDIF line the record begins on, or null when it was not read from LDIF.
+     */
     public function __construct(
         public RequestInterface $request,
-        Control ...$controls,
+        array $controls = [],
+        public ?int $line = null,
     ) {
         $this->controls = array_values($controls);
     }

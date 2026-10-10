@@ -118,10 +118,13 @@ final class LdifParser
                 $cursor,
                 $dnDirective,
             )
-            : new LdifChangeRecord($this->parseContentRecord(
-                $cursor,
-                $dnDirective->value,
-            ));
+            : new LdifChangeRecord(
+                $this->parseContentRecord(
+                    $cursor,
+                    $dnDirective->value,
+                ),
+                line: $dnDirective->position,
+            );
     }
 
     /**
