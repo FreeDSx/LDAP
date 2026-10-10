@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Ldif;
 use ArrayIterator;
 use Countable;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Ldif\Url\LdifUrlResolverInterface;
@@ -56,6 +57,8 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
 
     /**
      * Buffers a loader's parsed records into a collection. For streaming, iterate {@see LdifParser::parse()} directly.
+     *
+     * @throws LdifParseException
      */
     public static function fromLoader(
         LdifLoaderInterface $loader,
@@ -70,6 +73,8 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
 
     /**
      * Convenience for buffering an in-memory LDIF string via {@see StringLdifLoader}.
+     *
+     * @throws LdifParseException
      */
     public static function fromString(
         string $ldif,

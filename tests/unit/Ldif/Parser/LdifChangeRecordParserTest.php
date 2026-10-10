@@ -258,20 +258,24 @@ final class LdifChangeRecordParserTest extends TestCase
         );
     }
 
-    public function test_it_rejects_a_modrdn_record_missing_newrdn(): void
+    public function test_it_rejects_a_modrdn_record_missing_newrdn_at_the_records_dn_line(): void
     {
-        $this->expectException(LdifParseException::class);
-        $this->expectExceptionMessage('Missing "newrdn:"');
-
-        LdifChanges::fromString("dn: cn=alice,dc=x\nchangetype: modrdn\ndeleteoldrdn: 1\n");
+        $this->assertParseFails(
+            "dn: cn=alice,dc=x\nchangetype: modrdn\ndeleteoldrdn: 1\n",
+            'Missing "newrdn:"',
+            1,
+            'dn: cn=alice,dc=x',
+        );
     }
 
-    public function test_it_rejects_a_modrdn_record_missing_deleteoldrdn(): void
+    public function test_it_rejects_a_modrdn_record_missing_deleteoldrdn_at_the_records_dn_line(): void
     {
-        $this->expectException(LdifParseException::class);
-        $this->expectExceptionMessage('Missing "deleteoldrdn:"');
-
-        LdifChanges::fromString("dn: cn=alice,dc=x\nchangetype: modrdn\nnewrdn: cn=alicia\n");
+        $this->assertParseFails(
+            "dn: cn=alice,dc=x\nchangetype: modrdn\nnewrdn: cn=alicia\n",
+            'Missing "deleteoldrdn:"',
+            1,
+            'dn: cn=alice,dc=x',
+        );
     }
 
     public function test_it_rejects_deleteoldrdn_that_is_not_zero_or_one(): void
@@ -284,12 +288,14 @@ final class LdifChangeRecordParserTest extends TestCase
         );
     }
 
-    public function test_it_rejects_an_unknown_changetype(): void
+    public function test_it_rejects_an_unknown_changetype_at_its_own_line(): void
     {
-        $this->expectException(LdifParseException::class);
-        $this->expectExceptionMessage('Unsupported changetype "bogus"');
-
-        LdifChanges::fromString("dn: cn=alice,dc=x\nchangetype: bogus\n");
+        $this->assertParseFails(
+            "dn: cn=alice,dc=x\nchangetype: bogus\n",
+            'Unsupported changetype "bogus"',
+            2,
+            'changetype: bogus',
+        );
     }
 
     public function test_it_reads_a_control_that_precedes_the_changetype(): void
@@ -394,5 +400,30 @@ final class LdifChangeRecordParserTest extends TestCase
         LdifChanges::fromString(
             "dn: cn=alice,dc=x\ncontrol: \nchangetype: delete\n",
         );
+    }
+
+    private function assertParseFails(
+        string $ldif,
+        string $message,
+        int $line,
+        string $sourceLine,
+    ): void {
+        try {
+            LdifChanges::fromString($ldif);
+            self::fail('Expected an LdifParseException.');
+        } catch (LdifParseException $e) {
+            self::assertStringContainsString(
+                $message,
+                $e->getMessage(),
+            );
+            self::assertSame(
+                $line,
+                $e->getLineNumber(),
+            );
+            self::assertSame(
+                $sourceLine,
+                $e->getSourceLine(),
+            );
+        }
     }
 }
