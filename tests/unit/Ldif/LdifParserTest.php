@@ -115,6 +115,57 @@ final class LdifParserTest extends TestCase
         );
     }
 
+    public function test_a_fold_landing_in_the_spaces_after_the_colon_leaves_them_out_of_the_value(): void
+    {
+        $entry = LdifChanges::fromString(
+            "dn: cn=foo,dc=x\ntitle:\n  twospace\n",
+        )->entries()[0];
+
+        self::assertSame(
+            ['twospace'],
+            $entry->get('title')?->getValues(),
+        );
+    }
+
+    public function test_a_fold_landing_in_the_spaces_after_a_base64_marker_still_decodes(): void
+    {
+        $entry = LdifChanges::fromString(
+            "dn: cn=foo,dc=x\ncn::\n  " . base64_encode('Bär') . "\n",
+        )->entries()[0];
+
+        self::assertSame(
+            ['Bär'],
+            $entry->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_a_fold_landing_in_the_spaces_after_a_url_marker_still_resolves(): void
+    {
+        $url = $this->tempFileUrl('photo-bytes');
+
+        $result = LdifChanges::fromString(
+            "dn: cn=foo,dc=x\ncn: foo\njpegPhoto:<\n  $url\n",
+            urlResolver: new FileUrlResolver(),
+        );
+
+        self::assertSame(
+            'photo-bytes',
+            $result->entries()[0]->get('jpegPhoto')?->firstValue(),
+        );
+    }
+
+    public function test_a_fold_inside_an_attribute_name_is_joined(): void
+    {
+        $entry = LdifChanges::fromString(
+            "dn: cn=foo,dc=x\nti\n tle: folded\n",
+        )->entries()[0];
+
+        self::assertSame(
+            ['folded'],
+            $entry->get('title')?->getValues(),
+        );
+    }
+
     public function test_it_decodes_a_base64_value(): void
     {
         $entry = LdifChanges::fromString(
