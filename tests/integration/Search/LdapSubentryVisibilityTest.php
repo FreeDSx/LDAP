@@ -167,6 +167,76 @@ class LdapSubentryVisibilityTest extends ServerTestCase
         );
     }
 
+    public function test_base_scope_hides_an_entry_when_the_control_is_true(): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            [],
+            $this->searchDns(
+                self::PEOPLE_DN,
+                SearchRequest::SCOPE_BASE_OBJECT,
+                Controls::subentries(true),
+            ),
+        );
+    }
+
+    public function test_base_scope_hides_a_subentry_when_the_control_is_false(): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            [],
+            $this->searchDns(
+                'cn=people-policy,ou=people,dc=foo,dc=bar',
+                SearchRequest::SCOPE_BASE_OBJECT,
+                Controls::subentries(false),
+            ),
+        );
+    }
+
+    public function test_base_scope_recognizes_a_subentry_when_only_other_attributes_are_requested(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('cn'))
+                ->base('cn=people-policy,ou=people,dc=foo,dc=bar')
+                ->useBaseScope()
+                ->setAttributes('cn'),
+            Controls::subentries(true),
+        );
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+    }
+
+    public function test_the_root_dse_and_the_subschema_ignore_a_non_critical_control(): void
+    {
+        $this->authenticateUser();
+
+        foreach ([true, false] as $visible) {
+            self::assertCount(
+                1,
+                $this->searchDns(
+                    '',
+                    SearchRequest::SCOPE_BASE_OBJECT,
+                    Controls::subentries($visible)->setCriticality(false),
+                ),
+            );
+            self::assertSame(
+                ['cn=Subschema'],
+                $this->searchDns(
+                    'cn=Subschema',
+                    SearchRequest::SCOPE_BASE_OBJECT,
+                    Controls::subentries($visible)->setCriticality(false),
+                ),
+            );
+        }
+    }
+
     public function test_the_control_is_accepted_rather_than_rejected_as_critical(): void
     {
         $this->authenticateUser();

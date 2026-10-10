@@ -283,12 +283,23 @@ trait ServerSearchTrait
         return new ControlBag(...$filtered);
     }
 
-    private function subentryVisibility(ControlBag $controls): SubentryVisibility
-    {
+    /**
+     * RFC 3672 §3: the control applies at every scope, and only the default without it depends on the scope.
+     */
+    private function subentryVisibility(
+        ControlBag $controls,
+        SearchRequest $request,
+    ): SubentryVisibility {
         $control = $controls->get(Control::OID_SUBENTRIES);
 
-        return $control instanceof SubentriesControl && $control->getIsVisible()
-            ? SubentryVisibility::Only
+        if ($control instanceof SubentriesControl) {
+            return $control->getIsVisible()
+                ? SubentryVisibility::Only
+                : SubentryVisibility::Hide;
+        }
+
+        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
+            ? SubentryVisibility::All
             : SubentryVisibility::Hide;
     }
 

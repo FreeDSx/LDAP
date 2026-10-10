@@ -220,7 +220,10 @@ final readonly class PageFiller
     ): EntryStream {
         return $this->backend->search(
             $pagingRequest->getSearchRequest(),
-            $this->subentryVisibility($pagingRequest->controls()),
+            $this->subentryVisibility(
+                $pagingRequest->controls(),
+                $pagingRequest->getSearchRequest(),
+            ),
             $pagingRequest->controls(),
             new SearchLimits(
                 maxSearchTimeLimit: $this->limits->maxSearchTimeLimit(),
