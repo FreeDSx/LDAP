@@ -13,10 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Replay;
 
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RecordRefusedException;
 use FreeDSx\Ldap\Ldif\LdifChangeRecord;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -33,7 +38,7 @@ final readonly class WriteRequestReplayer
 
     /**
      * @param iterable<LdifChangeRecord> $records
-     * @throws OperationException
+     * @throws RecordRefusedException
      */
     public function apply(iterable $records): void
     {
@@ -42,14 +47,22 @@ final readonly class WriteRequestReplayer
         foreach ($records as $record) {
             ++$messageId;
 
-            $this->assertApplied($this->pipeline->handle(new ServerRequestContext(
-                new LdapMessageRequest(
-                    $messageId,
-                    $record->request,
-                    ...$record->controls,
-                ),
-                new SystemToken(),
-            )));
+            try {
+                $this->assertApplied($this->pipeline->handle(new ServerRequestContext(
+                    new LdapMessageRequest(
+                        $messageId,
+                        $record->request,
+                        ...$record->controls,
+                    ),
+                    new SystemToken(),
+                )));
+            } catch (AnswerableExceptionInterface $e) {
+                throw new RecordRefusedException(
+                    $e,
+                    OperationTargetDn::of($record->request) ?? new Dn(''),
+                    $record->line,
+                );
+            }
         }
     }
 
@@ -67,8 +80,26 @@ final readonly class WriteRequestReplayer
         }
 
         throw new OperationException(
-            'The change record was refused by the server.',
+            self::diagnosticOf($stream),
             $result->resultCode(),
         );
+    }
+
+    /**
+     * The server's own message for the refusal, or an empty one when it gave none.
+     */
+    private static function diagnosticOf(ResponseStream $stream): string
+    {
+        $diagnostic = '';
+
+        foreach ($stream->messages as $message) {
+            $response = $message->getResponse();
+
+            if ($response instanceof LdapResult) {
+                $diagnostic = $response->getDiagnosticMessage();
+            }
+        }
+
+        return $diagnostic;
     }
 }

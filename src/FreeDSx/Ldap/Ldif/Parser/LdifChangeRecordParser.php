@@ -77,7 +77,8 @@ final class LdifChangeRecordParser
 
         return new LdifChangeRecord(
             $request,
-            ...$controls,
+            $controls,
+            $dnDirective->position,
         );
     }
 

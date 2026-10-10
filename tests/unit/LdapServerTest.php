@@ -15,7 +15,9 @@ namespace Tests\Unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RecordRefusedException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\LdapServer;
@@ -323,6 +325,97 @@ class LdapServerTest extends TestCase
         $this->expectExceptionMessage('only accepts content records');
 
         $this->subject->seed(new StringLdifLoader("dn: cn=any,dc=x\nchangetype: delete\n"));
+    }
+
+    public function test_a_change_record_refused_by_seeding_is_reported_at_its_ldif_line(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('(LDIF line 12)');
+
+        $this->subject->seed(new StringLdifLoader(
+            self::SEED_LDIF . "\n\ndn: cn=any,dc=example,dc=com\nchangetype: delete\n",
+        ));
+    }
+
+    public function test_an_entry_refused_by_seeding_names_its_dn_and_ldif_line(): void
+    {
+        try {
+            $this->subject->seed(new StringLdifLoader(
+                self::SEED_LDIF . "\n\ndn: cn=nosn,dc=example,dc=com\nobjectClass: top\nobjectClass: person\ncn: nosn\n",
+            ));
+            self::fail('The entry missing its required attribute should have been refused.');
+        } catch (RecordRefusedException $e) {
+            self::assertSame(
+                'cn=nosn,dc=example,dc=com',
+                $e->getDn()->toString(),
+            );
+            self::assertSame(
+                12,
+                $e->getLdifLine(),
+            );
+            self::assertSame(
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                $e->getCode(),
+            );
+            self::assertStringContainsString(
+                '(entry "cn=nosn,dc=example,dc=com", LDIF line 12).',
+                $e->getMessage(),
+            );
+        }
+    }
+
+    public function test_an_entry_refused_by_seeding_entries_names_its_dn(): void
+    {
+        try {
+            $this->subject->seedEntries([
+                Entry::fromArray(
+                    'dc=example,dc=com',
+                    [
+                        'objectClass' => ['top', 'domain'],
+                        'dc' => ['example'],
+                    ],
+                ),
+                Entry::fromArray(
+                    'cn=nosn,dc=example,dc=com',
+                    [
+                        'objectClass' => ['top', 'person'],
+                        'cn' => ['nosn'],
+                    ],
+                ),
+            ]);
+            self::fail('The entry missing its required attribute should have been refused.');
+        } catch (RecordRefusedException $e) {
+            self::assertNull($e->getLdifLine());
+            self::assertStringContainsString(
+                '(entry "cn=nosn,dc=example,dc=com").',
+                $e->getMessage(),
+            );
+        }
+    }
+
+    public function test_a_change_record_refused_by_apply_changes_names_its_dn_and_ldif_line(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        try {
+            $this->subject->applyChanges(new StringLdifLoader(
+                "dn: cn=foo,dc=example,dc=com\nchangetype: delete\n\ndn: cn=ghost,dc=example,dc=com\nchangetype: delete\n",
+            ));
+            self::fail('Deleting a missing entry should have been refused.');
+        } catch (RecordRefusedException $e) {
+            self::assertSame(
+                'cn=ghost,dc=example,dc=com',
+                $e->getDn()->toString(),
+            );
+            self::assertSame(
+                4,
+                $e->getLdifLine(),
+            );
+            self::assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $e->getCode(),
+            );
+        }
     }
 
     public function test_it_should_apply_modify_changes_against_the_seeded_storage(): void

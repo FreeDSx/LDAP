@@ -13,10 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RecordRefusedException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Ldif\LdifChangeRecord;
@@ -26,6 +29,7 @@ use FreeDSx\Ldap\Ldif\Url\RefusingUrlResolver;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
+use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\DrainableWritesInterface;
@@ -34,6 +38,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedStream;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -85,15 +90,19 @@ class LdapServer
      * @throws LdifParseException when the LDIF cannot be parsed
      * @throws RuntimeException when the LDIF contains a non-add change record
      * @throws InvalidArgumentException when the creator DN is malformed
-     * @throws OperationException when an entry is refused, such as one violating the schema or missing its parent
+     * @throws RecordRefusedException when an entry is refused, naming its DN and LDIF line
+     * @throws OperationException when the batch is refused as a whole, such as for a reference nothing in it resolves
      * @throws StorageBusyException when a write keeps conflicting with concurrent writes
      */
     public function seed(
         LdifLoaderInterface $loader,
         SeedOptions $options = new SeedOptions(),
     ): self {
-        return $this->seedEntries(
-            $this->streamSeedEntries($loader, $options->getUrlResolver()),
+        return $this->import(
+            $this->parseLdif(
+                $loader,
+                $options->getUrlResolver(),
+            ),
             $options,
         );
     }
@@ -104,23 +113,18 @@ class LdapServer
      * @param iterable<Entry> $entries Depth-first, since a parent has to exist before the entries beneath it.
      *
      * @throws InvalidArgumentException when the creator DN is malformed
-     * @throws OperationException when an entry is refused, such as one violating the schema or missing its parent
+     * @throws RecordRefusedException when an entry is refused, naming its DN
+     * @throws OperationException when the batch is refused as a whole, such as for a reference nothing in it resolves
      * @throws StorageBusyException when a write keeps conflicting with concurrent writes
      */
     public function seedEntries(
         iterable $entries,
         SeedOptions $options = new SeedOptions(),
     ): self {
-        $this->container->get(LdapImporter::class)->importEntries(
-            $entries,
-            $options->getCreatorDn(),
-            $options->isIgnoreValidation(),
-            $options->isSkipExisting(),
+        return $this->import(
+            self::addRecordsOf($entries),
+            $options,
         );
-
-        $this->drainWrites();
-
-        return $this;
     }
 
     /**
@@ -129,15 +133,22 @@ class LdapServer
      * Use {@see seed()} instead for bulk initial provisioning of content records straight to storage.
      *
      * @throws LdifParseException when the LDIF cannot be parsed
-     * @throws OperationException when a write fails (no such entry, schema violation, etc.)
+     * @throws RecordRefusedException when a record is refused, such as a missing entry, naming its DN and LDIF line
      * @throws StorageBusyException when a write keeps conflicting with concurrent writes
      */
     public function applyChanges(
         LdifLoaderInterface $loader,
         LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
     ): self {
-        $this->container->get(WriteRequestReplayer::class)
-            ->apply($this->parseLdif($loader, $urlResolver));
+        try {
+            $this->container->get(WriteRequestReplayer::class)
+                ->apply($this->parseLdif(
+                    $loader,
+                    $urlResolver,
+                ));
+        } finally {
+            $this->drainWrites();
+        }
 
         return $this;
     }
@@ -182,7 +193,7 @@ class LdapServer
     }
 
     /**
-     * Releases whatever the write path keeps between writes, since seeding is a burst followed by silence.
+     * Releases whatever the write path keeps between writes, since seeding and replay are a burst followed by silence.
      *
      * Under Swoole that helper is a coroutine, and one still waiting for work holds open the scope it was spawned in.
      */
@@ -196,22 +207,51 @@ class LdapServer
     }
 
     /**
-     * @return Generator<Entry>
-     * @throws RuntimeException when the LDIF contains a non-add change record
-     * @throws LdifParseException
+     * @param iterable<LdifChangeRecord> $records
+     * @throws RuntimeException when a record is not an add
+     * @throws RecordRefusedException when an entry is refused
+     * @throws OperationException when the batch is refused as a whole
      */
-    private function streamSeedEntries(
-        LdifLoaderInterface $loader,
-        LdifUrlResolverInterface $urlResolver,
-    ): Generator {
-        foreach ($this->parseLdif($loader, $urlResolver) as $record) {
-            if (!$record->request instanceof AddRequest) {
-                throw new RuntimeException(
-                    'seed() only accepts content records (adds). Use applyChanges() for modify/delete/rename.',
-                );
+    private function import(
+        iterable $records,
+        SeedOptions $options,
+    ): self {
+        $stream = new SeedStream($records);
+
+        try {
+            $this->container->get(LdapImporter::class)->importEntries(
+                $stream->entries(),
+                $options->getCreatorDn(),
+                $options->isIgnoreValidation(),
+                $options->isSkipExisting(),
+            );
+        } catch (AnswerableExceptionInterface $e) {
+            $refused = $stream->current();
+
+            if ($refused === null) {
+                throw $e;
             }
 
-            yield $record->request->getEntry();
+            throw new RecordRefusedException(
+                $e,
+                OperationTargetDn::of($refused->request) ?? new Dn(''),
+                $refused->line,
+            );
+        } finally {
+            $this->drainWrites();
+        }
+
+        return $this;
+    }
+
+    /**
+     * @param iterable<Entry> $entries
+     * @return Generator<LdifChangeRecord>
+     */
+    private static function addRecordsOf(iterable $entries): Generator
+    {
+        foreach ($entries as $entry) {
+            yield new LdifChangeRecord(new AddRequest($entry));
         }
     }
 
