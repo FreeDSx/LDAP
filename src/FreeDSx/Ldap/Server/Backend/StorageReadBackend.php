@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
@@ -33,6 +34,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
@@ -114,6 +116,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
                 $normBase,
                 $baseDn,
                 $request,
+                $subentries,
                 $effectiveLimits,
             );
         }
@@ -136,11 +139,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
             $stream = $this->lister->list($options);
         } catch (InvalidAttributeException) {
             # RFC 4511 §4.5.1.7: unrecognized attribute descriptions evaluate to Undefined; yield zero entries.
-            return EntryStream::of((static function (): Generator {
-                yield from [];
-
-                return null;
-            })());
+            return self::emptyStream();
         }
 
         return $this->searchStream->buildForList(
@@ -181,24 +180,42 @@ final readonly class StorageReadBackend implements ReadBackendInterface
         Dn $normBase,
         Dn $baseDn,
         SearchRequest $request,
+        SubentryVisibility $subentries,
         ?SearchLimits $effectiveLimits,
     ): EntryStream {
+        $projection = $this->listOptions->projectionFor(
+            $request,
+            $effectiveLimits,
+        );
         $entry = $this->reader->find(
             $normBase,
-            $this->listOptions->projectionFor(
-                $request,
-                $effectiveLimits,
-            ),
+            $subentries === SubentryVisibility::All
+                ? $projection
+                : $projection->including(AttributeTypeOid::NAME_OBJECT_CLASS),
         );
 
         if ($entry === null) {
             $this->locator->throwNoSuchObject($baseDn);
         }
 
+        // RFC 3672 §3: an entry the control makes non-visible is not returned.
+        if (!SubentryDetector::isVisibleUnder($entry, $subentries)) {
+            return self::emptyStream();
+        }
+
         return $this->searchStream->buildForBaseObject(
             $entry,
             $request,
         );
+    }
+
+    private static function emptyStream(): EntryStream
+    {
+        return EntryStream::of((static function (): Generator {
+            yield from [];
+
+            return null;
+        })());
     }
 
     /**

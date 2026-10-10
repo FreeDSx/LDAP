@@ -116,6 +116,62 @@ final class StorageReadBackendTest extends TestCase
         );
     }
 
+    /**
+     * @return iterable<string, array{string, SubentryVisibility, int}>
+     */
+    public static function baseScopeVisibility(): iterable
+    {
+        yield 'an entry with subentries only' => [
+            'dc=example,dc=com',
+            SubentryVisibility::Only,
+            0,
+        ];
+        yield 'an entry with subentries hidden' => [
+            'dc=example,dc=com',
+            SubentryVisibility::Hide,
+            1,
+        ];
+        yield 'a subentry with subentries hidden' => [
+            'cn=policy,dc=example,dc=com',
+            SubentryVisibility::Hide,
+            0,
+        ];
+        yield 'a subentry with subentries only' => [
+            'cn=policy,dc=example,dc=com',
+            SubentryVisibility::Only,
+            1,
+        ];
+        yield 'a subentry with both visible' => [
+            'cn=policy,dc=example,dc=com',
+            SubentryVisibility::All,
+            1,
+        ];
+    }
+
+    #[DataProvider('baseScopeVisibility')]
+    public function test_a_base_scope_search_returns_only_an_entry_its_visibility_selects(
+        string $baseDn,
+        SubentryVisibility $visibility,
+        int $expected,
+    ): void {
+        $subject = $this->backendFor(EntryFixture::inMemoryStorage(
+            $this->base,
+            new Entry(
+                new Dn('cn=policy,dc=example,dc=com'),
+                new Attribute('objectClass', 'top', 'subentry'),
+                new Attribute('cn', 'policy'),
+            ),
+        ));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base($baseDn)
+            ->useBaseScope();
+
+        self::assertCount(
+            $expected,
+            iterator_to_array($subject->search($request, $visibility)->entries()),
+        );
+    }
+
     public function test_search_single_level_returns_direct_children(): void
     {
         $request = (new SearchRequest(new PresentFilter('objectClass')))

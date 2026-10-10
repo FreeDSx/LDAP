@@ -14,14 +14,14 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Subentry;
 
 /**
- * Which of the two entry populations a one-level or subtree search selects. RFC 3672.
+ * Which of the two entry populations a search selects. RFC 3672.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 enum SubentryVisibility
 {
     /**
-     * Ordinary entries only, the default when no subentries control is present.
+     * Ordinary entries only, requested by a FALSE control and the one-level or subtree default without one.
      */
     case Hide;
 
@@ -31,7 +31,7 @@ enum SubentryVisibility
     case Only;
 
     /**
-     * Both populations. Never selectable over the protocol; used by replication and internal lookups.
+     * Both populations, the base scope default without a control; also used by replication and internal lookups.
      */
     case All;
 }

@@ -58,6 +58,27 @@ final readonly class EntryProjection
     }
 
     /**
+     * The same projection also materializing the given base attribute.
+     */
+    public function including(string $attribute): self
+    {
+        if ($this->attributes === null) {
+            return $this;
+        }
+
+        return new self(
+            array_values(array_unique([
+                ...$this->attributes,
+                strtolower($attribute),
+            ])),
+            $this->linkCap,
+            $this->withHasSubordinates,
+            $this->windows,
+            $this->backlinks,
+        );
+    }
+
+    /**
      * The base names to materialize as a set, or null for every attribute.
      *
      * @return array<string, true>|null
