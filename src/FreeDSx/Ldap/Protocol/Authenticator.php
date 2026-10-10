@@ -47,13 +47,17 @@ class Authenticator
             } catch (SaslNegotiationAbortedException $e) {
                 // Each abort consumes a client message, so the bind that replaced it drives the next round.
                 $dispatched = $e->request;
+            } catch (ResponseAlreadySentException $e) {
+                throw $e;
             } catch (OperationException $e) {
                 if ($dispatched === $request) {
                     throw $e;
                 }
 
-                // The caller still holds the message this one replaced, so the refusal is answered here instead.
-                throw $this->answer($dispatched, $e);
+                throw $this->answer(
+                    $dispatched,
+                    $e,
+                );
             }
         }
     }

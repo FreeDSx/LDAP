@@ -14,10 +14,15 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
+use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Bind\BindInterface;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -32,17 +37,20 @@ final class AuthenticatorTest extends TestCase
 
     private BindInterface&MockObject $authTwo;
 
+    private ServerQueue&MockObject $queue;
+
     protected function setUp(): void
     {
         $this->authOne = $this->createMock(BindInterface::class);
         $this->authTwo = $this->createMock(BindInterface::class);
+        $this->queue = $this->createMock(ServerQueue::class);
 
         $this->subject = new Authenticator(
             [
                 $this->authOne,
                 $this->authTwo,
             ],
-            $this->createMock(ServerQueue::class),
+            $this->queue,
         );
     }
 
@@ -89,5 +97,79 @@ final class AuthenticatorTest extends TestCase
             $token,
             $this->subject->bind($message),
         );
+    }
+
+    public function test_a_failed_replacement_bind_is_answered_once_on_its_own_message_id(): void
+    {
+        $replacement = new LdapMessageRequest(
+            2,
+            new SimpleBindRequest(
+                'foo',
+                'wrong',
+            ),
+        );
+        $this->givenTheBindIsReplacedBy(
+            $replacement,
+            new OperationException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+            ),
+        );
+
+        $this->queue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(self::callback(
+                fn(LdapMessageResponse $response): bool => $response->getMessageId() === 2,
+            ));
+        self::expectException(ResponseAlreadySentException::class);
+
+        $this->subject->bind($this->initialSaslBind());
+    }
+
+    public function test_a_replacement_bind_that_answered_itself_is_not_answered_again(): void
+    {
+        $replacement = new LdapMessageRequest(
+            2,
+            new SaslBindRequest('PLAIN'),
+        );
+        $this->givenTheBindIsReplacedBy(
+            $replacement,
+            new ResponseAlreadySentException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+            ),
+        );
+
+        $this->queue
+            ->expects(self::never())
+            ->method('sendMessage');
+        self::expectException(ResponseAlreadySentException::class);
+
+        $this->subject->bind($this->initialSaslBind());
+    }
+
+    private function initialSaslBind(): LdapMessageRequest
+    {
+        return new LdapMessageRequest(
+            1,
+            new SaslBindRequest('CRAM-MD5'),
+        );
+    }
+
+    private function givenTheBindIsReplacedBy(
+        LdapMessageRequest $replacement,
+        OperationException $replacementFailure,
+    ): void {
+        $this->authOne
+            ->method('supports')
+            ->willReturn(true);
+        $this->authOne
+            ->method('bind')
+            ->willReturnCallback(
+                fn(LdapMessageRequest $message): never => throw ($message === $replacement
+                    ? $replacementFailure
+                    : new SaslNegotiationAbortedException($replacement)),
+            );
     }
 }
