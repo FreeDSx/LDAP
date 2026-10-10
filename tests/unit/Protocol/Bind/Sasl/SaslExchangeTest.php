@@ -17,8 +17,10 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
@@ -294,6 +296,87 @@ final class SaslExchangeTest extends TestCase
                 $e->request,
             );
         }
+    }
+
+    public function test_an_unbind_mid_exchange_ends_the_bind_without_a_response(): void
+    {
+        $unbind = new LdapMessageRequest(
+            2,
+            new UnbindRequest(),
+        );
+
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn($unbind);
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('requeue')
+            ->with($unbind);
+
+        self::expectException(ResponseAlreadySentException::class);
+
+        $this->subject->run($this->makeInput());
+    }
+
+    public function test_an_abandon_mid_exchange_is_ignored(): void
+    {
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturnOnConsecutiveCalls(
+                $this->makeContext(isComplete: false, response: 'server-challenge'),
+                $this->makeContext(isComplete: true, response: 'server-final'),
+            );
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageRequest(
+                    2,
+                    new AbandonRequest(1),
+                ),
+                new LdapMessageRequest(
+                    3,
+                    new SaslBindRequest(self::MECH, 'creds'),
+                ),
+            );
+
+        $result = $this->subject->run($this->makeInput());
+
+        self::assertSame(
+            3,
+            $result->getLastMessage()->getMessageId(),
+        );
+    }
+
+    public function test_it_rejects_an_abandon_carrying_a_zero_message_id(): void
+    {
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn(new LdapMessageRequest(
+                0,
+                new AbandonRequest(1),
+            ));
+
+        self::expectException(RequestValidationException::class);
+
+        $this->subject->run($this->makeInput());
     }
 
     public function test_it_rejects_a_continuation_carrying_a_zero_message_id(): void

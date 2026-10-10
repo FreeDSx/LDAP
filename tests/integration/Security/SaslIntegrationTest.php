@@ -15,7 +15,9 @@ namespace Tests\Integration\FreeDSx\Ldap\Security;
 
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -26,6 +28,7 @@ use FreeDSx\Sasl\Options\CramMD5Options;
 use FreeDSx\Sasl\Options\PlainOptions;
 use FreeDSx\Sasl\Options\ScramOptions;
 use FreeDSx\Sasl\Sasl;
+use FreeDSx\Socket\Exception\ConnectionException;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
@@ -288,6 +291,68 @@ final class SaslIntegrationTest extends ServerTestCase
             self::assertSame(
                 ResultCode::SUCCESS,
                 $this->resultCodeOf($queue->getMessage(2)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    public function testAnUnbindMidNegotiationClosesTheSessionWithoutAResponse(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new UnbindRequest(),
+            ));
+
+            $this->expectException(ConnectionException::class);
+
+            $queue->getMessage();
+        } finally {
+            $queue->close();
+        }
+    }
+
+    public function testAnAbandonMidNegotiationIsIgnored(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            $challenge = $queue->getMessage(1)->getResponse();
+            self::assertInstanceOf(
+                BindResponse::class,
+                $challenge,
+            );
+
+            $queue->sendMessage(
+                new LdapMessageRequest(
+                    2,
+                    new AbandonRequest(1),
+                ),
+                new LdapMessageRequest(
+                    3,
+                    new SaslBindRequest(
+                        'CRAM-MD5',
+                        'user ' . hash_hmac('md5', (string) $challenge->getSaslCredentials(), '12345'),
+                    ),
+                ),
+            );
+
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $this->resultCodeOf($queue->getMessage(3)),
             );
         } finally {
             $queue->close();

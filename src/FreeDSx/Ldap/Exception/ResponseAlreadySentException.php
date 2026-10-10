@@ -14,6 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Exception;
 
 /**
- * Signals that a handler already sent the client response, so the dispatcher must not send another.
+ * Signals that the dispatcher must not respond.
  */
 final class ResponseAlreadySentException extends OperationException {}
