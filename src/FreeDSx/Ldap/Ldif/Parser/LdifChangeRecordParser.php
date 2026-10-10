@@ -49,25 +49,30 @@ final class LdifChangeRecordParser
     private const MOD_TERMINATOR = '-';
 
     /**
+     * @param LdifDirective $dnDirective The record's dn line, which errors about the record as a whole report.
      * @throws LdifParseException
      */
     public function parseRecord(
         LdifLineCursor $cursor,
-        string $dn,
+        LdifDirective $dnDirective,
     ): LdifChangeRecord {
+        $dn = $dnDirective->value;
         $controls = $this->readControls($cursor);
         $changetype = $this->readChangetype($cursor);
-        $type = ChangeType::tryFrom(strtolower($changetype));
+        $type = ChangeType::tryFrom(strtolower($changetype->value));
 
         $request = match ($type) {
             ChangeType::Add => $this->parseAddRecord($cursor, $dn),
             ChangeType::Delete => $this->parseDeleteRecord($cursor, $dn),
             ChangeType::Modify => $this->parseModifyRecord($cursor, $dn),
-            ChangeType::ModRdn, ChangeType::ModDn => $this->parseModRdnRecord($cursor, $dn),
-            null => $cursor->error(sprintf(
-                'Unsupported changetype "%s"',
+            ChangeType::ModRdn, ChangeType::ModDn => $this->parseModRdnRecord($cursor, $dnDirective),
+            null => $cursor->errorFor(
                 $changetype,
-            )),
+                sprintf(
+                    'Unsupported changetype "%s"',
+                    $changetype->value,
+                ),
+            ),
         };
 
         return new LdifChangeRecord(
@@ -164,7 +169,7 @@ final class LdifChangeRecordParser
     /**
      * @throws LdifParseException
      */
-    private function readChangetype(LdifLineCursor $cursor): string
+    private function readChangetype(LdifLineCursor $cursor): LdifDirective
     {
         while (!$cursor->atEnd() && $cursor->isComment($cursor->current())) {
             $cursor->skipComment();
@@ -183,7 +188,7 @@ final class LdifChangeRecordParser
             );
         }
 
-        return $directive->value;
+        return $directive;
     }
 
     /**
@@ -320,7 +325,7 @@ final class LdifChangeRecordParser
      */
     private function parseModRdnRecord(
         LdifLineCursor $cursor,
-        string $dn,
+        LdifDirective $dnDirective,
     ): ModifyDnRequest {
         $newRdn = null;
         $deleteOldRdn = null;
@@ -356,14 +361,20 @@ final class LdifChangeRecordParser
         }
 
         if ($newRdn === null) {
-            $cursor->error('Missing "newrdn:" in modrdn record');
+            $cursor->errorFor(
+                $dnDirective,
+                'Missing "newrdn:" in modrdn record',
+            );
         }
         if ($deleteOldRdn === null) {
-            $cursor->error('Missing "deleteoldrdn:" in modrdn record');
+            $cursor->errorFor(
+                $dnDirective,
+                'Missing "deleteoldrdn:" in modrdn record',
+            );
         }
 
         return new ModifyDnRequest(
-            $dn,
+            $dnDirective->value,
             $newRdn,
             $deleteOldRdn,
             $newSuperior,

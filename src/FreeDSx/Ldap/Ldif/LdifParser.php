@@ -111,11 +111,17 @@ final class LdifParser
      */
     private function parseRecord(LdifLineCursor $cursor): LdifChangeRecord
     {
-        $dn = $cursor->readDirective()->value;
+        $dnDirective = $cursor->readDirective();
 
         return $this->isAtChangeRecord($cursor)
-            ? $this->changeParser->parseRecord($cursor, $dn)
-            : new LdifChangeRecord($this->parseContentRecord($cursor, $dn));
+            ? $this->changeParser->parseRecord(
+                $cursor,
+                $dnDirective,
+            )
+            : new LdifChangeRecord($this->parseContentRecord(
+                $cursor,
+                $dnDirective->value,
+            ));
     }
 
     /**
