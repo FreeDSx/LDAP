@@ -182,7 +182,8 @@ entries is not a replica.
 The following RFCs are not current implemented.
 
 * Server-side VLV. The client can send the control, but the server does not support it.
-* SASL GSSAPI. The server offers PLAIN, CRAM-MD5, DIGEST-MD5, EXTERNAL and the SCRAM family.
+* SASL GSSAPI. The server offers PLAIN, CRAM-MD5, EXTERNAL and the SCRAM family.
+* SASL DIGEST-MD5, which RFC 6331 moved to Historic. Use the SCRAM family instead.
 * The full string preparation algorithm of RFC 4518. Only a subset of the steps runs. See [Schema Validation](Schema.md#string-matching-and-internationalization-rfc-4518).
 * Referrals and RFC 3296 `ManageDsaIT`, so the `referral` result code is never returned.
 * Syntax validation for Guide (RFC 4517 section 3.3.25) and Enhanced Guide (section 3.3.21).

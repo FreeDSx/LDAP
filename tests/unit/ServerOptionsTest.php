@@ -641,7 +641,6 @@ final class ServerOptionsTest extends TestCase
         $this->subject->setSaslMechanisms(
             ServerOptions::SASL_PLAIN,
             ServerOptions::SASL_CRAM_MD5,
-            ServerOptions::SASL_DIGEST_MD5,
             ServerOptions::SASL_SCRAM_SHA_1,
             ServerOptions::SASL_SCRAM_SHA_1_PLUS,
             ServerOptions::SASL_SCRAM_SHA_224,
@@ -657,9 +656,17 @@ final class ServerOptionsTest extends TestCase
         );
 
         self::assertCount(
-            15,
+            14,
             $this->subject->getSaslMechanisms(),
         );
+    }
+
+    public function test_it_refuses_the_digest_md5_mechanism(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The SASL mechanism "DIGEST-MD5" is not supported.');
+
+        $this->subject->setSaslMechanisms('DIGEST-MD5');
     }
 
     public function test_setting_administrators_after_reading_acl_rules_rebuilds_the_secure_default(): void

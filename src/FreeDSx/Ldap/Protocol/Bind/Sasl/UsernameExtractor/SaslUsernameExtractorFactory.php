@@ -33,8 +33,7 @@ final class SaslUsernameExtractorFactory
                 => new PlainUsernameExtractor(),
             $mechanism->isScram()
                 => new ScramUsernameExtractor(),
-            $mechanism === MechanismName::CRAM_MD5,
-            $mechanism === MechanismName::DIGEST_MD5
+            $mechanism === MechanismName::CRAM_MD5
                 => new UsernameFieldExtractor(),
             default => throw new RuntimeException(
                 sprintf('No username extractor is registered for the SASL mechanism "%s".', $mechanism->value),

@@ -16,7 +16,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\CramMD5MechanismOptionsBuilder;
-use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\DigestMD5MechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\PlainMechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ScramMechanismOptionsBuilder;
@@ -53,12 +52,12 @@ final class MechanismOptionsBuilderFactoryTest extends TestCase
         );
     }
 
-    public function test_make_digest_md5_returns_digest_md5_builder(): void
+    public function test_make_digest_md5_is_not_supported(): void
     {
-        self::assertInstanceOf(
-            DigestMD5MechanismOptionsBuilder::class,
-            $this->subject->make(MechanismName::DIGEST_MD5),
-        );
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OTHER);
+
+        $this->subject->make(MechanismName::DIGEST_MD5);
     }
 
     public function test_make_scram_sha256_returns_scram_builder(): void
