@@ -503,7 +503,7 @@ It handles all password-based bind authentication through two methods:
 
 * `authenticate(string $name, string $password): AuthenticatedTokenInterface` — called for simple binds
 * `getSaslIdentity(string $username, MechanismName $mechanism): ?SaslIdentity` — called for all SASL mechanisms
-  (PLAIN, CRAM-MD5, DIGEST-MD5, SCRAM-*). Returns the stored password and resolved DN, or `null` to reject.
+  (PLAIN, CRAM-MD5, SCRAM-*). Returns the stored password and resolved DN, or `null` to reject.
 
 Every mechanism except PLAIN uses the returned value as the shared secret, so a hash would become the password. The
 built-in authenticator returns `null` for those mechanisms when the stored value is hashed, and a custom one should
@@ -539,7 +539,7 @@ class ExternalAuthenticator implements PasswordAuthenticatableInterface
         MechanismName $mechanism,
     ): ?SaslIdentity {
         // Resolve the SASL identity to an entry. Return null to reject the bind.
-        // Challenge mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*) require a plaintext
+        // Challenge mechanisms (CRAM-MD5, SCRAM-*) require a plaintext
         // or recoverable password; one-way hashes (bcrypt, argon2) cannot be used.
         return null;
     }
@@ -556,7 +556,7 @@ $server = new LdapServer(
 );
 ```
 
-**Note**: Challenge-based mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*) require `getSaslIdentity()` to return a
+**Note**: Challenge-based mechanisms (CRAM-MD5, SCRAM-*) require `getSaslIdentity()` to return a
 `SaslIdentity` with a plaintext or recoverable password. Return `null` to reject SASL for that user.
 
 **Default**: `null` (resolved automatically as described above)
@@ -945,7 +945,6 @@ Use the constants defined on `ServerOptions` to specify mechanisms:
 | `ServerOptions::SASL_PLAIN`               | `PLAIN`               |
 | `ServerOptions::SASL_EXTERNAL`            | `EXTERNAL`            |
 | `ServerOptions::SASL_CRAM_MD5`            | `CRAM-MD5`            |
-| `ServerOptions::SASL_DIGEST_MD5`          | `DIGEST-MD5`          |
 | `ServerOptions::SASL_SCRAM_SHA_1`         | `SCRAM-SHA-1`         |
 | `ServerOptions::SASL_SCRAM_SHA_1_PLUS`    | `SCRAM-SHA-1-PLUS`    |
 | `ServerOptions::SASL_SCRAM_SHA_224`       | `SCRAM-SHA-224`       |
@@ -960,8 +959,10 @@ Use the constants defined on `ServerOptions` to specify mechanisms:
 | `ServerOptions::SASL_SCRAM_SHA3_512_PLUS` | `SCRAM-SHA3-512-PLUS` |
 
 All mechanisms call `getSaslIdentity()` on `PasswordAuthenticatableInterface`. PLAIN accepts any hash scheme
-supported by `PasswordHashService`. Challenge mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*) require a plaintext or
-recoverable password since the digest is computed server-side.
+supported by `PasswordHashService`. Challenge mechanisms (CRAM-MD5, SCRAM-*) require a plaintext or recoverable
+password since the digest is computed server-side.
+
+DIGEST-MD5 is not offered, as RFC 6331 moved it to Historic. Use `SASL_SCRAM_SHA_256` instead.
 
 All mechanisms are handled through `PasswordAuthenticatableInterface` — no separate handler interface is required.
 Configure authentication via `setPasswordAuthenticator()` or by implementing `PasswordAuthenticatableInterface`

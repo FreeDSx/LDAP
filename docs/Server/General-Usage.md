@@ -35,7 +35,7 @@ General LDAP Server Usage
 * [StartTLS SSL Certificate Support](#starttls-ssl-certificate-support)
 * [SASL Authentication](#sasl-authentication)
   * [PLAIN Mechanism](#plain-mechanism)
-  * [Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)](#challenge-based-mechanisms-cram-md5-digest-md5-and-scram)
+  * [Challenge-Based Mechanisms (CRAM-MD5 and SCRAM)](#challenge-based-mechanisms-cram-md5-and-scram)
   * [Identity Resolution for SASL](#identity-resolution-for-sasl)
 * [Password Modify Extended Operation](#password-modify-extended-operation)
 
@@ -127,7 +127,7 @@ For full control over credential storage, such as delegating to an external user
 `PasswordAuthenticatableInterface` directly. This single interface covers all bind types:
 
 - `authenticate()` is called for simple binds
-- `getSaslIdentity()` is called for all SASL mechanisms (PLAIN, CRAM-MD5, DIGEST-MD5, SCRAM-*)
+- `getSaslIdentity()` is called for all SASL mechanisms (PLAIN, CRAM-MD5, SCRAM-*)
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -739,7 +739,7 @@ interface PasswordAuthenticatableInterface
         string $password,
     ): AuthenticatedTokenInterface;
 
-    // Called for all SASL mechanisms (PLAIN, CRAM-MD5, DIGEST-MD5, SCRAM-*).
+    // Called for all SASL mechanisms (PLAIN, CRAM-MD5, SCRAM-*).
     // Return a SaslIdentity with the stored password and resolved DN, or null to reject.
     public function getSaslIdentity(
         string $username,
@@ -862,9 +862,9 @@ supplied password against the stored `userPassword` using `PasswordHashService`,
 **Note**: PLAIN transmits credentials in cleartext. Only enable it when the connection is protected by TLS (StartTLS
 or `setUseSsl`).
 
-### Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)
+### Challenge-Based Mechanisms (CRAM-MD5 and SCRAM)
 
-`CRAM-MD5`, `DIGEST-MD5`, and the `SCRAM-*` family are challenge-response mechanisms. The server issues a challenge
+`CRAM-MD5` and the `SCRAM-*` family are challenge-response mechanisms. The server issues a challenge
 to the client and verifies the response against a digest computed from the user's plaintext password. The server calls
 `PasswordAuthenticatableInterface::getSaslIdentity()` to retrieve the password.
 
@@ -874,6 +874,8 @@ custom authenticator that can return a recoverable value.
 
 **Note**: Because challenge mechanisms require a recoverable password, they are fundamentally incompatible with
 one-way hashing. If one-way hashing is a hard requirement, use `PLAIN` over TLS instead.
+
+DIGEST-MD5 is not offered, as RFC 6331 moved it to Historic. Use `SCRAM-SHA-256` instead.
 
 ### Identity Resolution for SASL
 

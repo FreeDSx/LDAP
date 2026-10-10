@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 use Closure;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Bind\Sasl\UsernameExtractor\UsernameFieldExtractor;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 
@@ -45,8 +44,6 @@ final readonly class MechanismOptionsBuilderFactory
                 => new PlainMechanismOptionsBuilder($this->authenticator),
             $mechanism === MechanismName::CRAM_MD5
                 => new CramMD5MechanismOptionsBuilder($this->authenticator),
-            $mechanism === MechanismName::DIGEST_MD5
-                => new DigestMD5MechanismOptionsBuilder($this->authenticator, new UsernameFieldExtractor()),
             $mechanism->isScram()
                 => new ScramMechanismOptionsBuilder($this->authenticator),
             $mechanism === MechanismName::EXTERNAL && $this->externalBuilderFactory !== null

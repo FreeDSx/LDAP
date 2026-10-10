@@ -54,12 +54,11 @@ final class SaslUsernameExtractorFactoryTest extends TestCase
         );
     }
 
-    public function test_make_digest_md5_returns_username_field_extractor(): void
+    public function test_make_digest_md5_throws(): void
     {
-        self::assertInstanceOf(
-            UsernameFieldExtractor::class,
-            $this->subject->make(MechanismName::DIGEST_MD5),
-        );
+        self::expectException(RuntimeException::class);
+
+        $this->subject->make(MechanismName::DIGEST_MD5);
     }
 
     public function test_make_unsupported_mechanism_throws(): void

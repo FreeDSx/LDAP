@@ -50,8 +50,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     public const SASL_CRAM_MD5 = 'CRAM-MD5';
 
-    public const SASL_DIGEST_MD5 = 'DIGEST-MD5';
-
     public const SASL_EXTERNAL = 'EXTERNAL';
 
     public const SASL_SCRAM_SHA_1 = 'SCRAM-SHA-1';
@@ -81,7 +79,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
     private const SUPPORTED_SASL_MECHANISMS = [
         self::SASL_PLAIN,
         self::SASL_CRAM_MD5,
-        self::SASL_DIGEST_MD5,
         self::SASL_EXTERNAL,
         self::SASL_SCRAM_SHA_1,
         self::SASL_SCRAM_SHA_1_PLUS,

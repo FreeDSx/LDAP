@@ -14,14 +14,13 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Bind\Sasl\UsernameExtractor;
 
 use FreeDSx\Sasl\Encoder\CramMD5Encoder;
-use FreeDSx\Sasl\Encoder\DigestMD5Encoder;
 use FreeDSx\Sasl\Encoder\EncoderInterface;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\SaslContext;
 
 /**
  * Extracts the username from SASL credential bytes for mechanisms whose client response
- * contains a 'username' field (e.g. CRAM-MD5, DIGEST-MD5).
+ * contains a 'username' field (e.g. CRAM-MD5).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -36,13 +35,12 @@ class UsernameFieldExtractor implements SaslUsernameExtractorInterface
 
     /**
      * @param array<string, EncoderInterface> $encoders Map of mechanism name to its encoder.
-     *                                                   Defaults to CRAM-MD5 and DIGEST-MD5.
+     *                                                   Defaults to CRAM-MD5.
      */
     public function __construct(array $encoders = [])
     {
         $this->encoders = $encoders ?: [
             MechanismName::CRAM_MD5->value => new CramMD5Encoder(),
-            MechanismName::DIGEST_MD5->value => new DigestMD5Encoder(),
         ];
     }
 
@@ -56,7 +54,6 @@ class UsernameFieldExtractor implements SaslUsernameExtractorInterface
         $encoder = $this->encoders[$mechanism->value];
 
         // Always decode as server-side: we are parsing a client response, not a server challenge.
-        // For DIGEST-MD5 this is required; for others it is harmless.
         $context = new SaslContext();
         $context->setIsServerMode(true);
         $message = $encoder->decode(
