@@ -16,7 +16,9 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
+use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authenticator;
@@ -171,9 +173,11 @@ final class BindMiddlewareTest extends TestCase
         );
     }
 
-    public function test_an_unsupported_authentication_type_is_rejected(): void
-    {
-        // Anonymous binds are disabled by default.
+    #[DataProvider('unsupportedBindProvider')]
+    public function test_a_bind_whose_method_is_not_enabled_is_refused_with_the_code_for_its_kind(
+        BindRequest $request,
+        int $expectedCode,
+    ): void {
         $this->authenticator
             ->expects(self::never())
             ->method('bind');
@@ -182,17 +186,60 @@ final class BindMiddlewareTest extends TestCase
             $this->subject()->process(
                 new ServerRequestContext(new LdapMessageRequest(
                     1,
-                    new AnonBindRequest(),
+                    $request,
                 )),
                 $this->next,
             );
             self::fail('Expected an OperationException.');
         } catch (OperationException $e) {
             self::assertSame(
-                ResultCode::AUTH_METHOD_UNSUPPORTED,
+                $expectedCode,
                 $e->getCode(),
             );
         }
+    }
+
+    /**
+     * @return iterable<string, array{BindRequest, int}>
+     */
+    public static function unsupportedBindProvider(): iterable
+    {
+        // Anonymous access and SASL are both off by default.
+        yield 'an anonymous bind' => [
+            new AnonBindRequest(),
+            ResultCode::INAPPROPRIATE_AUTHENTICATION,
+        ];
+        yield 'a name with no password' => [
+            new AnonBindRequest('cn=user,dc=foo,dc=bar'),
+            ResultCode::UNWILLING_TO_PERFORM,
+        ];
+        yield 'a SASL mechanism that is not configured' => [
+            new SaslBindRequest('PLAIN'),
+            ResultCode::AUTH_METHOD_UNSUPPORTED,
+        ];
+    }
+
+    public function test_an_anonymous_bind_is_authenticated_when_anonymous_access_is_on(): void
+    {
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults()->setAllowAnonymous(true));
+
+        $this->authenticator
+            ->expects(self::once())
+            ->method('bind')
+            ->willReturn(new AnonToken());
+
+        $result = $this->subject()->process(
+            new ServerRequestContext(new LdapMessageRequest(
+                1,
+                new AnonBindRequest(),
+            )),
+            $this->next,
+        );
+
+        self::assertSame(
+            OperationOutcome::Succeeded,
+            $result->outcome()->outcome(),
+        );
     }
 
     #[DataProvider('unsupportedVersionProvider')]
