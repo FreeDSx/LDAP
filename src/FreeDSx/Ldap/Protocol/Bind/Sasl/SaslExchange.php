@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\SaslContext;
@@ -173,10 +174,37 @@ final class SaslExchange
             return null;
         }
 
-        $authcToken = BindToken::fromSasl(
-            $username ?? $resolvedDn->toString(),
-            $resolvedDn,
-        );
+        try {
+            $effective = $this->assumeAuthzId(
+                BindToken::fromSasl(
+                    $username ?? $resolvedDn->toString(),
+                    $resolvedDn,
+                ),
+                $rawAuthzId,
+            );
+        } catch (OperationException $e) {
+            // RFC 4513 5 refuses the bind with invalidCredentials when the authzid may not be assumed.
+            throw new OperationException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+                $e,
+            );
+        }
+
+        return $effective instanceof AuthenticatedTokenInterface
+            ? $effective
+            : null;
+    }
+
+    /**
+     * Assumes the requested authzid as the authenticated identity, returning the effective token.
+     *
+     * @throws OperationException when the authzid is malformed or may not be assumed.
+     */
+    private function assumeAuthzId(
+        BindToken $authcToken,
+        string $rawAuthzId,
+    ): TokenInterface {
         try {
             $authzId = AuthzId::fromString($rawAuthzId);
         } catch (InvalidArgumentException) {
@@ -185,14 +213,11 @@ final class SaslExchange
                 $rawAuthzId,
             );
         }
-        $effective = $this->authzIdResolver->assume(
+
+        return $this->authzIdResolver->assume(
             $authcToken,
             $authzId,
         );
-
-        return $effective instanceof AuthenticatedTokenInterface
-            ? $effective
-            : null;
     }
 
     /**
