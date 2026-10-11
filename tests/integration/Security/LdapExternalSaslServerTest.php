@@ -16,10 +16,14 @@ namespace Tests\Integration\FreeDSx\Ldap\Security;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\ExternalOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 use Throwable;
 
@@ -27,6 +31,8 @@ use function strtolower;
 
 final class LdapExternalSaslServerTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     /**
      * Client cert with subject "/DC=bar/DC=foo/CN=extuser" -> maps to the seeded cn=extuser,dc=foo,dc=bar.
      */
@@ -127,6 +133,35 @@ final class LdapExternalSaslServerTest extends ServerTestCase
         $this->expectException(BindException::class);
 
         $client->bindSasl(new ExternalOptions(), MechanismName::EXTERNAL);
+    }
+
+    public function testAnExternalBindWithoutTlsIsRefusedAsInappropriateAuthentication(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            ['--external'],
+        );
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('EXTERNAL'),
+            ));
+            $response = $queue->getMessage(1)->getResponse();
+
+            self::assertInstanceOf(
+                BindResponse::class,
+                $response,
+            );
+            self::assertSame(
+                ResultCode::INAPPROPRIATE_AUTHENTICATION,
+                $response->getResultCode(),
+            );
+        } finally {
+            $queue->close();
+        }
     }
 
     private function clientWithCertificate(

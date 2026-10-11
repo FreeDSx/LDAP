@@ -79,7 +79,7 @@ final class ExternalMechanismOptionsBuilderTest extends TestCase
         ));
 
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONFIDENTIALITY_REQUIRED);
+        $this->expectExceptionCode(ResultCode::INAPPROPRIATE_AUTHENTICATION);
 
         $validate(null);
     }
