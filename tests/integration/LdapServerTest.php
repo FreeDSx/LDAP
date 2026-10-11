@@ -682,6 +682,19 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    public function testAnAnonymousBindIsRefusedAsInappropriateAuthenticationWhenAnonymousAccessIsOff(): void
+    {
+        try {
+            $this->ldapClient()->send(Operations::bindAnonymously());
+            $this->fail('An anonymous bind should not have been accepted.');
+        } catch (BindException $e) {
+            $this->assertSame(
+                ResultCode::INAPPROPRIATE_AUTHENTICATION,
+                $e->getCode(),
+            );
+        }
+    }
+
     /**
      * RFC 4513 5.1.2 names unwillingToPerform for a bind supplying a name but no password.
      */

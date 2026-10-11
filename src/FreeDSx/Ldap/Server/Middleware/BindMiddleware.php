@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Bind\VersionValidatorTrait;
@@ -63,22 +65,37 @@ final readonly class BindMiddleware implements MiddlewareInterface
         $this->criticalControls->assertSupportedForBind($context->message->controls());
 
         if (!$this->authorization->isAuthenticationTypeSupported($request)) {
-            // RFC 4513 5.1.2 names unwillingToPerform for a bind carrying a name but no password, which is a
-            // different refusal than the method itself being unavailable.
-            throw $this->authorization->isUnauthenticatedBind($request)
-                ? new OperationException(
-                    'Unauthenticated bind is not supported.',
-                    ResultCode::UNWILLING_TO_PERFORM,
-                )
-                : new OperationException(
-                    'The requested authentication type is not supported.',
-                    ResultCode::AUTH_METHOD_UNSUPPORTED,
-                );
+            throw $this->unsupportedBind($request);
         }
-
-        // The authenticator writes the bind response itself (an interactive sub-protocol); carry only the outcome.
         $this->authorization->setToken($this->authenticator->bind($context->message));
 
         return ResponseStream::resolved(OperationOutcomeResult::succeeded());
+    }
+
+    /**
+     * The refusal for a bind whose method is not enabled, so an anonymous bind reaching it means anonymous access is off.
+     */
+    private function unsupportedBind(RequestInterface $request): OperationException
+    {
+        // RFC 4513 5.1.2 names unwillingToPerform for a bind carrying a name but no password.
+        if ($this->authorization->isUnauthenticatedBind($request)) {
+            return new OperationException(
+                'Unauthenticated bind is not supported.',
+                ResultCode::UNWILLING_TO_PERFORM,
+            );
+        }
+
+        // RFC 4511 A.2 defines inappropriateAuthentication as the refusal of an anonymous bind.
+        if ($request instanceof AnonBindRequest) {
+            return new OperationException(
+                'Anonymous bind is not allowed.',
+                ResultCode::INAPPROPRIATE_AUTHENTICATION,
+            );
+        }
+
+        return new OperationException(
+            'The requested authentication type is not supported.',
+            ResultCode::AUTH_METHOD_UNSUPPORTED,
+        );
     }
 }
