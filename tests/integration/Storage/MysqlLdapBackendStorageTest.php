@@ -51,13 +51,6 @@ final class MysqlLdapBackendStorageTest extends LdapBackendStorageTestCase
         parent::setUp();
     }
 
-    public function tearDown(): void
-    {
-        $this->stopServer();
-
-        parent::tearDown();
-    }
-
     /**
      * Declared so a test that restarts the server gets this backend rather than the command's default.
      */

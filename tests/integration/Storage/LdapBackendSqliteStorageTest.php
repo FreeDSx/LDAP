@@ -25,24 +25,10 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedReferenceTestsTrait;
  *
  * Uses the same ldap-backend-storage.php bootstrap script with the 'sqlite' handler,
  * which seeds a SQLite-backed PDO storage and recreates the database file on each startup.
- *
- * Each mutating test restarts the server so the database is recreated cleanly,
- * preventing cross-test pollution.
  */
 final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
 {
     use LinkedReferenceTestsTrait;
-
-    /**
-     * Tests that mutate the database and would pollute subsequent tests.
-     */
-    private const MUTATING_TESTS = [
-        'testAddStoresEntry',
-        'testDeleteRemovesEntry',
-        'testModifyReplacesAttributeValue',
-        'testRenameChangesRdn',
-        'testWritesPersistAcrossConnections',
-    ];
 
     public static function setUpBeforeClass(): void
     {
@@ -62,19 +48,6 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
     public static function tearDownAfterClass(): void
     {
         LdapBackendSqliteStorageTest::tearDownSharedServer();
-    }
-
-    public function setUp(): void
-    {
-        parent::setUp();
-
-        if (in_array($this->name(), self::MUTATING_TESTS, true)) {
-            $this->stopServer();
-            $this->createServerProcess(
-                'tcp',
-                static::storageExtraArgs(),
-            );
-        }
     }
 
     public function testWritesPersistAcrossConnections(): void
@@ -100,6 +73,11 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
                 ->useSubtreeScope(),
         );
 
+        $secondClient->bind(
+            'cn=admin,dc=foo,dc=bar',
+            '12345',
+        );
+        $secondClient->delete('cn=persistent,dc=foo,dc=bar');
         $secondClient->unbind();
 
         self::assertCount(

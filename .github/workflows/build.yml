@@ -66,14 +66,19 @@ jobs:
         run: echo "127.0.0.1 foo.com" | sudo tee -a /etc/hosts
 
       # Linux: MySQL 8.0 for MysqlLdapBackendStorageTest. Test self-skips on other platforms.
+      # Durability is traded for speed (memory-backed datadir, no binlog, no flush per commit) since the data is throwaway.
       - name: Start MySQL
         if: runner.os == 'Linux'
         run: |
           docker run -d --name freedsx-mysql \
+            --tmpfs /var/lib/mysql:rw \
             -e MYSQL_ROOT_PASSWORD=root \
             -e MYSQL_DATABASE=freedsx \
             -p 3306:3306 \
-            mysql:8.0
+            mysql:8.0 \
+            --skip-log-bin \
+            --innodb-flush-log-at-trx-commit=0 \
+            --innodb-doublewrite=0
           until docker exec freedsx-mysql mysqladmin ping -h 127.0.0.1 -proot --silent >/dev/null 2>&1; do
             sleep 2
           done

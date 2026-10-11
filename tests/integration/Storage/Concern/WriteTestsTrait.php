@@ -44,7 +44,12 @@ trait WriteTestsTrait
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        self::assertCount(1, $entries);
+        $this->ldapClient()->delete('cn=charlie,dc=foo,dc=bar');
+
+        self::assertCount(
+            1,
+            $entries,
+        );
     }
 
     public function testDnsDifferingOnlyByAccentAreDistinctEntries(): void
@@ -587,14 +592,22 @@ trait WriteTestsTrait
     public function testDeleteRemovesEntry(): void
     {
         $this->authenticateAdmin();
-        $this->ldapClient()->delete('cn=alice,ou=people,dc=foo,dc=bar');
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=delete-target,ou=people,dc=foo,dc=bar',
+            ['cn' => 'delete-target', 'sn' => 'Target', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $this->ldapClient()->delete('cn=delete-target,ou=people,dc=foo,dc=bar');
 
         $entries = $this->ldapClient()->search(
-            Operations::search(Filters::equal('cn', 'alice'))
+            Operations::search(Filters::equal('cn', 'delete-target'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        self::assertCount(0, $entries);
+        self::assertCount(
+            0,
+            $entries,
+        );
     }
 
     public function testDeleteNonLeafEntryFails(): void
@@ -611,18 +624,30 @@ trait WriteTestsTrait
     public function testModifyReplacesAttributeValue(): void
     {
         $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=modify-target,ou=people,dc=foo,dc=bar',
+            ['cn' => 'modify-target', 'sn' => 'Smith', 'objectClass' => 'inetOrgPerson'],
+        ));
 
-        $entry = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
+        $entry = Entry::fromArray('cn=modify-target,ou=people,dc=foo,dc=bar');
         $entry->set('sn', 'Jones');
         $this->ldapClient()->update($entry);
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('sn', 'Jones'))
-                ->base('dc=foo,dc=bar')
-                ->useSubtreeScope(),
+                ->base('cn=modify-target,ou=people,dc=foo,dc=bar')
+                ->useBaseScope(),
         );
-        self::assertCount(1, $entries);
-        self::assertSame(['Jones'], $entries->first()?->get('sn')?->getValues());
+        $this->ldapClient()->delete('cn=modify-target,ou=people,dc=foo,dc=bar');
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+        self::assertSame(
+            ['Jones'],
+            $entries->first()?->get('sn')?->getValues(),
+        );
     }
 
     public function testRejectedModifyLeavesTheEntryUnchanged(): void
@@ -1355,23 +1380,40 @@ trait WriteTestsTrait
     public function testRenameChangesRdn(): void
     {
         $this->authenticateAdmin();
-        $this->ldapClient()->rename('cn=alice,ou=people,dc=foo,dc=bar', 'cn=bob', true);
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=rename-target,ou=people,dc=foo,dc=bar',
+            ['cn' => 'rename-target', 'sn' => 'Target', 'objectClass' => 'inetOrgPerson'],
+        ));
+        $this->ldapClient()->rename(
+            'cn=rename-target,ou=people,dc=foo,dc=bar',
+            'cn=renamed',
+            true,
+        );
 
         $found = $this->ldapClient()->search(
-            Operations::search(Filters::equal('cn', 'bob'))
+            Operations::search(Filters::equal('cn', 'renamed'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        self::assertCount(1, $found);
-        self::assertSame('cn=bob,ou=people,dc=foo,dc=bar', $found->first()?->getDn()->toString());
-
-        // Old DN should no longer exist
         $notFound = $this->ldapClient()->search(
-            Operations::search(Filters::equal('cn', 'alice'))
+            Operations::search(Filters::equal('cn', 'rename-target'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        self::assertCount(0, $notFound);
+        $this->ldapClient()->delete('cn=renamed,ou=people,dc=foo,dc=bar');
+
+        self::assertCount(
+            1,
+            $found,
+        );
+        self::assertSame(
+            'cn=renamed,ou=people,dc=foo,dc=bar',
+            $found->first()?->getDn()->toString(),
+        );
+        self::assertCount(
+            0,
+            $notFound,
+        );
     }
 
     public function testAddStoresAValueThatIsNotUtf8(): void
