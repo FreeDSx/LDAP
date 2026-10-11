@@ -17,11 +17,21 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
+use FreeDSx\Ldap\Operation\Request\CancelRequest;
+use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Operation\Response\DeleteResponse;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Schema\SchemaResource;
@@ -32,6 +42,7 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
@@ -43,6 +54,7 @@ use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\SaslContext;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -325,6 +337,86 @@ final class SaslExchangeTest extends TestCase
         self::expectException(ResponseAlreadySentException::class);
 
         $this->subject->run($this->makeInput());
+    }
+
+    #[DataProvider('otherRequests')]
+    public function test_another_request_mid_exchange_is_answered_with_an_operations_error_on_its_own_id(
+        RequestInterface $request,
+        string $responseClass,
+    ): void {
+        $sent = [];
+
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$sent): ServerQueue {
+                $sent[] = $response;
+
+                return $this->mockQueue;
+            });
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn(new LdapMessageRequest(
+                2,
+                $request,
+            ));
+
+        try {
+            $this->subject->run($this->makeInput());
+            self::fail('The request was accepted mid exchange.');
+        } catch (ResponseAlreadySentException) {
+        }
+
+        $refusal = $sent[1]->getResponse();
+        self::assertSame(
+            2,
+            $sent[1]->getMessageId(),
+        );
+        self::assertInstanceOf(
+            LdapResult::class,
+            $refusal,
+        );
+        self::assertSame(
+            $responseClass,
+            $refusal::class,
+        );
+        self::assertSame(
+            ResultCode::OPERATIONS_ERROR,
+            $refusal->getResultCode(),
+        );
+    }
+
+    /**
+     * @return array<string, array{RequestInterface, string}>
+     */
+    public static function otherRequests(): array
+    {
+        return [
+            'start tls' => [
+                new ExtendedRequest(ExtendedRequest::OID_START_TLS),
+                ExtendedResponse::class,
+            ],
+            'who am i' => [
+                new ExtendedRequest(ExtendedRequest::OID_WHOAMI),
+                ExtendedResponse::class,
+            ],
+            'cancel' => [
+                new CancelRequest(1),
+                ExtendedResponse::class,
+            ],
+            'search' => [
+                (new SearchRequest(Filters::present('objectClass')))->base('dc=foo,dc=bar'),
+                SearchResultDone::class,
+            ],
+            'delete' => [
+                new DeleteRequest('cn=foo,dc=foo,dc=bar'),
+                DeleteResponse::class,
+            ],
+        ];
     }
 
     public function test_an_abandon_mid_exchange_is_ignored(): void

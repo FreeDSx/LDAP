@@ -16,9 +16,11 @@ namespace Tests\Integration\FreeDSx\Ldap\Security;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -29,6 +31,7 @@ use FreeDSx\Sasl\Options\PlainOptions;
 use FreeDSx\Sasl\Options\ScramOptions;
 use FreeDSx\Sasl\Sasl;
 use FreeDSx\Socket\Exception\ConnectionException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
@@ -295,6 +298,57 @@ final class SaslIntegrationTest extends ServerTestCase
         } finally {
             $queue->close();
         }
+    }
+
+    #[DataProvider('extendedOperationsMidNegotiation')]
+    public function testAnExtendedOperationMidNegotiationIsAnsweredWithAnOperationsError(string $requestName): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new ExtendedRequest($requestName),
+            ));
+            $refusal = $queue->getMessage(2)->getResponse();
+
+            self::assertInstanceOf(
+                ExtendedResponse::class,
+                $refusal,
+            );
+            self::assertSame(
+                ResultCode::OPERATIONS_ERROR,
+                $refusal->getResultCode(),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                3,
+                new SaslBindRequest('PLAIN', "\x00user\x0012345"),
+            ));
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $this->resultCodeOf($queue->getMessage(3)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function extendedOperationsMidNegotiation(): array
+    {
+        return [
+            'start tls' => [ExtendedRequest::OID_START_TLS],
+            'who am i' => [ExtendedRequest::OID_WHOAMI],
+        ];
     }
 
     public function testAnUnbindMidNegotiationClosesTheSessionWithoutAResponse(): void

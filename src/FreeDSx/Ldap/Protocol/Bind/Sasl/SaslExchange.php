@@ -418,9 +418,10 @@ final class SaslExchange
             throw new SaslNegotiationAbortedException($message);
         }
 
+        // RFC 4511 4.2.1 forbids other operations between the steps of a bind, which makes this one out of sequence.
         throw new OperationException(
-            'Expected a SASL bind continuation during the exchange.',
-            ResultCode::PROTOCOL_ERROR,
+            self::BIND_IN_PROGRESS,
+            ResultCode::OPERATIONS_ERROR,
         );
     }
 }
