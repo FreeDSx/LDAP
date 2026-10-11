@@ -101,10 +101,11 @@ final class ExternalMechanismOptionsBuilder implements MechanismOptionsBuilderIn
     private function assertSecureChannel(): void
     {
         // LDAPS connections are encrypted from accept (the StartTLS-only isEncrypted flag is not set for them).
+        // RFC 4513 5.2.3 names inappropriateAuthentication when no lower layer has established credentials.
         if (!$this->options->getNetworkConfig()->isUseSsl() && !$this->queue->isEncrypted()) {
             throw new OperationException(
                 'SASL EXTERNAL requires a TLS-protected connection.',
-                ResultCode::CONFIDENTIALITY_REQUIRED,
+                ResultCode::INAPPROPRIATE_AUTHENTICATION,
             );
         }
 
