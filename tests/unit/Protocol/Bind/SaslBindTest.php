@@ -190,7 +190,7 @@ final class SaslBindTest extends TestCase
         );
     }
 
-    public function test_it_denies_a_proxy_authz_id_without_the_grant(): void
+    public function test_a_proxy_authz_id_without_the_grant_is_refused_as_invalid_credentials(): void
     {
         $credentials = "dn:cn=alice,dc=foo,dc=bar\x00cn=admin,dc=foo,dc=bar\x0012345";
         $identity = new SaslIdentity('12345', new Dn('cn=admin,dc=foo,dc=bar'));
@@ -208,7 +208,7 @@ final class SaslBindTest extends TestCase
             ->method('sendMessage');
 
         self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::AUTHORIZATION_DENIED);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
 
         $this->subjectWith($this->resolverWith(
             $accessControl,
@@ -219,7 +219,7 @@ final class SaslBindTest extends TestCase
         ));
     }
 
-    public function test_it_denies_a_malformed_authz_id(): void
+    public function test_a_malformed_authz_id_is_refused_as_invalid_credentials(): void
     {
         // 'bogus' is neither empty, a dn:, nor a u: form, and differs from the authcid.
         $credentials = "bogus\x00cn=admin,dc=foo,dc=bar\x0012345";
@@ -234,7 +234,7 @@ final class SaslBindTest extends TestCase
             ->method('sendMessage');
 
         self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::AUTHORIZATION_DENIED);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
 
         $this->subject->bind(new LdapMessageRequest(
             1,

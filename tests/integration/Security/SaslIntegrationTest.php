@@ -300,6 +300,23 @@ final class SaslIntegrationTest extends ServerTestCase
         }
     }
 
+    public function testAnAuthzIdTheUserMayNotAssumeIsRefusedWithInvalidCredentials(): void
+    {
+        $response = $this->sendRawBind(new SaslBindRequest(
+            'PLAIN',
+            "dn:cn=other,dc=foo,dc=bar\x00user\x0012345",
+        ));
+
+        self::assertInstanceOf(
+            BindResponse::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::INVALID_CREDENTIALS,
+            $response->getResultCode(),
+        );
+    }
+
     #[DataProvider('extendedOperationsMidNegotiation')]
     public function testAnExtendedOperationMidNegotiationIsAnsweredWithAnOperationsError(string $requestName): void
     {
