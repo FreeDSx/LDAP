@@ -22,16 +22,6 @@ final class LdapBackendSqliteSwooleStorageTest extends LdapBackendStorageTestCas
 {
     use LinkedReferenceTestsTrait;
 
-    /**
-     * Tests that mutate the database and would pollute subsequent tests.
-     */
-    private const MUTATING_TESTS = [
-        'testAddStoresEntry',
-        'testDeleteRemovesEntry',
-        'testModifyReplacesAttributeValue',
-        'testRenameChangesRdn',
-    ];
-
     public static function setUpBeforeClass(): void
     {
         // Intentionally skips the parent, which would start the in-memory PCNTL server.
@@ -56,14 +46,6 @@ final class LdapBackendSqliteSwooleStorageTest extends LdapBackendStorageTestCas
         $this->requireSwoole();
 
         parent::setUp();
-
-        if (in_array($this->name(), self::MUTATING_TESTS, true)) {
-            $this->stopServer();
-            $this->createServerProcess(
-                'tcp',
-                static::storageExtraArgs(),
-            );
-        }
     }
 
     protected static function storageExtraArgs(): array

@@ -16,28 +16,12 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage;
 /**
  * Runs the full LdapBackendStorageTestCase suite against the SwooleServerRunner.
  *
- * Read-only tests share a single Swoole server process started in
- * setUpBeforeClass(). Write tests that mutate the InMemoryStorageAdapter
- * state stop the shared server and spin up a fresh one in setUp() — giving
- * Swoole's coroutine startup the same natural gap between setUp() and the
- * first LDAP call that the original per-test approach relied on. tearDown()
- * then restarts the shared server so subsequent tests see a clean seed.
+ * Every test shares a single Swoole server process started in setUpBeforeClass().
  *
  * Skipped automatically when the swoole extension is not loaded.
  */
 final class LdapBackendStorageSwooleTest extends LdapBackendStorageTestCase
 {
-    /**
-     * Tests that write to the InMemoryStorageAdapter and would pollute the
-     * shared server's state for subsequent tests.
-     */
-    private const MUTATING_TESTS = [
-        'testAddStoresEntry',
-        'testDeleteRemovesEntry',
-        'testModifyReplacesAttributeValue',
-        'testRenameChangesRdn',
-    ];
-
     /**
      * Start a single shared Swoole server instead of the PCNTL server that
      * LdapBackendStorageTestCase::setUpBeforeClass() would launch.
@@ -67,15 +51,6 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTestCase
         $this->requireSwoole();
 
         parent::setUp();
-
-        if (in_array($this->name(), self::MUTATING_TESTS, true)) {
-            // Stop the shared server and spin up a fresh one for each mutating
-            // test. The LdapClient created by parent::setUp() is lazy (no TCP
-            // connection yet), so stopServer() will find no active Swoole
-            // connections and the drain coroutine exits immediately.
-            $this->stopServer();
-            $this->createServerProcess('tcp', static::storageExtraArgs());
-        }
     }
 
     /**
