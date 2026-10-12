@@ -2017,6 +2017,10 @@ trait QueryTestsTrait
                 ResultCode::ALIAS_PROBLEM,
                 $e->getCode(),
             );
+            self::assertSame(
+                'cn=dangle,dc=foo,dc=bar',
+                $e->getMatchedDn()?->toString(),
+            );
         } finally {
             $this->ldapClient()->delete('cn=dangle,dc=foo,dc=bar');
         }
@@ -2048,6 +2052,13 @@ trait QueryTestsTrait
             self::assertSame(
                 ResultCode::ALIAS_PROBLEM,
                 $e->getCode(),
+            );
+            self::assertContains(
+                $e->getMatchedDn()?->toString(),
+                [
+                    'cn=loopa,dc=foo,dc=bar',
+                    'cn=loopb,dc=foo,dc=bar',
+                ],
             );
         } finally {
             $this->ldapClient()->delete('cn=loopa,dc=foo,dc=bar');

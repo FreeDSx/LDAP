@@ -52,15 +52,16 @@ final readonly class AliasResolver
         $hops = 0;
         while ($this->isAlias($current)) {
             if (++$hops > self::MAX_HOPS) {
-                throw new OperationException(
+                throw $this->aliasProblem(
                     'The alias chain is too long, or loops.',
-                    ResultCode::ALIAS_PROBLEM,
+                    $current,
                 );
             }
-            $current = $this->storage->find($this->aliasedName($current)->normalize())
-                ?? throw new OperationException(
+            $alias = $current;
+            $current = $this->storage->find($this->aliasedName($alias)->normalize())
+                ?? throw $this->aliasProblem(
                     'An alias names an entry that does not exist.',
-                    ResultCode::ALIAS_PROBLEM,
+                    $alias,
                 );
         }
 
@@ -88,19 +89,34 @@ final readonly class AliasResolver
         $value = $alias->get(AttributeTypeOid::NAME_ALIASED_OBJECT_NAME)?->firstValue();
 
         if ($value === null || $value === '') {
-            throw new OperationException(
+            throw $this->aliasProblem(
                 'An alias carries no aliased object name.',
-                ResultCode::ALIAS_PROBLEM,
+                $alias,
             );
         }
 
         try {
             return new Dn($value);
         } catch (InvalidArgumentException) {
-            throw new OperationException(
+            throw $this->aliasProblem(
                 'An alias names an entry that is not a valid DN.',
-                ResultCode::ALIAS_PROBLEM,
+                $alias,
             );
         }
+    }
+
+    /**
+     * RFC 4511 4.1.9: the matchedDN names the last alias used in finding the base.
+     */
+    private function aliasProblem(
+        string $message,
+        Entry $alias,
+    ): OperationException {
+        return new OperationException(
+            $message,
+            ResultCode::ALIAS_PROBLEM,
+            null,
+            $alias->getDn(),
+        );
     }
 }
