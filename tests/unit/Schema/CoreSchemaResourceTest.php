@@ -127,7 +127,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_attribute_type_count(): void
     {
         self::assertCount(
-            79,
+            80,
             $this->schema->getAttributeTypes(),
         );
     }
@@ -172,6 +172,27 @@ final class CoreSchemaResourceTest extends TestCase
         self::assertSame(
             SyntaxOid::OID_UUID,
             $this->schema->getAttributeType(AttributeTypeOid::NAME_ENTRY_UUID)?->syntaxOid,
+        );
+    }
+
+    public function test_governing_structure_rule_is_a_read_only_operational_integer(): void
+    {
+        $type = $this->schema->getAttributeType('governingStructureRule');
+
+        self::assertNotNull($type);
+        self::assertSame(
+            '2.5.21.10',
+            $type->oid,
+        );
+        self::assertSame(
+            SyntaxOid::OID_INTEGER,
+            $type->syntaxOid,
+        );
+        self::assertTrue($type->singleValue);
+        self::assertTrue($type->noUserModification);
+        self::assertSame(
+            AttributeUsage::DirectoryOperation,
+            $type->usage,
         );
     }
 
