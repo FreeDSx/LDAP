@@ -79,6 +79,12 @@ final class SchemaRuleTest extends TestCase
             'byPolicy' => true,
         ];
 
+        yield 'defined object classes' => [
+            'rule' => SchemaRule::DefinedObjectClasses,
+            'byControl' => false,
+            'byPolicy' => true,
+        ];
+
         yield 'single value' => [
             'rule' => SchemaRule::SingleValue,
             'byControl' => false,

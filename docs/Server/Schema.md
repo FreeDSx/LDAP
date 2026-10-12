@@ -141,14 +141,14 @@ Relax Rules control (logged with `validation_mode: relaxed`). It is ACL-gated. S
 [Control Rules](Access-Control.md#control-rules). The control waives only the rules the draft RFC names for an
 existing entry.
 
-| Rule                                                                                                                | Relax Rules control | `Lenient` |
-|---------------------------------------------------------------------------------------------------------------------|---------------------|-----------|
-| Changing the structural object class                                                                                | Waived              | Waived    |
-| Writing `createTimestamp`, `modifyTimestamp`, `creatorsName` or `modifiersName`                                     | Waived              | Waived    |
-| Writing `entryUUID` on Add                                                                                          | Waived              | Waived    |
-| Writing `entryUUID` on Modify, or any other `NO-USER-MODIFICATION` attribute                                        | Refused             | Waived    |
-| Required and allowed attributes, a structural object class, undefined types, single-valued types, naming attributes | Refused             | Waived    |
-| Attribute syntax, the value limit, equivalent values, an attribute description given twice                          | Refused             | Refused   |
+| Rule                                                                                                                                         | Relax Rules control | `Lenient` |
+|----------------------------------------------------------------------------------------------------------------------------------------------|---------------------|-----------|
+| Changing the structural object class                                                                                                         | Waived              | Waived    |
+| Writing `createTimestamp`, `modifyTimestamp`, `creatorsName` or `modifiersName`                                                              | Waived              | Waived    |
+| Writing `entryUUID` on Add                                                                                                                   | Waived              | Waived    |
+| Writing `entryUUID` on Modify, or any other `NO-USER-MODIFICATION` attribute                                                                 | Refused             | Waived    |
+| Required and allowed attributes, a structural object class, undefined types, undefined object classes, single-valued types, naming attributes | Refused             | Waived    |
+| Attribute syntax, the value limit, equivalent values, an attribute description given twice                                                   | Refused             | Refused   |
 
 Each violation is logged and the first that is not waived decides the result code.
 

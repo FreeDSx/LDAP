@@ -437,6 +437,54 @@ trait WriteTestsTrait
         ));
     }
 
+    public function testAddRejectsAnUndefinedObjectClassAndStoresNothing(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->create(new Entry(
+                'cn=undefinedclass,dc=foo,dc=bar',
+                new Attribute('objectClass', 'top', 'person', 'xNoSuchClass'),
+                new Attribute('cn', 'undefinedclass'),
+                new Attribute('sn', 'Undefined'),
+            ));
+            self::fail('An add carrying an undefined object class should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->ldapClient()->read('cn=undefinedclass,dc=foo,dc=bar'));
+    }
+
+    public function testModifyRejectsAddingAnUndefinedObjectClass(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::add(new Attribute('objectClass', '1.2.3.4.5.6.7.8')),
+            ));
+            self::fail('A modify adding an undefined object class should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotContains(
+            '1.2.3.4.5.6.7.8',
+            $this->ldapClient()->read(
+                'cn=user,dc=foo,dc=bar',
+                ['objectClass'],
+            )?->get('objectClass')?->getValues() ?? [],
+        );
+    }
+
     public function testModifyRejectsChangingTheStructuralObjectClass(): void
     {
         $this->authenticateAdmin();

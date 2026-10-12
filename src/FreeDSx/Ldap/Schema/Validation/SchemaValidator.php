@@ -418,6 +418,7 @@ final class SchemaValidator
                 $chain->must,
             ),
             fn() => $this->checkAttributeTypesAreDefined($entry),
+            fn() => $this->checkObjectClassesAreDefined($entry),
         ];
 
         // RFC 4512 §4.3 lets extensibleObject hold any user attribute, so only the MAY list is waived; the
@@ -528,6 +529,29 @@ final class SchemaValidator
                 sprintf('Undefined attribute type: "%s".', $attr->getName()),
                 ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
                 SchemaRule::DefinedAttributeTypes,
+            );
+        }
+    }
+
+    /**
+     * RFC 4512 7.1: an entry may only belong to classes the schema defines.
+     *
+     * @throws OperationException
+     */
+    private function checkObjectClassesAreDefined(Entry $entry): void
+    {
+        foreach ($entry->get('objectClass')?->getValues() ?? [] as $name) {
+            if ($this->schema->getObjectClass($name) !== null) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf(
+                    'Undefined object class: "%s".',
+                    $name,
+                ),
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                SchemaRule::DefinedObjectClasses,
             );
         }
     }

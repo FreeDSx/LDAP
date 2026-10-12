@@ -438,6 +438,42 @@ final class SchemaValidatorTest extends TestCase
         $this->subject->validateAdd($entry);
     }
 
+    public function test_add_undefined_object_class_throws_object_class_violation(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', 'person', 'xNoSuchClass'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', 'Smith'),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->subject->validateAdd($entry);
+    }
+
+    public function test_a_modify_adding_an_undefined_object_class_breaks_only_that_rule(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', 'person', '1.2.3.4.5.6.7.8'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', 'Smith'),
+        );
+
+        self::assertSame(
+            [SchemaRule::DefinedObjectClasses],
+            $this->rulesBrokenBy(fn() => $this->subject->validateModify(
+                new UpdateCommand(
+                    $entry->getDn(),
+                    [Change::add('objectClass', '1.2.3.4.5.6.7.8')],
+                ),
+                $entry,
+            )),
+        );
+    }
+
     public function test_add_single_valued_violation_throws_constraint_violation(): void
     {
         $entry = new Entry(
