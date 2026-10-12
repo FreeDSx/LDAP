@@ -42,6 +42,8 @@ enum SchemaRule
 
     case DefinedAttributeTypes;
 
+    case DefinedObjectClasses;
+
     case SingleValue;
 
     case NamingAttributes;
