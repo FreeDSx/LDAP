@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
@@ -96,6 +97,32 @@ final class LdapProxiedAuthorizationControlTest extends ServerTestCase
         self::assertSame(
             'dn:' . self::PROXIED_DN,
             $extended->getValue(),
+        );
+    }
+
+    public function test_a_control_without_a_value_is_refused_with_a_protocol_error_and_the_session_continues(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::whoami(),
+                new Control(
+                    Control::OID_PROXY_AUTHORIZATION,
+                    criticality: true,
+                ),
+            );
+            self::fail('A proxied authorization control without a value should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
         );
     }
 

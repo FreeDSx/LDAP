@@ -91,8 +91,12 @@ final class ProxyAuthorizationControl extends Control
             ));
         }
 
-        [1 => $criticality, 2 => $authzId] = self::parseAsn1ControlValues($type);
-        $rawAuthzId = $authzId ?? '';
+        [1 => $criticality, 2 => $rawAuthzId] = self::parseAsn1ControlValues($type);
+
+        // RFC 4370 3: the value is present even for an anonymous identity.
+        if ($rawAuthzId === null) {
+            throw new ProtocolException('The proxied authorization control must have a value.');
+        }
 
         try {
             return new static(
