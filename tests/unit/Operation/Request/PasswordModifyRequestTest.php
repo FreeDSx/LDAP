@@ -165,4 +165,24 @@ final class PasswordModifyRequestTest extends TestCase
                 ->toAsn1(),
         );
     }
+
+    public function test_it_refuses_a_field_it_does_not_recognize(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        PasswordModifyRequest::fromAsn1(
+            (new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY))
+                ->setValue(Asn1::sequence(
+                    Asn1::context(
+                        2,
+                        Asn1::octetString('newpass'),
+                    ),
+                    Asn1::context(
+                        3,
+                        Asn1::octetString('extension'),
+                    ),
+                ))
+                ->toAsn1(),
+        );
+    }
 }

@@ -13,13 +13,16 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordModifyHandler;
@@ -46,6 +49,8 @@ final class ServerPasswordModifyHandlerTest extends TestCase
 {
     private ReadBackendInterface&MockObject $mockBackend;
 
+    private WriteHandlerInterface&MockObject $mockWriteHandler;
+
     private ServerPasswordModifyHandler $subject;
 
     private Entry $userEntry;
@@ -55,7 +60,7 @@ final class ServerPasswordModifyHandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->mockBackend = $this->createMock(ReadBackendInterface::class);
-        $mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
+        $this->mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
 
         $this->userEntry = new Entry(
             new Dn('cn=user,dc=foo,dc=bar'),
@@ -72,7 +77,7 @@ final class ServerPasswordModifyHandlerTest extends TestCase
                     $this->createMock(BindNameResolverInterface::class),
                 ),
                 accessControl: $this->createMock(AccessControlInterface::class),
-                writeDispatcher: $mockWriteHandler,
+                writeDispatcher: $this->mockWriteHandler,
                 hashService: new PasswordHashService(hashCost: 4),
             ),
         );
@@ -150,6 +155,57 @@ final class ServerPasswordModifyHandlerTest extends TestCase
             ResultCode::PROTOCOL_ERROR,
             $this->singleResponse($stream->messages)->getResultCode(),
         );
+    }
+
+    #[DataProvider('undecodableValueProvider')]
+    public function test_a_value_it_cannot_decode_is_refused_with_protocol_error_and_changes_nothing(string $value): void
+    {
+        $this->mockWriteHandler
+            ->expects(self::never())
+            ->method('handle');
+
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(
+                    ExtendedRequest::OID_PWD_MODIFY,
+                    $value,
+                ),
+            ),
+            $this->userToken,
+        );
+
+        self::assertSame(
+            ResultCode::PROTOCOL_ERROR,
+            $this->singleResponse($stream->messages)->getResultCode(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function undecodableValueProvider(): iterable
+    {
+        $encoder = new LdapEncoder();
+
+        yield 'a field it does not recognize' => [
+            $encoder->encode(Asn1::sequence(
+                Asn1::context(
+                    2,
+                    Asn1::octetString('newpass'),
+                ),
+                Asn1::context(
+                    3,
+                    Asn1::octetString('extension'),
+                ),
+            )),
+        ];
+        yield 'a value that is not a sequence' => [
+            $encoder->encode(Asn1::octetString('')),
+        ];
+        yield 'a field that is not context tagged' => [
+            $encoder->encode(Asn1::sequence(Asn1::octetString('newpass'))),
+        ];
     }
 
     #[DataProvider('singleFieldProvider')]

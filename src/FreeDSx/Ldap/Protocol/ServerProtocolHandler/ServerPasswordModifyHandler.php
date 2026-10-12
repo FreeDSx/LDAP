@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
@@ -91,9 +92,7 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
             );
         }
 
-        /** @var ExtendedRequest $raw */
-        $raw = $message->getRequest();
-        $request = PasswordModifyRequest::fromAsn1($raw->toAsn1());
+        $request = $this->decodeRequest($message);
         $this->assertNamesAField($request);
 
         return $this->service->change(
@@ -101,6 +100,27 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
             $token,
             $message->controls(),
         );
+    }
+
+    /**
+     * Decodes the request value, answering one that is malformed or carries an unrecognized field as a protocol error.
+     *
+     * @throws OperationException
+     */
+    private function decodeRequest(LdapMessageRequest $message): PasswordModifyRequest
+    {
+        /** @var ExtendedRequest $raw */
+        $raw = $message->getRequest();
+
+        try {
+            return PasswordModifyRequest::fromAsn1($raw->toAsn1());
+        } catch (ProtocolException $e) {
+            throw new OperationException(
+                $e->getMessage(),
+                ResultCode::PROTOCOL_ERROR,
+                $e,
+            );
+        }
     }
 
     /**
