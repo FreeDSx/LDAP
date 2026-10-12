@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -22,6 +23,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Result\EntryResult;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class LdapCancelServerTest extends ServerTestCase
@@ -78,6 +80,37 @@ final class LdapCancelServerTest extends ServerTestCase
         $this->expectExceptionCode(ResultCode::NO_SUCH_OPERATION);
 
         $this->ldapClient()->sendAndReceive(Operations::cancel(999));
+    }
+
+    #[DataProvider('undecodableCancelValueProvider')]
+    public function testACancelWhoseValueCannotBeDecodedIsAnsweredWithoutEndingTheSession(string $value): void
+    {
+        try {
+            $this->ldapClient()->sendAndReceive(new ExtendedRequest(
+                ExtendedRequest::OID_CANCEL,
+                $value,
+            ));
+            $this->fail('A cancel value that cannot be decoded should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function undecodableCancelValueProvider(): iterable
+    {
+        yield 'a value that is not BER' => ["\x01\x02\x03"];
+        yield 'an empty value' => [''];
     }
 
     public function testACancelNamingItselfCannotBeCanceled(): void

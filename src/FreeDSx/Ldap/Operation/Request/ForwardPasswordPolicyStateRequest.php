@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Operation\Request;
 use DateTimeImmutable;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
@@ -112,7 +111,6 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
      *
      * @param AbstractType<mixed> $type
      * @throws EncoderException
-     * @throws PartialPduException
      * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type): static

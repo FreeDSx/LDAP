@@ -91,6 +91,8 @@ final class CancelRequestTest extends TestCase
             [$req->toAsn1()],
             [$req->setValue(Asn1::sequence())->toAsn1()],
             [$req->setValue(Asn1::sequence(Asn1::octetString('bar')))->toAsn1()],
+            [$req->setValue("\x01\x02\x03")->toAsn1()],
+            [$req->setValue('')->toAsn1()],
         ];
     }
 }
