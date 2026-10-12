@@ -29,29 +29,34 @@ final class Cancellation
 {
     private ?LdapMessageRequest $signal = null;
 
+    private bool $observed = false;
+
     /**
      * The writer offers each poll result; nulls are ignored so a real signal is never overwritten.
      */
     public function offer(?LdapMessageRequest $signal): void
     {
-        if ($signal !== null) {
-            $this->signal = $signal;
+        if ($signal === null) {
+            return;
         }
+
+        $this->signal = $signal;
+        $this->observed = false;
     }
 
     public function isSignalled(): bool
     {
-        return $this->signal !== null;
+        return $this->observe() !== null;
     }
 
     public function isAbandoned(): bool
     {
-        return $this->signal?->getRequest() instanceof AbandonRequest;
+        return $this->observe()?->getRequest() instanceof AbandonRequest;
     }
 
     public function isCanceled(): bool
     {
-        return $this->signal?->getRequest() instanceof CancelRequest;
+        return $this->observe()?->getRequest() instanceof CancelRequest;
     }
 
     /**
@@ -59,11 +64,32 @@ final class Cancellation
      */
     public function isUnbound(): bool
     {
-        return $this->signal?->getRequest() instanceof UnbindRequest;
+        return $this->observe()?->getRequest() instanceof UnbindRequest;
     }
 
     public function signal(): ?LdapMessageRequest
     {
+        return $this->observe();
+    }
+
+    /**
+     * A Cancel offered after the producer last looked.
+     */
+    public function unobservedCancel(): ?LdapMessageRequest
+    {
+        if ($this->observed || !$this->signal?->getRequest() instanceof CancelRequest) {
+            return null;
+        }
+
+        return $this->signal;
+    }
+
+    private function observe(): ?LdapMessageRequest
+    {
+        if ($this->signal !== null) {
+            $this->observed = true;
+        }
+
         return $this->signal;
     }
 }

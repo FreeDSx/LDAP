@@ -34,4 +34,9 @@ final readonly class QueueWriterConfig
     {
         return $this->signalInterval > 0 || $this->flushPerMessage;
     }
+
+    public function isPollDue(int $sinceLastPoll): bool
+    {
+        return $this->signalInterval > 0 && $sinceLastPoll >= $this->signalInterval;
+    }
 }

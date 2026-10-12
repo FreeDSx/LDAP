@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
@@ -39,5 +40,27 @@ trait RawClientQueueTrait
                     ->setSslValidateCert($validateSslCert),
             ))->setServers(['127.0.0.1']),
         ));
+    }
+
+    /**
+     * @return array<int, int> result codes keyed by message ID
+     */
+    private function resultCodesFor(
+        ClientQueue $queue,
+        int ...$messageIds,
+    ): array {
+        $resultCodes = [];
+
+        while (count($resultCodes) < count($messageIds)) {
+            $message = $queue->getMessage();
+            $response = $message->getResponse();
+            if (!in_array($message->getMessageId(), $messageIds, true) || !$response instanceof LdapResult) {
+                continue;
+            }
+            $resultCodes[$message->getMessageId()] = $response->getResultCode();
+        }
+        ksort($resultCodes);
+
+        return $resultCodes;
     }
 }

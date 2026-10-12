@@ -55,10 +55,21 @@ final readonly class ResponseWriter
         return $stream->outcome();
     }
 
-    /**
-     * Walk the generator, flushing in batches and offering polled cancel signals at the configured interval.
-     */
     private function step(
+        ResponseStream $stream,
+        int $messageId,
+    ): void {
+        try {
+            $this->drain(
+                $stream,
+                $messageId,
+            );
+        } finally {
+            $this->keepUnobservedCancel($stream);
+        }
+    }
+
+    private function drain(
         ResponseStream $stream,
         int $messageId,
     ): void {
@@ -69,6 +80,7 @@ final readonly class ResponseWriter
             : max(1, $config->signalInterval);
         $chunk = [];
         $sincePoll = 0;
+        $signalled = false;
 
         // The producer reads the offered signal from the Cancellation token when foreach resumes it.
         foreach ($stream->generator() as $message) {
@@ -80,15 +92,45 @@ final readonly class ResponseWriter
                 $chunk = [];
             }
 
-            if ($config->signalInterval > 0 && $sincePoll >= $config->signalInterval) {
+            // A producer holding a signal is winding down, so a later Abandon or Cancel is left for the dispatcher.
+            if (!$signalled && $config->isPollDue($sincePoll)) {
                 $sincePoll = 0;
-                $stream->cancellation?->offer($this->pollForSignal($messageId));
+                $signalled = $this->offerSignal(
+                    $stream,
+                    $messageId,
+                );
             }
         }
 
         if ($chunk !== []) {
             $this->queue->sendMessages($chunk);
         }
+    }
+
+    /**
+     * Offers the polled signal to the producer, reporting whether there was one.
+     */
+    private function offerSignal(
+        ResponseStream $stream,
+        int $messageId,
+    ): bool {
+        $signal = $this->pollForSignal($messageId);
+        $stream->cancellation?->offer($signal);
+
+        return $signal !== null;
+    }
+
+    /**
+     * A Cancel the stream ended without looking at is answered by the dispatcher, as one arriving afterwards would be.
+     */
+    private function keepUnobservedCancel(ResponseStream $stream): void
+    {
+        $cancel = $stream->cancellation?->unobservedCancel();
+        if ($cancel === null) {
+            return;
+        }
+
+        $this->queue->buffer($cancel);
     }
 
     /**
