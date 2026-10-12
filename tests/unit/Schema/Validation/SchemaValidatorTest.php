@@ -353,6 +353,37 @@ final class SchemaValidatorTest extends TestCase
         $this->subject->validateAdd($this->personEntry('cn=Alice,jpegPhoto=zz,dc=example,dc=com'));
     }
 
+    #[DataProvider('rdnValueFailingItsSyntaxProvider')]
+    public function test_add_with_an_rdn_value_failing_its_syntax_throws_invalid_dn_syntax(string $dn): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->subject->validateAdd($this->personEntry($dn));
+    }
+
+    #[DataProvider('rdnValueFailingItsSyntaxProvider')]
+    public function test_rename_onto_an_rdn_value_failing_its_syntax_throws_invalid_dn_syntax(string $dn): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $entry = $this->personEntry($dn);
+        $this->subject->validateModifyDn(
+            $entry,
+            $entry->getDn()->getRdn(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function rdnValueFailingItsSyntaxProvider(): iterable
+    {
+        yield 'an empty directory string' => ['cn=,dc=example,dc=com'];
+        yield 'a country code of three letters' => ['c=USA,dc=example,dc=com'];
+    }
+
     public function test_rename_onto_a_type_with_no_equality_rule_throws_naming_violation(): void
     {
         self::expectException(OperationException::class);

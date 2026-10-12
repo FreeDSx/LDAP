@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Schema\Validation;
 use Closure;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -115,7 +116,11 @@ final class SchemaValidator
         if ($this->mode === SchemaValidationMode::Off) {
             return;
         }
-        $checks = [fn() => $this->checkAttributeSyntaxes($entry)];
+        // Ahead of the value syntax check, which reports the same value with the less specific code.
+        $checks = [
+            fn() => $this->checkRdnValuesConform($entry->getDn()),
+            fn() => $this->checkAttributeSyntaxes($entry),
+        ];
 
         if (!$isSystem) {
             array_push(
@@ -199,7 +204,11 @@ final class SchemaValidator
         if ($this->mode === SchemaValidationMode::Off) {
             return;
         }
-        $checks = [fn() => $this->checkAttributeSyntaxes($result)];
+        // Ahead of the value syntax check, which reports the same value with the less specific code.
+        $checks = [
+            fn() => $this->checkRdnValuesConform($result->getDn()),
+            fn() => $this->checkAttributeSyntaxes($result),
+        ];
 
         // The new RDN is client-supplied, so the values it puts on the entry face the same restriction as a modify.
         if (!$isSystem) {
@@ -333,6 +342,33 @@ final class SchemaValidator
                 ),
                 ResultCode::NAMING_VIOLATION,
                 SchemaRule::NamingAttributes,
+            );
+        }
+    }
+
+    /**
+     * RFC 4511 A.2: an RDN holding a value its type's syntax rejects is an invalid DN.
+     *
+     * @throws OperationException
+     */
+    private function checkRdnValuesConform(Dn $dn): void
+    {
+        if ($dn->isRootDse()) {
+            return;
+        }
+
+        foreach ($dn->getRdn()->getAll() as $component) {
+            if ($this->syntaxResolver->conforms($component->getName(), Rdn::unescape($component->getValue()))) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf(
+                    'A value of attribute "%s" in the RDN does not conform to its syntax.',
+                    $component->getName(),
+                ),
+                ResultCode::INVALID_DN_SYNTAX,
+                SchemaRule::AttributeSyntax,
             );
         }
     }
