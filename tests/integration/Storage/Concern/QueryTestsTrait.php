@@ -302,6 +302,52 @@ trait QueryTestsTrait
             )),
             0,
         ];
+        // RFC 4511 4.5.1.7.7: the rule determines the assertion syntax, and a value it rejects is Undefined.
+        yield 'extensible with an assertion value the rule rejects is Undefined' => [
+            Filters::extensible(
+                'uidNumber',
+                'abc',
+                'integerOrderingMatch',
+                false,
+            ),
+            0,
+        ];
+        yield 'negating an extensible with an assertion value the rule rejects is still Undefined' => [
+            Filters::not(Filters::extensible(
+                'uidNumber',
+                'abc',
+                'integerOrderingMatch',
+                false,
+            )),
+            0,
+        ];
+        yield 'extensible with a signed integer assertion is Undefined as on the equality path' => [
+            Filters::extensible(
+                'uidNumber',
+                '+100',
+                'integerMatch',
+                false,
+            ),
+            0,
+        ];
+        yield 'extensible bitAnd with a mask that is not an integer is Undefined' => [
+            Filters::extensible(
+                'uidNumber',
+                'abc',
+                '1.2.840.113556.1.4.803',
+                false,
+            ),
+            0,
+        ];
+        yield 'extensible bitAnd matches no value that is not an integer' => [
+            Filters::extensible(
+                'cn',
+                '0',
+                '1.2.840.113556.1.4.803',
+                false,
+            ),
+            0,
+        ];
 
         // RFC 4518 appendix B: a space at the edge of a fragment stays significant, so these must not match a value
         // holding no space there. Collapsing and trimming both sides alike would wrongly match all three.
