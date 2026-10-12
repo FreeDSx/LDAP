@@ -823,11 +823,37 @@ $server = new LdapServer(
 ## Handling the RootDSE
 
 The server generates the RootDSE. `namingContexts` is derived from the backend storage contents; other attributes such
-as `vendorName` come from `ServerOptions`. The entry always advertises:
+as `vendorName` come from `ServerOptions`. Every RootDSE attribute is operational. A client must request `+` or name
+the attributes it wants. The entry always advertises:
 
-- `supportedControl`: paging (RFC 2696)
-- `supportedExtension`: WhoAmI (RFC 4532), Password Modify (RFC 3062), and StartTLS (RFC 4511) if an SSL certificate is configured
+- `supportedControl`:
+    - paged results (RFC 2696)
+    - server-side sort (RFC 2891)
+    - relax rules
+    - proxied authorization (RFC 4370)
+    - ManageDsaIT (RFC 3296)
+    - assertion (RFC 4528)
+    - pre-read and post-read (RFC 4527)
+    - subtree delete
+    - subentries (RFC 3672)
+    - the password policy request control
+- `supportedExtension`:
+    - WhoAmI (RFC 4532)
+    - Password Modify (RFC 3062)
+    - Cancel (RFC 3909)
+- `supportedFeatures`:
+    - all operational attributes via `+` (RFC 3673)
+    - absolute true and false filters (RFC 4526)
 - `supportedLDAPVersion`: `3`
+- `subschemaSubentry`: `cn=Subschema`
+
+Depending on the configuration, it also advertises:
+
+- StartTLS (RFC 4511) in `supportedExtension` when an SSL certificate is configured
+- `supportedSASLMechanisms` when SASL mechanisms are configured
+- the content synchronization control (RFC 4533) and the password policy state forward extension when the server is a
+  replication provider with a change journal (see [Replication](Replication.md))
+- `vendorVersion` and `altServer` when they are set in `ServerOptions`
 
 A proxy server forwards RootDSE requests to the upstream automatically.
 

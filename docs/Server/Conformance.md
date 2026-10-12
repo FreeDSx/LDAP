@@ -185,5 +185,7 @@ The following RFCs are not current implemented.
 * SASL GSSAPI. The server offers PLAIN, CRAM-MD5, EXTERNAL and the SCRAM family.
 * SASL DIGEST-MD5, which RFC 6331 moved to Historic. Use the SCRAM family instead.
 * The full string preparation algorithm of RFC 4518. Only a subset of the steps runs. See [Schema Validation](Schema.md#string-matching-and-internationalization-rfc-4518).
-* Referrals and RFC 3296 `ManageDsaIT`, so the `referral` result code is never returned.
+* Referral entries (RFC 3296 named subordinate references). The `ManageDsaIT` control is accepted but has nothing to
+  act on. The `referral` result code is still returned by a read-only replica refusing a write, and by a proxy relaying
+  one from its upstream.
 * Syntax validation for Guide (RFC 4517 section 3.3.25) and Enhanced Guide (section 3.3.21).
