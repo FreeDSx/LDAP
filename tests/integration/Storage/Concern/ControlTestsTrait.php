@@ -661,6 +661,47 @@ trait ControlTestsTrait
         );
     }
 
+    #[DataProvider('repeatedControlProvider')]
+    public function testASearchCarryingTheSameControlTwiceIsRefusedWithAProtocolError(
+        Control $first,
+        Control $second,
+    ): void {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+                $first,
+                $second,
+            );
+            self::fail('A search carrying the same control twice should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{Control, Control}>
+     */
+    public static function repeatedControlProvider(): iterable
+    {
+        yield 'a matching assertion, then a failing one' => [
+            Controls::assertion(Filters::equal('dc', 'foo')),
+            Controls::assertion(Filters::equal('dc', 'nope')),
+        ];
+        yield 'a failing assertion, then a matching one' => [
+            Controls::assertion(Filters::equal('dc', 'nope')),
+            Controls::assertion(Filters::equal('dc', 'foo')),
+        ];
+        yield 'two paging controls' => [
+            Controls::paging(2),
+            Controls::paging(100),
+        ];
+    }
+
     public function testAnAssertionMatchingTheEntryLetsTheCompareAnswer(): void
     {
         $this->authenticateUser();

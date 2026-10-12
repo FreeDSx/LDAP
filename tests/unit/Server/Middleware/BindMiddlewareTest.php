@@ -144,6 +144,24 @@ final class BindMiddlewareTest extends TestCase
         ];
     }
 
+    public function test_a_bind_carrying_the_same_control_twice_is_refused_as_a_protocol_error(): void
+    {
+        $context = new ServerRequestContext(new LdapMessageRequest(
+            1,
+            new SimpleBindRequest('cn=user,dc=foo,dc=bar', 'secret'),
+            new Control(Control::OID_PWD_POLICY),
+            new Control(Control::OID_PWD_POLICY),
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->subject()->process(
+            $context,
+            $this->next,
+        );
+    }
+
     public function test_a_successful_bind_stores_the_token_and_short_circuits(): void
     {
         $token = BindToken::fromDn('cn=user,dc=foo,dc=bar');
