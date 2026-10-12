@@ -753,6 +753,60 @@ trait QueryTestsTrait
         );
     }
 
+    #[DataProvider('supertypeFilterProvider')]
+    public function testASupertypeFilterMatchesTheSameEntriesWhateverAttributesAreRequested(FilterInterface $filter): void
+    {
+        $this->authenticateUser();
+
+        $withEveryAttribute = $this->dnsMatching(
+            $filter,
+            '*',
+        );
+
+        self::assertNotSame(
+            [],
+            $withEveryAttribute,
+        );
+        self::assertSame(
+            $withEveryAttribute,
+            $this->dnsMatching(
+                $filter,
+                SearchRequest::ATTRIBUTES_NONE,
+            ),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{FilterInterface}>
+     */
+    public static function supertypeFilterProvider(): iterable
+    {
+        yield 'an equality on a supertype' => [
+            Filters::equal(
+                'name',
+                'alice',
+            ),
+        ];
+        yield 'a substring on a supertype' => [
+            Filters::startsWith(
+                'name',
+                'ali',
+            ),
+        ];
+        yield 'a negated equality on a supertype' => [
+            Filters::not(Filters::equal(
+                'name',
+                'alice',
+            )),
+        ];
+        yield 'an equality reaching a DN-valued subtype' => [
+            Filters::equal(
+                'distinguishedName',
+                'cn=admin,dc=foo,dc=bar',
+            ),
+        ];
+    }
+
     /**
      * @return iterable<string, array{string, FilterInterface, int}>
      */
@@ -2175,6 +2229,29 @@ trait QueryTestsTrait
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         )->first();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function dnsMatching(
+        FilterInterface $filter,
+        string $selector,
+    ): array {
+        $dns = array_map(
+            static fn(Entry $entry): string => $entry->getDn()->toString(),
+            $this->ldapClient()->search(
+                Operations::search(
+                    $filter,
+                    $selector,
+                )
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            )->toArray(),
+        );
+        sort($dns);
+
+        return $dns;
     }
 
     /**

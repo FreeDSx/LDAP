@@ -81,9 +81,17 @@ final class StorageListOptionsFactoryTest extends TestCase
                 'cn',
                 'commonname',
                 'sn',
+                'surname',
             ],
             $this->subject->projectionFor($request)->attributes,
         );
+    }
+
+    public function test_a_filter_naming_a_supertype_materializes_every_attribute(): void
+    {
+        $request = (new SearchRequest(Filters::equal('name', 'x')))->setAttributes(SearchRequest::ATTRIBUTES_NONE);
+
+        self::assertNull($this->subject->projectionFor($request)->attributes);
     }
 
     public function test_the_projection_asks_for_has_subordinates_when_the_request_names_it(): void
