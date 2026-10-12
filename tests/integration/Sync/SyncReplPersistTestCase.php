@@ -14,14 +14,21 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 use Closure;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 /**
@@ -29,6 +36,8 @@ use Tests\Support\FreeDSx\Ldap\TestWorker;
  */
 abstract class SyncReplPersistTestCase extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     protected const SEED_LDIF = __DIR__ . '/../../resources/seed/sync-seed.ldif';
 
     private const LISTEN_READ_TIMEOUT = 20;
@@ -99,6 +108,58 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
             $cookies,
             'The refresh boundary and persist phase advance the cookie via SyncInfo messages.',
         );
+    }
+
+    public function testASecondCancelForAPersistSearchIsAnswered(): void
+    {
+        $queue = $this->rawQueue(timeoutRead: 5);
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                new SyncRequestControl(SyncRequestControl::MODE_REFRESH_AND_PERSIST),
+            ));
+            do {
+                $message = $queue->getMessage(2);
+            } while (!$message->getResponse() instanceof IntermediateResponse);
+
+            $queue->sendMessage(
+                new LdapMessageRequest(
+                    3,
+                    Operations::cancel(2),
+                ),
+                new LdapMessageRequest(
+                    4,
+                    Operations::cancel(2),
+                ),
+            );
+
+            self::assertSame(
+                [
+                    3 => ResultCode::SUCCESS,
+                    4 => ResultCode::NO_SUCH_OPERATION,
+                ],
+                $this->resultCodesFor(
+                    $queue,
+                    3,
+                    4,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
     }
 
     public function testPersistDeliversADeletion(): void

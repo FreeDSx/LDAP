@@ -116,6 +116,14 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     }
 
     /**
+     * Holds a message read while peeking for the dispatcher, behind the ones that arrived before it.
+     */
+    public function buffer(LdapMessageRequest $message): void
+    {
+        $this->pendingMessages[] = $message;
+    }
+
+    /**
      * Checks whether an Abandon or Cancel targeting a message ID has arrived.
      *
      * Other messages received while peeking are buffered.

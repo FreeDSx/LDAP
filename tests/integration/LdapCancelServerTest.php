@@ -113,6 +113,47 @@ final class LdapCancelServerTest extends ServerTestCase
         yield 'an empty value' => [''];
     }
 
+    public function testACancelReadWithTheFinalMessageOfASearchIsAnswered(): void
+    {
+        $queue = $this->rawQueue(timeoutRead: 5);
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            // 49 entries and the done make 50 messages, so the only check for a signal follows the final one.
+            $queue->sendMessage(
+                new LdapMessageRequest(
+                    2,
+                    Operations::search(Filters::equal('objectClass', 'inetOrgPerson'))
+                        ->base('dc=foo,dc=bar')
+                        ->useSubtreeScope()
+                        ->sizeLimit(49),
+                ),
+                new LdapMessageRequest(
+                    3,
+                    Operations::cancel(2),
+                ),
+            );
+
+            self::assertSame(
+                [3 => ResultCode::NO_SUCH_OPERATION],
+                $this->resultCodesFor(
+                    $queue,
+                    3,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     public function testACancelNamingItselfCannotBeCanceled(): void
     {
         $queue = $this->rawQueue();

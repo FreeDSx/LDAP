@@ -213,12 +213,12 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
      */
     public static function malformedRequestValueProvider(): iterable
     {
-        yield 'a value that is not a sequence' =>
-            ["\x04\x00"];
-        yield 'a value that is not BER' =>
-            ["\x01\x02\x03"];
-        yield 'an empty value' =>
-            [''];
+        yield 'a value that is not a sequence'
+            => ["\x04\x00"];
+        yield 'a value that is not BER'
+            => ["\x01\x02\x03"];
+        yield 'an empty value'
+            => [''];
     }
 
     public function testExplicitIdentityPasswordChange(): void
