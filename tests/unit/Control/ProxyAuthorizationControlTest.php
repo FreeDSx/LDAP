@@ -9,6 +9,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ProxyAuthorizationControl;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdType;
 use PHPUnit\Framework\TestCase;
@@ -120,6 +121,16 @@ final class ProxyAuthorizationControlTest extends TestCase
             '',
             $control->getRawAuthzId(),
         );
+    }
+
+    public function test_it_refuses_a_control_without_a_value(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        ProxyAuthorizationControl::fromAsn1(Asn1::sequence(
+            Asn1::octetString(Control::OID_PROXY_AUTHORIZATION),
+            Asn1::boolean(true),
+        ));
     }
 
     public function test_it_defers_a_malformed_authz_id_until_it_is_read(): void
