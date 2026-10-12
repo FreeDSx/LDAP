@@ -116,6 +116,7 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
+use FreeDSx\Ldap\Server\Middleware\TargetDnSyntaxMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\LdapClientForwardStateSender;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwarder;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
@@ -324,6 +325,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                     $options->getEventLogPolicy(),
                     (new ConnectionContext())->toLogContext(),
                 ))),
+                new TargetDnSyntaxMiddleware(),
                 ...($consumerConfig !== null
                     ? [new ReadOnlyMiddleware($consumerConfig)]
                     : []),

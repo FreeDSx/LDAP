@@ -73,6 +73,7 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
+use FreeDSx\Ldap\Server\Middleware\TargetDnSyntaxMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
@@ -431,6 +432,8 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     $backend,
                     $this->container->get(AccessControlInterface::class),
                 ),
+                // Ahead of the access check, so every identity gets the same answer for a DN the grammar rejects.
+                new TargetDnSyntaxMiddleware(),
                 // Only present on a read-only replica; sits below the writer so its referral is drained,
                 // and before the ACL loop so a write short-circuits early.
                 ...($consumerConfig !== null
