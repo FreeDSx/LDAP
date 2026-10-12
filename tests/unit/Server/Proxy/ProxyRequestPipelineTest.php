@@ -9,6 +9,7 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -39,6 +40,7 @@ final class ProxyRequestPipelineTest extends TestCase
             new ResponseWriter(
                 $queue = $this->createMock(ServerQueue::class),
                 new DecodeFailureResponder($queue),
+                new OutOfSequenceResponder($queue),
             ),
         );
     }

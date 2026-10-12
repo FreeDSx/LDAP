@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Queue\Response;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use PHPUnit\Framework\TestCase;
 
@@ -32,5 +33,20 @@ final class QueueWriterConfigTest extends TestCase
 
         self::assertFalse($subject->isPollDue(1));
         self::assertFalse($subject->isPollDue(100));
+    }
+
+    public function test_a_stream_is_not_persistent_by_default(): void
+    {
+        self::assertFalse((new QueueWriterConfig(signalInterval: 1))->persistent);
+    }
+
+    public function test_a_persistent_stream_must_poll_for_signals(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new QueueWriterConfig(
+            flushPerMessage: true,
+            persistent: true,
+        );
     }
 }

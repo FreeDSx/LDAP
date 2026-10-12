@@ -104,7 +104,8 @@ The consumer chooses how it reads; the provider supports both:
   This works on both runners with any journaling storage.
 * Listen: the request stays open and the server sends changes as they happen. This needs the runner-or-storage
   condition described above. While a listen is idle, the server sends a periodic keepalive that advances the consumer's
-  cookie and lets the server notice a consumer that has gone away.
+  cookie and lets the server notice a consumer that has gone away. Unrelated operations sent during a sync are refused
+  with an `operationsError`.
 
 ## Retention
 

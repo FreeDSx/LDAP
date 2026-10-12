@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSyncHandler;
@@ -50,7 +51,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Sync\Provider\SyncCookie;
 use FreeDSx\Ldap\Sync\Provider\SyncPersistStreamer;
 use FreeDSx\Ldap\Sync\Provider\SyncResultProjector;
@@ -58,6 +58,7 @@ use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
 
 final class ServerSyncHandlerTest extends TestCase
 {
@@ -90,7 +91,7 @@ final class ServerSyncHandlerTest extends TestCase
     private ServerSyncHandler $subject;
 
     /**
-     * @var list<?LdapMessageRequest> cancel/abandon signals the persist loop peeks, in order
+     * @var list<?LdapMessageRequest> cancel/abandon signals the persist loop polls, in order
      */
     private array $cancelSignals = [];
 
@@ -156,7 +157,7 @@ final class ServerSyncHandlerTest extends TestCase
                 return $this->queue;
             });
         $this->queue
-            ->method('peekForCancelSignal')
+            ->method('pollMessage')
             ->willReturnCallback(fn(): ?LdapMessageRequest => array_shift($this->cancelSignals));
 
         $this->changeStream = new ChangeStream($this->journal);
@@ -169,7 +170,7 @@ final class ServerSyncHandlerTest extends TestCase
             entries: $this->entries,
             projector: $this->syncProjector,
             stream: $this->changeStream,
-            sleeper: new BlockingSleeper(),
+            sleeper: new CallbackSleeper(),
         );
 
         $this->subject = new ServerSyncHandler(
@@ -583,6 +584,29 @@ final class ServerSyncHandlerTest extends TestCase
         self::assertTrue($boundary->getRefreshDone());
     }
 
+    public function test_refresh_and_persist_is_written_as_a_persistent_stream(): void
+    {
+        $stream = $this->persistHandler()->handleRequest(
+            $this->syncMessage(
+                null,
+                SyncRequestControl::MODE_REFRESH_AND_PERSIST,
+            ),
+            $this->token,
+        );
+
+        self::assertTrue($stream->writerConfig->persistent);
+    }
+
+    public function test_refresh_only_is_not_written_as_a_persistent_stream(): void
+    {
+        $stream = $this->persistHandler()->handleRequest(
+            $this->syncMessage(null),
+            $this->token,
+        );
+
+        self::assertFalse($stream->writerConfig->persistent);
+    }
+
     public function test_sync_is_declined_when_no_change_stream_is_available(): void
     {
         $handler = new ServerSyncHandler(
@@ -646,6 +670,7 @@ final class ServerSyncHandlerTest extends TestCase
         return (new ResponseWriter(
             $this->queue,
             new DecodeFailureResponder($this->queue),
+            new OutOfSequenceResponder($this->queue),
         ))->write(
             $handler->handleRequest(
                 $message,

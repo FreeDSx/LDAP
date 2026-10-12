@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -155,6 +156,97 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
                     $queue,
                     3,
                     4,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    public function testRequestsSentDuringAPersistSearchAreRefusedWithAnOperationsError(): void
+    {
+        $queue = $this->rawQueue(timeoutRead: 5);
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                new SyncRequestControl(SyncRequestControl::MODE_REFRESH_AND_PERSIST),
+            ));
+            do {
+                $message = $queue->getMessage(2);
+            } while (!$message->getResponse() instanceof IntermediateResponse);
+
+            $queue->sendMessage(
+                new LdapMessageRequest(
+                    3,
+                    Operations::whoami(),
+                ),
+                new LdapMessageRequest(
+                    4,
+                    new ExtendedRequest(ExtendedRequest::OID_START_TLS),
+                ),
+                new LdapMessageRequest(
+                    5,
+                    Operations::bind(
+                        'cn=user,dc=foo,dc=bar',
+                        '12345',
+                    ),
+                ),
+            );
+
+            self::assertSame(
+                [
+                    3 => ResultCode::OPERATIONS_ERROR,
+                    4 => ResultCode::OPERATIONS_ERROR,
+                    5 => ResultCode::OPERATIONS_ERROR,
+                ],
+                $this->resultCodesFor(
+                    $queue,
+                    3,
+                    4,
+                    5,
+                ),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                6,
+                Operations::cancel(2),
+            ));
+
+            self::assertSame(
+                [
+                    2 => ResultCode::CANCELED,
+                    6 => ResultCode::SUCCESS,
+                ],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                    6,
+                ),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                7,
+                Operations::whoami(),
+            ));
+
+            self::assertSame(
+                [7 => ResultCode::SUCCESS],
+                $this->resultCodesFor(
+                    $queue,
+                    7,
                 ),
             );
         } finally {

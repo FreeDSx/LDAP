@@ -66,7 +66,7 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | `ldap.password_policy.must_change`    | on      | info    | A bind succeeded with a reset password that must be changed first |
 | `ldap.password_policy.grace_login`    | on      | info    | A bind used one of an expired password's grace logins     |
 | `ldap.password_policy.change_rejected` | on     | notice  | A password change violated the password policy            |
-| `ldap.operation.refused`              | off     | notice  | A bind or authorization failure refused a request before it was processed |
+| `ldap.operation.refused`              | off     | notice  | A bind or authorization failure, or an open sync listen, refused a request before it was processed |
 | `ldap.message.decode_failed`          | off     | notice  | A request could not be decoded and was answered with an error |
 | `ldap.entry.added`                    | off     | info    | Add succeeds (audit-trail)                                |
 | `ldap.entry.modified`                 | off     | info    | Modify succeeds (audit-trail)                             |

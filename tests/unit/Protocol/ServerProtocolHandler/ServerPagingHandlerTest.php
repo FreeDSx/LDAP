@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
@@ -1285,6 +1286,7 @@ class ServerPagingHandlerTest extends TestCase
         return (new ResponseWriter(
             $this->mockQueue,
             new DecodeFailureResponder($this->mockQueue),
+            new OutOfSequenceResponder($this->mockQueue),
         ))->write(
             $stream,
             $message->getMessageId(),
