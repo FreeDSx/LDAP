@@ -46,6 +46,26 @@ final class BitMaskComparatorTest extends TestCase
         self::assertTrue($result);
     }
 
+    public function test_a_value_that_is_not_an_integer_never_matches(): void
+    {
+        self::assertFalse((new BitMaskComparator(requireAllBits: true))->equals(
+            'Alice',
+            '0',
+        ));
+        self::assertFalse((new BitMaskComparator(requireAllBits: false))->equals(
+            'Alice',
+            '1',
+        ));
+    }
+
+    public function test_a_mask_that_is_not_an_integer_never_matches(): void
+    {
+        self::assertFalse((new BitMaskComparator(requireAllBits: true))->equals(
+            '7',
+            'abc',
+        ));
+    }
+
     public function test_bit_or_no_bits_set(): void
     {
         $subject = new BitMaskComparator(requireAllBits: false);

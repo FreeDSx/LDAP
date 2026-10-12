@@ -333,6 +333,20 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    public function testTheSubschemaPublishesNoMatchingRuleUse(): void
+    {
+        $this->authenticateAdmin();
+
+        $entry = $this->ldapClient()->read(
+            'cn=Subschema',
+            ['+'],
+        );
+
+        self::assertNotNull($entry);
+        self::assertNotNull($entry->get('matchingRules'));
+        self::assertNull($entry->get('matchingRuleUse'));
+    }
+
     public function testThatOperationCompareRequireAuthentication(): void
     {
         $this->expectException(OperationException::class);

@@ -15,18 +15,26 @@ namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
+use FreeDSx\Ldap\Schema\Validation\Syntax\IntegerSyntaxValidator;
 
 /**
  * Bit-mask comparator for bitwise AND (bitAndMatch) and OR (bitOrMatch) matching rules.
  */
 final readonly class BitMaskComparator implements MatchingRuleComparatorInterface
 {
-    public function __construct(private bool $requireAllBits) {}
+    public function __construct(
+        private bool $requireAllBits,
+        private IntegerSyntaxValidator $integers = new IntegerSyntaxValidator(),
+    ) {}
 
     public function equals(
         string $a,
         string $b,
     ): bool {
+        if (!$this->integers->isValid($a) || !$this->integers->isValid($b)) {
+            return false;
+        }
+
         $mask = (int) $b;
 
         return $this->requireAllBits

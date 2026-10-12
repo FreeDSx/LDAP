@@ -175,33 +175,11 @@ final class ServerSubschemaHandlerTest extends TestCase
         );
     }
 
-    public function test_it_returns_non_empty_matching_rule_use(): void
+    public function test_it_publishes_no_matching_rule_use(): void
     {
         $entry = $this->handleAndCaptureEntry('+');
 
-        self::assertGreaterThan(
-            0,
-            count($entry->get('matchingRuleUse')?->getValues() ?? []),
-        );
-    }
-
-    public function test_matching_rule_use_lists_a_subtype_that_inherits_the_rule(): void
-    {
-        $entry = $this->handleAndCaptureEntry('+');
-
-        $applies = array_filter(
-            $entry->get('matchingRuleUse')?->getValues() ?? [],
-            static fn(string $use): bool => str_contains($use, "NAME 'distinguishedNameMatch'"),
-        );
-
-        self::assertCount(
-            1,
-            $applies,
-        );
-        self::assertStringContainsString(
-            'roleOccupant',
-            (string) reset($applies),
-        );
+        self::assertNull($entry->get('matchingRuleUse'));
     }
 
     /**

@@ -48,6 +48,16 @@ final readonly class AttributeSyntaxResolver
     }
 
     /**
+     * Whether a value conforms to a syntax named directly; true when the syntax carries no validator.
+     */
+    public function conformsToSyntax(
+        string $syntaxOid,
+        string $value,
+    ): bool {
+        return $this->registry->get($syntaxOid)?->isValid($value) ?? true;
+    }
+
+    /**
      * The validator enforcing the type's effective syntax, or null when it is unconstrained.
      */
     public function validatorFor(AttributeType $type): ?SyntaxValidatorInterface

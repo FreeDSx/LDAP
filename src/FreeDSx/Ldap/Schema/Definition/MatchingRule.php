@@ -62,33 +62,6 @@ final readonly class MatchingRule implements NamedDefinitionInterface
     }
 
     /**
-     * Produces the matchingRuleUse description string for this rule and the attribute types that reference it.
-     *
-     * @param list<string> $appliesTo attribute type OIDs or names
-     */
-    public function toMatchingRuleUseString(array $appliesTo): string
-    {
-        $parts = array_filter([
-            '( ' . $this->oid,
-            $this->names !== []
-                ? DefinitionKeyword::NAME . ' ' . $this->formatDescriptors($this->names)
-                : null,
-            $this->token(
-                DefinitionKeyword::DESC,
-                $this->desc !== null
-                    ? $this->quoteString($this->desc)
-                    : null,
-            ),
-            $this->obsolete
-                ? DefinitionKeyword::OBSOLETE
-                : null,
-            DefinitionKeyword::APPLIES . ' ' . $this->formatOids($appliesTo),
-        ]);
-
-        return implode(' ', $parts) . ' )';
-    }
-
-    /**
      * Produces the description string used in the subschema matchingRules attribute.
      */
     public function toDescriptionString(): string

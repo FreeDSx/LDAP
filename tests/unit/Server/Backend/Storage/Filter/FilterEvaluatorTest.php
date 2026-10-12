@@ -1167,6 +1167,51 @@ final class FilterEvaluatorTest extends TestCase
                 'abc',
             ),
         ];
+        yield 'an extensible match with an ordering rule' => [
+            Filters::extensible(
+                'uidNumber',
+                'abc',
+                MatchingRuleOid::OID_INTEGER_ORDERING_MATCH,
+                false,
+            ),
+        ];
+        yield 'an extensible match with bitAnd' => [
+            Filters::extensible(
+                'uidNumber',
+                'abc',
+                MatchingRuleOid::OID_BIT_AND_MATCH,
+                false,
+            ),
+        ];
+        yield 'an extensible match with a signed integer' => [
+            Filters::extensible(
+                'uidNumber',
+                '+100',
+                MatchingRuleOid::OID_INTEGER_MATCH,
+                false,
+            ),
+        ];
+        yield 'an extensible match without a rule' => [
+            Filters::extensible(
+                'uidNumber',
+                '+100',
+                null,
+                false,
+            ),
+        ];
+    }
+
+    public function test_bit_and_does_not_match_a_value_that_is_not_an_integer(): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            Filters::extensible(
+                'cn',
+                '0',
+                MatchingRuleOid::OID_BIT_AND_MATCH,
+                false,
+            ),
+        ));
     }
 
     public function test_a_conforming_assertion_value_is_unaffected(): void

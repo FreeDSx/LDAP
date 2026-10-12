@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
-use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecification;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -75,7 +74,7 @@ readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
                     fn($ls) => $ls->toDescriptionString(),
                     $schema->getLdapSyntaxes(),
                 ),
-                AttributeTypeOid::NAME_MATCHING_RULE_USE => $this->buildMatchingRuleUse($schema),
+                // Any recognized rule may be used with any type in an extensible match, which leaves no matchingRuleUse to publish.
             ]),
         );
 
@@ -85,40 +84,5 @@ readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
             $entry,
             $token,
         );
-    }
-
-    /**
-     * Rules are resolved through the SUP chain, so a subtype inheriting one is listed alongside its supertype.
-     *
-     * @return list<string>
-     */
-    private function buildMatchingRuleUse(Schema $schema): array
-    {
-        $ruleToAttrs = [];
-        foreach ($schema->getAttributeTypes() as $attrType) {
-            $name = $attrType->primaryName();
-            $ruleOids = [
-                $schema->getEqualityRuleOid($attrType->oid),
-                $schema->getOrderingRuleOid($attrType->oid),
-                $schema->getSubstringRuleOid($attrType->oid),
-            ];
-
-            // A type naming one rule in two roles would otherwise be listed against it twice.
-            foreach (array_unique(array_filter($ruleOids)) as $ruleOid) {
-                $ruleToAttrs[$ruleOid][] = $name;
-            }
-        }
-
-        $use = [];
-        foreach ($ruleToAttrs as $ruleOid => $attrNames) {
-            $rule = $schema->getMatchingRule($ruleOid);
-            if ($rule === null) {
-                continue;
-            }
-
-            $use[] = $rule->toMatchingRuleUseString($attrNames);
-        }
-
-        return $use;
     }
 }

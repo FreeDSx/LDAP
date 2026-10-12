@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
+use FreeDSx\Ldap\Schema\Matching\Comparator\BitMaskComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
@@ -382,6 +383,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::Undefined;
         }
 
+        if (!$this->ruleAssertionIsValid($filter)) {
+            return FilterResult::Undefined;
+        }
+
         $filterValue = $filter->getValue();
         $values = $this->collectValuesToTest($entry, $filter);
 
@@ -497,10 +502,8 @@ final class FilterEvaluator implements FilterEvaluatorInterface
                 => strtolower($v) === strtolower($a),
             self::MATCHING_RULE_CASE_EXACT => static fn(string $v, string $a): bool
                 => $v === $a,
-            self::MATCHING_RULE_BIT_AND => static fn(string $v, string $a): bool
-                => ((int) $v & (int) $a) === (int) $a,
-            self::MATCHING_RULE_BIT_OR => static fn(string $v, string $a): bool
-                => ((int) $v & (int) $a) !== 0,
+            self::MATCHING_RULE_BIT_AND => (new BitMaskComparator(requireAllBits: true))->equals(...),
+            self::MATCHING_RULE_BIT_OR => (new BitMaskComparator(requireAllBits: false))->equals(...),
             default => null,
         };
     }
@@ -648,6 +651,34 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     {
         return $this->assertionSyntaxCache[$filter] ??= $this->syntaxResolver->conforms(
             $filter->getAttribute(),
+            $filter->getValue(),
+        );
+    }
+
+    /**
+     * RFC 4511 4.5.1.7.7: the rule determines the assertion syntax, and a value that does not conform is Undefined.
+     */
+    private function ruleAssertionIsValid(MatchingRuleFilter $filter): bool
+    {
+        return $this->assertionSyntaxCache[$filter] ??= $this->ruleAssertionConforms($filter);
+    }
+
+    private function ruleAssertionConforms(MatchingRuleFilter $filter): bool
+    {
+        $rule = $filter->getMatchingRule();
+        $attribute = $filter->getAttribute();
+
+        if ($rule === null) {
+            return $attribute === null || $this->syntaxResolver->conforms(
+                $attribute,
+                $filter->getValue(),
+            );
+        }
+
+        $syntaxOid = $this->schema->getMatchingRule($rule)?->syntaxOid;
+
+        return $syntaxOid === null || $this->syntaxResolver->conformsToSyntax(
+            $syntaxOid,
             $filter->getValue(),
         );
     }
