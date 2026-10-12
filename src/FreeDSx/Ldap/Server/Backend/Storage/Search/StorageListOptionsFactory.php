@@ -252,7 +252,7 @@ final readonly class StorageListOptionsFactory
         }
 
         $materialized = [];
-        foreach ($names as $name) {
+        foreach ([...$names, ...$filterAttributes] as $name) {
             if ($name === SearchRequest::ATTRIBUTES_NONE) {
                 continue;
             }
@@ -267,9 +267,6 @@ final readonly class StorageListOptionsFactory
             foreach ($this->schema->getAttributeType($name)->names ?? [] as $alias) {
                 $materialized[strtolower($alias)] = true;
             }
-        }
-        foreach ($filterAttributes as $attribute) {
-            $materialized[$attribute] = true;
         }
 
         return array_keys($materialized);
