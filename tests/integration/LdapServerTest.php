@@ -347,6 +347,42 @@ final class LdapServerTest extends ServerTestCase
         self::assertNull($entry->get('matchingRuleUse'));
     }
 
+    public function testGoverningStructureRuleIsARecognizedReadOnlyType(): void
+    {
+        $this->authenticateAdmin();
+
+        $subschema = $this->ldapClient()->read(
+            'cn=Subschema',
+            ['attributeTypes'],
+        );
+        self::assertNotEmpty(array_filter(
+            $subschema?->get('attributeTypes')?->getValues() ?? [],
+            static fn(string $definition): bool => str_contains($definition, "NAME 'governingStructureRule'"),
+        ));
+
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=user,dc=foo,dc=bar',
+            'governingStructureRule',
+            '1',
+        ));
+
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::replace(
+                    'governingStructureRule',
+                    '1',
+                ),
+            ));
+            self::fail('A modify of a NO-USER-MODIFICATION type should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+    }
+
     public function testThatOperationCompareRequireAuthentication(): void
     {
         $this->expectException(OperationException::class);
