@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Middleware\ServerControlRegistry;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
@@ -112,6 +113,57 @@ final class CriticalControlMiddlewareTest extends TestCase
             $this->next->received,
             'Proxied authorization is gated upstream, so the check must accept it everywhere.',
         );
+    }
+
+    #[DataProvider('criticalityProvider')]
+    public function test_a_supported_control_sent_twice_is_rejected_as_a_protocol_error(
+        bool $firstCritical,
+        bool $secondCritical,
+    ): void {
+        $this->routeResolvesTo(HandlerId::Search);
+
+        try {
+            $this->subject->process(
+                $this->contextWith(
+                    new Control(Control::OID_ASSERTION, criticality: $firstCritical),
+                    new Control(Control::OID_ASSERTION, criticality: $secondCritical),
+                ),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->next->received);
+    }
+
+    /**
+     * @return iterable<string, array{bool, bool}>
+     */
+    public static function criticalityProvider(): iterable
+    {
+        yield 'both critical' => [true, true];
+        yield 'a non-critical copy ahead of a critical one' => [false, true];
+        yield 'both non-critical' => [false, false];
+    }
+
+    public function test_an_ignored_control_sent_twice_passes_through(): void
+    {
+        $this->routeResolvesTo(HandlerId::Search);
+
+        $this->subject->process(
+            $this->contextWith(
+                new Control('1.2.3.4.5', criticality: false),
+                new Control('1.2.3.4.5', criticality: false),
+            ),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
     }
 
     public function test_exempt_handlers_skip_the_check_entirely(): void

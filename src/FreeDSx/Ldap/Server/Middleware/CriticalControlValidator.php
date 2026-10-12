@@ -44,7 +44,7 @@ final readonly class CriticalControlValidator
             return;
         }
 
-        $this->assertNoCriticalUnsupportedControls(
+        $this->assertControls(
             $controls,
             $this->controlRegistry->supportedControlsFor(
                 $routeId,
@@ -59,10 +59,63 @@ final readonly class CriticalControlValidator
      */
     public function assertSupportedForBind(ControlBag $controls): void
     {
-        $this->assertNoCriticalUnsupportedControls(
+        $this->assertControls(
             $controls,
             $this->controlRegistry->supportedControlsForBind(),
         );
+    }
+
+    /**
+     * @param list<string> $supported
+     *
+     * @throws OperationException
+     */
+    private function assertControls(
+        ControlBag $controls,
+        array $supported,
+    ): void {
+        $this->assertNoCriticalUnsupportedControls(
+            $controls,
+            $supported,
+        );
+        $this->assertNoRepeatedControls(
+            $controls,
+            $supported,
+        );
+    }
+
+    /**
+     * RFC 4511 4.1.11: no supported control defines a meaning for a repeated copy.
+     *
+     * @param list<string> $supported
+     *
+     * @throws OperationException
+     */
+    private function assertNoRepeatedControls(
+        ControlBag $controls,
+        array $supported,
+    ): void {
+        $seen = [];
+
+        foreach ($controls as $control) {
+            $oid = $control->getTypeOid();
+
+            // Copies of a control the operation ignores are ignored with it.
+            if (!in_array($oid, $supported, true)) {
+                continue;
+            }
+
+            if (isset($seen[$oid])) {
+                throw new OperationException(
+                    sprintf(
+                        'The control %s is specified more than once.',
+                        $oid,
+                    ),
+                    ResultCode::PROTOCOL_ERROR,
+                );
+            }
+            $seen[$oid] = true;
+        }
     }
 
     /**
