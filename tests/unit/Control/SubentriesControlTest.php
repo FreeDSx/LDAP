@@ -9,9 +9,12 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\SubentriesControl;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 class SubentriesControlTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private SubentriesControl $subject;
 
     protected function setUp(): void
@@ -64,6 +67,19 @@ class SubentriesControlTest extends TestCase
         ));
 
         self::assertTrue($result->getIsVisible());
+        self::assertSame(
+            Control::OID_SUBENTRIES,
+            $result->getTypeOid(),
+        );
+    }
+
+    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
+    {
+        $result = SubentriesControl::fromAsn1(self::withTrailingComponent(
+            (new SubentriesControl(false))->toAsn1(),
+        ));
+
+        self::assertFalse($result->getIsVisible());
         self::assertSame(
             Control::OID_SUBENTRIES,
             $result->getTypeOid(),

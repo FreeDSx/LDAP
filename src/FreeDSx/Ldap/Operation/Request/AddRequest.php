@@ -76,8 +76,8 @@ class AddRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type): self
     {
-        if (!($type instanceof SequenceType && count($type) === 2)) {
-            throw new ProtocolException('The add request is malformed: %s');
+        if (!($type instanceof SequenceType && count($type) >= 2)) {
+            throw new ProtocolException('The add request is malformed.');
         }
 
         $dn = $type->getChild(0);
@@ -89,7 +89,7 @@ class AddRequest implements RequestInterface
 
         $attributes = [];
         foreach ($attrList->getChildren() as $attrListing) {
-            if (!($attrListing instanceof SequenceType && count($attrListing->getChildren()) == 2)) {
+            if (!($attrListing instanceof SequenceType && count($attrListing->getChildren()) >= 2)) {
                 throw new ProtocolException(sprintf(
                     'Expected a sequence type, but received: %s',
                     get_class($attrListing),

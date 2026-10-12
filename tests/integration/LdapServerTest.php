@@ -24,15 +24,23 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
+use FreeDSx\Ldap\Operation\Response\CompareResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
+use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentRequest;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Throwable;
 
 final class LdapServerTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     /**
      * The supertype arm is one the index cannot answer, so every candidate reaches the evaluator the limit counts.
      */
@@ -590,6 +598,72 @@ final class LdapServerTest extends ServerTestCase
 
         // The session must survive: a malformed DN is one operation failing, not a protocol error.
         $this->assertNotNull($this->ldapClient()->read(''));
+    }
+
+    public function testASearchCarryingATrailingComponentItDoesNotRecognizeIsAnswered(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new TrailingComponentRequest(Operations::read('')),
+            ));
+            $entry = $queue->getMessage(1)->getResponse();
+            $done = $queue->getMessage(1)->getResponse();
+
+            $this->assertInstanceOf(
+                SearchResultEntry::class,
+                $entry,
+            );
+            $this->assertInstanceOf(
+                SearchResultDone::class,
+                $done,
+            );
+            $this->assertSame(
+                ResultCode::SUCCESS,
+                $done->getResultCode(),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    public function testACompareCarryingATrailingComponentItDoesNotRecognizeIsAnswered(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new TrailingComponentRequest(Operations::compare(
+                    'cn=user,dc=foo,dc=bar',
+                    'cn',
+                    'user',
+                )),
+            ));
+            $response = $queue->getMessage(2)->getResponse();
+
+            $this->assertInstanceOf(
+                CompareResponse::class,
+                $response,
+            );
+            $this->assertSame(
+                ResultCode::COMPARE_TRUE,
+                $response->getResultCode(),
+            );
+        } finally {
+            $queue->close();
+        }
     }
 
     public function testAnUnescapedCommaInANewRdnIsRefused(): void

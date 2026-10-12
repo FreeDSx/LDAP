@@ -25,8 +25,6 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use Stringable;
 
-use function count;
-
 /**
  * Represents a control. RFC 4511, 4.1.11
  *
@@ -200,11 +198,8 @@ class Control implements ProtocolElementInterface, Stringable
         Control $control,
         AbstractType $type,
     ): Control {
-        if (!($type instanceof SequenceType && count($type->getChildren()) <= 3)) {
-            throw new ProtocolException(sprintf(
-                'The received control is malformed. Expected at least 3 sequence values. Received %s.',
-                count($type->getChildren()),
-            ));
+        if (!$type instanceof SequenceType) {
+            throw new ProtocolException('The received control is malformed.');
         }
         [0 => $control->controlType, 1 => $control->criticality, 2 => $control->controlValue] = self::parseAsn1ControlValues($type);
 

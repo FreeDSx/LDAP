@@ -20,9 +20,12 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class AddRequestTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private AddRequest $subject;
 
     protected function setUp(): void
@@ -90,6 +93,24 @@ final class AddRequestTest extends TestCase
         );
     }
 
+    public function test_it_ignores_trailing_components_it_does_not_recognize(): void
+    {
+        $asn1 = self::withTrailingComponent(Asn1::application(8, Asn1::sequence(
+            Asn1::octetString('cn=foo,dc=foo,dc=bar'),
+            Asn1::sequenceOf(
+                self::withTrailingComponent(Asn1::sequence(
+                    Asn1::octetString('cn'),
+                    Asn1::setOf(Asn1::octetString('foo')),
+                )),
+            ),
+        )));
+
+        self::assertEquals(
+            $this->subject,
+            AddRequest::fromAsn1($asn1),
+        );
+    }
+
     /**
      * @param AbstractType<mixed> $type
      */
@@ -107,16 +128,6 @@ final class AddRequestTest extends TestCase
     public static function malformedAsn1DataProvider()
     {
         return [
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::sequence(),
-                Asn1::octetString('bar'),
-            )],
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::sequence(),
-                Asn1::octetString('bar'),
-            )],
             [Asn1::sequence(
                 Asn1::octetString('foo'),
                 Asn1::integer(2),

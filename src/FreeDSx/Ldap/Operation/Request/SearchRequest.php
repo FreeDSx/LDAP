@@ -417,7 +417,7 @@ class SearchRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type): self
     {
-        if (!($type instanceof SequenceType && count($type) === 8)) {
+        if (!($type instanceof SequenceType && count($type) >= 8)) {
             throw new ProtocolException('The search request is malformed');
         }
         $baseDn = $type->getChild(0);

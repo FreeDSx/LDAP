@@ -19,9 +19,12 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class ModifyRequestTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private ModifyRequest $subject;
 
     protected function setUp(): void
@@ -114,6 +117,30 @@ final class ModifyRequestTest extends TestCase
                 Change::replace('foobar', 'foo'),
             ),
             ModifyRequest::fromAsn1($req->toAsn1()),
+        );
+    }
+
+    public function test_it_ignores_trailing_components_it_does_not_recognize(): void
+    {
+        $asn1 = self::withTrailingComponent(Asn1::application(6, Asn1::sequence(
+            Asn1::octetString('cn=foo,dc=foo,dc=bar'),
+            Asn1::sequenceOf(
+                self::withTrailingComponent(Asn1::sequence(
+                    Asn1::enumerated(Change::TYPE_REPLACE),
+                    self::withTrailingComponent(Asn1::sequence(
+                        Asn1::octetString('foo'),
+                        Asn1::setOf(Asn1::octetString('bar')),
+                    )),
+                )),
+            ),
+        )));
+
+        self::assertEquals(
+            new ModifyRequest(
+                'cn=foo,dc=foo,dc=bar',
+                Change::replace('foo', 'bar'),
+            ),
+            ModifyRequest::fromAsn1($asn1),
         );
     }
 

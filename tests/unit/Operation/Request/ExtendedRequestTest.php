@@ -19,9 +19,12 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class ExtendedRequestTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private ExtendedRequest $subject;
 
     protected function setUp(): void
@@ -92,6 +95,16 @@ final class ExtendedRequestTest extends TestCase
         self::assertEquals(
             $request,
             ExtendedRequest::fromAsn1($request->toAsn1()),
+        );
+    }
+
+    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
+    {
+        $request = new ExtendedRequest('foo', 'bar');
+
+        self::assertEquals(
+            $request,
+            ExtendedRequest::fromAsn1(self::withTrailingComponent($request->toAsn1())),
         );
     }
 

@@ -99,7 +99,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
      */
     public static function fromAsn1(AbstractType $type): self
     {
-        if (!($type instanceof SequenceType && count($type) === 2)) {
+        if (!($type instanceof SequenceType && count($type) >= 2)) {
             throw new ProtocolException('The modify request is malformed');
         }
 
@@ -149,7 +149,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
      */
     private static function parseChange(AbstractType $type): Change
     {
-        if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
+        if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {
             throw new ProtocolException('The change for the modify request is malformed.');
         }
 
@@ -172,7 +172,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
      */
     private static function parsePartialAttribute(SequenceType $type): Attribute
     {
-        if (count($type->getChildren()) !== 2) {
+        if (count($type->getChildren()) < 2) {
             throw new ProtocolException('The partial attribute for the modify request is malformed.');
         }
 

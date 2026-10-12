@@ -199,7 +199,7 @@ class SubstringFilter implements FilterInterface, FilterAttributeInterface, Stri
     {
         $encoder = new LdapEncoder();
         $type = $type instanceof IncompleteType ? $encoder->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
-        if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
+        if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {
             throw new ProtocolException('The substring type is malformed');
         }
 

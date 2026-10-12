@@ -16,9 +16,12 @@ namespace Tests\Unit\FreeDSx\Ldap\Search\Filter;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class MatchingRuleFilterTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private MatchingRuleFilter $subject;
 
     protected function setUp(): void
@@ -132,6 +135,16 @@ final class MatchingRuleFilterTest extends TestCase
         self::assertEquals(
             $rule,
             MatchingRuleFilter::fromAsn1($rule->toAsn1()),
+        );
+    }
+
+    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
+    {
+        $rule = new MatchingRuleFilter('foo', 'foo', 'bar', true);
+
+        self::assertEquals(
+            $rule,
+            MatchingRuleFilter::fromAsn1(self::withTrailingComponent($rule->toAsn1())),
         );
     }
 

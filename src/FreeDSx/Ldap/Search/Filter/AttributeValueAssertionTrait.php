@@ -94,7 +94,7 @@ trait AttributeValueAssertionTrait
     public static function fromAsn1(AbstractType $type): static
     {
         $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
-        if (!($type instanceof SequenceType && count($type) === 2)) {
+        if (!($type instanceof SequenceType && count($type) >= 2)) {
             throw new ProtocolException('The attribute value assertion is malformed.');
         }
 
