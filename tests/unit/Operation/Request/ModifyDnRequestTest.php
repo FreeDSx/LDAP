@@ -21,9 +21,12 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class ModifyDnRequestTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private ModifyDnRequest $subject;
 
     protected function setUp(): void
@@ -137,6 +140,35 @@ final class ModifyDnRequestTest extends TestCase
         );
     }
 
+    public function test_it_ignores_a_trailing_component_after_the_new_superior(): void
+    {
+        $req = new ModifyDnRequest(
+            'foo',
+            'cn=bar',
+            false,
+            'foobar',
+        );
+
+        self::assertEquals(
+            $req,
+            $req->fromAsn1(self::withTrailingComponent($req->toAsn1())),
+        );
+    }
+
+    public function test_it_does_not_mistake_a_trailing_component_for_a_new_superior(): void
+    {
+        $req = new ModifyDnRequest(
+            'foo',
+            'cn=bar',
+            false,
+        );
+
+        self::assertEquals(
+            $req,
+            $req->fromAsn1(self::withTrailingComponent($req->toAsn1())),
+        );
+    }
+
     /**
      * @param AbstractType<mixed> $type
      */
@@ -156,12 +188,6 @@ final class ModifyDnRequestTest extends TestCase
         return [
             [Asn1::octetString('foo')],
             [Asn1::sequence(Asn1::integer(1))],
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::octetString('cn=foo'),
-                Asn1::boolean(true),
-                Asn1::octetString('foobar'),
-            )],
         ];
     }
 }

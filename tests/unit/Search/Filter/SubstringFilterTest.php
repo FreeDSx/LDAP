@@ -17,9 +17,12 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class SubstringFilterTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private SubstringFilter $subject;
 
     protected function setUp(): void
@@ -122,6 +125,14 @@ final class SubstringFilterTest extends TestCase
         $this->subject->setContains();
 
         $this->subject->toAsn1();
+    }
+
+    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
+    {
+        self::assertEquals(
+            $this->subject,
+            SubstringFilter::fromAsn1(self::withTrailingComponent($this->subject->toAsn1())),
+        );
     }
 
     public function test_it_should_be_constructed_from_asn1(): void

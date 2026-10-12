@@ -25,9 +25,12 @@ use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Search\Result\ReferralResult;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class SearchRequestTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private SearchRequest $subject;
 
     protected function setUp(): void
@@ -270,6 +273,16 @@ final class SearchRequestTest extends TestCase
         self::assertSame(
             2,
             $this->subject->getDereferenceAliases(),
+        );
+    }
+
+    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
+    {
+        $search = (new SearchRequest(new EqualityFilter('foo', 'bar'), 'cn'))->base('dc=foo,dc=bar');
+
+        self::assertEquals(
+            $search->toAsn1(),
+            SearchRequest::fromAsn1(self::withTrailingComponent($search->toAsn1()))->toAsn1(),
         );
     }
 

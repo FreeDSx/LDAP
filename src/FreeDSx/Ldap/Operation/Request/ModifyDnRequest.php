@@ -125,7 +125,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
      */
     public static function fromAsn1(AbstractType $type): static
     {
-        if (!($type instanceof SequenceType && count($type) >= 3 && count($type) <= 4)) {
+        if (!($type instanceof SequenceType && count($type) >= 3)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
         $entry = $type->getChild(0);
@@ -136,8 +136,9 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
         if (!($entry instanceof OctetStringType && $newRdn instanceof OctetStringType && $deleteOldRdn instanceof BooleanType)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
+        // RFC 4511 4: a trailing component with any other tag is an extension to ignore, not a newSuperior.
         if ($newSuperior !== null && !($newSuperior->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $newSuperior->getTagNumber() === 0)) {
-            throw new ProtocolException('The modify dn request is malformed');
+            $newSuperior = null;
         }
         $newSuperior = ($newSuperior instanceof IncompleteType)
             ? (new LdapEncoder())->complete($newSuperior, AbstractType::TAG_TYPE_OCTET_STRING)

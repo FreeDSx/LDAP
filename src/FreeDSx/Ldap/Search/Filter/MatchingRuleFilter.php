@@ -199,7 +199,7 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
                 self::CHILD_TAG_MAP,
             )
             : $type;
-        if (!($type instanceof SequenceType && (count($type) >= 1 && count($type) <= 4))) {
+        if (!($type instanceof SequenceType && count($type) >= 1)) {
             throw new ProtocolException('The matching rule filter is malformed');
         }
         $matchingRule = null;

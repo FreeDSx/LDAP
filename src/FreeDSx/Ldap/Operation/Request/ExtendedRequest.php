@@ -182,7 +182,7 @@ class ExtendedRequest implements RequestInterface
      */
     protected static function parseAsn1ExtendedRequest(AbstractType $type): array
     {
-        if (!($type instanceof SequenceType && (count($type) === 1 || count($type) === 2))) {
+        if (!($type instanceof SequenceType && count($type) >= 1)) {
             throw new ProtocolException('The extended request is malformed');
         }
         $oid = null;

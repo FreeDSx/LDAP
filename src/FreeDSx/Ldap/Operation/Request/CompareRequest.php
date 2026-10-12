@@ -82,7 +82,7 @@ class CompareRequest implements RequestInterface, DnRequestInterface
      */
     public static function fromAsn1(AbstractType $type): self
     {
-        if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
+        if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {
             throw new ProtocolException('The compare request is malformed');
         }
         $dn = $type->getChild(0);

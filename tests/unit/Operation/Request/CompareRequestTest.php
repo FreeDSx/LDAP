@@ -21,9 +21,12 @@ use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class CompareRequestTest extends TestCase
 {
+    use TrailingComponentTrait;
+
     private CompareRequest $subject;
 
     protected function setUp(): void
@@ -82,6 +85,22 @@ final class CompareRequestTest extends TestCase
         self::assertEquals(
             $req,
             CompareRequest::fromAsn1($req->toAsn1()),
+        );
+    }
+
+    public function test_it_ignores_trailing_components_it_does_not_recognize(): void
+    {
+        $asn1 = self::withTrailingComponent(Asn1::application(14, Asn1::sequence(
+            Asn1::octetString('dc=foo,dc=bar'),
+            self::withTrailingComponent(Asn1::sequence(
+                Asn1::octetString('foo'),
+                Asn1::octetString('bar'),
+            )),
+        )));
+
+        self::assertEquals(
+            $this->subject,
+            CompareRequest::fromAsn1($asn1),
         );
     }
 
