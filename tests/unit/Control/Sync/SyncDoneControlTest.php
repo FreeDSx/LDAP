@@ -51,7 +51,6 @@ class SyncDoneControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_SYNC_DONE),
-                Asn1::boolean(true),
                 Asn1::octetString(
                     $encoder->encode(Asn1::sequence(
                         Asn1::octetString('omnomnom'),
@@ -73,7 +72,6 @@ class SyncDoneControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_SYNC_DONE),
-                Asn1::boolean(true),
                 Asn1::octetString(
                     $encoder->encode(Asn1::sequence(
                         Asn1::octetString('omnomnom'),

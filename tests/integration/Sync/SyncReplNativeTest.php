@@ -13,21 +13,29 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 /**
  * End-to-end RFC 4533 refreshOnly sync against the built-in FreeDSx server.
  */
 final class SyncReplNativeTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     private const SEED_LDIF = __DIR__ . '/../../resources/seed/sync-seed.ldif';
 
     public static function setUpBeforeClass(): void
@@ -86,6 +94,39 @@ final class SyncReplNativeTest extends ServerTestCase
             ],
             $dns,
         );
+    }
+
+    public function testTheSyncDoneControlIsSentAsNonCritical(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                new SyncRequestControl(),
+            ));
+            do {
+                $message = $queue->getMessage(2);
+            } while (!$message->getResponse() instanceof SearchResultDone);
+
+            $syncDone = $message->controls()->get(Control::OID_SYNC_DONE);
+            self::assertNotNull($syncDone);
+            self::assertFalse($syncDone->getCriticality());
+        } finally {
+            $queue->close();
+        }
     }
 
     public function testAPollWithAFilterOnlyStreamsMatchingEntries(): void
