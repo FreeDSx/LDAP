@@ -14,8 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
@@ -66,8 +64,7 @@ class CancelRequest extends ExtendedRequest
      * {@inheritDoc}
      *
      * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type): static
     {

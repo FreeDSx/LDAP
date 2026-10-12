@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PasswordModifyRequestTest extends TestCase
@@ -164,6 +165,27 @@ final class PasswordModifyRequestTest extends TestCase
                 ->setValue(Asn1::set())
                 ->toAsn1(),
         );
+    }
+
+    #[DataProvider('undecodableValueProvider')]
+    public function test_it_refuses_a_value_it_cannot_decode(string $value): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        PasswordModifyRequest::fromAsn1(
+            (new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY))
+                ->setValue($value)
+                ->toAsn1(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function undecodableValueProvider(): iterable
+    {
+        yield 'a value that is not BER' => ["\x01\x02\x03"];
+        yield 'an empty value' => [''];
     }
 
     public function test_it_refuses_a_field_it_does_not_recognize(): void

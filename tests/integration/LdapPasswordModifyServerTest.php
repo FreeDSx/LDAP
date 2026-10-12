@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\FreeDSx\Ldap\LdapBackendStorageCommand;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
@@ -180,7 +181,8 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $verifyClient->unbind();
     }
 
-    public function testAMalformedRequestValueIsAnsweredWithoutEndingTheSession(): void
+    #[DataProvider('malformedRequestValueProvider')]
+    public function testAMalformedRequestValueIsAnsweredWithoutEndingTheSession(string $value): void
     {
         $this->ldapClient()->bind(
             self::USER_DN,
@@ -190,9 +192,9 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         try {
             $this->ldapClient()->sendAndReceive(new ExtendedRequest(
                 ExtendedRequest::OID_PWD_MODIFY,
-                Asn1::octetString(''),
+                $value,
             ));
-            $this->fail('A password modify value that is not a sequence should have been refused.');
+            $this->fail('A malformed password modify value should have been refused.');
         } catch (OperationException $e) {
             $this->assertSame(
                 ResultCode::PROTOCOL_ERROR,
@@ -204,6 +206,19 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
             'dn:' . self::USER_DN,
             $this->ldapClient()->whoami(),
         );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function malformedRequestValueProvider(): iterable
+    {
+        yield 'a value that is not a sequence' =>
+            ["\x04\x00"];
+        yield 'a value that is not BER' =>
+            ["\x01\x02\x03"];
+        yield 'an empty value' =>
+            [''];
     }
 
     public function testExplicitIdentityPasswordChange(): void

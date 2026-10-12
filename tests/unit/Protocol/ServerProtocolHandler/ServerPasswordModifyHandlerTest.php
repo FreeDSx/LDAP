@@ -206,6 +206,12 @@ final class ServerPasswordModifyHandlerTest extends TestCase
         yield 'a field that is not context tagged' => [
             $encoder->encode(Asn1::sequence(Asn1::octetString('newpass'))),
         ];
+        yield 'a value that is not BER' => [
+            "\x01\x02\x03",
+        ];
+        yield 'an empty value' => [
+            '',
+        ];
     }
 
     #[DataProvider('singleFieldProvider')]

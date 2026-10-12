@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
+use FreeDSx\Asn1\Exception\InvalidArgumentException as Asn1InvalidArgumentException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -66,6 +66,8 @@ class ExtendedRequest implements RequestInterface
     public const OID_PPOLICY_STATE_FORWARD = '1.3.6.1.4.1.66207.1.1.1';
 
     protected const APP_TAG = 23;
+
+    private const MALFORMED = 'The extended request is malformed.';
 
     /**
      * @var null|string|AbstractType<mixed>|ProtocolElementInterface
@@ -164,15 +166,25 @@ class ExtendedRequest implements RequestInterface
     /**
      * @param AbstractType<mixed> $type
      * @return AbstractType<mixed>|null
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws PartialPduException
+     * @throws ProtocolException when the value is present but cannot be decoded.
      */
     protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
     {
         [1 => $value] = self::parseAsn1ExtendedRequest($type);
+        if ($value === null) {
+            return null;
+        }
 
-        return $value !== null ? (new LdapEncoder())->decode($value) : null;
+        try {
+            return (new LdapEncoder())->decode($value);
+        } catch (EncoderException|Asn1InvalidArgumentException $e) {
+            // RFC 4511 4.1.1 answers a request that cannot be parsed with protocolError.
+            throw new ProtocolException(
+                self::MALFORMED,
+                0,
+                $e,
+            );
+        }
     }
 
     /**
@@ -183,7 +195,7 @@ class ExtendedRequest implements RequestInterface
     protected static function parseAsn1ExtendedRequest(AbstractType $type): array
     {
         if (!($type instanceof SequenceType && count($type) >= 1)) {
-            throw new ProtocolException('The extended request is malformed');
+            throw new ProtocolException(self::MALFORMED);
         }
         $oid = null;
         $value = null;
@@ -199,13 +211,13 @@ class ExtendedRequest implements RequestInterface
             }
         }
         if ($oid === null) {
-            throw new ProtocolException('The extended request is malformed');
+            throw new ProtocolException(self::MALFORMED);
         }
 
         $oidValue = $oid->getValue();
         $rawValue = $value?->getValue();
         if (!is_string($oidValue) || ($rawValue !== null && !is_string($rawValue))) {
-            throw new ProtocolException('The extended request is malformed');
+            throw new ProtocolException(self::MALFORMED);
         }
 
         return [
