@@ -615,6 +615,53 @@ final class LdapServerTest extends ServerTestCase
         $this->assertNotNull($this->ldapClient()->read(''));
     }
 
+    #[DataProvider('malformedTargetDnProvider')]
+    public function testARequestNamingAMalformedDnIsAnsweredWithInvalidDnSyntax(RequestInterface $request): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->send($request);
+            $this->fail('A request naming a malformed DN should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function malformedTargetDnProvider(): iterable
+    {
+        yield 'a modify target' => [
+            Operations::modify(
+                'nonsense,dc=foo,dc=bar',
+                Change::replace(
+                    'description',
+                    'x',
+                ),
+            ),
+        ];
+        yield 'a delete target' => [Operations::delete('cn=a,,dc=foo,dc=bar')];
+        yield 'a compare target' => [
+            Operations::compare(
+                '=x,dc=foo,dc=bar',
+                'cn',
+                'x',
+            ),
+        ];
+        // The rename target is missing, so only the new superior can account for the refusal.
+        yield 'a new superior' => [
+            Operations::move(
+                'cn=missing,dc=foo,dc=bar',
+                'nonsense,dc=foo,dc=bar',
+            ),
+        ];
+    }
+
     public function testASearchCarryingATrailingComponentItDoesNotRecognizeIsAnswered(): void
     {
         $queue = $this->rawQueue();

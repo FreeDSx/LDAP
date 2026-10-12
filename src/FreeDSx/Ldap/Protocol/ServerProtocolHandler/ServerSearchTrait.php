@@ -112,7 +112,6 @@ trait ServerSearchTrait
         }
 
         $this->assertSearchParametersInRange($request);
-        $this->assertBaseDnParses($request);
         $this->assertEveryAssertionNamesAnAttribute($request);
 
         return $request;
@@ -134,25 +133,6 @@ trait ServerSearchTrait
         throw new OperationException(
             'An extensible match must name an attribute type.',
             ResultCode::INAPPROPRIATE_MATCHING,
-        );
-    }
-
-    /**
-     * A base the DN grammar rejects would otherwise fall back to a lowercased string and read as a lookup miss,
-     * reporting noSuchObject where RFC 4511 4.1.3 calls for invalidDNSyntax.
-     *
-     * @throws OperationException
-     */
-    private function assertBaseDnParses(SearchRequest $request): void
-    {
-        $baseDn = $request->getBaseDn();
-        if ($baseDn === null || Dn::isValid($baseDn)) {
-            return;
-        }
-
-        throw new OperationException(
-            'The search base DN is not valid.',
-            ResultCode::INVALID_DN_SYNTAX,
         );
     }
 

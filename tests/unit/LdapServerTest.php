@@ -418,6 +418,18 @@ class LdapServerTest extends TestCase
         }
     }
 
+    public function test_a_change_record_naming_a_malformed_dn_is_refused_with_invalid_dn_syntax(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        $this->expectException(RecordRefusedException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->subject->applyChanges(new StringLdifLoader(
+            "dn: cn=ghost,,dc=example,dc=com\nchangetype: delete\n",
+        ));
+    }
+
     public function test_it_should_apply_modify_changes_against_the_seeded_storage(): void
     {
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
