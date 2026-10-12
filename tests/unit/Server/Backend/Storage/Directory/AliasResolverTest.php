@@ -66,50 +66,71 @@ final class AliasResolverTest extends TestCase
         );
     }
 
-    public function test_an_alias_naming_a_missing_entry_is_an_alias_problem(): void
+    public function test_an_alias_naming_a_missing_entry_is_an_alias_problem_matching_the_alias(): void
     {
         $subject = $this->resolverFor([$this->alias('ptr', 'cn=gone,' . self::BASE)]);
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ALIAS_PROBLEM);
-
-        $subject->resolve(new Dn('cn=ptr,' . self::BASE));
+        $this->assertAliasProblemMatching(
+            $subject,
+            'ptr',
+            ['cn=ptr,' . self::BASE],
+        );
     }
 
-    public function test_an_alias_loop_is_an_alias_problem(): void
+    public function test_a_chain_ending_at_a_dangling_alias_matches_the_last_alias_used(): void
+    {
+        $subject = $this->resolverFor([
+            $this->alias('one', 'cn=two,' . self::BASE),
+            $this->alias('two', 'cn=gone,' . self::BASE),
+        ]);
+
+        $this->assertAliasProblemMatching(
+            $subject,
+            'one',
+            ['cn=two,' . self::BASE],
+        );
+    }
+
+    public function test_an_alias_loop_is_an_alias_problem_matching_an_alias_in_the_loop(): void
     {
         $subject = $this->resolverFor([
             $this->alias('one', 'cn=two,' . self::BASE),
             $this->alias('two', 'cn=one,' . self::BASE),
         ]);
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ALIAS_PROBLEM);
-
-        $subject->resolve(new Dn('cn=one,' . self::BASE));
+        $this->assertAliasProblemMatching(
+            $subject,
+            'one',
+            [
+                'cn=one,' . self::BASE,
+                'cn=two,' . self::BASE,
+            ],
+        );
     }
 
-    public function test_an_alias_carrying_no_aliased_object_name_is_an_alias_problem(): void
+    public function test_an_alias_carrying_no_aliased_object_name_is_an_alias_problem_matching_the_alias(): void
     {
         $subject = $this->resolverFor([Entry::fromArray('cn=ptr,' . self::BASE, [
             'objectClass' => ['top', 'alias', 'extensibleObject'],
             'cn' => 'ptr',
         ])]);
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ALIAS_PROBLEM);
-
-        $subject->resolve(new Dn('cn=ptr,' . self::BASE));
+        $this->assertAliasProblemMatching(
+            $subject,
+            'ptr',
+            ['cn=ptr,' . self::BASE],
+        );
     }
 
-    public function test_an_alias_naming_something_that_is_not_a_dn_is_an_alias_problem(): void
+    public function test_an_alias_naming_something_that_is_not_a_dn_is_an_alias_problem_matching_the_alias(): void
     {
         $subject = $this->resolverFor([$this->alias('ptr', 'not a dn')]);
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ALIAS_PROBLEM);
-
-        $subject->resolve(new Dn('cn=ptr,' . self::BASE));
+        $this->assertAliasProblemMatching(
+            $subject,
+            'ptr',
+            ['cn=ptr,' . self::BASE],
+        );
     }
 
     public function test_it_recognizes_an_alias_by_its_object_class_whatever_the_case(): void
@@ -122,6 +143,29 @@ final class AliasResolverTest extends TestCase
         self::assertFalse($subject->isAlias(Entry::fromArray('cn=plain,' . self::BASE, [
             'objectClass' => ['top', 'person'],
         ])));
+    }
+
+    /**
+     * @param list<string> $matchedDns
+     */
+    private function assertAliasProblemMatching(
+        AliasResolver $subject,
+        string $name,
+        array $matchedDns,
+    ): void {
+        try {
+            $subject->resolve(new Dn("cn=$name," . self::BASE));
+            self::fail('Expected an alias problem.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ALIAS_PROBLEM,
+                $e->getCode(),
+            );
+            self::assertContains(
+                $e->getMatchedDn()?->toString(),
+                $matchedDns,
+            );
+        }
     }
 
     /**
