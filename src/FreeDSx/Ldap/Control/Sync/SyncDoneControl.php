@@ -38,14 +38,14 @@ use function count;
  */
 class SyncDoneControl extends Control
 {
+    /**
+     * RFC 4533 2.4 defines the control as non-critical, so the criticality is left at its default of FALSE.
+     */
     public function __construct(
         private readonly ?string $cookie = null,
         private readonly bool $refreshDeletes = false,
     ) {
-        parent::__construct(
-            self::OID_SYNC_DONE,
-            true,
-        );
+        parent::__construct(self::OID_SYNC_DONE);
     }
 
     public function getCookie(): ?string
