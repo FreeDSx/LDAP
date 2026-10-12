@@ -437,6 +437,63 @@ trait WriteTestsTrait
         ));
     }
 
+    #[DataProvider('rdnValueFailingItsSyntaxProvider')]
+    public function testAddIsRefusedWhenAnRdnValueFailsItsSyntax(Entry $entry): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->create($entry);
+            self::fail('An add whose RDN value fails its syntax should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{Entry}>
+     */
+    public static function rdnValueFailingItsSyntaxProvider(): iterable
+    {
+        yield 'an empty directory string' => [
+            new Entry(
+                'cn=,dc=foo,dc=bar',
+                new Attribute('objectClass', 'top', 'person'),
+                new Attribute('sn', 'Empty'),
+            ),
+        ];
+        yield 'a country code of three letters' => [
+            new Entry(
+                'c=USA,dc=foo,dc=bar',
+                new Attribute('objectClass', 'top', 'country'),
+            ),
+        ];
+    }
+
+    public function testRenameIsRefusedWhenTheNewRdnValueFailsItsSyntax(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->rename(
+                'cn=user,dc=foo,dc=bar',
+                'cn=',
+                true,
+            );
+            self::fail('A rename onto an RDN value failing its syntax should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->ldapClient()->read('cn=user,dc=foo,dc=bar'));
+    }
+
     public function testAddRejectsAnUndefinedObjectClassAndStoresNothing(): void
     {
         $this->authenticateAdmin();
