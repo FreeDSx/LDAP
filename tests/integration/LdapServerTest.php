@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -725,6 +726,29 @@ final class LdapServerTest extends ServerTestCase
                 ResultCode::INVALID_DN_SYNTAX,
                 $e->getCode(),
             );
+        }
+    }
+
+    public function testAMalformedRequestCarryingMessageIdZeroEndsTheSession(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            0,
+            Operations::read(''),
+            new Control(
+                Control::OID_PAGING,
+                false,
+                'not-a-paging-control',
+            ),
+        ));
+
+        try {
+            $queue->getMessage();
+            $this->fail('The malformed request was answered.');
+        } catch (UnsolicitedNotificationException $e) {
+            $this->assertTrue($e->isNoticeOfDisconnection());
+        } finally {
+            $queue->close();
         }
     }
 

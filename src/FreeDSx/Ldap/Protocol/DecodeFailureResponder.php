@@ -40,6 +40,11 @@ final readonly class DecodeFailureResponder
      */
     public function answer(MessageDecodeException $e): bool
     {
+        // A response on the reserved message ID 0 would read as an unsolicited notification.
+        if ($e->getMessageId() === 0) {
+            return false;
+        }
+
         $response = $this->responseFactory->getDecodeFailureResponse(
             $e->getMessageId(),
             $e->getProtocolOpTag(),
