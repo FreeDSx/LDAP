@@ -34,6 +34,8 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PasswordModifyRequest extends ExtendedRequest
 {
+    private const MALFORMED = 'The password modify request is malformed.';
+
     public function __construct(
         private ?string $userIdentity = null,
         private ?string $oldPassword = null,
@@ -118,7 +120,7 @@ class PasswordModifyRequest extends ExtendedRequest
             return new static();
         }
         if (!($request instanceof SequenceType)) {
-            throw new ProtocolException('The password modify request is malformed.');
+            throw new ProtocolException(self::MALFORMED);
         }
 
         $userIdentity = null;
@@ -126,7 +128,7 @@ class PasswordModifyRequest extends ExtendedRequest
         $newPasswd = null;
         foreach ($request->getChildren() as $value) {
             if ($value->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                throw new ProtocolException('The password modify request is malformed');
+                throw new ProtocolException(self::MALFORMED);
             }
             if ($value->getTagNumber() === 0) {
                 $userIdentity = $value;
@@ -134,6 +136,9 @@ class PasswordModifyRequest extends ExtendedRequest
                 $oldPasswd = $value;
             } elseif ($value->getTagNumber() === 2) {
                 $newPasswd = $value;
+            } else {
+                // RFC 3062 3: a field the server does not recognize must leave the password unchanged.
+                throw new ProtocolException(self::MALFORMED);
             }
         }
 

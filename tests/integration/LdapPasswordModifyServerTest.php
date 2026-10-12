@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap;
 
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
@@ -139,6 +141,69 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
             self::USER_PASSWORD,
         );
         $verifyClient->unbind();
+    }
+
+    public function testARequestCarryingAnUnrecognizedFieldIsRefusedAndChangesNothing(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new ExtendedRequest(
+                ExtendedRequest::OID_PWD_MODIFY,
+                Asn1::sequence(
+                    Asn1::context(
+                        2,
+                        Asn1::octetString('newpass123'),
+                    ),
+                    Asn1::context(
+                        3,
+                        Asn1::octetString('extension'),
+                    ),
+                ),
+            ));
+            $this->fail('A password modify carrying an unrecognized field should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        $verifyClient = $this->buildClient('tcp');
+        $verifyClient->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+        $verifyClient->unbind();
+    }
+
+    public function testAMalformedRequestValueIsAnsweredWithoutEndingTheSession(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new ExtendedRequest(
+                ExtendedRequest::OID_PWD_MODIFY,
+                Asn1::octetString(''),
+            ));
+            $this->fail('A password modify value that is not a sequence should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertSame(
+            'dn:' . self::USER_DN,
+            $this->ldapClient()->whoami(),
+        );
     }
 
     public function testExplicitIdentityPasswordChange(): void
