@@ -474,6 +474,61 @@ final class ServerQueueTest extends TestCase
         );
     }
 
+    public function test_poll_returns_null_when_nothing_is_waiting(): void
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn(false);
+
+        $queue = new ServerQueue(
+            $socket,
+            new LdapEncoder(),
+        );
+
+        self::assertNull($queue->pollMessage());
+    }
+
+    public function test_poll_takes_a_buffered_message_before_reading_the_socket_and_holds_neither(): void
+    {
+        $encoder = new LdapEncoder();
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn(
+            $encoder->encode((new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1())
+                . $encoder->encode((new LdapMessageRequest(6, new DeleteRequest('dc=foo,dc=bar')))->toAsn1()),
+            false,
+        );
+        $queue = new ServerQueue(
+            $socket,
+            $encoder,
+        );
+        $queue->peekForCancelSignal(2);
+
+        $buffered = $queue->pollMessage();
+        $read = $queue->pollMessage();
+        $nothing = $queue->pollMessage();
+
+        self::assertSame(
+            5,
+            $buffered?->getMessageId(),
+        );
+        self::assertSame(
+            6,
+            $read?->getMessageId(),
+        );
+        self::assertNull($nothing);
+    }
+
+    public function test_poll_refuses_a_message_carrying_a_zero_message_id(): void
+    {
+        $queue = $this->makeQueueWithEncodedRequest(
+            new LdapMessageRequest(0, new DeleteRequest('dc=foo,dc=bar')),
+        );
+
+        self::expectException(RequestValidationException::class);
+        self::expectExceptionMessage('The message ID 0 cannot be used in a client request.');
+
+        $queue->pollMessage();
+    }
+
     public function test_encrypt_discards_plaintext_pipelined_behind_the_upgrade(): void
     {
         $encoder = new LdapEncoder();

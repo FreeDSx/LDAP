@@ -25,6 +25,11 @@ use FreeDSx\Socket\SocketPoolOptions;
 trait RawClientQueueTrait
 {
     /**
+     * How long to wait for every expected result while unrelated messages.
+     */
+    private const RESULT_WAIT_SECONDS = 10;
+
+    /**
      * @param int $timeoutRead Shorten it when the assertion is that nothing arrives.
      */
     private function rawQueue(
@@ -43,6 +48,8 @@ trait RawClientQueueTrait
     }
 
     /**
+     * Reads until each message ID has a result or the wait runs out, returning what arrived.
+     *
      * @return array<int, int> result codes keyed by message ID
      */
     private function resultCodesFor(
@@ -50,8 +57,9 @@ trait RawClientQueueTrait
         int ...$messageIds,
     ): array {
         $resultCodes = [];
+        $deadline = microtime(true) + self::RESULT_WAIT_SECONDS;
 
-        while (count($resultCodes) < count($messageIds)) {
+        while (count($resultCodes) < count($messageIds) && microtime(true) < $deadline) {
             $message = $queue->getMessage();
             $response = $message->getResponse();
             if (!in_array($message->getMessageId(), $messageIds, true) || !$response instanceof LdapResult) {

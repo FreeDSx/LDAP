@@ -139,8 +139,12 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
                     ),
                 ),
                 $outcome,
-                // Each change and keepalive flushes immediately for liveness; poll cancel after each.
-                new QueueWriterConfig(flushPerMessage: true, signalInterval: 1),
+                // Each change and keepalive flushes immediately and polls after each, refusing anything but a signal.
+                new QueueWriterConfig(
+                    signalInterval: 1,
+                    flushPerMessage: true,
+                    persistent: true,
+                ),
                 $cancellation,
             );
         }

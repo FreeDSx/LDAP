@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProviderInterface;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\PasswordPolicyResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -419,6 +420,10 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     new ResponseWriter(
                         $queue,
                         new DecodeFailureResponder(
+                            $queue,
+                            $eventLogger,
+                        ),
+                        new OutOfSequenceResponder(
                             $queue,
                             $eventLogger,
                         ),

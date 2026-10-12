@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -52,6 +53,63 @@ final class ResponseWriterTest extends TestCase
         $this->subject = new ResponseWriter(
             $this->queue,
             new DecodeFailureResponder($this->queue),
+            new OutOfSequenceResponder($this->queue),
+        );
+    }
+
+    public function test_a_persistent_stream_polls_for_waiting_requests_rather_than_peeking(): void
+    {
+        $this->queue
+            ->expects(self::never())
+            ->method('peekForCancelSignal');
+        $this->queue
+            ->expects(self::atLeastOnce())
+            ->method('pollMessage')
+            ->willReturn(null);
+
+        $this->subject->write(
+            $this->stream(
+                count: 2,
+                observes: false,
+                persistent: true,
+            ),
+            2,
+        );
+    }
+
+    public function test_a_finite_stream_peeks_rather_than_polling_for_waiting_requests(): void
+    {
+        $this->queue
+            ->expects(self::never())
+            ->method('pollMessage');
+        $this->queue
+            ->expects(self::atLeastOnce())
+            ->method('peekForCancelSignal')
+            ->willReturn(null);
+
+        $this->subject->write(
+            $this->stream(
+                count: 2,
+                observes: false,
+            ),
+            2,
+        );
+    }
+
+    public function test_a_persistent_stream_stops_polling_once_the_producer_has_a_signal(): void
+    {
+        $this->queue
+            ->expects(self::once())
+            ->method('pollMessage')
+            ->willReturn($this->cancel);
+
+        $this->subject->write(
+            $this->stream(
+                count: 3,
+                observes: false,
+                persistent: true,
+            ),
+            2,
         );
     }
 
@@ -134,6 +192,7 @@ final class ResponseWriterTest extends TestCase
     private function stream(
         int $count,
         bool $observes,
+        bool $persistent = false,
     ): ResponseStream {
         return ResponseStream::streaming(
             $this->messages(
@@ -141,7 +200,10 @@ final class ResponseWriterTest extends TestCase
                 $observes,
             ),
             static fn(): OperationOutcomeResult => OperationOutcomeResult::succeeded(),
-            new QueueWriterConfig(signalInterval: 1),
+            new QueueWriterConfig(
+                signalInterval: 1,
+                persistent: $persistent,
+            ),
             $this->cancellation,
         );
     }

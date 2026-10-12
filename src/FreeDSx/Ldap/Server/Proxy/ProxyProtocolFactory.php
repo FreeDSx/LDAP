@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Authorization\DispatchAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
@@ -111,6 +112,10 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 new ResponseWriter(
                     $queue,
                     new DecodeFailureResponder(
+                        $queue,
+                        $eventLogger,
+                    ),
+                    new OutOfSequenceResponder(
                         $queue,
                         $eventLogger,
                     ),

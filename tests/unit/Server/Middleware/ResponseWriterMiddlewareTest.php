@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -91,6 +92,7 @@ final class ResponseWriterMiddlewareTest extends TestCase
             new ResponseWriter(
                 $this->mockQueue,
                 new DecodeFailureResponder($this->mockQueue),
+                new OutOfSequenceResponder($this->mockQueue),
             ),
             $this->mockBackend,
             $this->mockAccessControl,

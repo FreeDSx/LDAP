@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
@@ -1216,6 +1217,7 @@ final class ServerSearchHandlerTest extends TestCase
         return (new ResponseWriter(
             $this->mockQueue,
             new DecodeFailureResponder($this->mockQueue),
+            new OutOfSequenceResponder($this->mockQueue),
         ))->write(
             $stream,
             $search->getMessageId(),

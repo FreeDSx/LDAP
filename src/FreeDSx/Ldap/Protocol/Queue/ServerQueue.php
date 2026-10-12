@@ -143,13 +143,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         }
 
         // Reads past anything already buffered; draining that here would re-inspect the same message forever.
-        $message = $this->readRequest(null);
-
-        // Peeking skips the validation middleware, and buffering defers a refusal a persist stream never reaches.
-        if ($message->getMessageId() === 0) {
-            throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
-        }
-
+        $message = $this->readAheadRequest();
         $request = $message->getRequest();
 
         if ($this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
@@ -164,6 +158,25 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         }
 
         return null;
+    }
+
+    /**
+     * Takes the next waiting message, buffered ones first, or null when none has arrived.
+     *
+     * @throws RequestValidationException If the message carries an unusable message ID.
+     * @throws MessageDecodeException If the message has an envelope that parses and a body that does not.
+     */
+    public function pollMessage(): ?LdapMessageRequest
+    {
+        if ($this->pendingMessages !== []) {
+            return array_shift($this->pendingMessages);
+        }
+
+        if (!$this->hasPendingData()) {
+            return null;
+        }
+
+        return $this->readAheadRequest();
     }
 
     /**
@@ -345,5 +358,23 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     ): bool {
         return ($request instanceof AbandonRequest || $request instanceof CancelRequest)
             && $request->getMessageId() === $inFlightMessageId;
+    }
+
+    /**
+     * Reads a request ahead of the dispatcher, refusing the reserved message ID the validation middleware would.
+     *
+     * @throws RequestValidationException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
+     */
+    private function readAheadRequest(): LdapMessageRequest
+    {
+        $message = $this->readRequest(null);
+        if ($message->getMessageId() === 0) {
+            throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
+        }
+
+        return $message;
     }
 }

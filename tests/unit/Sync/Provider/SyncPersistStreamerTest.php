@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
+use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -109,7 +110,7 @@ final class SyncPersistStreamerTest extends TestCase
                 return $this->queue;
             });
         $this->queue
-            ->method('peekForCancelSignal')
+            ->method('pollMessage')
             ->willReturnCallback(fn(): ?LdapMessageRequest => array_shift($this->cancelSignals));
 
         $this->entries = $this->createMock(ReadEntryInterface::class);
@@ -256,13 +257,18 @@ final class SyncPersistStreamerTest extends TestCase
                 $cancellation,
             ),
             fn(): OperationOutcomeResult => OperationOutcomeResult::succeeded(),
-            new QueueWriterConfig(flushPerMessage: true, signalInterval: 1),
+            new QueueWriterConfig(
+                signalInterval: 1,
+                flushPerMessage: true,
+                persistent: true,
+            ),
             $cancellation,
         );
 
         (new ResponseWriter(
             $this->queue,
             new DecodeFailureResponder($this->queue),
+            new OutOfSequenceResponder($this->queue),
         ))->write(
             $stream,
             5,

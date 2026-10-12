@@ -32,6 +32,7 @@ final readonly class ResponseWriter
     public function __construct(
         private ServerQueue $queue,
         private DecodeFailureResponder $decodeFailures,
+        private OutOfSequenceResponder $outOfSequence,
     ) {}
 
     public function write(
@@ -114,7 +115,10 @@ final readonly class ResponseWriter
         ResponseStream $stream,
         int $messageId,
     ): bool {
-        $signal = $this->pollForSignal($messageId);
+        $signal = $this->pollForSignal(
+            $stream->writerConfig,
+            $messageId,
+        );
         $stream->cancellation?->offer($signal);
 
         return $signal !== null;
@@ -134,14 +138,18 @@ final readonly class ResponseWriter
     }
 
     /**
-     * A message that arrives mid-stream is answered the same way one between operations is.
+     * A request behind a persistent stream is refused at once, and one behind any other stream waits for it to end.
      *
      * @throws MessageDecodeException When the message cannot be answered at all.
      */
-    private function pollForSignal(int $messageId): ?LdapMessageRequest
-    {
+    private function pollForSignal(
+        QueueWriterConfig $config,
+        int $messageId,
+    ): ?LdapMessageRequest {
         try {
-            return $this->queue->peekForCancelSignal($messageId);
+            return $config->persistent
+                ? $this->outOfSequence->signalOrRefuse($messageId)
+                : $this->queue->peekForCancelSignal($messageId);
         } catch (MessageDecodeException $e) {
             if ($this->decodeFailures->answer($e)) {
                 return null;
