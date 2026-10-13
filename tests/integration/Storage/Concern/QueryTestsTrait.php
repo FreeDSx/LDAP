@@ -339,6 +339,25 @@ trait QueryTestsTrait
             ),
             0,
         ];
+        // RFC 4517 4.2 assigns generalizedTimeMatch 2.5.13.27 and generalizedTimeOrderingMatch 2.5.13.28.
+        yield 'negating generalizedTimeMatch named by its OID matches every stamped entry' => [
+            Filters::not(Filters::extensible(
+                'createTimestamp',
+                '19700101000000Z',
+                '2.5.13.27',
+                false,
+            )),
+            8,
+        ];
+        yield 'generalizedTimeOrderingMatch named by its OID matches every earlier stamp' => [
+            Filters::extensible(
+                'createTimestamp',
+                '99991231235959Z',
+                '2.5.13.28',
+                false,
+            ),
+            8,
+        ];
         yield 'extensible bitAnd matches no value that is not an integer' => [
             Filters::extensible(
                 'cn',

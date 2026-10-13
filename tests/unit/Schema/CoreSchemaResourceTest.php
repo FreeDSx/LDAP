@@ -175,6 +175,27 @@ final class CoreSchemaResourceTest extends TestCase
         );
     }
 
+    public function test_the_generalized_time_rules_carry_their_rfc_4517_oids(): void
+    {
+        self::assertSame(
+            MatchingRuleOid::NAME_GENERALIZED_TIME_MATCH,
+            $this->schema->getMatchingRule('2.5.13.27')?->primaryName(),
+        );
+        self::assertSame(
+            MatchingRuleOid::NAME_GENERALIZED_TIME_ORDERING_MATCH,
+            $this->schema->getMatchingRule('2.5.13.28')?->primaryName(),
+        );
+        self::assertNull($this->schema->getMatchingRule('2.5.13.18'));
+        self::assertSame(
+            '2.5.13.27',
+            $this->schema->getEqualityRuleOid('createTimestamp'),
+        );
+        self::assertSame(
+            '2.5.13.28',
+            $this->schema->getOrderingRuleOid('modifyTimestamp'),
+        );
+    }
+
     public function test_governing_structure_rule_is_a_read_only_operational_integer(): void
     {
         $type = $this->schema->getAttributeType('governingStructureRule');
