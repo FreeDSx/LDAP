@@ -92,11 +92,11 @@ final class MatchingRuleOid
 
     public const NAME_OCTET_STRING_MATCH = 'octetStringMatch';
 
-    public const OID_GENERALIZED_TIME_MATCH = '2.5.13.18';
+    public const OID_GENERALIZED_TIME_MATCH = '2.5.13.27';
 
     public const NAME_GENERALIZED_TIME_MATCH = 'generalizedTimeMatch';
 
-    public const OID_GENERALIZED_TIME_ORDERING_MATCH = '2.5.13.19';
+    public const OID_GENERALIZED_TIME_ORDERING_MATCH = '2.5.13.28';
 
     public const NAME_GENERALIZED_TIME_ORDERING_MATCH = 'generalizedTimeOrderingMatch';
 
