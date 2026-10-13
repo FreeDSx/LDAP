@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -492,6 +493,35 @@ trait WriteTestsTrait
         }
 
         self::assertNotNull($this->ldapClient()->read('cn=user,dc=foo,dc=bar'));
+    }
+
+    public function testNothingCanBeAddedOrMovedBeneathAnAlias(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(new Entry(
+            'cn=ptr,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'alias', 'extensibleObject'),
+            new Attribute('cn', 'ptr'),
+            new Attribute('aliasedObjectName', 'cn=user,dc=foo,dc=bar'),
+        ));
+
+        try {
+            foreach ($this->placementsBeneath('cn=ptr,dc=foo,dc=bar') as $request) {
+                try {
+                    $this->ldapClient()->send($request);
+                    self::fail('A placement beneath an alias should have been refused.');
+                } catch (OperationException $e) {
+                    self::assertSame(
+                        ResultCode::ALIAS_PROBLEM,
+                        $e->getCode(),
+                    );
+                }
+            }
+
+            self::assertNotNull($this->ldapClient()->read('cn=user,dc=foo,dc=bar'));
+        } finally {
+            $this->ldapClient()->delete('cn=ptr,dc=foo,dc=bar');
+        }
     }
 
     public function testAddRejectsAnUndefinedObjectClassAndStoresNothing(): void
@@ -1757,6 +1787,25 @@ trait WriteTestsTrait
 
         // The refusal answers the operation rather than dropping the connection, so the session still serves.
         self::assertNotNull($this->ldapClient()->read('cn=admin,dc=foo,dc=bar'));
+    }
+
+    /**
+     * @return list<RequestInterface>
+     */
+    private function placementsBeneath(string $parentDn): array
+    {
+        return [
+            Operations::add(new Entry(
+                'cn=child,' . $parentDn,
+                new Attribute('objectClass', 'top', 'person'),
+                new Attribute('cn', 'child'),
+                new Attribute('sn', 'Child'),
+            )),
+            Operations::move(
+                'cn=user,dc=foo,dc=bar',
+                $parentDn,
+            ),
+        ];
     }
 
     private function mailSearch(string $value): Entries
