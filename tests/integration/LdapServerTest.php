@@ -333,6 +333,42 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    public function testTheSubschemaPublishesTheSameTimestampsOnEveryConnection(): void
+    {
+        $this->authenticateAdmin();
+        $first = $this->ldapClient()->read(
+            'cn=Subschema',
+            ['createTimestamp', 'modifyTimestamp'],
+        );
+
+        $otherClient = $this->buildClient('tcp');
+        $otherClient->bind(
+            'cn=admin,dc=foo,dc=bar',
+            '12345',
+        );
+        $second = $otherClient->read(
+            'cn=Subschema',
+            ['modifyTimestamp'],
+        );
+        $otherClient->unbind();
+
+        $timestamp = $first?->get('modifyTimestamp')?->firstValue();
+
+        self::assertNotNull($timestamp);
+        self::assertMatchesRegularExpression(
+            '/^\d{14}Z$/',
+            $timestamp,
+        );
+        self::assertSame(
+            $timestamp,
+            $first?->get('createTimestamp')?->firstValue(),
+        );
+        self::assertSame(
+            $timestamp,
+            $second?->get('modifyTimestamp')?->firstValue(),
+        );
+    }
+
     public function testTheSubschemaPublishesNoMatchingRuleUse(): void
     {
         $this->authenticateAdmin();

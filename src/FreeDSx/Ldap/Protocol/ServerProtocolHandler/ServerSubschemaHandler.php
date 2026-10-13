@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecification;
@@ -42,6 +43,7 @@ readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
         $schemaDn = GeneratedEntry::Subschema->dn();
         $rdn = $schemaDn->getRdn();
         $schema = $this->options->getSchema();
+        $changedAt = GeneralizedTime::format($this->options->getSchemaConfig()->getChangedAt());
 
         $entry = Entry::fromArray(
             $schemaDn->toString(),
@@ -58,6 +60,9 @@ readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
                 AttributeTypeOid::NAME_SUBTREE_SPECIFICATION => [(new SubtreeSpecification())->toString()],
                 // Self-referential, so a client discovering schema never has to special-case this entry.
                 AttributeTypeOid::NAME_SUBSCHEMA_SUBENTRY => [$schemaDn->toString()],
+                // RFC 4512 4.2: lets a client caching the schema tell whether its copy is stale.
+                AttributeTypeOid::NAME_CREATE_TIMESTAMP => [$changedAt],
+                AttributeTypeOid::NAME_MODIFY_TIMESTAMP => [$changedAt],
                 AttributeTypeOid::NAME_ATTRIBUTE_TYPES => array_map(
                     fn($at) => $at->toDescriptionString(),
                     $schema->getAttributeTypes(),
