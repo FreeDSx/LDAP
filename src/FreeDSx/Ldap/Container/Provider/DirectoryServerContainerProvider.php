@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
@@ -198,6 +199,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $c->get(RowLockableInterface::class),
                 $c->get(EntryLocator::class),
                 $c->get(SubentryPlacementGuard::class),
+                new AliasResolver($c->get(ReadEntryInterface::class)),
             ),
             EntryMutation::class => static fn(Container $c): EntryMutation => new EntryMutation(
                 $c->get(WriteEntryOperationHandler::class),

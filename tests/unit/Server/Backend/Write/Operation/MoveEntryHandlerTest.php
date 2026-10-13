@@ -181,6 +181,31 @@ final class MoveEntryHandlerTest extends TestCase
         self::assertNull($this->find('cn=bob,ou=people,dc=example,dc=com'));
     }
 
+    public function test_it_refuses_a_new_superior_that_is_an_alias(): void
+    {
+        $this->writeGraph(EntryFixture::inMemoryStorage(...[...$this->fixture(), $this->aliasToAlice()]));
+
+        try {
+            $this->moves()->handle(
+                new MoveCommand(
+                    new Dn('cn=Alice,dc=example,dc=com'),
+                    Rdn::create('cn=Alice'),
+                    true,
+                    new Dn('cn=Ptr,dc=example,dc=com'),
+                ),
+                $this->context(),
+            );
+            self::fail('A move beneath an alias should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ALIAS_PROBLEM,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->find('cn=Alice,dc=example,dc=com'));
+    }
+
     public function test_it_refuses_relocating_an_entry_beneath_itself(): void
     {
         $this->addPeopleOu();

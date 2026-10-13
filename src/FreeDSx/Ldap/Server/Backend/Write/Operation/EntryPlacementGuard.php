@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -37,6 +38,7 @@ readonly class EntryPlacementGuard
         private RowLockableInterface $locks,
         private EntryLocator $locator,
         private SubentryPlacementGuard $subentries,
+        private AliasResolver $aliases,
     ) {}
 
     /**
@@ -49,6 +51,10 @@ readonly class EntryPlacementGuard
     ): void {
         $this->assertParentExists(
             $normDn,
+            $isSystem,
+        );
+        $this->assertNotBeneathAlias(
+            $normDn->getParent(),
             $isSystem,
         );
         $this->subentries->assertPlacement(
@@ -108,6 +114,10 @@ readonly class EntryPlacementGuard
     ): void {
         $this->assertNotNamingContext($command->dn);
         $this->assertNewSuperiorExists($command->newParent);
+        $this->assertNotBeneathAlias(
+            $command->newParent,
+            $isSystem,
+        );
         $this->assertNotIntoOwnSubtree(
             $command->dn,
             $command->newParent,
@@ -164,6 +174,35 @@ readonly class EntryPlacementGuard
         if (!$this->locks->lockForReference($newParent->normalize())) {
             $this->locator->throwNoSuchObject($newParent);
         }
+    }
+
+    /**
+     * RFC 4512 2.6: an alias is always a leaf, and RFC 4511 forbids dereferencing it to place the entry elsewhere.
+     *
+     * @throws OperationException
+     */
+    private function assertNotBeneathAlias(
+        ?Dn $parent,
+        bool $isSystem,
+    ): void {
+        // Server-initiated writes replay a placement the provider already accepted.
+        if ($isSystem || $parent === null || $parent->isRootDse()) {
+            return;
+        }
+
+        $parentEntry = $this->storage->find($parent->normalize());
+
+        // A missing parent is reported by the existence check, which resolves the matched DN.
+        if ($parentEntry === null || !$this->aliases->isAlias($parentEntry)) {
+            return;
+        }
+
+        throw new OperationException(
+            'An entry cannot be placed beneath an alias.',
+            ResultCode::ALIAS_PROBLEM,
+            null,
+            $parentEntry->getDn(),
+        );
     }
 
     /**

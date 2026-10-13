@@ -211,6 +211,48 @@ final class AddEntryHandlerTest extends TestCase
         }
     }
 
+    public function test_it_refuses_an_entry_placed_beneath_an_alias_naming_the_alias(): void
+    {
+        $this->writeGraph(EntryFixture::inMemoryStorage(...[...$this->fixture(), $this->aliasToAlice()]));
+
+        try {
+            $this->adds()->handle(
+                new AddCommand(new Entry(
+                    new Dn('cn=New,cn=Ptr,dc=example,dc=com'),
+                    new Attribute('cn', 'New'),
+                )),
+                $this->context(),
+            );
+            self::fail('An entry beneath an alias should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ALIAS_PROBLEM,
+                $e->getCode(),
+            );
+            self::assertSame(
+                'cn=Ptr,dc=example,dc=com',
+                $e->getMatchedDn()?->toString(),
+            );
+        }
+
+        self::assertNull($this->find('cn=New,cn=Ptr,dc=example,dc=com'));
+    }
+
+    public function test_a_system_write_may_place_an_entry_beneath_an_alias(): void
+    {
+        $this->writeGraph(EntryFixture::inMemoryStorage(...[...$this->fixture(), $this->aliasToAlice()]));
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=New,cn=Ptr,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+            )),
+            $this->systemContext(),
+        );
+
+        self::assertNotNull($this->find('cn=New,cn=Ptr,dc=example,dc=com'));
+    }
+
     public function test_a_system_write_may_create_a_naming_context_root(): void
     {
         $this->writeGraph(new InMemoryStorage());

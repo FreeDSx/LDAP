@@ -109,6 +109,16 @@ trait WriteHandlerTestTrait
         ];
     }
 
+    private function aliasToAlice(): Entry
+    {
+        return new Entry(
+            new Dn('cn=Ptr,dc=example,dc=com'),
+            new Attribute('objectClass', 'alias', 'extensibleObject'),
+            new Attribute('cn', 'Ptr'),
+            new Attribute('aliasedObjectName', 'cn=Alice,dc=example,dc=com'),
+        );
+    }
+
     private function adds(): AddEntryHandler
     {
         return $this->graph->get(AddEntryHandler::class);
