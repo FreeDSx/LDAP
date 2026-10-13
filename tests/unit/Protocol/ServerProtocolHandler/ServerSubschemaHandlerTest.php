@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSubschemaHandler;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -172,6 +173,22 @@ final class ServerSubschemaHandlerTest extends TestCase
         self::assertGreaterThan(
             0,
             count($entry->get('ldapSyntaxes')?->getValues() ?? []),
+        );
+    }
+
+    public function test_it_publishes_when_the_schema_took_its_shape_as_both_timestamps(): void
+    {
+        $changedAt = GeneralizedTime::format($this->options->getSchemaConfig()->getChangedAt());
+
+        $entry = $this->handleAndCaptureEntry('+');
+
+        self::assertSame(
+            [$changedAt],
+            $entry->get('createTimestamp')?->getValues(),
+        );
+        self::assertSame(
+            [$changedAt],
+            $entry->get('modifyTimestamp')?->getValues(),
         );
     }
 

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Config;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Schema;
@@ -22,6 +23,8 @@ use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\Clock\ClockInterface;
+use FreeDSx\Ldap\Server\Clock\SystemClock;
 
 /**
  * The schema the server enforces and publishes, and where it is published.
@@ -52,6 +55,13 @@ final class SchemaConfig
 
     private ?Schema $resolved = null;
 
+    private DateTimeImmutable $changedAt;
+
+    public function __construct(private readonly ClockInterface $clock = new SystemClock())
+    {
+        $this->changedAt = $this->clock->now();
+    }
+
     /**
      * @return list<SchemaSourceInterface>
      */
@@ -66,7 +76,7 @@ final class SchemaConfig
     public function setSources(SchemaSourceInterface ...$sources): self
     {
         $this->sources = array_values($sources);
-        $this->resolved = null;
+        $this->schemaChanged();
 
         return $this;
     }
@@ -79,7 +89,7 @@ final class SchemaConfig
         foreach ($sources as $source) {
             $this->sources[] = $source;
         }
-        $this->resolved = null;
+        $this->schemaChanged();
 
         return $this;
     }
@@ -110,7 +120,7 @@ final class SchemaConfig
     public function setLoadMode(SchemaLoadMode $mode): self
     {
         $this->loadMode = $mode;
-        $this->resolved = null;
+        $this->schemaChanged();
 
         return $this;
     }
@@ -144,6 +154,23 @@ final class SchemaConfig
     public function resolve(): Schema
     {
         return $this->resolved ??= $this->mergeSources();
+    }
+
+    /**
+     * When the schema took its current shape, which the subschema entry publishes for clients caching it.
+     */
+    public function getChangedAt(): DateTimeImmutable
+    {
+        return $this->changedAt;
+    }
+
+    /**
+     * Drops the merged schema so the next read rebuilds it, and records when its shape changed.
+     */
+    private function schemaChanged(): void
+    {
+        $this->resolved = null;
+        $this->changedAt = $this->clock->now();
     }
 
     /**
