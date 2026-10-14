@@ -40,17 +40,33 @@ $server = new LdapServer(new ServerOptions(
 
 ## What Gets Validated
 
-Every `add` and `modify` is checked before reaching storage:
+Every `add`, `modify` and `modify DN` is checked before reaching storage:
 
 - At least one structural `objectClass` known to the schema is present.
+- Every `objectClass` value is defined by the schema.
 - All `MUST` attributes for the object class chain are present.
 - No attributes outside the `MUST` + `MAY` set appear (unless `extensibleObject` is included).
 - Single-valued attributes carry at most one value.
 - No attribute holds more values than its limit allows.
 - Attributes marked `NO-USER-MODIFICATION` are not writable by clients.
+- Values conform to their attribute's syntax, and so do RDN values.
+- No attribute is given twice, and no value is repeated under an equivalent spelling.
+- The structural object class of an existing entry does not change.
+- Naming attributes have an equality matching rule.
 
-Failures return `objectClassViolation` (65), `undefinedAttributeType` (17), `constraintViolation` (19), or
-`adminLimitExceeded` (11) for a value count, with a diagnostic message naming the offending attribute or class.
+Failures return one of these codes, with a diagnostic naming the attribute or class:
+
+| Result code                      | Rule                                                                            |
+|----------------------------------|---------------------------------------------------------------------------------|
+| `objectClassViolation` (65)      | The structural class, `MUST` and `MAY` attributes, an undefined object class    |
+| `undefinedAttributeType` (17)    | An attribute type the schema does not define                                    |
+| `invalidAttributeSyntax` (21)    | A value that does not conform to its syntax                                     |
+| `invalidDNSyntax` (34)           | An RDN value that does not conform to its syntax                                |
+| `constraintViolation` (19)       | Several values on a single-valued attribute, a `NO-USER-MODIFICATION` attribute |
+| `attributeOrValueExists` (20)    | An attribute given twice, a value repeated under an equivalent spelling         |
+| `objectClassModsProhibited` (69) | Changing the structural object class                                            |
+| `namingViolation` (64)           | A naming attribute with no equality matching rule                               |
+| `adminLimitExceeded` (11)        | More values than the attribute's limit                                          |
 
 ## Entry Requirements
 
