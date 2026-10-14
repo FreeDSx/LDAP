@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Schema;
 
-use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 
 /**
  * A single schema violation detected by the validator.
@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 final readonly class SchemaViolation
 {
     public function __construct(
-        public OperationException $exception,
+        public RuleViolation $violation,
         public SchemaViolationDisposition $disposition,
     ) {}
 }

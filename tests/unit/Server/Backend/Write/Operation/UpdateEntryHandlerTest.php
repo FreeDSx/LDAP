@@ -319,7 +319,7 @@ final class UpdateEntryHandlerTest extends TestCase
         );
         self::assertSame(
             ResultCode::CONSTRAINT_VIOLATION,
-            $violations->all()[0]->exception->getCode(),
+            $violations->all()[0]->violation->code,
         );
         self::assertSame(
             SchemaViolationDisposition::RelaxedByPolicy,

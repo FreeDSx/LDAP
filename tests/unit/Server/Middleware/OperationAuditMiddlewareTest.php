@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
+use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationDisposition;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -147,19 +149,18 @@ final class OperationAuditMiddlewareTest extends TestCase
 
     public function test_it_records_schema_violations_from_a_schema_rule_exception(): void
     {
+        $violation = new RuleViolation(
+            SchemaRule::StructuralClass,
+            ResultCode::OBJECT_CLASS_VIOLATION,
+            'objectClass violation.',
+        );
         $violations = new SchemaViolations();
         $violations->record(
-            new OperationException(
-                'objectClass violation.',
-                ResultCode::OBJECT_CLASS_VIOLATION,
-            ),
+            $violation,
             SchemaViolationDisposition::Rejected,
         );
         $exception = new SchemaRuleException(
-            new OperationException(
-                'objectClass violation.',
-                ResultCode::OBJECT_CLASS_VIOLATION,
-            ),
+            $violation,
             $violations,
         );
 

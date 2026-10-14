@@ -245,13 +245,16 @@ final readonly class OperationAuditor
         LdapMessageRequest $message,
         TokenInterface $token,
     ): void {
-        foreach ($violations->all() as $violation) {
-            $this->eventLogger->recordFailure(
+        foreach ($violations->all() as $recorded) {
+            $this->eventLogger->record(
                 ServerEvent::SchemaViolation,
-                $violation->exception,
                 $this->writeEventContext(
                     $message->getRequest(),
-                    [EventContext::VALIDATION_MODE => $violation->disposition->value],
+                    [
+                        EventContext::VALIDATION_MODE => $recorded->disposition->value,
+                        EventContext::RESULT_CODE => $recorded->violation->code,
+                        EventContext::REASON => $recorded->violation->message,
+                    ],
                 ),
                 subject: $token,
                 message: $message,

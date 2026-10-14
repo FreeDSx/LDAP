@@ -31,6 +31,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
+use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationDisposition;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Logging\EventContext;
@@ -512,9 +514,10 @@ final class OperationAuditorTest extends TestCase
     ): void {
         $violations = new SchemaViolations();
         $violations->record(
-            new OperationException(
-                'Required attribute "sn" is missing.',
+            new RuleViolation(
+                SchemaRule::RequiredAttributes,
                 ResultCode::OBJECT_CLASS_VIOLATION,
+                'Required attribute "sn" is missing.',
             ),
             $disposition,
         );
@@ -571,16 +574,18 @@ final class OperationAuditorTest extends TestCase
     {
         $violations = new SchemaViolations();
         $violations->record(
-            new OperationException(
-                'first',
+            new RuleViolation(
+                SchemaRule::RequiredAttributes,
                 ResultCode::OBJECT_CLASS_VIOLATION,
+                'first',
             ),
             SchemaViolationDisposition::RelaxedByPolicy,
         );
         $violations->record(
-            new OperationException(
-                'second',
+            new RuleViolation(
+                SchemaRule::SingleValue,
                 ResultCode::CONSTRAINT_VIOLATION,
+                'second',
             ),
             SchemaViolationDisposition::RelaxedByPolicy,
         );

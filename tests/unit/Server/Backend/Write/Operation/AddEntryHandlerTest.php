@@ -769,9 +769,9 @@ final class AddEntryHandlerTest extends TestCase
     private function outcomes(SchemaViolations $violations): array
     {
         return array_values(array_map(
-            static fn(SchemaViolation $violation): array => [
-                $violation->exception->getCode(),
-                $violation->disposition,
+            static fn(SchemaViolation $recorded): array => [
+                $recorded->violation->code,
+                $recorded->disposition,
             ],
             $violations->all(),
         ));

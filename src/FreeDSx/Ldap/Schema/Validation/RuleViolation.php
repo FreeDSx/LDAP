@@ -11,25 +11,18 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Exception;
-
-use FreeDSx\Ldap\Schema\Validation\SchemaRule;
+namespace FreeDSx\Ldap\Schema\Validation;
 
 /**
- * An entry breaking one schema rule.
+ * A write breaking one schema rule, with the result code and message a client is answered with.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class SchemaViolationException extends OperationException
+final readonly class RuleViolation
 {
     public function __construct(
-        string $message,
-        int $code,
-        public readonly SchemaRule $rule,
-    ) {
-        parent::__construct(
-            $message,
-            $code,
-        );
-    }
+        public SchemaRule $rule,
+        public int $code,
+        public string $message,
+    ) {}
 }

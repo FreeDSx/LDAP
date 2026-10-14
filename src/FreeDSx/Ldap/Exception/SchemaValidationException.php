@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Exception;
 
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
+
 /**
  * Every schema rule an entry breaks, answered with the result code and message of the first.
  *
@@ -21,14 +23,13 @@ namespace FreeDSx\Ldap\Exception;
 final class SchemaValidationException extends OperationException
 {
     /**
-     * @param non-empty-list<SchemaViolationException> $violations
+     * @param non-empty-list<RuleViolation> $violations
      */
     public function __construct(public readonly array $violations)
     {
         parent::__construct(
-            $violations[0]->getMessage(),
-            $violations[0]->getCode(),
-            $violations[0],
+            $violations[0]->message,
+            $violations[0]->code,
         );
     }
 }

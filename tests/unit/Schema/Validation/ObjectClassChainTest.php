@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Schema\Validation;
 
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
@@ -291,6 +294,105 @@ final class ObjectClassChainTest extends TestCase
         self::assertContains(
             'ou',
             $chain->must,
+        );
+    }
+
+    public function test_for_entry_resolves_only_the_classes_the_schema_defines(): void
+    {
+        $person = new ObjectClass(
+            '2.1',
+            ['person'],
+            must: ['cn'],
+        );
+        $this->schema->addObjectClass($person);
+
+        $chain = ObjectClassChain::forEntry(
+            $this->schema,
+            new Entry(
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute('objectClass', 'person', 'xNoSuchClass'),
+            ),
+        );
+
+        self::assertSame(
+            [$person],
+            $chain->classes,
+        );
+    }
+
+    public function test_the_structural_head_is_the_most_subordinate_structural_class(): void
+    {
+        $alpha = new ObjectClass(
+            '2.1',
+            ['alpha'],
+        );
+        $alphaChild = new ObjectClass(
+            '2.2',
+            ['alphaChild'],
+            superClassOids: ['2.1'],
+        );
+        $this->schema
+            ->addObjectClass($alpha)
+            ->addObjectClass($alphaChild);
+
+        $chain = new ObjectClassChain(
+            $this->schema,
+            [$alpha, $alphaChild],
+        );
+
+        self::assertSame(
+            $alphaChild,
+            $chain->structuralHead,
+        );
+    }
+
+    public function test_unrelated_structural_classes_have_no_head(): void
+    {
+        $alpha = new ObjectClass(
+            '2.1',
+            ['alpha'],
+        );
+        $beta = new ObjectClass(
+            '2.2',
+            ['beta'],
+        );
+
+        $chain = new ObjectClassChain(
+            $this->schema,
+            [$alpha, $beta],
+        );
+
+        self::assertSame(
+            [$alpha, $beta],
+            $chain->structural,
+        );
+        self::assertNull($chain->structuralHead);
+    }
+
+    public function test_auxiliary_classes_are_not_structural(): void
+    {
+        $structural = new ObjectClass(
+            '2.1',
+            ['person'],
+        );
+        $aux = new ObjectClass(
+            '2.5',
+            ['posixAccount'],
+            ObjectClassType::AuxiliaryClass,
+        );
+
+        $chain = new ObjectClassChain(
+            $this->schema,
+            [$structural, $aux],
+        );
+
+        self::assertSame(
+            [$structural],
+            $chain->structural,
+        );
+        self::assertSame(
+            $structural,
+            $chain->structuralHead,
         );
     }
 }

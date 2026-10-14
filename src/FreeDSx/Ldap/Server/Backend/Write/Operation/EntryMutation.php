@@ -68,7 +68,6 @@ readonly class EntryMutation
     ): Entry {
         $moved = $this->entryHandler->apply($entry, $command);
         $this->schemaGate->assertMoveAllowed(
-            $command,
             $moved,
             $context,
         );

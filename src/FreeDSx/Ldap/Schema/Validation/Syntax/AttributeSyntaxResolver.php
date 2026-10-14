@@ -48,6 +48,29 @@ final readonly class AttributeSyntaxResolver
     }
 
     /**
+     * Whether every value of an attribute conforms; true when the type is unknown or its syntax carries no validator.
+     */
+    public function allConform(Attribute $attribute): bool
+    {
+        $type = $this->schema->getAttributeType($attribute->getName());
+        $validator = $type === null
+            ? null
+            : $this->validatorFor($type);
+
+        if ($validator === null) {
+            return true;
+        }
+
+        foreach ($attribute->getValues() as $value) {
+            if (!$validator->isValid($value)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Whether a value conforms to a syntax named directly; true when the syntax carries no validator.
      */
     public function conformsToSyntax(

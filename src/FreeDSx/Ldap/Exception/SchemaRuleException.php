@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Exception;
 
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 
 /**
@@ -23,15 +24,12 @@ use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 final class SchemaRuleException extends OperationException
 {
     public function __construct(
-        OperationException $violation,
+        RuleViolation $violation,
         private readonly SchemaViolations $violations,
     ) {
         parent::__construct(
-            $violation->getMessage(),
-            $violation->getCode(),
-            $violation,
-            $violation->getMatchedDn(),
-            $violation->controls(),
+            $violation->message,
+            $violation->code,
         );
     }
 

@@ -19,11 +19,11 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SchemaRuleException;
 use FreeDSx\Ldap\Exception\SchemaValidationException;
-use FreeDSx\Ldap\Exception\SchemaViolationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
-use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
+use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -43,19 +43,13 @@ final readonly class SchemaViolationGate
         Entry $entry,
         WriteContext $context,
     ): void {
-        $this->assertTypesStorable($entry);
-
-        try {
-            $this->validator->validateAdd(
+        $this->assertAllowed(
+            SchemaWrite::add(
                 $entry,
                 $context->isSystem(),
-            );
-        } catch (SchemaValidationException $e) {
-            $this->recordOrReject(
-                $e,
-                $context,
-            );
-        }
+            ),
+            $context,
+        );
     }
 
     /**
@@ -66,38 +60,43 @@ final readonly class SchemaViolationGate
         Entry $updated,
         WriteContext $context,
     ): void {
-        $this->assertTypesStorable($updated);
-
-        try {
-            $this->validator->validateModify(
-                $command,
+        $this->assertAllowed(
+            SchemaWrite::modify(
                 $updated,
+                $command->changes,
                 $context->isSystem(),
-            );
-        } catch (SchemaValidationException $e) {
-            $this->recordOrReject(
-                $e,
-                $context,
-            );
-        }
+            ),
+            $context,
+        );
     }
 
     /**
      * @throws OperationException
      */
     public function assertMoveAllowed(
-        MoveCommand $command,
         Entry $moved,
         WriteContext $context,
     ): void {
-        $this->assertTypesStorable($moved);
+        $this->assertAllowed(
+            SchemaWrite::modifyDn(
+                $moved,
+                $context->isSystem(),
+            ),
+            $context,
+        );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertAllowed(
+        SchemaWrite $write,
+        WriteContext $context,
+    ): void {
+        $this->assertTypesStorable($write->entry);
 
         try {
-            $this->validator->validateModifyDn(
-                $moved,
-                $command->newRdn,
-                $context->isSystem(),
-            );
+            $this->validator->validate($write);
         } catch (SchemaValidationException $e) {
             $this->recordOrReject(
                 $e,
@@ -161,7 +160,7 @@ final readonly class SchemaViolationGate
     }
 
     private function dispositionFor(
-        SchemaViolationException $violation,
+        RuleViolation $violation,
         WriteContext $context,
     ): SchemaViolationDisposition {
         if ($violation->rule->isRelaxableByControl() && $context->getControls()->has(Control::OID_RELAX_RULES)) {

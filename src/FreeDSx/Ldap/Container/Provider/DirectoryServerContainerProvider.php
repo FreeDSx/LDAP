@@ -20,6 +20,21 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Schema\Validation\Check\AllowedAttributesCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\AttributeSyntaxCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\DefinedAttributeTypesCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\DefinedObjectClassesCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\DistinctDescriptionsCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\EquivalentValuesCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\NamingAttributesCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\NoUserModificationCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\RdnSyntaxCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\RequiredAttributesCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\SchemaCheckInterface;
+use FreeDSx\Ldap\Schema\Validation\Check\SingleValueCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\StructuralClassChangeCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\StructuralClassCheck;
+use FreeDSx\Ldap\Schema\Validation\Check\ValueLimitCheck;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
@@ -495,14 +510,52 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function buildSchemaValidator(Container $container): SchemaValidator
     {
         $options = $container->get(ServerOptions::class);
+        $syntaxResolver = $this->makeAttributeSyntaxResolver($container);
 
         return new SchemaValidator(
             $options->getSchema(),
             $options->getSchemaValidationMode(),
-            equalityResolver: $container->get(EqualityComparatorResolver::class),
-            maxValues: $options->getSchemaConfig()->getMaxAttributeValues(),
-            linked: $container->get(LinkedAttributes::class),
+            $syntaxResolver,
+            $this->makeSchemaChecks(
+                $container,
+                $syntaxResolver,
+            ),
         );
+    }
+
+    /**
+     * Every write runs these in one order, so the first violation decides its result code the same way for each.
+     *
+     * @return list<SchemaCheckInterface>
+     */
+    private function makeSchemaChecks(
+        Container $container,
+        AttributeSyntaxResolver $syntaxResolver,
+    ): array {
+        $options = $container->get(ServerOptions::class);
+        $schema = $options->getSchema();
+
+        return [
+            // Ahead of the value syntax check, which reports the same value with the less specific code.
+            new RdnSyntaxCheck($syntaxResolver),
+            new AttributeSyntaxCheck($syntaxResolver),
+            new NoUserModificationCheck($schema),
+            new DistinctDescriptionsCheck(),
+            new EquivalentValuesCheck($container->get(EqualityComparatorResolver::class)),
+            new NamingAttributesCheck($schema),
+            new StructuralClassChangeCheck(),
+            new StructuralClassCheck(),
+            new RequiredAttributesCheck($schema),
+            new DefinedAttributeTypesCheck($schema),
+            new DefinedObjectClassesCheck($schema),
+            new AllowedAttributesCheck($schema),
+            new SingleValueCheck($schema),
+            new ValueLimitCheck(
+                $schema,
+                $container->get(LinkedAttributes::class),
+                $options->getSchemaConfig()->getMaxAttributeValues(),
+            ),
+        ];
     }
 
     /**

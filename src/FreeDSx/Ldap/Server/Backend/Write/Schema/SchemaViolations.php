@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Schema;
 
-use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 
 /**
  * Request-scoped record of schema violations detected during a write.
@@ -28,11 +28,11 @@ final class SchemaViolations
     private array $violations = [];
 
     public function record(
-        OperationException $exception,
+        RuleViolation $violation,
         SchemaViolationDisposition $disposition,
     ): void {
         $this->violations[] = new SchemaViolation(
-            $exception,
+            $violation,
             $disposition,
         );
     }
