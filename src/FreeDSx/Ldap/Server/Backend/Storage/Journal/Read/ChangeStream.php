@@ -30,17 +30,22 @@ final readonly class ChangeStream
     ) {}
 
     /**
-     * Records with seq greater than $afterSeq, optionally narrowed to a scope, in ascending seq order.
+     * Records after $afterSeq and through $throughSeq, optionally narrowed to a scope, in ascending seq order.
      *
      * @api
      *
+     * @param ?int $throughSeq The high-water mark the reader's cookie claims, or null to read to the end.
      * @return iterable<ChangeRecord>
      */
     public function since(
         int $afterSeq = 0,
         ?ChangeScope $scope = null,
+        ?int $throughSeq = null,
     ): iterable {
         foreach ($this->journal->read($afterSeq) as $record) {
+            if ($throughSeq !== null && $record->seq > $throughSeq) {
+                return;
+            }
             if ($scope === null || $this->touchesScope($record->change, $scope)) {
                 yield $record;
             }

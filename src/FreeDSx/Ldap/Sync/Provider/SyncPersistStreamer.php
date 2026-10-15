@@ -56,19 +56,21 @@ final readonly class SyncPersistStreamer
     ) {}
 
     /**
-     * The net effect of journal changes since a sequence, as sync results (adds and deletes).
+     * The net effect of journal changes after one sequence and through another, as sync results (adds and deletes).
      *
+     * @param int $throughSeq The seq the cookie sent after these results claims.
      * @return iterable<SyncResult>
      */
     public function projectSince(
         int $sinceSeq,
+        int $throughSeq,
         SearchRequest $request,
         TokenInterface $token,
     ): iterable {
         $scope = $this->scopeFor($request);
         $netByUuid = [];
 
-        foreach ($this->stream->since($sinceSeq, $scope) as $record) {
+        foreach ($this->stream->since($sinceSeq, $scope, $throughSeq) as $record) {
             // Re-keyed at its latest change.
             // An entry relocating is sent before one that might later take it.
             unset($netByUuid[$record->change->entryUuid]);
@@ -125,7 +127,13 @@ final readonly class SyncPersistStreamer
             }
 
             if ($latestSeq > $lastSeq) {
-                yield from $this->pushChanges($lastSeq, $request, $token, $messageId);
+                yield from $this->pushChanges(
+                    $lastSeq,
+                    $latestSeq,
+                    $request,
+                    $token,
+                    $messageId,
+                );
                 $lastSeq = $latestSeq;
             }
 
@@ -167,6 +175,7 @@ final readonly class SyncPersistStreamer
      */
     private function pushChanges(
         int $sinceSeq,
+        int $throughSeq,
         SearchRequest $request,
         TokenInterface $token,
         int $messageId,
@@ -174,6 +183,7 @@ final readonly class SyncPersistStreamer
         yield from $this->batcher->batch(
             $this->projectSince(
                 $sinceSeq,
+                $throughSeq,
                 $request,
                 $token,
             ),

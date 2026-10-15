@@ -52,6 +52,49 @@ final class ChangeStreamTest extends TestCase
         );
     }
 
+    public function test_since_stops_at_the_through_seq(): void
+    {
+        $this->append('cn=a,dc=example,dc=com');
+        $this->append('cn=b,dc=example,dc=com');
+        $this->append('cn=c,dc=example,dc=com');
+        $this->append('cn=d,dc=example,dc=com');
+
+        $seqs = array_map(
+            static fn(ChangeRecord $record): int => $record->seq,
+            iterator_to_array($this->subject->since(
+                1,
+                null,
+                3,
+            )),
+        );
+
+        self::assertSame(
+            [2, 3],
+            $seqs,
+        );
+    }
+
+    public function test_since_applies_the_through_seq_alongside_a_scope(): void
+    {
+        $this->append('cn=a,dc=example,dc=com');
+        $this->append('cn=b,dc=other,dc=com');
+        $this->append('cn=c,dc=example,dc=com');
+
+        $dns = array_map(
+            static fn(ChangeRecord $record): string => $record->change->dn->toString(),
+            iterator_to_array($this->subject->since(
+                0,
+                ChangeScope::wholeSubtree(new Dn('dc=example,dc=com')),
+                2,
+            )),
+        );
+
+        self::assertSame(
+            ['cn=a,dc=example,dc=com'],
+            $dns,
+        );
+    }
+
     public function test_since_without_a_scope_returns_every_record(): void
     {
         $this->append('cn=a,dc=example,dc=com');

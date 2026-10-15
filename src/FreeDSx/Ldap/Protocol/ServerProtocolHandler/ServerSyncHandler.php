@@ -104,7 +104,15 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
 
         $entries = $sinceSeq === null
             ? $this->fullRefreshEntries($message, $request, $token, $state)
-            : $this->incrementalEntries($message, $request, $token, $streamer, $sinceSeq, $state);
+            : $this->incrementalEntries(
+                $message,
+                $request,
+                $token,
+                $streamer,
+                $sinceSeq,
+                $latestSeq,
+                $state,
+            );
 
         $cookie = (new SyncCookie(
             $stream->origin(),
@@ -296,6 +304,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
     /**
      * Valid cookie: the net effect per entry since its seq, as adds and deletes.
      *
+     * @param int $throughSeq The seq the refresh's cookie claims, which is also where a persist phase resumes.
      * @return Generator<LdapMessageResponse>
      */
     private function incrementalEntries(
@@ -304,10 +313,12 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         SyncPersistStreamer $streamer,
         int $sinceSeq,
+        int $throughSeq,
         SearchResultState $state,
     ): Generator {
         $results = $streamer->projectSince(
             $sinceSeq,
+            $throughSeq,
             $request,
             $token,
         );
