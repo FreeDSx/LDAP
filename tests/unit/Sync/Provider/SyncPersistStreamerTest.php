@@ -242,6 +242,29 @@ final class SyncPersistStreamerTest extends TestCase
         );
     }
 
+    public function test_project_since_reads_no_change_past_the_through_seq(): void
+    {
+        $this->liveEntries[self::ENTRY_DN] = $this->entry();
+        $this->append(ChangeType::Add);
+        $this->append(ChangeType::Modify);
+
+        $results = iterator_to_array($this->subject->projectSince(
+            0,
+            1,
+            $this->request(),
+            $this->token,
+        ));
+
+        self::assertCount(
+            1,
+            $results,
+        );
+        self::assertSame(
+            SyncStateControl::STATE_ADD,
+            $results[0]->control->getState(),
+        );
+    }
+
     /**
      * Drives the persist generator through the writer, which polls the queue and feeds the cancellation token.
      */
