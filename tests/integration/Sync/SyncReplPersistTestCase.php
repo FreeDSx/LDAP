@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 use Closure;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\LdapClient;
@@ -312,11 +313,7 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
      */
     public function testPersistCoalescesMultipleDeletionsIntoAnIdSet(): void
     {
-        $dns = [
-            'cn=idset-one,dc=foo,dc=bar',
-            'cn=idset-two,dc=foo,dc=bar',
-            'cn=idset-three,dc=foo,dc=bar',
-        ];
+        $container = 'ou=idset,dc=foo,dc=bar';
         $idSet = null;
 
         $syncRepl = $this->boundSync();
@@ -328,21 +325,31 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
 
         $this->listenAfterWriting(
             $syncRepl,
-            static function (LdapClient $w) use ($dns): void {
-                foreach ($dns as $dn) {
+            static function (LdapClient $w) use ($container): void {
+                $w->create(Entry::fromArray(
+                    $container,
+                    [
+                        'ou' => 'idset',
+                        'objectClass' => 'organizationalUnit',
+                    ],
+                ));
+
+                foreach (['idset-one', 'idset-two', 'idset-three'] as $cn) {
                     $w->create(Entry::fromArray(
-                        $dn,
+                        "cn={$cn},{$container}",
                         [
-                            'cn' => explode(',', $dn)[0],
+                            'cn' => $cn,
                             'sn' => 'Doomed',
                             'objectClass' => 'inetOrgPerson',
                         ],
                     ));
                 }
 
-                foreach ($dns as $dn) {
-                    $w->delete($dn);
-                }
+                // Separate deletes can straddle a journal poll, while a subtree delete commits them all together.
+                $w->sendAndReceive(
+                    Operations::delete($container),
+                    Controls::subtreeDelete(),
+                );
             },
         );
 
@@ -353,7 +360,7 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         );
         self::assertTrue($idSet->isDeleted());
         self::assertCount(
-            3,
+            4,
             $idSet,
         );
     }
