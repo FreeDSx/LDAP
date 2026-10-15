@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
+namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;

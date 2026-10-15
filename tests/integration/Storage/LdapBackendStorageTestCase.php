@@ -14,15 +14,30 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
-use Tests\Integration\FreeDSx\Ldap\Storage\Concern\AttributeValueLimitTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\AssertionControlTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BacklinkAttributeTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BindTestsTrait;
-use Tests\Integration\FreeDSx\Ldap\Storage\Concern\ControlTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\ControlValidationTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\DefaultAclTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedAttributeTestsTrait;
-use Tests\Integration\FreeDSx\Ldap\Storage\Concern\QueryTestsTrait;
-use Tests\Integration\FreeDSx\Ldap\Storage\Concern\SubtreeMoveTestsTrait;
-use Tests\Integration\FreeDSx\Ldap\Storage\Concern\WriteTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\AliasDereferencingTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\AttributeSelectionTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\CompareTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\FilterEvaluationTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\FilterMatchingTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\PagingControlTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\SearchLimitTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\SearchScopeTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\SortControlTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\AttributeTypeSpellingTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\AttributeValueLimitTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\DnSpellingTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\ReadEntryControlTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\StorageBoundsTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\SubtreeMoveTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\ValueMatchingWriteTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\WriteOperationTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\WriteSchemaTestsTrait;
 
 /**
  * Backend behavior shared by every storage adapter.
@@ -35,14 +50,29 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\WriteTestsTrait;
 abstract class LdapBackendStorageTestCase extends ServerTestCase
 {
     use BindTestsTrait;
-    use QueryTestsTrait;
+    use SearchScopeTestsTrait;
+    use FilterEvaluationTestsTrait;
+    use FilterMatchingTestsTrait;
+    use AttributeSelectionTestsTrait;
+    use CompareTestsTrait;
+    use AliasDereferencingTestsTrait;
+    use SearchLimitTestsTrait;
     use DefaultAclTestsTrait;
-    use WriteTestsTrait;
+    use WriteOperationTestsTrait;
+    use WriteSchemaTestsTrait;
+    use ValueMatchingWriteTestsTrait;
+    use DnSpellingTestsTrait;
+    use AttributeTypeSpellingTestsTrait;
+    use StorageBoundsTestsTrait;
     use AttributeValueLimitTestsTrait;
     use LinkedAttributeTestsTrait;
     use BacklinkAttributeTestsTrait;
     use SubtreeMoveTestsTrait;
-    use ControlTestsTrait;
+    use PagingControlTestsTrait;
+    use SortControlTestsTrait;
+    use ReadEntryControlTestsTrait;
+    use AssertionControlTestsTrait;
+    use ControlValidationTestsTrait;
 
     protected const SHARED_MAX_ATTRIBUTE_VALUES = 500;
 
