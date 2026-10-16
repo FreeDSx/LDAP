@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Helper\AttributeEntryMessage;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
@@ -87,6 +88,26 @@ class SearchResultEntry implements ResponseInterface
 
         return new self(Entry::raw(
             new Dn($dn->getValue()),
+            $attributes,
+        ));
+    }
+
+    /**
+     * Builds the entry from a message decoded directly from BER, which bypasses the ASN.1 type graph.
+     */
+    public static function fromAttributeEntry(AttributeEntryMessage $message): self
+    {
+        $attributes = [];
+
+        foreach ($message->attributes as [$description, $values]) {
+            $attributes[] = Attribute::fromArray(
+                $description,
+                $values,
+            );
+        }
+
+        return new self(Entry::raw(
+            new Dn($message->primaryId),
             $attributes,
         ));
     }
