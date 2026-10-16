@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Helper\AttributeEntryMessage;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use PHPUnit\Framework\TestCase;
@@ -89,6 +90,28 @@ final class SearchResultEntryTest extends TestCase
         self::assertEquals(
             Entry::create('dc=foo,dc=bar', ['cn' => ['foo'], 'sn' => ['foo', 'bar']]),
             $this->subject->getEntry(),
+        );
+    }
+
+    public function test_it_should_be_constructed_from_an_attribute_entry_message(): void
+    {
+        self::assertEquals(
+            Entry::create(
+                'dc=foo,dc=bar',
+                [
+                    'cn' => ['foo'],
+                    'sn' => ['foo', 'bar'],
+                ],
+            ),
+            SearchResultEntry::fromAttributeEntry(new AttributeEntryMessage(
+                1,
+                'dc=foo,dc=bar',
+                [
+                    ['cn', ['foo']],
+                    ['sn', ['foo', 'bar']],
+                ],
+                0,
+            ))->getEntry(),
         );
     }
 
