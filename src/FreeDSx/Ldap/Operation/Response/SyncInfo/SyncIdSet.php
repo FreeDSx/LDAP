@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\SetOfType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
@@ -97,7 +98,7 @@ class SyncIdSet extends SyncInfoMessage
             $asn1->addChild(Asn1::boolean(true));
         }
 
-        $asn1->addChild(Asn1::setOf(...$uuids));
+        $asn1->addChild(SetOfType::fromChildren($uuids));
 
         $this->setResponseValueToEncode($asn1);
 

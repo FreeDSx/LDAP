@@ -109,6 +109,20 @@ final class AndFilterTest extends TestCase
         );
     }
 
+    public function test_it_should_generate_correct_asn1_after_a_filter_is_removed(): void
+    {
+        [$equal] = $this->subject->get();
+        $this->subject->remove($equal);
+
+        self::assertEquals(
+            Asn1::context(
+                0,
+                Asn1::setOf(Filters::gte('foo', '2')->toAsn1()),
+            ),
+            $this->subject->toAsn1(),
+        );
+    }
+
     public function test_it_should_be_constructed_from_asn1(): void
     {
         $and = new AndFilter(new EqualityFilter('foo', 'bar'), new SubstringFilter('bar', 'foo'));

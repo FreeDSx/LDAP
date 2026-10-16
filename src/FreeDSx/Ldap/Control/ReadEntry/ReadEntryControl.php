@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Control\ReadEntry;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceOfType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -50,10 +51,11 @@ abstract class ReadEntryControl extends Control
 
     public function toAsn1(): SequenceType
     {
-        $this->controlValue = Asn1::sequenceOf(...array_map(
-            static fn(string $attribute): OctetStringType => Asn1::octetString($attribute),
-            $this->attributes,
-        ));
+        $attributes = [];
+        foreach ($this->attributes as $attribute) {
+            $attributes[] = Asn1::octetString($attribute);
+        }
+        $this->controlValue = SequenceOfType::fromChildren($attributes);
 
         return parent::toAsn1();
     }

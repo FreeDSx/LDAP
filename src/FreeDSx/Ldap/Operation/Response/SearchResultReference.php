@@ -21,8 +21,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 
-use function array_map;
-
 /**
  * A search result reference. RFC 4511, 4.5.3.
  *
@@ -82,11 +80,14 @@ class SearchResultReference implements ResponseInterface
 
     public function toAsn1(): SequenceType
     {
+        $referrals = [];
+        foreach ($this->referrals as $referral) {
+            $referrals[] = Asn1::octetString($referral->toString());
+        }
+
         return Asn1::application(
             self::TAG_NUMBER,
-            Asn1::sequence(...array_map(function (LdapUrl $ref) {
-                return Asn1::octetString($ref->toString());
-            }, $this->referrals)),
+            SequenceType::fromChildren($referrals),
         );
     }
 }

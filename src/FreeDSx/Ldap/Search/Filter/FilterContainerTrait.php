@@ -95,12 +95,14 @@ trait FilterContainerTrait
 
     public function toAsn1(): SetOfType
     {
+        $filters = [];
+        foreach ($this->filters as $filter) {
+            $filters[] = $filter->toAsn1();
+        }
+
         return Asn1::context(
             tagNumber: self::CHOICE_TAG,
-            type: Asn1::setOf(...array_map(
-                fn(FilterInterface $filter) => $filter->toAsn1(),
-                $this->filters,
-            )),
+            type: SetOfType::fromChildren($filters),
         );
     }
 
