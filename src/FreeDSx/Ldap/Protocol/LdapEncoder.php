@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Encoder\BerEncoder;
-use FreeDSx\Asn1\Encoder\EncoderOptions;
 use FreeDSx\Asn1\Type\AbstractType;
 
 /**
@@ -30,12 +29,12 @@ use FreeDSx\Asn1\Type\AbstractType;
 class LdapEncoder extends BerEncoder
 {
     /**
-     * {@inheritdoc}
+     * The LDAP application tags mapped to their universal types.
+     *
+     * @var array<int, array<int, int>>
      */
-    public function __construct(EncoderOptions $options = new EncoderOptions())
-    {
-        parent::__construct($options);
-        $this->setTagMap(AbstractType::TAG_CLASS_APPLICATION, [
+    protected array $tagMap = [
+        AbstractType::TAG_CLASS_APPLICATION => [
             0 => AbstractType::TAG_TYPE_SEQUENCE,
             1 => AbstractType::TAG_TYPE_SEQUENCE,
             2 => AbstractType::TAG_TYPE_NULL,
@@ -57,6 +56,8 @@ class LdapEncoder extends BerEncoder
             23 => AbstractType::TAG_TYPE_SEQUENCE,
             24 => AbstractType::TAG_TYPE_SEQUENCE,
             25 => AbstractType::TAG_TYPE_SEQUENCE,
-        ]);
-    }
+        ],
+        AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [],
+        AbstractType::TAG_CLASS_PRIVATE => [],
+    ];
 }
