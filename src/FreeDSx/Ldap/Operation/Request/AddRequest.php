@@ -17,13 +17,13 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\SetOfType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
-use function array_map;
 use function count;
 
 /**
@@ -134,11 +134,12 @@ class AddRequest implements RequestInterface
         foreach ($this->entry->getAttributes() as $attribute) {
             $attr = Asn1::sequence(Asn1::octetString($attribute->getDescription()));
 
-            $attrValues = Asn1::setOf(...array_map(function ($value) {
-                return Asn1::octetString($value);
-            }, $attribute->getValues()));
+            $attrValues = [];
+            foreach ($attribute->getValues() as $value) {
+                $attrValues[] = Asn1::octetString($value);
+            }
 
-            $attributeList->addChild($attr->addChild($attrValues));
+            $attributeList->addChild($attr->addChild(SetOfType::fromChildren($attrValues)));
         }
 
         return Asn1::application(self::APP_TAG, Asn1::sequence(

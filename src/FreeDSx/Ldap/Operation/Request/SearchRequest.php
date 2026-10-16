@@ -20,6 +20,7 @@ use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceOfType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
@@ -28,8 +29,6 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-
-use function array_map;
 
 /**
  * A Search Request. RFC 4511, 4.5.1.
@@ -487,6 +486,11 @@ class SearchRequest implements RequestInterface
             throw new RuntimeException('The search baseDn cannot be empty.');
         }
 
+        $attributes = [];
+        foreach ($this->attributes as $attribute) {
+            $attributes[] = Asn1::octetString($attribute->getDescription());
+        }
+
         return Asn1::application(self::APP_TAG, Asn1::sequence(
             Asn1::octetString($this->baseDn->toString()),
             Asn1::enumerated($this->scope),
@@ -495,9 +499,7 @@ class SearchRequest implements RequestInterface
             Asn1::integer($this->timeLimit),
             Asn1::boolean($this->attributesOnly),
             $this->filter->toAsn1(),
-            Asn1::sequenceOf(...array_map(function (Attribute $attr) {
-                return Asn1::octetString($attr->getDescription());
-            }, $this->attributes)),
+            SequenceOfType::fromChildren($attributes),
         ));
     }
 }

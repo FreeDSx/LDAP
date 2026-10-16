@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Helper\AttributeEntryMessage;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\SetOfType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
@@ -122,11 +123,13 @@ class SearchResultEntry implements ResponseInterface
 
         $partialAttributes = Asn1::sequenceOf();
         foreach ($this->entry->getAttributes() as $attribute) {
+            $values = [];
+            foreach ($attribute->getValues() as $value) {
+                $values[] = Asn1::octetString($value);
+            }
             $partialAttributes->addChild(Asn1::sequence(
                 Asn1::octetString($attribute->getDescription()),
-                Asn1::setOf(...array_map(function ($v) {
-                    return Asn1::octetString($v);
-                }, $attribute->getValues())),
+                SetOfType::fromChildren($values),
             ));
         }
         $asn1->addChild(Asn1::octetString($this->entry->getDn()->toString()));

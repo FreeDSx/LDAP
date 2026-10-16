@@ -20,6 +20,7 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\SetOfType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -27,7 +28,6 @@ use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Validation\Syntax\UuidSyntaxValidator;
 use Throwable;
 
-use function array_map;
 use function array_values;
 use function count;
 use function is_string;
@@ -85,13 +85,14 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
 
     public function toAsn1(): SequenceType
     {
+        $failureTimes = [];
+        foreach ($this->failureTimes as $time) {
+            $failureTimes[] = Asn1::octetString(GeneralizedTime::formatWithFraction($time));
+        }
+
         $sequence = Asn1::sequence(
             Asn1::octetString($this->entryUuid),
-            Asn1::setOf(...array_map(
-                static fn(DateTimeImmutable $time): OctetStringType
-                    => Asn1::octetString(GeneralizedTime::formatWithFraction($time)),
-                $this->failureTimes,
-            )),
+            SetOfType::fromChildren($failureTimes),
         );
 
         if ($this->lastSuccess !== null) {
