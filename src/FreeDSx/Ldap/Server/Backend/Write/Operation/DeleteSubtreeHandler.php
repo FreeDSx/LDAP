@@ -13,10 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\OperationType;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
@@ -46,7 +43,6 @@ readonly class DeleteSubtreeHandler
         private EntryLocator $locator,
         private EntryPlacementGuard $placement,
         private SubtreeEnumerator $subtree,
-        private AccessControlInterface $accessControl,
         private ChangeRecorderInterface $changeRecorder = new UnrecordedChanges(),
     ) {}
 
@@ -64,11 +60,6 @@ readonly class DeleteSubtreeHandler
         // Enumerated outside any transaction, since the removal below spans several of them.
         $dnList = $this->subtree->dnListDeepestFirst($base);
 
-        // Authorize every entry up front so a denial aborts before any removal.
-        foreach ($dnList as $dn) {
-            $this->authorize($dn, $context);
-        }
-
         foreach (array_chunk($dnList, self::BATCH_SIZE) as $batch) {
             $this->transaction->atomic(function () use ($batch, $context): void {
                 $preImages = $this->changeRecorder->records()
@@ -84,26 +75,5 @@ readonly class DeleteSubtreeHandler
                 }
             });
         }
-    }
-
-    /**
-     * The client never named these entries, and the rules governing them are DN driven.
-     *
-     * @throws OperationException
-     */
-    private function authorize(
-        Dn $dn,
-        WriteContext $context,
-    ): void {
-        // Replay is privileged by construction, having already been authorized where the change originated.
-        if ($context->isSystem()) {
-            return;
-        }
-
-        $this->accessControl->authorizeOperation(
-            OperationType::Delete,
-            $context->getToken(),
-            $dn,
-        );
     }
 }

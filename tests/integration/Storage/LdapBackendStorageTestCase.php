@@ -34,6 +34,7 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\AttributeValueLimitTest
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\DnSpellingTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\ReadEntryControlTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\StorageBoundsTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\SubtreeDeleteTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\SubtreeMoveTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\ValueMatchingWriteTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write\WriteOperationTestsTrait;
@@ -68,6 +69,7 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     use LinkedAttributeTestsTrait;
     use BacklinkAttributeTestsTrait;
     use SubtreeMoveTestsTrait;
+    use SubtreeDeleteTestsTrait;
     use PagingControlTestsTrait;
     use SortControlTestsTrait;
     use ReadEntryControlTestsTrait;

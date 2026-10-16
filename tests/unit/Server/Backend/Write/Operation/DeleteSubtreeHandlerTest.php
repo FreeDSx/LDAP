@@ -17,9 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -29,9 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteSubtreeHandler;
-use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -40,8 +36,6 @@ use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 final class DeleteSubtreeHandlerTest extends TestCase
 {
     use WriteHandlerTestTrait;
-
-    private AccessControlInterface&MockObject $accessControl;
 
     protected function setUp(): void
     {
@@ -73,78 +67,6 @@ final class DeleteSubtreeHandlerTest extends TestCase
         self::assertNull($this->find('ou=staff,ou=people,dc=example,dc=com'));
         self::assertNull($this->find('cn=deep,ou=staff,ou=people,dc=example,dc=com'));
         self::assertNotNull($this->find('dc=example,dc=com'));
-    }
-
-    public function test_it_authorizes_every_entry(): void
-    {
-        $seen = [];
-        $this->accessControl
-            ->method('authorizeOperation')
-            ->willReturnCallback(static function (
-                OperationType $operation,
-                TokenInterface $token,
-                Dn $dn,
-            ) use (&$seen): void {
-                $seen[] = $dn->toString();
-            });
-
-        $this->deleteSubtree('ou=people,dc=example,dc=com');
-
-        sort($seen);
-        self::assertSame(
-            [
-                'cn=alice,ou=people,dc=example,dc=com',
-                'cn=bob,ou=people,dc=example,dc=com',
-                'ou=people,dc=example,dc=com',
-            ],
-            $seen,
-        );
-    }
-
-    public function test_a_denial_removes_nothing(): void
-    {
-        $this->accessControl
-            ->method('authorizeOperation')
-            ->willReturnCallback(static function (
-                OperationType $operation,
-                TokenInterface $token,
-                Dn $dn,
-            ): void {
-                if (str_contains($dn->toString(), 'cn=bob')) {
-                    throw new OperationException(
-                        'denied',
-                        ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
-                    );
-                }
-            });
-
-        try {
-            $this->deleteSubtree('ou=people,dc=example,dc=com');
-            self::fail('Expected OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(
-                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
-                $e->getCode(),
-            );
-        }
-
-        self::assertNotNull($this->find('ou=people,dc=example,dc=com'));
-        self::assertNotNull($this->find('cn=alice,ou=people,dc=example,dc=com'));
-        self::assertNotNull($this->find('cn=bob,ou=people,dc=example,dc=com'));
-    }
-
-    public function test_a_privileged_write_authorizes_nothing_separately(): void
-    {
-        $this->accessControl
-            ->expects(self::never())
-            ->method('authorizeOperation');
-
-        $this->deleteSubtree(
-            'ou=people,dc=example,dc=com',
-            privileged: true,
-        );
-
-        self::assertNull($this->find('ou=people,dc=example,dc=com'));
     }
 
     public function test_it_refuses_a_naming_context_base(): void
@@ -207,46 +129,34 @@ final class DeleteSubtreeHandlerTest extends TestCase
         return TestServerOptions::unvalidatedCore();
     }
 
-    private function deleteSubtree(
-        string $dn,
-        bool $privileged = false,
-    ): void {
+    private function deleteSubtree(string $dn): void
+    {
         $this->graph->get(DeleteSubtreeHandler::class)->handle(
             new DeleteSubtreeCommand(new Dn($dn)),
-            $privileged
-                ? $this->systemContext()
-                : $this->context(),
+            $this->context(),
         );
     }
 
     private function subtreeGraph(?InMemoryStorage $storage = null): void
     {
-        $this->accessControl = $this->createMock(AccessControlInterface::class);
-        $this->writeGraph(
-            $storage ?? EntryFixture::inMemoryStorage(
-                new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-                new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
-                new Entry(new Dn('cn=alice,ou=people,dc=example,dc=com'), new Attribute('cn', 'alice')),
-                new Entry(new Dn('cn=bob,ou=people,dc=example,dc=com'), new Attribute('cn', 'bob')),
-            ),
-            sharedInstances: [AccessControlInterface::class => $this->accessControl],
-        );
+        $this->writeGraph($storage ?? EntryFixture::inMemoryStorage(
+            new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
+            new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
+            new Entry(new Dn('cn=alice,ou=people,dc=example,dc=com'), new Attribute('cn', 'alice')),
+            new Entry(new Dn('cn=bob,ou=people,dc=example,dc=com'), new Attribute('cn', 'bob')),
+        ));
     }
 
     private function journaledGraph(): InMemoryChangeJournal
     {
         $journal = new InMemoryChangeJournal();
-        $this->accessControl = $this->createMock(AccessControlInterface::class);
 
         // Seeded directly so only the operations under test are journaled.
         $this->writeGraph(
             EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
-            [
-                AccessControlInterface::class => $this->accessControl,
-                ChangeJournalInterface::class => $journal,
-            ],
+            [ChangeJournalInterface::class => $journal],
         );
 
         return $journal;

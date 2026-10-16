@@ -52,12 +52,12 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 final readonly class OperationAuthorizationMiddleware implements MiddlewareInterface
 {
     /**
-     * Control OIDs requiring an explicit ControlRule grant. Fixed rather than configurable: the sync route has no
-     * gate of its own, so this grant is its whole authorization.
+     * Control OIDs requiring an explicit ControlRule grant, fixed because each conveys authority no other check covers.
      */
     public const PRIVILEGED_CONTROLS = [
         Control::OID_RELAX_RULES,
         Control::OID_SYNC_REQUEST,
+        Control::OID_SUBTREE_DELETE,
     ];
 
     /**

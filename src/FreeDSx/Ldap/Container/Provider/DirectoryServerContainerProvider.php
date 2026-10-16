@@ -414,7 +414,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             locator: $container->get(EntryLocator::class),
             placement: $container->get(EntryPlacementGuard::class),
             subtree: $container->get(SubtreeEnumerator::class),
-            accessControl: $container->get(AccessControlInterface::class),
             changeRecorder: $this->changeRecorderFor($container),
         );
     }

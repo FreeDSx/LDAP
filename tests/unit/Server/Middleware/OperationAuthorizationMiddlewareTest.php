@@ -456,7 +456,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $message = new LdapMessageRequest(
             1,
             new DeleteRequest('cn=foo,dc=bar'),
-            new Control(Control::OID_SUBTREE_DELETE, criticality: true),
+            new Control(Control::OID_MANAGE_DSA_IT, criticality: true),
         );
 
         $this->subject->process(
@@ -465,6 +465,70 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
 
         self::assertNotNull($this->next->received);
+    }
+
+    public function test_a_subtree_delete_authorizes_its_control_against_the_base(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+
+        $authorized = [];
+        $this->accessControl
+            ->method('authorizeControl')
+            ->willReturnCallback(function (
+                TokenInterface $token,
+                Dn $dn,
+                string $oid,
+            ) use (&$authorized): void {
+                $authorized[] = [
+                    $dn->toString(),
+                    $oid,
+                ];
+            });
+
+        $message = new LdapMessageRequest(
+            1,
+            new DeleteRequest('ou=people,dc=bar'),
+            Controls::subtreeDelete(),
+        );
+
+        $this->subject->process(
+            new ServerRequestContext($message, $this->token),
+            $this->next,
+        );
+
+        self::assertSame(
+            [['ou=people,dc=bar', Control::OID_SUBTREE_DELETE]],
+            $authorized,
+        );
+    }
+
+    public function test_a_denied_subtree_delete_control_blocks_dispatch(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->method('authorizeControl')
+            ->willThrowException($this->denied());
+
+        $message = new LdapMessageRequest(
+            1,
+            new DeleteRequest('ou=people,dc=bar'),
+            Controls::subtreeDelete(),
+        );
+
+        try {
+            $this->subject->process(
+                new ServerRequestContext($message, $this->token),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->next->received);
     }
 
     public function test_a_privileged_control_on_a_forward_is_gated_against_the_root(): void
