@@ -72,6 +72,23 @@ final class LdapBackendStorageCommand extends Command
     public const SEALED_CONTAINER_DN = 'ou=sealed,dc=foo,dc=bar';
 
     /**
+     * Holds Delete without administrator rights, plus the subtree delete control beneath one container.
+     */
+    public const PRUNER_DN = 'cn=pruner,dc=foo,dc=bar';
+
+    public const PRUNER_PASSWORD = '12345';
+
+    /**
+     * The only container cn=pruner may delete as a subtree.
+     */
+    public const PRUNABLE_CONTAINER_DN = 'ou=prunable,dc=foo,dc=bar';
+
+    /**
+     * An entry cn=pruner may not delete on its own.
+     */
+    public const PRUNE_GUARDED_DN = 'cn=guarded,ou=prunable,dc=foo,dc=bar';
+
+    /**
      * Tests assert on replicated state, so they should not wait a production poll for it.
      */
     private const SYNC_POLL_INTERVAL = 0.05;
@@ -459,6 +476,7 @@ final class LdapBackendStorageCommand extends Command
         }
 
         $this->grantSubtreeMoves($serverOptions);
+        $this->grantSubtreeDeletes($serverOptions);
 
         if ($input->getOption('manager')) {
             $serverOptions->setManager(new ManagerIdentity(
@@ -593,6 +611,38 @@ final class LdapBackendStorageCommand extends Command
                     RelocationRule::allow(
                         $mover,
                         Target::subtree(self::ROOT_DN),
+                    ),
+                ),
+        );
+    }
+
+    /**
+     * Lets cn=pruner delete anywhere, but delete a subtree only beneath the prunable container.
+     */
+    private function grantSubtreeDeletes(ServerOptions $serverOptions): void
+    {
+        $pruner = Subject::dn(self::PRUNER_DN);
+
+        $serverOptions->setAclRules(
+            $serverOptions->getAclRules()
+                // Denies first, since the first match wins.
+                ->appendOperationRules(
+                    OperationRule::deny(
+                        $pruner,
+                        Target::dn(self::PRUNE_GUARDED_DN),
+                        OperationType::Delete,
+                    ),
+                    OperationRule::allow(
+                        $pruner,
+                        Target::subtree(self::ROOT_DN),
+                        OperationType::Delete,
+                    ),
+                )
+                ->appendControlRules(
+                    ControlRule::allow(
+                        $pruner,
+                        Target::subtree(self::PRUNABLE_CONTAINER_DN),
+                        Control::OID_SUBTREE_DELETE,
                     ),
                 ),
         );

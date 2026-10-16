@@ -17,6 +17,7 @@ Access Control
 * [Filter Rules](#filter-rules)
 * [Confidential Attributes](#confidential-attributes)
 * [Control Rules](#control-rules)
+    * [Subtree Delete](#subtree-delete)
 * [Extended Operation Rules](#extended-operation-rules)
 
 ## Overview
@@ -28,7 +29,7 @@ Access control operates at four levels:
 - **Attribute level**: Checked for each attribute involved in Compare, Add, and Modify operations. Also applied to
   each Search result entry. Disallowed attributes are stripped before the entry is sent. If the entry itself is
   denied at operation level, it is suppressed entirely from results.
-- **Control level**: Checked for privileged request controls (Relax Rules and Content Sync). See
+- **Control level**: Checked for privileged request controls (Relax Rules, Content Sync, and Subtree Delete). See
   [Control Rules](#control-rules).
 - **Extended operation level**: Checked for privileged extended operations. See
   [Extended Operation Rules](#extended-operation-rules).
@@ -256,7 +257,8 @@ replacing them, so they compose on `secureDefault()` or on a policy built from `
 
 It covers operations, attribute writes, and [relocation](#relocation-rules) only. Controls, extended operations, and
 confidential attributes are gated separately, which is why an administrator gets those from
-`withCredentialProtection()` rather than from this method.
+`withCredentialProtection()` rather than from this method. An identity granted full access still needs a
+[control rule](#control-rules) to delete a whole subtree.
 
 ```php
 // A provisioning account with full rights over one subtree.
@@ -534,8 +536,9 @@ rule grants it.
 The gated controls are:
 
 * **Relax Rules control** (`Control::OID_RELAX_RULES`). See [Schema Validation](Schema.md#validation-mode).
+* **Subtree Delete control** (`Control::OID_SUBTREE_DELETE`). See [Subtree Delete](#subtree-delete).
 
-The set is fixed. These are the controls whose routes carry no other gate, so the grant is the whole authorization.
+The set is fixed. Each of these controls conveys authority that no other rule covers.
 
 ```php
 use FreeDSx\Ldap\Control\Control;
@@ -552,6 +555,23 @@ AclRules::fromEmpty()->replaceControlRules(
 ```
 
 A client attaches the control with `Controls::relaxRules()`, e.g. `$client->create($entry, Controls::relaxRules())`.
+
+### Subtree Delete
+
+A delete with the subtree delete control removes the entry and everything beneath it. It needs `Delete` on the
+entry named, plus a control rule granting the subtree delete control on that entry. Nothing beneath it is checked
+separately.
+
+```php
+// The pruners group may delete whole subtrees under ou=people.
+$rules->appendControlRules(ControlRule::allow(
+    Subject::group('cn=pruners,dc=example,dc=com'),
+    Target::subtree('ou=people,dc=example,dc=com'),
+    Control::OID_SUBTREE_DELETE,
+));
+```
+
+A client attaches it via `Controls::subtreeDelete()`, e.g. `$client->send(Operations::delete($dn), Controls::subtreeDelete())`.
 
 ## Relocation Rules
 
