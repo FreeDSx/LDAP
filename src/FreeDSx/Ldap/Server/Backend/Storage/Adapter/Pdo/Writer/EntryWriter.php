@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
@@ -215,28 +216,41 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
      *
      * @param list<Dn> $dns
      */
-    public function removeAll(array $dns): void
+    public function removeAll(array $dns): int
     {
-        $this->connection->joinAtomic(function () use ($dns): void {
+        return $this->connection->joinAtomic(function () use ($dns): int {
+            $removed = 0;
+
             foreach (array_chunk($dns, self::DELETE_BATCH_SIZE) as $chunk) {
-                $this->connection->execute(
-                    $this->dialect->queryDeleteIn(count($chunk)),
-                    array_map(
-                        static fn(Dn $dn): string => $dn->normalizedString(),
-                        $chunk,
-                    ),
-                );
+                $removed += $this->connection
+                    ->execute(
+                        $this->dialect->queryDeleteIn(count($chunk)),
+                        array_map(
+                            static fn(Dn $dn): string => $dn->normalizedString(),
+                            $chunk,
+                        ),
+                    )
+                    ->rowCount();
             }
+
+            return $removed;
         });
     }
 
-    public function lockForWrite(Dn $dn): void
+    public function lockForWrite(array $dns): array
     {
-        $this->dialect->lockRowForWrite(
+        $held = $this->dialect->lockRowForWrite(
             $this->connection->pdo(),
-            'entries',
-            'lc_dn',
-            $dn->normalizedString(),
+            LockableTable::Entries,
+            array_map(
+                static fn(Dn $dn): string => $dn->normalizedString(),
+                $dns,
+            ),
+        );
+
+        return array_map(
+            static fn(string|int $key): Dn => Dn::fromCanonical((string) $key),
+            $held,
         );
     }
 
@@ -244,8 +258,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     {
         return $this->dialect->lockRowForReference(
             $this->connection->pdo(),
-            'entries',
-            'lc_dn',
+            LockableTable::Entries,
             $dn->normalizedString(),
         );
     }
@@ -257,7 +270,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         Dn $normDn,
         string $uuid,
     ): bool {
-        $this->lockForWrite($normDn);
+        $this->lockForWrite([$normDn]);
         $storedUuid = $this->connection
             ->execute(
                 $this->dialect->queryEntryUuid(),
@@ -357,7 +370,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
      */
     private function lockedEntry(Dn $normDn): ?Entry
     {
-        $this->lockForWrite($normDn);
+        $this->lockForWrite([$normDn]);
 
         return $this->indexedEntry($normDn);
     }

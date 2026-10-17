@@ -573,6 +573,11 @@ $rules->appendControlRules(ControlRule::allow(
 
 A client attaches it via `Controls::subtreeDelete()`, e.g. `$client->send(Operations::delete($dn), Controls::subtreeDelete())`.
 
+One request removes at most 25,000 entries. A larger subtree is answered with `adminLimitExceeded` (11) and the entry
+named is kept. Send the same request again to continue where it stopped.
+
+A response to a subtree delete that removed entries carries a `SubtreeDeleteProgressControl` with the number removed.
+
 ## Relocation Rules
 
 `RelocationRule`s gate whether entries may leave or arrive in a container. This is a separate question from whether an

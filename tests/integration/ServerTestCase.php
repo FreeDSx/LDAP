@@ -153,10 +153,22 @@ class ServerTestCase extends LdapTestCase
 
         $process = new Process($processArgs);
         $process->start();
-        self::waitForProcess($process, 'server starting...');
+        self::waitForProcess(
+            $process,
+            'server starting...',
+            $this->serverStartupSeconds(),
+        );
 
         $this->overrideProcess = $process;
         $this->client = $this->buildClient($transport);
+    }
+
+    /**
+     * How long a per-test server may take to start, raised by a suite that seeds enough entries to start slowly.
+     */
+    protected function serverStartupSeconds(): int
+    {
+        return self::SERVER_MAX_WAIT_SECONDS;
     }
 
     protected function stopServer(): void
@@ -341,9 +353,12 @@ class ServerTestCase extends LdapTestCase
         return $found;
     }
 
-    private static function waitForProcess(Process $process, string $marker): string
-    {
-        $deadline = microtime(true) + self::SERVER_MAX_WAIT_SECONDS;
+    private static function waitForProcess(
+        Process $process,
+        string $marker,
+        int $maxWaitSeconds = self::SERVER_MAX_WAIT_SECONDS,
+    ): string {
+        $deadline = microtime(true) + $maxWaitSeconds;
 
         while ($process->isRunning()) {
             $output = $process->getOutput();
@@ -363,7 +378,7 @@ class ServerTestCase extends LdapTestCase
         throw new Exception(sprintf(
             'The expected output (%s) was not received after %d seconds. Received: %s',
             $marker,
-            self::SERVER_MAX_WAIT_SECONDS,
+            $maxWaitSeconds,
             PHP_EOL . $process->getErrorOutput(),
         ));
     }

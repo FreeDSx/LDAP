@@ -14,8 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -49,7 +47,6 @@ final class ServerControlRegistryTest extends TestCase
             $this->subject->supportedControlsFor(
                 HandlerId::Search,
                 self::searchRequest(),
-                new ControlBag(),
             ),
         );
     }
@@ -69,7 +66,6 @@ final class ServerControlRegistryTest extends TestCase
             $this->subject->supportedControlsFor(
                 HandlerId::Paging,
                 self::searchRequest(),
-                new ControlBag(),
             ),
         );
     }
@@ -130,7 +126,6 @@ final class ServerControlRegistryTest extends TestCase
             $this->subject->supportedControlsFor(
                 HandlerId::Compare,
                 Operations::compare('cn=foo,dc=foo,dc=bar', 'cn', 'foo'),
-                new ControlBag(),
             ),
         );
     }
@@ -153,25 +148,6 @@ final class ServerControlRegistryTest extends TestCase
             $this->subject->supportedControlsFor(
                 HandlerId::Dispatch,
                 $request,
-                new ControlBag(),
-            ),
-        );
-    }
-
-    public function test_a_subtree_delete_supports_neither_the_assertion_nor_pre_read(): void
-    {
-        self::assertSame(
-            [
-                Control::OID_PROXY_AUTHORIZATION,
-                Control::OID_MANAGE_DSA_IT,
-                Control::OID_PWD_POLICY,
-                Control::OID_RELAX_RULES,
-                Control::OID_SUBTREE_DELETE,
-            ],
-            $this->subject->supportedControlsFor(
-                HandlerId::Dispatch,
-                Operations::delete('cn=foo,dc=foo,dc=bar'),
-                new ControlBag(Controls::subtreeDelete()),
             ),
         );
     }
@@ -191,7 +167,6 @@ final class ServerControlRegistryTest extends TestCase
             $this->subject->supportedControlsFor(
                 $id,
                 self::searchRequest(),
-                new ControlBag(),
             ),
         );
     }
@@ -207,7 +182,6 @@ final class ServerControlRegistryTest extends TestCase
             $this->subject->supportedControlsFor(
                 $id,
                 self::searchRequest(),
-                new ControlBag(),
             ),
         );
     }

@@ -68,6 +68,8 @@ interface WriteEntryInterface
      * Remove every given entry, ignoring any that are already gone.
      *
      * @param list<Dn> $dns
+     *
+     * @return int how many were there to remove
      */
-    public function removeAll(array $dns): void;
+    public function removeAll(array $dns): int;
 }

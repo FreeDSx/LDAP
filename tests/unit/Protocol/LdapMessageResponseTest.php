@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -118,6 +119,33 @@ class LdapMessageResponseTest extends TestCase
         self::assertSame(
             PwdPolicyError::CHANGE_AFTER_RESET,
             $decoded->getError(),
+        );
+    }
+
+    public function test_it_decodes_the_subtree_delete_progress_control_as_its_typed_class(): void
+    {
+        $encoder = new LdapEncoder();
+        $control = new IncompleteType($encoder->encode((new SubtreeDeleteProgressControl(25000))->toAsn1()));
+
+        $message = LdapMessageResponse::fromAsn1(Asn1::sequence(
+            Asn1::integer(4),
+            Asn1::application(
+                11,
+                Asn1::sequence(
+                    Asn1::enumerated(11),
+                    Asn1::octetString(''),
+                    Asn1::octetString(''),
+                ),
+            ),
+            Asn1::context(
+                0,
+                $control->setIsConstructed(true),
+            ),
+        ));
+
+        self::assertSame(
+            25000,
+            $message->controls()->getByClass(SubtreeDeleteProgressControl::class)?->getDeleted(),
         );
     }
 }

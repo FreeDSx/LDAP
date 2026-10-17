@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Subentry\SubentryPlacementGuard;
 
@@ -93,12 +94,20 @@ readonly class EntryPlacementGuard
     }
 
     /**
-     * A subtree delete takes the subordinates with it, so it is held only to the naming context rule.
+     * A subtree delete takes the subordinates with it, so it is held only to its base existing and the naming context rule.
      *
      * @throws OperationException
      */
     public function assertSubtreeDeletePlacement(Dn $dn): void
     {
+        // A missing base is answered as missing rather than mistaken for a naming context.
+        $this->locator->findOrFail(
+            $dn->normalize(),
+            new EntryProjection(
+                attributes: [],
+                linkCap: 0,
+            ),
+        );
         $this->assertNotNamingContext($dn);
     }
 

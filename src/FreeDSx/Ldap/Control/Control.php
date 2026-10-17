@@ -81,6 +81,8 @@ class Control implements ProtocolElementInterface, Stringable
 
     public const OID_SUBTREE_DELETE = '1.2.840.113556.1.4.805';
 
+    public const OID_SUBTREE_DELETE_PROGRESS = '1.3.6.1.4.1.66207.1.3.1';
+
     public const OID_SORTING = '1.2.840.113556.1.4.473';
 
     public const OID_SORTING_RESPONSE = '1.2.840.113556.1.4.474';

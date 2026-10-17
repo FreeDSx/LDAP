@@ -29,4 +29,13 @@ interface ListEntryInterface
      * Lazily yield entries per $options scope: direct children when subtree is false; the base entry AND all descendants when true (RFC 4511 §4.5.1.2); empty baseDn lists from the tree root.
      */
     public function list(StorageListOptions $options): EntryStream;
+
+    /**
+     * The canonical DN of every entry directly below any of the parents, reading no entry and holding nothing open.
+     *
+     * @param list<string> $parents canonical DNs
+     *
+     * @return list<string>
+     */
+    public function childDns(array $parents): array;
 }

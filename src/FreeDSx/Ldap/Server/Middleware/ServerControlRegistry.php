@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
@@ -109,14 +108,6 @@ final class ServerControlRegistry
     ];
 
     /**
-     * A subtree is removed across several transactions, so neither a precondition nor a before image can be atomic.
-     */
-    private const SUBTREE_DELETE_CONTROLS = [
-        Control::OID_RELAX_RULES,
-        Control::OID_SUBTREE_DELETE,
-    ];
-
-    /**
      * A compare reads rather than updates, so it takes neither the read-entry pair nor relax.
      */
     private const COMPARE_CONTROLS = [
@@ -154,11 +145,13 @@ final class ServerControlRegistry
     public function supportedControlsFor(
         HandlerId $id,
         RequestInterface $request,
-        ControlBag $controls,
     ): array {
         return [
             ...self::GLOBAL_CONTROLS,
-            ...$this->handlerControlsFor($id, $request, $controls),
+            ...$this->handlerControlsFor(
+                $id,
+                $request,
+            ),
         ];
     }
 
@@ -168,12 +161,11 @@ final class ServerControlRegistry
     private function handlerControlsFor(
         HandlerId $id,
         RequestInterface $request,
-        ControlBag $controls,
     ): array {
         return match ($id) {
             HandlerId::Search => self::SEARCH_CONTROLS,
             HandlerId::Paging => self::PAGING_CONTROLS,
-            HandlerId::Dispatch => $this->dispatchControlsFor($request, $controls),
+            HandlerId::Dispatch => $this->dispatchControlsFor($request),
             HandlerId::Compare => self::COMPARE_CONTROLS,
             HandlerId::Sync => self::SYNC_CONTROLS,
             default => [],
@@ -186,16 +178,12 @@ final class ServerControlRegistry
      *
      * @return list<string>
      */
-    private function dispatchControlsFor(
-        RequestInterface $request,
-        ControlBag $controls,
-    ): array {
+    private function dispatchControlsFor(RequestInterface $request): array
+    {
         return match (true) {
             $request instanceof AddRequest => self::ADD_CONTROLS,
             $request instanceof ModifyRequest => self::MODIFY_CONTROLS,
             $request instanceof ModifyDnRequest => self::MODIFY_DN_CONTROLS,
-            $request instanceof DeleteRequest
-                && $controls->has(Control::OID_SUBTREE_DELETE) => self::SUBTREE_DELETE_CONTROLS,
             $request instanceof DeleteRequest => self::DELETE_CONTROLS,
             default => [],
         };

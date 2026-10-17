@@ -51,6 +51,11 @@ readonly class EntryLister implements ListEntryInterface
      */
     private const FETCH_BATCH_SIZE = 1000;
 
+    /**
+     * Parents per read of their children, well inside the placeholder limits of every supported driver.
+     */
+    private const PARENT_BATCH_SIZE = 500;
+
     public function __construct(
         private PdoConnection $connection,
         private PdoListQueryBuilder $queryBuilder,
@@ -83,6 +88,28 @@ readonly class EntryLister implements ListEntryInterface
             $options,
             $filterResult,
         );
+    }
+
+    /**
+     * Read over the parent index in chunks, so the placeholder count stays inside driver limits.
+     */
+    public function childDns(array $parents): array
+    {
+        $children = [];
+
+        foreach (array_chunk($parents, self::PARENT_BATCH_SIZE) as $chunk) {
+            $query = $this->queryBuilder->buildChildDns($chunk);
+            $statement = $this->connection->execute(
+                $query->sql,
+                $query->params,
+            );
+
+            while (($lcDn = $statement->fetchStringColumn()) !== null) {
+                $children[] = $lcDn;
+            }
+        }
+
+        return $children;
     }
 
     /**

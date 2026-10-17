@@ -47,15 +47,19 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\ChildDnsStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\SubtreeWalkStorageContractTests;
 
 final class EntryWriterTest extends TestCase
 {
+    use ChildDnsStorageContractTests;
     use EntryIdentityStorageContractTests;
     use EntryLinkFixtureTrait;
     use SubtreeRenameStorageContractTests;
+    use SubtreeWalkStorageContractTests;
 
     private const BASE = 'dc=example,dc=com';
 
@@ -279,18 +283,20 @@ final class EntryWriterTest extends TestCase
         self::assertNull($this->reader->find(new Dn(self::ALICE)));
     }
 
-    public function test_remove_all_deletes_every_given_entry_and_ignores_missing_ones(): void
+    public function test_remove_all_deletes_every_given_entry_and_counts_only_those_it_found(): void
     {
         foreach (range(1, 3) as $i) {
             $this->storeNamed("e{$i}");
         }
 
-        $this->subject->removeAll([
-            (new Dn('cn=e1,dc=example,dc=com'))->normalize(),
-            (new Dn('cn=gone,dc=example,dc=com'))->normalize(),
-            (new Dn('cn=e3,dc=example,dc=com'))->normalize(),
-        ]);
-
+        self::assertSame(
+            2,
+            $this->subject->removeAll([
+                (new Dn('cn=e1,dc=example,dc=com'))->normalize(),
+                (new Dn('cn=gone,dc=example,dc=com'))->normalize(),
+                (new Dn('cn=e3,dc=example,dc=com'))->normalize(),
+            ]),
+        );
         self::assertFalse($this->reader->exists(new Dn('cn=e1,dc=example,dc=com')));
         self::assertTrue($this->reader->exists(new Dn('cn=e2,dc=example,dc=com')));
         self::assertFalse($this->reader->exists(new Dn('cn=e3,dc=example,dc=com')));
@@ -303,8 +309,10 @@ final class EntryWriterTest extends TestCase
             $dns[] = $this->storeNamed("b{$i}");
         }
 
-        $this->subject->removeAll($dns);
-
+        self::assertSame(
+            1200,
+            $this->subject->removeAll($dns),
+        );
         self::assertFalse($this->reader->exists(new Dn('cn=b1,dc=example,dc=com')));
         self::assertFalse($this->reader->exists(new Dn('cn=b600,dc=example,dc=com')));
         self::assertFalse($this->reader->exists(new Dn('cn=b1200,dc=example,dc=com')));

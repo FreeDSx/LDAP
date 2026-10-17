@@ -76,9 +76,9 @@ final readonly class SerializedEntryWriter implements
         $this->submit(fn() => $this->writes->remove($dn));
     }
 
-    public function removeAll(array $dns): void
+    public function removeAll(array $dns): int
     {
-        $this->submit(fn() => $this->writes->removeAll($dns));
+        return $this->submit(fn(): int => $this->writes->removeAll($dns));
     }
 
     public function atomic(callable $operation): mixed
@@ -89,9 +89,9 @@ final readonly class SerializedEntryWriter implements
     /**
      * Only meaningful inside an atomic block, where the transaction holding the lock is open on the writer.
      */
-    public function lockForWrite(Dn $dn): void
+    public function lockForWrite(array $dns): array
     {
-        $this->writes->lockForWrite($dn);
+        return $this->writes->lockForWrite($dns);
     }
 
     /**

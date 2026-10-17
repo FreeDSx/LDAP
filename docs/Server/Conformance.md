@@ -4,6 +4,7 @@ Conformance
 * [Registered Identifiers](#registered-identifiers)
     * [Extended Operations](#extended-operations)
     * [Attribute Types](#attribute-types)
+    * [Controls](#controls)
     * [Schema Extensions](#schema-extensions)
 * [Deliberate Deviations](#deliberate-deviations)
     * [Group Membership Is Optional](#group-membership-is-optional)
@@ -35,6 +36,7 @@ it.
                  .1      LDAP
                    .1    extended operations
                    .2    attribute types
+                   .3    controls
 ```
 
 ## Extended Operations
@@ -48,6 +50,12 @@ it.
 | OID | Name | Purpose                                                                                                                                                                                                                                                   |
 | --- | --- |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `1.3.6.1.4.1.66207.1.2.1` | `pwdMaxRecordedFailure` | How many failure timestamps `pwdFailureTime` retains. `draft-behera-ldap-password-policy-10` purges the list only by `pwdFailureCountInterval` and says nothing about retention. This closes a gap in the RFC. See [Password Policy](Password-Policy.md). |
+
+## Controls
+
+| OID | Name | Purpose |
+| --- | --- | --- |
+| `1.3.6.1.4.1.66207.1.3.1` | Subtree delete progress | A response control giving the number of entries a subtree delete removed. See [Access Control](Access-Control.md#subtree-delete). |
 
 ## Schema Extensions
 

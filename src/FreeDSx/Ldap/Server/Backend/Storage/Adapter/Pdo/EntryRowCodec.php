@@ -65,37 +65,49 @@ readonly class EntryRowCodec
             ? $row['dn']
             : '');
 
+        $childFlag = $this->childFlag($row);
+
         // A projection that materializes nothing, such as a 1.1 request, never reads the blob.
         if ($allowed === []) {
             return Entry::raw(
                 $dn,
-                [],
-            );
-        }
-
-        $attributes = [
-            ...$this->storedAttributes(
-                $row,
-                $allowed,
-            ),
-            ...$this->linkedAttributes(
-                $links,
-                $allowed,
-            ),
-        ];
-
-        // Present only when the query projected it. This spares the resolver a query per entry.
-        if (isset($row['has_children'])) {
-            $attributes[] = new Attribute(
-                AttributeTypeOid::NAME_HAS_SUBORDINATES,
-                $row['has_children'] ? 'TRUE' : 'FALSE',
+                $childFlag,
             );
         }
 
         return Entry::raw(
             $dn,
-            $attributes,
+            [
+                ...$this->storedAttributes(
+                    $row,
+                    $allowed,
+                ),
+                ...$this->linkedAttributes(
+                    $links,
+                    $allowed,
+                ),
+                ...$childFlag,
+            ],
         );
+    }
+
+    /**
+     * Present only when the query projected it. This spares the resolver a query per entry.
+     *
+     * @param array<array-key, mixed> $row
+     *
+     * @return list<Attribute>
+     */
+    private function childFlag(array $row): array
+    {
+        if (!isset($row['has_children'])) {
+            return [];
+        }
+
+        return [new Attribute(
+            AttributeTypeOid::NAME_HAS_SUBORDINATES,
+            $row['has_children'] ? 'TRUE' : 'FALSE',
+        )];
     }
 
     /**

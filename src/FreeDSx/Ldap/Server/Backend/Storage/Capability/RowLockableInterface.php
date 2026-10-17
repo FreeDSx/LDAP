@@ -23,9 +23,13 @@ use FreeDSx\Ldap\Entry\Dn;
 interface RowLockableInterface
 {
     /**
-     * Acquire an exclusive lock on the entry within the current atomic block; released when it commits or rolls back.
+     * Exclusively lock the entries, in one global order, until the atomic block ends.
+     *
+     * @param list<Dn> $dns
+     *
+     * @return list<Dn> the entries now held, which leaves out any that were not there to lock
      */
-    public function lockForWrite(Dn $dn): void;
+    public function lockForWrite(array $dns): array;
 
     /**
      * Hold the entry against deletion for the rest of the atomic block.

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
 use PDO;
 
 /**
@@ -23,24 +24,29 @@ use PDO;
 trait PdoRowLockDialectTrait
 {
     /**
-     * Default no-op: SQLite already holds the write lock from `BEGIN IMMEDIATE`, so no per-row lock is needed.
+     * Default no-op: SQLite already holds the database write lock from `BEGIN IMMEDIATE`, which covers every row.
+     *
+     * @param list<string|int> $keys
+     *
+     * @return list<string|int>
      */
     public function lockRowForWrite(
         PDO $pdo,
-        string $table,
-        string $keyColumn,
-        string|int $key,
-    ): void {}
+        LockableTable $table,
+        array $keys,
+    ): array {
+        return $keys;
+    }
 
     public function lockRowForReference(
         PDO $pdo,
-        string $table,
-        string $keyColumn,
+        LockableTable $table,
         string|int $key,
     ): bool {
+        $keyColumn = $table->keyColumn();
         $statement = $pdo->prepare(<<<SQL
             SELECT $keyColumn
-            FROM $table
+            FROM {$table->value}
             WHERE $keyColumn = ?
             SQL);
         $statement->execute([$key]);

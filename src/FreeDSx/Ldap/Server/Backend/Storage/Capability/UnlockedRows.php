@@ -25,7 +25,13 @@ final readonly class UnlockedRows implements RowLockableInterface
 {
     public function __construct(private ReadEntryInterface $storage) {}
 
-    public function lockForWrite(Dn $dn): void {}
+    /**
+     * Holds every entry asked for, since nothing else may be writing concurrently.
+     */
+    public function lockForWrite(array $dns): array
+    {
+        return $dns;
+    }
 
     /**
      * Answers from the entry alone, which is sound only because nothing else may be writing concurrently.

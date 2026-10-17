@@ -67,13 +67,13 @@ final class PooledStatement
     }
 
     /**
-     * The first column of the next row or null
+     * The first column of the next row, or null when there is no row or it holds nothing.
      */
     public function fetchStringColumn(): ?string
     {
         $value = $this->statement->fetchColumn();
 
-        return is_scalar($value)
+        return $value !== false && is_scalar($value)
             ? (string) $value
             : null;
     }

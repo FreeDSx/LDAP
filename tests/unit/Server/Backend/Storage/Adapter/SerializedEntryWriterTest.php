@@ -110,10 +110,13 @@ final class SerializedEntryWriterTest extends TestCase
         $this->writes
             ->expects(self::once())
             ->method('removeAll')
-            ->with($dns);
+            ->with($dns)
+            ->willReturn(1);
 
-        $this->subject->removeAll($dns);
-
+        self::assertSame(
+            1,
+            $this->subject->removeAll($dns),
+        );
         self::assertSame(
             1,
             $this->queue->ranCount,
@@ -208,15 +211,21 @@ final class SerializedEntryWriterTest extends TestCase
 
     public function test_lock_for_write_delegates_without_queueing(): void
     {
-        $dn = new Dn('cn=alice,dc=example,dc=com');
+        $dns = [
+            new Dn('cn=alice,dc=example,dc=com'),
+            new Dn('cn=bob,dc=example,dc=com'),
+        ];
 
         $this->writes
             ->expects(self::once())
             ->method('lockForWrite')
-            ->with($dn);
+            ->with($dns)
+            ->willReturn([$dns[1]]);
 
-        $this->subject->lockForWrite($dn);
-
+        self::assertSame(
+            [$dns[1]],
+            $this->subject->lockForWrite($dns),
+        );
         self::assertSame(
             0,
             $this->queue->ranCount,

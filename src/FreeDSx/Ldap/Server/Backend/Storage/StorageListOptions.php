@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
@@ -58,6 +59,33 @@ final readonly class StorageListOptions
             filter: new AndFilter(),
             projection: $projection,
             bounds: new ReadBounds(deadline: $deadline),
+        );
+    }
+
+    /**
+     * One page of the entries directly below the parent, each flagged with whether it has children of its own.
+     */
+    public static function forChildPage(
+        Dn $parent,
+        int $limit,
+        ?PageCursor $after = null,
+    ): self {
+        return new self(
+            scope: new ListScope(
+                baseDn: $parent,
+                subtree: false,
+                subentries: SubentryVisibility::All,
+            ),
+            filter: new AndFilter(),
+            projection: new EntryProjection(
+                attributes: [],
+                linkCap: 0,
+                withHasSubordinates: true,
+            ),
+            bounds: new ReadBounds(slice: new PageSlice(
+                $limit,
+                $after,
+            )),
         );
     }
 
