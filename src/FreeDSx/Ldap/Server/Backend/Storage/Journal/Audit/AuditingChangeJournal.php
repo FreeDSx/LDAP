@@ -57,19 +57,20 @@ final class AuditingChangeJournal implements ChangeJournalInterface
     public function append(PendingChange $change): ChangeRecord
     {
         $record = $this->journal->append($change);
-
-        // The journal already holds the record, so a failed export is logged, not fatal: the write
-        // still succeeds and the record can be re-exported from the journal later.
-        try {
-            $this->sink->write($record);
-        } catch (Throwable $e) {
-            $this->logger->error(
-                'Failed to write a change record to the audit sink.',
-                ExceptionLogging::makeLogContext($e),
-            );
-        }
+        $this->export($record);
 
         return $record;
+    }
+
+    public function appendAll(array $changes): array
+    {
+        $records = $this->journal->appendAll($changes);
+
+        foreach ($records as $record) {
+            $this->export($record);
+        }
+
+        return $records;
     }
 
     public function read(int $afterSeq = 0): iterable
@@ -105,5 +106,17 @@ final class AuditingChangeJournal implements ChangeJournalInterface
     public function sharesAcrossProcesses(): bool
     {
         return $this->journal->sharesAcrossProcesses();
+    }
+
+    private function export(ChangeRecord $record): void
+    {
+        try {
+            $this->sink->write($record);
+        } catch (Throwable $e) {
+            $this->logger->error(
+                'Failed to write a change record to the audit sink.',
+                ExceptionLogging::makeLogContext($e),
+            );
+        }
     }
 }

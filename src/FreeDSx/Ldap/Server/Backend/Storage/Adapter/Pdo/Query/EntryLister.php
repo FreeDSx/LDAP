@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
@@ -52,9 +54,9 @@ readonly class EntryLister implements ListEntryInterface
     private const FETCH_BATCH_SIZE = 1000;
 
     /**
-     * Parents per read of their children, well inside the placeholder limits of every supported driver.
+     * DNs per read, well inside the placeholder limits of every supported driver.
      */
-    private const PARENT_BATCH_SIZE = 500;
+    private const DN_BATCH_SIZE = 500;
 
     public function __construct(
         private PdoConnection $connection,
@@ -97,7 +99,7 @@ readonly class EntryLister implements ListEntryInterface
     {
         $children = [];
 
-        foreach (array_chunk($parents, self::PARENT_BATCH_SIZE) as $chunk) {
+        foreach (array_chunk($parents, self::DN_BATCH_SIZE) as $chunk) {
             $query = $this->queryBuilder->buildChildDns($chunk);
             $statement = $this->connection->execute(
                 $query->sql,
@@ -110,6 +112,33 @@ readonly class EntryLister implements ListEntryInterface
         }
 
         return $children;
+    }
+
+    public function entriesAt(
+        array $dns,
+        EntryProjection $projection = new EntryProjection(),
+    ): array {
+        $found = [];
+
+        foreach (array_chunk($dns, self::DN_BATCH_SIZE) as $chunk) {
+            $fetched = $this->generateBatch(
+                $this->queryBuilder->buildEntriesAt(array_map(
+                    static fn(Dn $dn): string => $dn->normalizedString(),
+                    $chunk,
+                )),
+                null,
+                $projection,
+            );
+
+            foreach ($fetched as $row) {
+                $found[$row->entry->getDn()->normalizedString()] = $row->entry;
+            }
+        }
+
+        return self::inOrderOf(
+            $dns,
+            $found,
+        );
     }
 
     /**
@@ -442,5 +471,28 @@ readonly class EntryLister implements ListEntryInterface
         return is_int($key) || is_string($key)
             ? PageCursor::afterEntry((int) $key)
             : null;
+    }
+
+    /**
+     * @param list<Dn> $dns
+     * @param array<string, Entry> $found keyed by canonical DN
+     *
+     * @return list<Entry> those found, in the order of the DNs
+     */
+    private static function inOrderOf(
+        array $dns,
+        array $found,
+    ): array {
+        $entries = [];
+
+        foreach ($dns as $dn) {
+            $entry = $found[$dn->normalizedString()] ?? null;
+
+            if ($entry !== null) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $entries;
     }
 }

@@ -59,6 +59,17 @@ trait PdoEntryListDialectTrait
         SQL;
     }
 
+    public function queryEntriesAt(int $count): string
+    {
+        $markers = SqlFilterUtility::markers($count);
+
+        return <<<SQL
+            SELECT entry_id, dn, attributes
+            FROM entries
+            WHERE lc_dn IN ($markers)
+        SQL;
+    }
+
     public function querySubtree(bool $withChildFlag = false): string
     {
         $columns = $this->listColumns() . $this->childFlagColumn($withChildFlag, 'subtree');

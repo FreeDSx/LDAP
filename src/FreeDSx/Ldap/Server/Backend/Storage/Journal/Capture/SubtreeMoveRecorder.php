@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
+use function array_map;
 use function strlen;
 use function substr;
 
@@ -43,28 +44,44 @@ final readonly class SubtreeMoveRecorder
         Dn $normOld,
         Dn $normNew,
     ): void {
-        $this->recorder->recordModRdn(
-            $newEntry,
-            $previousDn,
+        $this->recorder->recordModRdns(
+            [
+                new MovedEntry(
+                    $newEntry,
+                    $previousDn,
+                ),
+                ...$this->movedDescendants(
+                    $normOld,
+                    $normNew,
+                ),
+            ],
             $context,
         );
+    }
 
+    /**
+     * @return list<MovedEntry>
+     */
+    private function movedDescendants(
+        Dn $normOld,
+        Dn $normNew,
+    ): array {
         // Respelling the base leaves every DN beneath it exactly where it was.
         if ($normNew->toString() === $normOld->toString()) {
-            return;
+            return [];
         }
 
-        foreach ($this->subtree->descendantsOf($normNew) as $entry) {
-            $this->recorder->recordModRdn(
+        return array_map(
+            fn(Entry $entry): MovedEntry => new MovedEntry(
                 $entry,
                 $this->previousDnOf(
                     $entry->getDn(),
                     $normOld,
                     $normNew,
                 ),
-                $context,
-            );
-        }
+            ),
+            $this->subtree->descendantsOf($normNew),
+        );
     }
 
     /**

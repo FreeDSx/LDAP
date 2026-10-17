@@ -27,6 +27,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\ChildDnsStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\EntriesAtStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
@@ -35,6 +36,7 @@ use Tests\Support\FreeDSx\Ldap\Storage\SubtreeWalkStorageContractTests;
 final class InMemoryStorageTest extends TestCase
 {
     use ChildDnsStorageContractTests;
+    use EntriesAtStorageContractTests;
     use EntryIdentityStorageContractTests;
     use ServerContainerTrait;
     use SubtreeRenameStorageContractTests;

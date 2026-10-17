@@ -340,6 +340,31 @@ final class MoveEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_a_renamed_container_journals_each_descendant_after_it_with_its_previous_dn(): void
+    {
+        $journal = $this->journaledGraph();
+        foreach (['ou=Old,dc=example,dc=com', 'cn=Kid,ou=Old,dc=example,dc=com'] as $dn) {
+            $this->adds()->handle(
+                new AddCommand(new Entry(
+                    new Dn($dn),
+                    new Attribute('objectClass', 'person'),
+                    new Attribute('cn', 'seed'),
+                )),
+                $this->context(),
+            );
+        }
+
+        $this->rename('ou=Old,dc=example,dc=com', 'ou=New');
+
+        self::assertSame(
+            [
+                'ou=New,dc=example,dc=com' => 'ou=Old,dc=example,dc=com',
+                'cn=Kid,ou=New,dc=example,dc=com' => 'cn=kid,ou=old,dc=example,dc=com',
+            ],
+            $this->previousDnsJournaled($journal),
+        );
+    }
+
     /**
      * Validation is opted into by the tests that assert on it, rather than applied to every fixture here.
      */
@@ -401,5 +426,23 @@ final class MoveEntryHandlerTest extends TestCase
         );
 
         return $journal;
+    }
+
+    /**
+     * @return array<string, ?string> the previous DN of each ModRdn record, keyed by the DN it moved to
+     */
+    private function previousDnsJournaled(InMemoryChangeJournal $journal): array
+    {
+        $previousDns = [];
+
+        foreach ($journal->read() as $record) {
+            if ($record->change->changeType !== ChangeType::ModRdn) {
+                continue;
+            }
+
+            $previousDns[$record->change->dn->toString()] = $record->change->previousDn?->toString();
+        }
+
+        return $previousDns;
     }
 }

@@ -139,8 +139,8 @@ final readonly class TransactionalEntryWrite
                 $check($current);
 
                 $this->writes->remove($dn);
-                $this->changeRecorder->recordDelete(
-                    $current,
+                $this->changeRecorder->recordDeletes(
+                    [$current],
                     $context,
                 );
             },

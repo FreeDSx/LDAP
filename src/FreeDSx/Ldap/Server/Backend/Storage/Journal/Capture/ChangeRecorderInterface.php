@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -34,14 +33,19 @@ interface ChangeRecorderInterface
         WriteContext $context,
     ): void;
 
-    public function recordModRdn(
-        Entry $entry,
-        Dn $previousDn,
+    /**
+     * @param list<MovedEntry> $moved in the order they were moved
+     */
+    public function recordModRdns(
+        array $moved,
         WriteContext $context,
     ): void;
 
-    public function recordDelete(
-        Entry $entry,
+    /**
+     * @param list<Entry> $entries as they were before removal, in the order they were removed
+     */
+    public function recordDeletes(
+        array $entries,
         WriteContext $context,
     ): void;
 

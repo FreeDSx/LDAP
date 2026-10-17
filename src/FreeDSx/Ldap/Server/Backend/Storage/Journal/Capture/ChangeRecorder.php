@@ -62,38 +62,72 @@ final readonly class ChangeRecorder implements ChangeRecorderInterface
         );
     }
 
-    public function recordModRdn(
-        Entry $entry,
-        Dn $previousDn,
+    public function recordModRdns(
+        array $moved,
         WriteContext $context,
     ): void {
-        $this->record(
-            ChangeType::ModRdn,
-            $entry,
-            $context,
-            previousDn: $previousDn,
-        );
+        $this->appendAll(array_map(
+            fn(MovedEntry $move): ?PendingChange => $this->changeFor(
+                ChangeType::ModRdn,
+                $move->entry,
+                $context,
+                previousDn: $move->previousDn,
+            ),
+            $moved,
+        ));
     }
 
-    public function recordDelete(
-        Entry $entry,
+    public function recordDeletes(
+        array $entries,
         WriteContext $context,
     ): void {
-        $this->record(
-            ChangeType::Delete,
-            $entry,
-            $context,
-            preImage: $entry->makeCopy(),
-        );
+        $this->appendAll(array_map(
+            fn(Entry $entry): ?PendingChange => $this->changeFor(
+                ChangeType::Delete,
+                $entry,
+                $context,
+                preImage: $entry->makeCopy(),
+            ),
+            $entries,
+        ));
     }
 
     private function record(
         ChangeType $type,
         Entry $entry,
         WriteContext $context,
+    ): void {
+        $change = $this->changeFor(
+            $type,
+            $entry,
+            $context,
+        );
+
+        if ($change === null) {
+            return;
+        }
+
+        $this->journal->append($change);
+    }
+
+    /**
+     * @param list<?PendingChange> $changes those skipped are null
+     */
+    private function appendAll(array $changes): void
+    {
+        $this->journal->appendAll(array_values(array_filter($changes)));
+    }
+
+    /**
+     * The record to journal, or null when the entry carries nothing to identify it by.
+     */
+    private function changeFor(
+        ChangeType $type,
+        Entry $entry,
+        WriteContext $context,
         ?Dn $previousDn = null,
         ?Entry $preImage = null,
-    ): void {
+    ): ?PendingChange {
         $uuid = $entry->getUuid();
 
         // entryUUID is stamped on every write.
@@ -108,16 +142,16 @@ final readonly class ChangeRecorder implements ChangeRecorderInterface
                 ],
             );
 
-            return;
+            return null;
         }
 
-        $this->journal->append(new PendingChange(
+        return new PendingChange(
             changeType: $type,
             dn: $entry->getDn(),
             entryUuid: $uuid,
             authzId: $context->getAuthzId(),
             previousDn: $previousDn,
             preImage: $preImage,
-        ));
+        );
     }
 }

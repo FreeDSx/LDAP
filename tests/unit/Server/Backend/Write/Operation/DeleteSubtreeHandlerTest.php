@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
 
-use DateTimeImmutable;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
@@ -36,7 +35,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
@@ -312,10 +310,7 @@ final class DeleteSubtreeHandlerTest extends TestCase
             $this->deleteSubtreeWith(
                 $this->handlerWith(
                     25_000,
-                    new SubtreeEnumerator(
-                        $this->storage,
-                        $lister,
-                    ),
+                    new SubtreeEnumerator($lister),
                 ),
                 $this->context(),
             );
@@ -591,20 +586,19 @@ final class DeleteSubtreeHandlerTest extends TestCase
      */
     private function graphWithFailingJournal(int $childCount): void
     {
+        $kept = new InMemoryChangeJournal();
         $journal = $this->createMock(ChangeJournalInterface::class);
         $journal
-            ->method('append')
-            ->willReturnCallback(static function (PendingChange $change): ChangeRecord {
-                if ($change->dn->normalizedString() === 'ou=people,dc=example,dc=com') {
-                    throw new StorageIoException('The journal is unavailable.');
+            ->method('appendAll')
+            ->willReturnCallback(static function (array $changes) use ($kept): array {
+                /** @var list<PendingChange> $changes */
+                foreach ($changes as $change) {
+                    if ($change->dn->normalizedString() === 'ou=people,dc=example,dc=com') {
+                        throw new StorageIoException('The journal is unavailable.');
+                    }
                 }
 
-                return new ChangeRecord(
-                    1,
-                    ReplicaId::local(),
-                    new DateTimeImmutable(),
-                    $change,
-                );
+                return $kept->appendAll($changes);
             });
         $this->writeGraph(
             $this->peopleWithChildren($childCount),

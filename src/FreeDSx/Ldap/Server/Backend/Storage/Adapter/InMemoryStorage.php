@@ -142,6 +142,26 @@ final class InMemoryStorage implements
         );
     }
 
+    public function entriesAt(
+        array $dns,
+        EntryProjection $projection = new EntryProjection(),
+    ): array {
+        $entries = [];
+
+        foreach ($dns as $dn) {
+            $entry = $this->find(
+                $dn,
+                $projection,
+            );
+
+            if ($entry !== null) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $entries;
+    }
+
     public function childDns(array $parents): array
     {
         $children = [];

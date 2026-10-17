@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
+
 /**
  * Cross-platform change-journal SQL shared by every PdoJournalDialectInterface implementation.
  *
@@ -20,12 +22,17 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
  */
 trait PdoJournalDialectTrait
 {
-    public function queryJournalInsert(): string
+    public function queryJournalInsert(int $count): string
     {
+        $rows = SqlFilterUtility::markers(
+            $count,
+            '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        );
+
         return <<<SQL
             INSERT INTO ldap_change_journal
                 (seq, origin, created_at, change_type, dn, lc_dn, lc_parent_dn, entry_uuid, authz_id, previous_dn, pre_image)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES $rows
         SQL;
     }
 
@@ -33,7 +40,7 @@ trait PdoJournalDialectTrait
     {
         return <<<SQL
             UPDATE ldap_change_journal_seq
-            SET seq = seq + 1
+            SET seq = seq + ?
             WHERE id = 1
         SQL;
     }

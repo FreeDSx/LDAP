@@ -55,6 +55,14 @@ final class InMemoryChangeJournal implements ChangeJournalInterface
         return $record;
     }
 
+    public function appendAll(array $changes): array
+    {
+        return array_map(
+            $this->append(...),
+            $changes,
+        );
+    }
+
     public function read(int $afterSeq = 0): iterable
     {
         foreach ($this->records as $record) {

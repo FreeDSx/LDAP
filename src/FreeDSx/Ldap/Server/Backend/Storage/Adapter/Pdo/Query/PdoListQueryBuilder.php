@@ -46,6 +46,17 @@ final readonly class PdoListQueryBuilder
         );
     }
 
+    /**
+     * @param list<string> $dns canonical DNs of the entries read
+     */
+    public function buildEntriesAt(array $dns): SqlQuery
+    {
+        return new SqlQuery(
+            $this->dialect->queryEntriesAt(count($dns)),
+            $dns,
+        );
+    }
+
     public function build(ListQuerySpec $spec): SqlQuery
     {
         $streamed = $this->tryBuildStreamingQuery($spec);

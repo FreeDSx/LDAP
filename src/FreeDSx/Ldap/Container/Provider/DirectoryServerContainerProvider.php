@@ -193,7 +193,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $c->get(ReadEntryInterface::class),
             ),
             SubtreeEnumerator::class => static fn(Container $c): SubtreeEnumerator => new SubtreeEnumerator(
-                $c->get(ReadEntryInterface::class),
                 $c->get(ListEntryInterface::class),
             ),
             SubentryPlacementGuard::class => static fn(Container $c): SubentryPlacementGuard => new SubentryPlacementGuard(

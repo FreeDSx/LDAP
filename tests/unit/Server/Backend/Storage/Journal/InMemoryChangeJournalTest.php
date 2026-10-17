@@ -59,6 +59,24 @@ final class InMemoryChangeJournalTest extends TestCase
         );
     }
 
+    public function test_appending_several_changes_allocates_consecutive_seqs_after_the_last(): void
+    {
+        $this->subject->append($this->change('cn=a,dc=example,dc=com'));
+
+        $records = $this->subject->appendAll([
+            $this->change('cn=b,dc=example,dc=com'),
+            $this->change('cn=c,dc=example,dc=com'),
+        ]);
+
+        self::assertSame(
+            [2, 3],
+            array_map(
+                static fn(ChangeRecord $record): int => $record->seq,
+                $records,
+            ),
+        );
+    }
+
     public function test_latest_seq_is_zero_until_anything_is_appended(): void
     {
         self::assertSame(

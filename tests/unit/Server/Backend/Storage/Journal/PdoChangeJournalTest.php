@@ -71,6 +71,67 @@ final class PdoChangeJournalTest extends TestCase
         );
     }
 
+    public function test_appending_several_changes_allocates_consecutive_seqs_after_the_last(): void
+    {
+        $this->subject->append($this->change('cn=a,dc=example,dc=com'));
+
+        $records = $this->subject->appendAll([
+            $this->change('cn=b,dc=example,dc=com'),
+            $this->change('cn=c,dc=example,dc=com'),
+        ]);
+
+        self::assertSame(
+            [2, 3],
+            array_map(
+                static fn(ChangeRecord $record): int => $record->seq,
+                $records,
+            ),
+        );
+        self::assertSame(
+            3,
+            $this->subject->latestSeq(),
+        );
+    }
+
+    public function test_appending_more_changes_than_one_insert_holds_keeps_every_one_in_order(): void
+    {
+        $changes = array_map(
+            fn(int $i): PendingChange => $this->change("cn=c{$i},dc=example,dc=com"),
+            range(
+                1,
+                200,
+            ),
+        );
+
+        $this->subject->appendAll($changes);
+
+        self::assertSame(
+            array_map(
+                static fn(PendingChange $change): string => $change->dn->toString(),
+                $changes,
+            ),
+            array_map(
+                static fn(ChangeRecord $record): string => $record->change->dn->toString(),
+                iterator_to_array(
+                    $this->subject->read(),
+                    false,
+                ),
+            ),
+        );
+    }
+
+    public function test_appending_no_changes_allocates_nothing(): void
+    {
+        self::assertSame(
+            [],
+            $this->subject->appendAll([]),
+        );
+        self::assertSame(
+            0,
+            $this->subject->latestSeq(),
+        );
+    }
+
     public function test_latest_seq_is_zero_until_anything_is_appended(): void
     {
         self::assertSame(

@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\MovedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
@@ -80,11 +81,15 @@ final class ChangeRecorderTest extends TestCase
         );
     }
 
-    public function test_record_modrdn_journals_the_previous_dn(): void
+    public function test_record_modrdns_journals_the_previous_dn(): void
     {
-        $this->subject->recordModRdn(
-            $this->entry('cn=new,dc=example,dc=com'),
-            new Dn('cn=old,dc=example,dc=com'),
+        $this->subject->recordModRdns(
+            [
+                new MovedEntry(
+                    $this->entry('cn=new,dc=example,dc=com'),
+                    new Dn('cn=old,dc=example,dc=com'),
+                ),
+            ],
             $this->context,
         );
 
@@ -99,12 +104,43 @@ final class ChangeRecorderTest extends TestCase
         );
     }
 
-    public function test_record_delete_captures_an_independent_pre_image(): void
+    public function test_record_modrdns_journals_each_moved_entry_in_the_order_given(): void
+    {
+        $this->subject->recordModRdns(
+            [
+                new MovedEntry(
+                    $this->entry('ou=new,dc=example,dc=com'),
+                    new Dn('ou=old,dc=example,dc=com'),
+                ),
+                new MovedEntry(
+                    $this->entry('cn=a,ou=new,dc=example,dc=com'),
+                    new Dn('cn=a,ou=old,dc=example,dc=com'),
+                ),
+            ],
+            $this->context,
+        );
+
+        self::assertSame(
+            [
+                'ou=old,dc=example,dc=com',
+                'cn=a,ou=old,dc=example,dc=com',
+            ],
+            array_map(
+                static fn(ChangeRecord $record): ?string => $record->change->previousDn?->toString(),
+                iterator_to_array(
+                    $this->journal->read(),
+                    false,
+                ),
+            ),
+        );
+    }
+
+    public function test_record_deletes_captures_an_independent_pre_image(): void
     {
         $entry = $this->entry('cn=a,dc=example,dc=com');
 
-        $this->subject->recordDelete(
-            $entry,
+        $this->subject->recordDeletes(
+            [$entry],
             $this->context,
         );
 
@@ -117,6 +153,58 @@ final class ChangeRecorderTest extends TestCase
         self::assertSame(
             'a',
             $preImage->get('cn')?->firstValue(),
+        );
+    }
+
+    public function test_record_deletes_journals_each_entry_in_the_order_given(): void
+    {
+        $this->subject->recordDeletes(
+            [
+                $this->entry('cn=child,cn=a,dc=example,dc=com'),
+                $this->entry('cn=a,dc=example,dc=com'),
+            ],
+            $this->context,
+        );
+
+        self::assertSame(
+            [
+                'cn=child,cn=a,dc=example,dc=com',
+                'cn=a,dc=example,dc=com',
+            ],
+            array_map(
+                static fn(ChangeRecord $record): string => $record->change->dn->toString(),
+                iterator_to_array(
+                    $this->journal->read(),
+                    false,
+                ),
+            ),
+        );
+    }
+
+    public function test_record_deletes_skips_an_entry_without_a_uuid_and_journals_the_rest(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning');
+        $recorder = new ChangeRecorder(
+            $this->journal,
+            $logger,
+        );
+
+        $recorder->recordDeletes(
+            [
+                new Entry(
+                    new Dn('cn=b,dc=example,dc=com'),
+                    new Attribute('cn', 'b'),
+                ),
+                $this->entry('cn=a,dc=example,dc=com'),
+            ],
+            $this->context,
+        );
+
+        self::assertSame(
+            'cn=a,dc=example,dc=com',
+            $this->onlyRecord()->change->dn->toString(),
         );
     }
 

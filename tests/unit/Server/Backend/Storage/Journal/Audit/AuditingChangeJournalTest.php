@@ -74,6 +74,25 @@ final class AuditingChangeJournalTest extends TestCase
         );
     }
 
+    public function test_it_tees_every_record_of_a_batch_to_the_sink_in_order(): void
+    {
+        $sink = new CapturingAuditSink();
+        $journal = new AuditingChangeJournal(
+            new InMemoryChangeJournal(),
+            $sink,
+        );
+
+        $records = $journal->appendAll([
+            $this->change('cn=a,dc=example,dc=com'),
+            $this->change('cn=b,dc=example,dc=com'),
+        ]);
+
+        self::assertSame(
+            $records,
+            $sink->written,
+        );
+    }
+
     public function test_a_sink_failure_is_logged_and_the_record_is_still_journaled(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
