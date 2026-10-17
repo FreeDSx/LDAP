@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\JournalLapsedException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
@@ -60,6 +61,8 @@ final readonly class SyncPersistStreamer
      *
      * @param int $throughSeq The seq the cookie sent after these results claims.
      * @return iterable<SyncResult>
+     *
+     * @throws JournalLapsedException
      */
     public function projectSince(
         int $sinceSeq,
@@ -68,28 +71,23 @@ final readonly class SyncPersistStreamer
         TokenInterface $token,
     ): iterable {
         $scope = $this->scopeFor($request);
-        $netByUuid = [];
+        $latestSeqs = $this->latestSeqByUuid(
+            $sinceSeq,
+            $throughSeq,
+            $scope,
+        );
 
         foreach ($this->stream->since($sinceSeq, $scope, $throughSeq) as $record) {
-            // Re-keyed at its latest change.
-            // An entry relocating is sent before one that might later take it.
-            unset($netByUuid[$record->change->entryUuid]);
-            $netByUuid[$record->change->entryUuid] = $record->change;
-        }
+            if (($latestSeqs[$record->change->entryUuid] ?? null) !== $record->seq) {
+                continue;
+            }
 
-        foreach ($netByUuid as $change) {
-            $result = $change->changeType === ChangeType::Delete
-                ? $this->projector->projectDeleted(
-                    $change,
-                    $request,
-                    $token,
-                )
-                : $this->fetchAndProject(
-                    $change,
-                    $scope,
-                    $request,
-                    $token,
-                );
+            $result = $this->project(
+                $record->change,
+                $scope,
+                $request,
+                $token,
+            );
 
             if ($result !== null) {
                 yield $result;
@@ -127,13 +125,19 @@ final readonly class SyncPersistStreamer
             }
 
             if ($latestSeq > $lastSeq) {
-                yield from $this->pushChanges(
-                    $lastSeq,
-                    $latestSeq,
-                    $request,
-                    $token,
-                    $messageId,
-                );
+                try {
+                    yield from $this->pushChanges(
+                        $lastSeq,
+                        $latestSeq,
+                        $request,
+                        $token,
+                        $messageId,
+                    );
+                } catch (JournalLapsedException) {
+                    yield $this->refreshRequired($messageId);
+
+                    return;
+                }
                 $lastSeq = $latestSeq;
             }
 
@@ -171,6 +175,24 @@ final readonly class SyncPersistStreamer
     }
 
     /**
+     * The responses as they are, ended by e-syncRefreshRequired if the journal no longer covers what they read.
+     *
+     * @param Generator<LdapMessageResponse> $responses
+     *
+     * @return Generator<LdapMessageResponse>
+     */
+    public function endOnLapse(
+        Generator $responses,
+        int $messageId,
+    ): Generator {
+        try {
+            yield from $responses;
+        } catch (JournalLapsedException) {
+            yield $this->refreshRequired($messageId);
+        }
+    }
+
+    /**
      * @return Generator<LdapMessageResponse>
      */
     private function pushChanges(
@@ -189,6 +211,47 @@ final readonly class SyncPersistStreamer
             ),
             $messageId,
         );
+    }
+
+    /**
+     * The seq of each entry's latest change in range.
+     *
+     * @return array<string, int>
+     *
+     * @throws JournalLapsedException
+     */
+    private function latestSeqByUuid(
+        int $sinceSeq,
+        int $throughSeq,
+        ChangeScope $scope,
+    ): array {
+        $latestSeqs = [];
+
+        foreach ($this->stream->since($sinceSeq, $scope, $throughSeq) as $record) {
+            $latestSeqs[$record->change->entryUuid] = $record->seq;
+        }
+
+        return $latestSeqs;
+    }
+
+    private function project(
+        PendingChange $change,
+        ChangeScope $scope,
+        SearchRequest $request,
+        TokenInterface $token,
+    ): ?SyncResult {
+        return $change->changeType === ChangeType::Delete
+            ? $this->projector->projectDeleted(
+                $change,
+                $request,
+                $token,
+            )
+            : $this->fetchAndProject(
+                $change,
+                $scope,
+                $request,
+                $token,
+            );
     }
 
     /**

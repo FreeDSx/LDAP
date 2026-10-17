@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -124,14 +125,22 @@ final class AuditingChangeJournalTest extends TestCase
         );
         $journal->append($this->change('cn=a,dc=example,dc=com'));
         $journal->append($this->change('cn=b,dc=example,dc=com'));
+        $journal->append($this->change('cn=c,dc=example,dc=com'));
 
         self::assertSame(
-            2,
+            3,
             $journal->latestSeq(),
         );
-        self::assertCount(
-            1,
-            iterator_to_array($journal->read(1)),
+        self::assertSame(
+            [2],
+            array_map(
+                static fn(ChangeRecord $record): int => $record->seq,
+                iterator_to_array($journal->read(
+                    1,
+                    3,
+                    1,
+                )),
+            ),
         );
 
         $journal->prune(new RetentionPolicy(maxRecords: 1));

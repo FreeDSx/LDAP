@@ -54,13 +54,14 @@ trait PdoJournalDialectTrait
         SQL;
     }
 
-    public function queryJournalReadSince(): string
+    public function queryJournalReadRange(): string
     {
         return <<<SQL
             SELECT seq, origin, created_at, change_type, dn, entry_uuid, authz_id, previous_dn, pre_image
             FROM ldap_change_journal
-            WHERE seq > ?
+            WHERE seq > ? AND seq <= ?
             ORDER BY seq ASC
+            LIMIT ?
         SQL;
     }
 

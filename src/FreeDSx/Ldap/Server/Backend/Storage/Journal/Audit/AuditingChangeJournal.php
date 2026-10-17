@@ -73,9 +73,16 @@ final class AuditingChangeJournal implements ChangeJournalInterface
         return $records;
     }
 
-    public function read(int $afterSeq = 0): iterable
-    {
-        return $this->journal->read($afterSeq);
+    public function read(
+        int $afterSeq = 0,
+        ?int $throughSeq = null,
+        int $limit = self::DEFAULT_READ_LIMIT,
+    ): iterable {
+        return $this->journal->read(
+            $afterSeq,
+            $throughSeq,
+            $limit,
+        );
     }
 
     public function latestSeq(): int

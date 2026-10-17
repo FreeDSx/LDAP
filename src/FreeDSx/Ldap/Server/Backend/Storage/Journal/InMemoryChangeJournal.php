@@ -63,13 +63,30 @@ final class InMemoryChangeJournal implements ChangeJournalInterface
         );
     }
 
-    public function read(int $afterSeq = 0): iterable
-    {
-        foreach ($this->records as $record) {
-            if ($record->seq > $afterSeq) {
-                yield $record;
-            }
-        }
+    /**
+     * @return list<ChangeRecord>
+     */
+    public function read(
+        int $afterSeq = 0,
+        ?int $throughSeq = null,
+        int $limit = self::DEFAULT_READ_LIMIT,
+    ): array {
+        $from = $this->firstAfter($afterSeq);
+        $to = $throughSeq === null
+            ? count($this->records)
+            : $this->firstAfter($throughSeq);
+
+        return array_slice(
+            $this->records,
+            $from,
+            max(
+                0,
+                min(
+                    $limit,
+                    $to - $from,
+                ),
+            ),
+        );
     }
 
     public function latestSeq(): int
@@ -126,5 +143,31 @@ final class InMemoryChangeJournal implements ChangeJournalInterface
         $this->records = array_values($records);
 
         return $before - count($this->records);
+    }
+
+    /**
+     * The index of the first record past the seq, found by halving since records are kept in seq order.
+     */
+    private function firstAfter(int $seq): int
+    {
+        $low = 0;
+        $high = count($this->records);
+
+        while ($low < $high) {
+            $mid = intdiv(
+                $low + $high,
+                2,
+            );
+
+            if ($this->records[$mid]->seq <= $seq) {
+                $low = $mid + 1;
+
+                continue;
+            }
+
+            $high = $mid;
+        }
+
+        return $low;
     }
 }

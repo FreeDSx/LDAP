@@ -126,6 +126,60 @@ final class InMemoryChangeJournalTest extends TestCase
         );
     }
 
+    public function test_read_returns_records_through_a_seq_and_at_most_the_limit(): void
+    {
+        foreach (['a', 'b', 'c', 'd', 'e'] as $cn) {
+            $this->subject->append($this->change("cn={$cn},dc=example,dc=com"));
+        }
+
+        self::assertSame(
+            [2, 3],
+            $this->seqsOf($this->subject->read(
+                1,
+                4,
+                2,
+            )),
+        );
+        self::assertSame(
+            [2, 3, 4],
+            $this->seqsOf($this->subject->read(
+                1,
+                4,
+            )),
+        );
+    }
+
+    public function test_read_through_a_seq_not_past_the_start_returns_nothing(): void
+    {
+        $this->subject->append($this->change('cn=a,dc=example,dc=com'));
+        $this->subject->append($this->change('cn=b,dc=example,dc=com'));
+
+        self::assertSame(
+            [],
+            $this->seqsOf($this->subject->read(
+                2,
+                2,
+            )),
+        );
+    }
+
+    public function test_read_after_a_pruned_prefix_starts_at_the_first_record_past_the_seq(): void
+    {
+        foreach (['a', 'b', 'c', 'd'] as $cn) {
+            $this->subject->append($this->change("cn={$cn},dc=example,dc=com"));
+        }
+        $this->subject->prune(new RetentionPolicy(maxRecords: 2));
+
+        self::assertSame(
+            [3, 4],
+            $this->seqsOf($this->subject->read(1)),
+        );
+        self::assertSame(
+            [4],
+            $this->seqsOf($this->subject->read(3)),
+        );
+    }
+
     public function test_read_without_an_argument_returns_everything(): void
     {
         $this->subject->append($this->change('cn=a,dc=example,dc=com'));
@@ -254,6 +308,22 @@ final class InMemoryChangeJournalTest extends TestCase
 
         self::assertFalse($this->subject->retainsSince(1));
         self::assertTrue($this->subject->retainsSince(2));
+    }
+
+    /**
+     * @param iterable<ChangeRecord> $records
+     *
+     * @return list<int>
+     */
+    private function seqsOf(iterable $records): array
+    {
+        $seqs = [];
+
+        foreach ($records as $record) {
+            $seqs[] = $record->seq;
+        }
+
+        return $seqs;
     }
 
     private function change(string $dn): PendingChange

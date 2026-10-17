@@ -132,19 +132,22 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
                 : new SyncRefreshDelete(true, $cookie);
 
             return ResponseStream::streaming(
-                $this->concat(
-                    $this->withRefreshDone(
-                        $entries,
-                        $messageId,
-                        $boundary,
+                $streamer->endOnLapse(
+                    $this->concat(
+                        $this->withRefreshDone(
+                            $entries,
+                            $messageId,
+                            $boundary,
+                        ),
+                        $streamer->stream(
+                            $latestSeq,
+                            $request,
+                            $token,
+                            $messageId,
+                            $cancellation,
+                        ),
                     ),
-                    $streamer->stream(
-                        $latestSeq,
-                        $request,
-                        $token,
-                        $messageId,
-                        $cancellation,
-                    ),
+                    $messageId,
                 ),
                 $outcome,
                 // Each change and keepalive flushes immediately and polls after each, refusing anything but a signal.
@@ -160,10 +163,13 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         // refreshDeletes: a delete phase (true) only for an incremental sync that sent explicit
         // deletes; a full refresh is a present phase (false) the consumer reconciles by absence.
         return ResponseStream::streaming(
-            $this->withSyncDone(
-                $entries,
+            $streamer->endOnLapse(
+                $this->withSyncDone(
+                    $entries,
+                    $messageId,
+                    new SyncDoneControl($cookie, $sinceSeq !== null),
+                ),
                 $messageId,
-                new SyncDoneControl($cookie, $sinceSeq !== null),
             ),
             $outcome,
         );

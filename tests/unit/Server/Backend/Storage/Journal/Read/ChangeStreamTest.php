@@ -15,12 +15,14 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Journal\Read;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\JournalLapsedException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use PHPUnit\Framework\TestCase;
 
 final class ChangeStreamTest extends TestCase
@@ -29,10 +31,103 @@ final class ChangeStreamTest extends TestCase
 
     private ChangeStream $subject;
 
+    private ChangeStream $paged;
+
     protected function setUp(): void
     {
         $this->journal = new InMemoryChangeJournal();
         $this->subject = new ChangeStream($this->journal);
+        $this->paged = new ChangeStream(
+            $this->journal,
+            pageSize: 2,
+        );
+    }
+
+    public function test_since_reads_more_records_than_one_page_in_order(): void
+    {
+        $this->appendMany(5);
+
+        $records = iterator_to_array($this->paged->since());
+
+        self::assertSame(
+            [1, 2, 3, 4, 5],
+            array_map(
+                static fn(ChangeRecord $record): int => $record->seq,
+                $records,
+            ),
+        );
+    }
+
+    public function test_a_page_with_nothing_in_scope_does_not_end_the_stream(): void
+    {
+        $this->append('cn=a,dc=other,dc=com');
+        $this->append('cn=b,dc=other,dc=com');
+        $this->append('cn=c,dc=example,dc=com');
+
+        self::assertSame(
+            [3],
+            array_map(
+                static fn(ChangeRecord $record): int => $record->seq,
+                iterator_to_array($this->paged->since(
+                    0,
+                    ChangeScope::wholeSubtree(new Dn('dc=example,dc=com')),
+                )),
+            ),
+        );
+    }
+
+    public function test_since_stops_at_a_through_seq_on_a_page_boundary(): void
+    {
+        $this->appendMany(5);
+
+        self::assertSame(
+            [1, 2, 3, 4],
+            array_map(
+                static fn(ChangeRecord $record): int => $record->seq,
+                iterator_to_array($this->paged->since(
+                    0,
+                    null,
+                    4,
+                )),
+            ),
+        );
+    }
+
+    public function test_a_record_pruned_before_it_is_read_ends_the_stream_as_lapsed(): void
+    {
+        $this->appendMany(5);
+
+        $this->expectException(JournalLapsedException::class);
+
+        foreach ($this->paged->since() as $record) {
+            $this->journal->prune(new RetentionPolicy(maxRecords: 1));
+        }
+    }
+
+    public function test_pruning_only_records_already_read_does_not_lapse(): void
+    {
+        $this->appendMany(4);
+        $seqs = [];
+
+        foreach ($this->paged->since() as $record) {
+            $seqs[] = $record->seq;
+            $this->journal->prune(new RetentionPolicy(maxRecords: 2));
+        }
+
+        self::assertSame(
+            [1, 2, 3, 4],
+            $seqs,
+        );
+    }
+
+    public function test_since_from_a_position_already_pruned_ends_as_lapsed(): void
+    {
+        $this->appendMany(3);
+        $this->journal->prune(new RetentionPolicy(maxRecords: 1));
+
+        $this->expectException(JournalLapsedException::class);
+
+        iterator_to_array($this->subject->since());
     }
 
     public function test_since_returns_only_records_after_the_given_seq(): void
@@ -183,6 +278,13 @@ final class ChangeStreamTest extends TestCase
                 ChangeScope::wholeSubtree(new Dn('dc=example,dc=com')),
             )),
         );
+    }
+
+    private function appendMany(int $count): void
+    {
+        for ($i = 1; $i <= $count; $i++) {
+            $this->append("cn=e{$i},dc=example,dc=com");
+        }
     }
 
     private function append(string $dn): void
