@@ -36,9 +36,11 @@ interface PdoJournalDialectInterface
     public function queryJournalSeqRead(): string;
 
     /**
-     * Journal records with seq greater than the bound value, ascending. Parameters: [afterSeq]
+     * Journal records with seq after the first bound and through the second, ascending, at most the third.
+     *
+     * Parameters: [afterSeq, throughSeq, limit]
      */
-    public function queryJournalReadSince(): string;
+    public function queryJournalReadRange(): string;
 
     /**
      * `SELECT MIN(seq) FROM ldap_change_journal` — the retained window floor (NULL when empty).

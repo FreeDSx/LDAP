@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\JournalLapsedException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -46,10 +47,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Sync\Provider\SyncPersistStreamer;
+use FreeDSx\Ldap\Sync\Provider\SyncResult;
 use FreeDSx\Ldap\Sync\Provider\SyncResultProjector;
+use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
@@ -89,9 +93,12 @@ final class SyncPersistStreamerTest extends TestCase
 
     private Closure $onSleep;
 
+    private Closure $onFind;
+
     protected function setUp(): void
     {
         $this->onSleep = static function (): void {};
+        $this->onFind = static function (): void {};
         $this->journal = new InMemoryChangeJournal(new ReplicaId(self::ORIGIN));
         $this->token = $this->createMock(TokenInterface::class);
 
@@ -116,7 +123,11 @@ final class SyncPersistStreamerTest extends TestCase
         $this->entries = $this->createMock(ReadEntryInterface::class);
         $this->entries
             ->method('findByUuid')
-            ->willReturnCallback(fn(string $uuid): ?Entry => $this->liveEntryHolding($uuid));
+            ->willReturnCallback(function (string $uuid): ?Entry {
+                ($this->onFind)();
+
+                return $this->liveEntryHolding($uuid);
+            });
 
         $accessControl = $this->createMock(AccessControlInterface::class);
         $accessControl
@@ -134,9 +145,132 @@ final class SyncPersistStreamerTest extends TestCase
                 filterEvaluator: $filterEvaluator,
                 schema: SchemaResource::Core->load(),
             ),
-            stream: new ChangeStream($this->journal),
+            stream: new ChangeStream(
+                $this->journal,
+                pageSize: 1,
+            ),
             sleeper: new CallbackSleeper(fn() => ($this->onSleep)()),
             pollInterval: 0.0,
+        );
+    }
+
+    public function test_project_since_sends_each_entry_once_in_the_order_of_its_latest_change(): void
+    {
+        $this->liveEntries['cn=a,dc=example,dc=com'] = $this->entryAt(
+            'cn=a,dc=example,dc=com',
+            'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
+        );
+        $this->liveEntries['cn=b,dc=example,dc=com'] = $this->entryAt(
+            'cn=b,dc=example,dc=com',
+            'aaaaaaaa-aaaa-4aaa-8aaa-000000000002',
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,dc=example,dc=com',
+            'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=b,dc=example,dc=com',
+            'aaaaaaaa-aaaa-4aaa-8aaa-000000000002',
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=b,dc=example,dc=com',
+            'aaaaaaaa-aaaa-4aaa-8aaa-000000000002',
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=a,dc=example,dc=com',
+            'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
+        );
+
+        $results = iterator_to_array($this->subject->projectSince(
+            0,
+            4,
+            $this->request(),
+            $this->token,
+        ));
+
+        self::assertSame(
+            [
+                'cn=b,dc=example,dc=com',
+                'cn=a,dc=example,dc=com',
+            ],
+            array_map(
+                static fn(SyncResult $result): string => $result->entry->getEntry()->getDn()->toString(),
+                $results,
+            ),
+        );
+    }
+
+    public function test_a_journal_trimmed_mid_projection_ends_the_stream_with_refresh_required(): void
+    {
+        foreach (['1', '2', '3'] as $n) {
+            $dn = "cn=e{$n},dc=example,dc=com";
+            $uuid = "aaaaaaaa-aaaa-4aaa-8aaa-00000000000{$n}";
+            $this->liveEntries[$dn] = $this->entryAt(
+                $dn,
+                $uuid,
+            );
+            $this->appendFor(
+                ChangeType::Add,
+                $dn,
+                $uuid,
+            );
+        }
+        $this->onFind = fn() => $this->journal->prune(new RetentionPolicy(maxRecords: 1));
+
+        $this->drive($this->subject);
+
+        $done = $this->firstSent(fn(LdapMessageResponse $m): bool => $m->getResponse() instanceof SearchResultDone);
+        self::assertNotNull($done);
+        $response = $done->getResponse();
+        self::assertInstanceOf(SearchResultDone::class, $response);
+        self::assertSame(
+            ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED,
+            $response->getResultCode(),
+        );
+        $syncDone = $done->controls()->getByClass(SyncDoneControl::class);
+        self::assertNotNull($syncDone);
+        self::assertNull($syncDone->getCookie());
+    }
+
+    public function test_responses_are_passed_through_and_a_lapse_ends_them_with_refresh_required(): void
+    {
+        $responses = (static function (): Generator {
+            yield new LdapMessageResponse(
+                5,
+                new SyncNewCookie('cookie'),
+            );
+
+            throw new JournalLapsedException(0);
+        })();
+
+        $sent = iterator_to_array(
+            $this->subject->endOnLapse(
+                $responses,
+                5,
+            ),
+            false,
+        );
+
+        self::assertCount(
+            2,
+            $sent,
+        );
+        self::assertInstanceOf(
+            SyncNewCookie::class,
+            $sent[0]->getResponse(),
+        );
+        $done = $sent[1]->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED,
+            $done->getResultCode(),
         );
     }
 
@@ -318,10 +452,22 @@ final class SyncPersistStreamerTest extends TestCase
 
     private function append(ChangeType $type): void
     {
+        $this->appendFor(
+            $type,
+            self::ENTRY_DN,
+            self::ENTRY_UUID,
+        );
+    }
+
+    private function appendFor(
+        ChangeType $type,
+        string $dn,
+        string $uuid,
+    ): void {
         $this->journal->append(new PendingChange(
             changeType: $type,
-            dn: new Dn(self::ENTRY_DN),
-            entryUuid: self::ENTRY_UUID,
+            dn: new Dn($dn),
+            entryUuid: $uuid,
             authzId: AuthzId::anonymous(),
         ));
     }
@@ -339,12 +485,22 @@ final class SyncPersistStreamerTest extends TestCase
 
     private function entry(): Entry
     {
-        return Entry::create(
+        return $this->entryAt(
             self::ENTRY_DN,
+            self::ENTRY_UUID,
+        );
+    }
+
+    private function entryAt(
+        string $dn,
+        string $uuid,
+    ): Entry {
+        return Entry::create(
+            $dn,
             [
                 'objectClass' => 'inetOrgPerson',
                 'cn' => 'new',
-                'entryUUID' => self::ENTRY_UUID,
+                'entryUUID' => $uuid,
             ],
         );
     }

@@ -82,11 +82,18 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
         return $records;
     }
 
-    public function read(int $afterSeq = 0): iterable
-    {
+    public function read(
+        int $afterSeq = 0,
+        ?int $throughSeq = null,
+        int $limit = self::DEFAULT_READ_LIMIT,
+    ): iterable {
         return $this->streamRecords($this->connection->execute(
-            $this->dialect->queryJournalReadSince(),
-            [$afterSeq],
+            $this->dialect->queryJournalReadRange(),
+            [
+                $afterSeq,
+                $throughSeq ?? PHP_INT_MAX,
+                $limit,
+            ],
         ));
     }
 

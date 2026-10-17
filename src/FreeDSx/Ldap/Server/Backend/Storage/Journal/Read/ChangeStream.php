@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Journal\Read;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\JournalLapsedException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
@@ -25,8 +26,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
  */
 final readonly class ChangeStream
 {
+    /**
+     * @param positive-int $pageSize records read from the journal at a time
+     */
     public function __construct(
         private ChangeJournalInterface $journal,
+        private int $pageSize = ChangeJournalInterface::DEFAULT_READ_LIMIT,
     ) {}
 
     /**
@@ -36,18 +41,32 @@ final readonly class ChangeStream
      *
      * @param ?int $throughSeq The high-water mark the reader's cookie claims, or null to read to the end.
      * @return iterable<ChangeRecord>
+     *
+     * @throws JournalLapsedException when a record not yet read is no longer retained
      */
     public function since(
         int $afterSeq = 0,
         ?ChangeScope $scope = null,
         ?int $throughSeq = null,
     ): iterable {
-        foreach ($this->journal->read($afterSeq) as $record) {
-            if ($throughSeq !== null && $record->seq > $throughSeq) {
-                return;
+        $position = $afterSeq;
+
+        while ($throughSeq === null || $position < $throughSeq) {
+            $page = $this->pageAfter(
+                $position,
+                $throughSeq,
+            );
+
+            foreach ($page as $record) {
+                $position = $record->seq;
+
+                if ($scope === null || $this->touchesScope($record->change, $scope)) {
+                    yield $record;
+                }
             }
-            if ($scope === null || $this->touchesScope($record->change, $scope)) {
-                yield $record;
+
+            if (count($page) < $this->pageSize) {
+                return;
             }
         }
     }
@@ -89,6 +108,31 @@ final readonly class ChangeStream
     public function generation(): string
     {
         return $this->journal->generation();
+    }
+
+    /**
+     * @return list<ChangeRecord>
+     *
+     * @throws JournalLapsedException
+     */
+    private function pageAfter(
+        int $position,
+        ?int $throughSeq,
+    ): array {
+        $page = iterator_to_array(
+            $this->journal->read(
+                $position,
+                $throughSeq,
+                $this->pageSize,
+            ),
+            false,
+        );
+
+        if (!$this->journal->retainsSince($position)) {
+            throw new JournalLapsedException($position);
+        }
+
+        return $page;
     }
 
     /**

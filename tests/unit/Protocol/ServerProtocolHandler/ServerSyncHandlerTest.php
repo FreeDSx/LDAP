@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use Closure;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
@@ -24,6 +25,7 @@ use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
@@ -67,6 +69,8 @@ final class ServerSyncHandlerTest extends TestCase
     private const UUID_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     private const UUID_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+    private const UUID_C = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
     private ServerQueue&MockObject $queue;
 
@@ -117,6 +121,8 @@ final class ServerSyncHandlerTest extends TestCase
      */
     private array $searchEntries = [];
 
+    private Closure $onFind;
+
     protected function setUp(): void
     {
         $this->queue = $this->createMock(ServerQueue::class);
@@ -140,9 +146,14 @@ final class ServerSyncHandlerTest extends TestCase
         $this->backend
             ->method('search')
             ->willReturnCallback(fn(): EntryStream => EntryStream::of($this->stream(...$this->searchEntries)));
+        $this->onFind = static function (): void {};
         $this->entries
             ->method('findByUuid')
-            ->willReturnCallback(fn(string $uuid): ?Entry => $this->liveEntryHolding($uuid));
+            ->willReturnCallback(function (string $uuid): ?Entry {
+                ($this->onFind)();
+
+                return $this->liveEntryHolding($uuid);
+            });
         $this->queue
             ->method('sendMessages')
             ->willReturnCallback(function (iterable $messages): ServerQueue {
@@ -160,7 +171,10 @@ final class ServerSyncHandlerTest extends TestCase
             ->method('pollMessage')
             ->willReturnCallback(fn(): ?LdapMessageRequest => array_shift($this->cancelSignals));
 
-        $this->changeStream = new ChangeStream($this->journal);
+        $this->changeStream = new ChangeStream(
+            $this->journal,
+            pageSize: 1,
+        );
         $this->syncProjector = new SyncResultProjector(
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
@@ -607,6 +621,56 @@ final class ServerSyncHandlerTest extends TestCase
         self::assertFalse($stream->writerConfig->persistent);
     }
 
+    public function test_a_journal_trimmed_during_an_incremental_refresh_ends_it_with_refresh_required(): void
+    {
+        $this->appendChangesToThreeEntries();
+        $this->onFind = fn() => $this->journal->prune(new RetentionPolicy(maxRecords: 1));
+
+        $this->handle($this->cookieAt(0));
+
+        $done = $this->lastSent()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED,
+            $done->getResultCode(),
+        );
+        self::assertNull($this->doneControl()->getCookie());
+    }
+
+    public function test_a_journal_trimmed_during_the_refresh_phase_of_refresh_and_persist_ends_it_with_refresh_required(): void
+    {
+        $this->appendChangesToThreeEntries();
+        $this->onFind = fn() => $this->journal->prune(new RetentionPolicy(maxRecords: 1));
+
+        $this->drive(
+            $this->persistHandler(),
+            $this->syncMessage(
+                $this->cookieAt(0),
+                SyncRequestControl::MODE_REFRESH_AND_PERSIST,
+            ),
+        );
+
+        $done = $this->lastSent()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED,
+            $done->getResultCode(),
+        );
+        self::assertNull($this->doneControl()->getCookie());
+        foreach ($this->sent as $message) {
+            self::assertNotInstanceOf(
+                SyncRefreshDelete::class,
+                $message->getResponse(),
+            );
+        }
+    }
+
     public function test_sync_is_declined_when_no_change_stream_is_available(): void
     {
         $handler = new ServerSyncHandler(
@@ -722,6 +786,22 @@ final class ServerSyncHandlerTest extends TestCase
             authzId: AuthzId::anonymous(),
             preImage: $preImage,
         ));
+    }
+
+    private function appendChangesToThreeEntries(): void
+    {
+        foreach ([self::UUID_A => 'cn=a', self::UUID_B => 'cn=b', self::UUID_C => 'cn=c'] as $uuid => $rdn) {
+            $dn = "{$rdn},dc=example,dc=com";
+            $this->liveEntries[$dn] = $this->entry(
+                $dn,
+                $uuid,
+            );
+            $this->append(
+                ChangeType::Modify,
+                $dn,
+                $uuid,
+            );
+        }
     }
 
     private function entry(

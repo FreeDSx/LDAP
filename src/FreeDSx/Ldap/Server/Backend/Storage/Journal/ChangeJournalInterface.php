@@ -24,6 +24,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 interface ChangeJournalInterface
 {
     /**
+     * Records one read returns unless asked for fewer.
+     */
+    public const DEFAULT_READ_LIMIT = 1000;
+
+    /**
      * Append a change, allocating the next monotonic seq, and return the stamped record.
      */
     public function append(PendingChange $change): ChangeRecord;
@@ -38,13 +43,20 @@ interface ChangeJournalInterface
     public function appendAll(array $changes): array;
 
     /**
-     * Records with seq greater than $afterSeq, in ascending seq order.
+     * Records with seq greater than $afterSeq, through $throughSeq and at most $limit of them, in ascending seq order.
      *
      * @api
      *
+     * @param ?int $throughSeq the highest seq to read, or null for no upper bound
+     * @param positive-int $limit
+     *
      * @return iterable<ChangeRecord>
      */
-    public function read(int $afterSeq = 0): iterable;
+    public function read(
+        int $afterSeq = 0,
+        ?int $throughSeq = null,
+        int $limit = self::DEFAULT_READ_LIMIT,
+    ): iterable;
 
     /**
      * Highest allocated seq, or 0 when nothing has been appended.
