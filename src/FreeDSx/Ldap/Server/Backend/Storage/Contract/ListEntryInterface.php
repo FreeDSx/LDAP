@@ -13,7 +13,10 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Contract;
 
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -38,4 +41,16 @@ interface ListEntryInterface
      * @return list<string>
      */
     public function childDns(array $parents): array;
+
+    /**
+     * The stored entries at the DNs, in the order given, leaving out any that are not stored.
+     *
+     * @param list<Dn> $dns
+     *
+     * @return list<Entry>
+     */
+    public function entriesAt(
+        array $dns,
+        EntryProjection $projection = new EntryProjection(),
+    ): array;
 }

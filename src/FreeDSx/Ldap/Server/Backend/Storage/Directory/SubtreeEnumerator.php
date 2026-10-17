@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -39,10 +38,7 @@ final readonly class SubtreeEnumerator
      */
     private const PAGE_SIZE = 500;
 
-    public function __construct(
-        private ReadEntryInterface $reader,
-        private ListEntryInterface $lister,
-    ) {}
+    public function __construct(private ListEntryInterface $lister) {}
 
     /**
      * Every entry after all of its children, read a page at a time, so no prefix of it strands a child of what it holds.
@@ -100,19 +96,11 @@ final readonly class SubtreeEnumerator
      */
     public function entriesAt(array $dnList): array
     {
-        $entries = [];
-        foreach ($dnList as $dn) {
-            // Removing an entry takes its links with it, so journaling them would only record what is already gone.
-            $entry = $this->reader->find(
-                $dn,
-                new EntryProjection(linkCap: 0),
-            );
-            if ($entry !== null) {
-                $entries[] = $entry;
-            }
-        }
-
-        return $entries;
+        // Removing an entry takes its links with it, so journaling them would only record what is already gone.
+        return $this->lister->entriesAt(
+            $dnList,
+            new EntryProjection(linkCap: 0),
+        );
     }
 
     /**

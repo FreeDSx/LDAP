@@ -21,12 +21,12 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 interface PdoJournalDialectInterface
 {
     /**
-     * Inserts one journal record. Parameters: [seq, origin, created_at, change_type, dn, entry_uuid, authz_id, previous_dn, pre_image]
+     * Inserts $count journal records. Parameters per record: [seq, origin, created_at, change_type, dn, lc_dn, lc_parent_dn, entry_uuid, authz_id, previous_dn, pre_image]
      */
-    public function queryJournalInsert(): string;
+    public function queryJournalInsert(int $count): string;
 
     /**
-     * `UPDATE ldap_change_journal_seq SET seq = seq + 1 WHERE id = 1`.
+     * `UPDATE ldap_change_journal_seq SET seq = seq + ? WHERE id = 1`. Parameters: [count]
      */
     public function queryJournalSeqBump(): string;
 

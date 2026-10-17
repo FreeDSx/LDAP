@@ -136,13 +136,10 @@ readonly class SubtreeChunkRemover
             ? $this->subtree->entriesAt($dnList)
             : [];
         $removed = $this->storage->removeAll($dnList);
-
-        foreach ($preImages as $entry) {
-            $this->changeRecorder->recordDelete(
-                $entry,
-                $context,
-            );
-        }
+        $this->changeRecorder->recordDeletes(
+            $preImages,
+            $context,
+        );
 
         return $removed;
     }

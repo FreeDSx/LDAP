@@ -35,10 +35,7 @@ final class DeletionQueueTest extends TestCase
             new Entry(new Dn('cn=t,cn=s,ou=q,dc=example,dc=com')),
         );
         $this->subject = new DeletionQueue(
-            new SubtreeEnumerator(
-                $storage,
-                $storage,
-            ),
+            new SubtreeEnumerator($storage),
             new Dn('ou=p,dc=example,dc=com'),
         );
     }

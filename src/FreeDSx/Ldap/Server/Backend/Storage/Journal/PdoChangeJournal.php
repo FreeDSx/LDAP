@@ -35,6 +35,11 @@ use Generator;
  */
 final readonly class PdoChangeJournal implements ChangeJournalInterface
 {
+    /**
+     * Records per insert. Eleven placeholders each, inside the 999 bound SQLite builds before 3.32 compile in.
+     */
+    private const RECORDS_PER_STATEMENT = 90;
+
     public function __construct(
         private PdoConnection $connection,
         private PdoJournalDialectInterface $dialect,
@@ -45,38 +50,36 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     public function append(PendingChange $change): ChangeRecord
     {
-        $normDn = $change->dn->normalize();
-        $seq = 0;
-        $createdAt = null;
+        return $this->appendAll([$change])[0] ?? throw new RuntimeException('The journal record was not stamped.');
+    }
+
+    public function appendAll(array $changes): array
+    {
+        if ($changes === []) {
+            return [];
+        }
+        $records = [];
 
         // Joins the write transaction that a journaled change already runs in, rather than nesting a savepoint in it.
-        $this->connection->joinAtomic(function () use ($change, $normDn, &$createdAt, &$seq): void {
-            $this->connection->execute($this->dialect->queryJournalSeqBump());
-            $seq = $this->latestSeq();
-            // Stamped under the sequence row lock that orders the seq.
-            $createdAt = $this->clock->now();
+        $this->connection->joinAtomic(function () use ($changes, &$records): void {
+            $this->connection->execute(
+                $this->dialect->queryJournalSeqBump(),
+                [count($changes)],
+            );
+            $records = $this->stamped(
+                $changes,
+                $this->latestSeq() - count($changes),
+            );
 
-            $this->connection->execute($this->dialect->queryJournalInsert(), [
-                $seq,
-                (string) $this->origin,
-                EpochMicroseconds::fromDateTime($createdAt),
-                $change->changeType->value,
-                $change->dn->toString(),
-                $normDn->toString(),
-                $normDn->getParent()?->toString() ?? '',
-                $change->entryUuid,
-                $change->authzId->toString(),
-                $change->previousDn?->toString(),
-                $this->encodePreImage($change->preImage),
-            ]);
+            foreach (array_chunk($records, self::RECORDS_PER_STATEMENT) as $chunk) {
+                $this->connection->execute(
+                    $this->dialect->queryJournalInsert(count($chunk)),
+                    $this->insertParameters($chunk),
+                );
+            }
         });
 
-        return new ChangeRecord(
-            seq: $seq,
-            origin: $this->origin,
-            createdAt: $createdAt ?? throw new RuntimeException('The journal record was not stamped.'),
-            change: $change,
-        );
+        return $records;
     }
 
     public function read(int $afterSeq = 0): iterable
@@ -138,6 +141,64 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
     public function sharesAcrossProcesses(): bool
     {
         return true;
+    }
+
+    /**
+     * Stamped under the sequence row lock that orders the seqs, each one past the last.
+     *
+     * @param list<PendingChange> $changes
+     *
+     * @return list<ChangeRecord>
+     */
+    private function stamped(
+        array $changes,
+        int $lastSeq,
+    ): array {
+        $createdAt = $this->clock->now();
+        $records = [];
+
+        foreach ($changes as $change) {
+            $records[] = new ChangeRecord(
+                seq: ++$lastSeq,
+                origin: $this->origin,
+                createdAt: $createdAt,
+                change: $change,
+            );
+        }
+
+        return $records;
+    }
+
+    /**
+     * @param list<ChangeRecord> $records
+     *
+     * @return list<string|int|null>
+     */
+    private function insertParameters(array $records): array
+    {
+        $parameters = [];
+
+        foreach ($records as $record) {
+            $change = $record->change;
+            $normDn = $change->dn->normalize();
+
+            array_push(
+                $parameters,
+                $record->seq,
+                (string) $this->origin,
+                EpochMicroseconds::fromDateTime($record->createdAt),
+                $change->changeType->value,
+                $change->dn->toString(),
+                $normDn->toString(),
+                $normDn->getParent()?->toString() ?? '',
+                $change->entryUuid,
+                $change->authzId->toString(),
+                $change->previousDn?->toString(),
+                $this->encodePreImage($change->preImage),
+            );
+        }
+
+        return $parameters;
     }
 
     private function pruneToRecordCap(int $maxRecords): int

@@ -46,6 +46,13 @@ interface PdoEntryListDialectInterface
     public function queryChildDns(int $count): string;
 
     /**
+     * The stored rows of $count entries.
+     *
+     * Parameters: the entries' lc_dn values
+     */
+    public function queryEntriesAt(int $count): string;
+
+    /**
      * A parameterless condition restricting $dnColumn to entries that lack, or carry, the subentry object class.
      */
     public function querySubentryCondition(

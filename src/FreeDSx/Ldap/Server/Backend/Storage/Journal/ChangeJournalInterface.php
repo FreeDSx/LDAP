@@ -29,6 +29,15 @@ interface ChangeJournalInterface
     public function append(PendingChange $change): ChangeRecord;
 
     /**
+     * Append changes in order, allocating consecutive seqs, and return the stamped records.
+     *
+     * @param list<PendingChange> $changes
+     *
+     * @return list<ChangeRecord>
+     */
+    public function appendAll(array $changes): array;
+
+    /**
      * Records with seq greater than $afterSeq, in ascending seq order.
      *
      * @api
