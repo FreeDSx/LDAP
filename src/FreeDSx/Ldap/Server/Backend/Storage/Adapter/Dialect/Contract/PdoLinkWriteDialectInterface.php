@@ -28,7 +28,7 @@ interface PdoLinkWriteDialectInterface
     public function queryLinkIdsForOwner(): string;
 
     /**
-     * The ids of $count normalised DNs, which is how a value becomes a link.
+     * The ids of $count normalised DNs, which is how a value becomes a link, share-locked where the engine locks rows.
      *
      * Parameters: [lc_dn, ...]
      */

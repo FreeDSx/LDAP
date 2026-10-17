@@ -172,6 +172,21 @@ final class MysqlDialect implements PdoDialectInterface
     }
 
     /**
+     * Share-locks each target by its unique key, as the parent check does, so a delete cannot remove it before the link lands.
+     */
+    public function queryResolveDns(int $count): string
+    {
+        $markers = SqlFilterUtility::markers($count);
+
+        return <<<SQL
+            SELECT entry_id, lc_dn
+            FROM entries FORCE INDEX (uq_lc_dn)
+            WHERE lc_dn IN ($markers)
+            FOR SHARE
+        SQL;
+    }
+
+    /**
      * What the DN columns hold, which is InnoDB's own ceiling for the unique key over one of them.
      */
     public function maxDnLength(): int
