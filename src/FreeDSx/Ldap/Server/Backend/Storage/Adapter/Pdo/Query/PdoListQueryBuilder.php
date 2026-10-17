@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 use function array_merge;
+use function count;
 use function implode;
 
 /**
@@ -33,6 +34,17 @@ final readonly class PdoListQueryBuilder
     public function __construct(
         private PdoEntryListDialectInterface $dialect,
     ) {}
+
+    /**
+     * @param list<string> $parents canonical DNs of the entries whose children are read
+     */
+    public function buildChildDns(array $parents): SqlQuery
+    {
+        return new SqlQuery(
+            $this->dialect->queryChildDns(count($parents)),
+            $parents,
+        );
+    }
 
     public function build(ListQuerySpec $spec): SqlQuery
     {

@@ -35,6 +35,7 @@ enum ServerEvent: string
     case EntryModified                  = 'ldap.entry.modified';
     case EntryDeleted                   = 'ldap.entry.deleted';
     case EntryRenamed                   = 'ldap.entry.renamed';
+    case SubtreeDeleted                 = 'ldap.subtree.deleted';
     case SearchAuthorized               = 'ldap.search.authorized';
     case CompareCompleted               = 'ldap.compare.completed';
     case PasswordModifySuccess          = 'ldap.password_modify.success';
@@ -142,6 +143,7 @@ enum ServerEvent: string
             self::EntryModified => 'An entry was modified.',
             self::EntryDeleted => 'An entry was deleted.',
             self::EntryRenamed => 'An entry was renamed or moved.',
+            self::SubtreeDeleted => 'A subtree delete removed entries.',
             self::SearchAuthorized => 'A search completed after authorization.',
             self::CompareCompleted => 'A compare completed.',
             self::PasswordModifySuccess => 'A password was modified.',

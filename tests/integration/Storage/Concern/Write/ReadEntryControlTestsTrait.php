@@ -201,4 +201,39 @@ trait ReadEntryControlTestsTrait
             $postRead->getEntry()->get('hasSubordinates')?->getValues(),
         );
     }
+
+    public function testThePreReadOfASubtreeDeleteIsTheBaseWithItsSubordinates(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray('ou=pre-read-tree,dc=foo,dc=bar', [
+            'objectClass' => ['organizationalUnit'],
+            'ou' => ['pre-read-tree'],
+        ]));
+        $this->ldapClient()->create(Entry::fromArray('cn=child,ou=pre-read-tree,dc=foo,dc=bar', [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['child'],
+            'sn' => ['Child'],
+        ]));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::delete('ou=pre-read-tree,dc=foo,dc=bar'),
+            Controls::subtreeDelete(),
+            Controls::preRead('ou', 'hasSubordinates'),
+        );
+
+        $preRead = $response->controls()->get(Control::OID_PRE_READ);
+        self::assertInstanceOf(
+            PreReadResponseControl::class,
+            $preRead,
+        );
+        self::assertSame(
+            ['pre-read-tree'],
+            $preRead->getEntry()->get('ou')?->getValues(),
+        );
+        self::assertSame(
+            ['TRUE'],
+            $preRead->getEntry()->get('hasSubordinates')?->getValues(),
+        );
+        self::assertNull($this->ldapClient()->read('cn=child,ou=pre-read-tree,dc=foo,dc=bar'));
+    }
 }

@@ -26,15 +26,19 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\ChildDnsStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\SubtreeWalkStorageContractTests;
 
 final class InMemoryStorageTest extends TestCase
 {
+    use ChildDnsStorageContractTests;
     use EntryIdentityStorageContractTests;
     use ServerContainerTrait;
     use SubtreeRenameStorageContractTests;
+    use SubtreeWalkStorageContractTests;
 
     private InMemoryStorage $subject;
 
@@ -379,6 +383,18 @@ final class InMemoryStorageTest extends TestCase
     {
         $this->subject->remove(new Dn('cn=alice,dc=example,dc=com'));
 
+        self::assertNull($this->subject->find(new Dn('cn=alice,dc=example,dc=com')));
+    }
+
+    public function test_remove_all_counts_only_the_entries_it_found(): void
+    {
+        self::assertSame(
+            1,
+            $this->subject->removeAll([
+                (new Dn('cn=alice,dc=example,dc=com'))->normalize(),
+                (new Dn('cn=nobody,dc=example,dc=com'))->normalize(),
+            ]),
+        );
         self::assertNull($this->subject->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 

@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortedQuery;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
 use function strtolower;
 
@@ -44,6 +45,17 @@ trait PdoEntryListDialectTrait
             SELECT {$columns}
             FROM entries
             WHERE lc_parent_dn = ?
+        SQL;
+    }
+
+    public function queryChildDns(int $count): string
+    {
+        $markers = SqlFilterUtility::markers($count);
+
+        return <<<SQL
+            SELECT lc_dn
+            FROM entries
+            WHERE lc_parent_dn IN ($markers)
         SQL;
     }
 

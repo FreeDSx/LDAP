@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
 use PDO;
 
 /**
@@ -23,22 +24,24 @@ use PDO;
 interface PdoRowLockDialectInterface
 {
     /**
-     * Exclusively lock a row of an internal (never client-named) table until the transaction ends.
+     * Exclusively lock the rows by key until the transaction ends, answering the keys of those it holds.
+     *
+     * @param list<string|int> $keys
+     *
+     * @return list<string|int>
      */
     public function lockRowForWrite(
         PDO $pdo,
-        string $table,
-        string $keyColumn,
-        string|int $key,
-    ): void;
+        LockableTable $table,
+        array $keys,
+    ): array;
 
     /**
-     * Share-lock a row of an internal (never client-named) table so it cannot be deleted until the transaction ends.
+     * Share-lock a row so it cannot be deleted until the transaction ends.
      */
     public function lockRowForReference(
         PDO $pdo,
-        string $table,
-        string $keyColumn,
+        LockableTable $table,
         string|int $key,
     ): bool;
 }

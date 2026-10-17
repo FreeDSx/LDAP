@@ -82,6 +82,10 @@ final class EventContext
 
     public const ENTRIES_ADDED = 'entries_added';
 
+    public const ENTRIES_DELETED = 'entries_deleted';
+
+    public const COMPLETE = 'complete';
+
     public const ENTRIES_SKIPPED = 'entries_skipped';
 
     public const NEW_RDN = 'new_rdn';

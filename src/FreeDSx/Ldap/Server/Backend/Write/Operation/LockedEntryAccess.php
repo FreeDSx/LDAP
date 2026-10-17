@@ -43,7 +43,8 @@ final readonly class LockedEntryAccess
      *
      * @template TResult
      *
-     * @param Closure(Entry): TResult $body
+     * @param Closure(Entry, list<Dn>): TResult $body Also handed every entry the lock holds.
+     * @param list<Dn> $alsoLocked Locked in the same batch as the entry, before anything is read.
      *
      * @return TResult
      *
@@ -54,16 +55,24 @@ final readonly class LockedEntryAccess
         WriteContext $context,
         Closure $body,
         EntryProjection $projection = new EntryProjection(linkCap: null),
+        array $alsoLocked = [],
     ): mixed {
-        return $this->locked($dn, function () use ($dn, $context, $body, $projection): mixed {
-            $current = $this->locator->findOrFail(
-                $dn,
-                $projection,
-            );
-            $context->controlEvaluator()?->evaluateTarget($current);
+        return $this->locked(
+            $dn,
+            function (array $held) use ($dn, $context, $body, $projection): mixed {
+                $current = $this->locator->findOrFail(
+                    $dn,
+                    $projection,
+                );
+                $context->controlEvaluator()?->evaluateTarget($current);
 
-            return $body($current);
-        });
+                return $body(
+                    $current,
+                    $held,
+                );
+            },
+            $alsoLocked,
+        );
     }
 
     /**
@@ -95,18 +104,23 @@ final readonly class LockedEntryAccess
     /**
      * @template TResult
      *
-     * @param Closure(): TResult $body
+     * @param Closure(list<Dn>): TResult $body
+     * @param list<Dn> $alsoLocked
      *
      * @return TResult
      */
     private function locked(
         Dn $dn,
         Closure $body,
+        array $alsoLocked = [],
     ): mixed {
-        return $this->transaction->atomic(function () use ($dn, $body): mixed {
-            $this->locks->lockForWrite($dn);
+        return $this->transaction->atomic(function () use ($dn, $body, $alsoLocked): mixed {
+            $held = $this->locks->lockForWrite([
+                $dn,
+                ...$alsoLocked,
+            ]);
 
-            return $body();
+            return $body($held);
         });
     }
 }

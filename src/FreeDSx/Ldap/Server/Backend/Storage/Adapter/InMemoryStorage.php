@@ -69,6 +69,13 @@ final class InMemoryStorage implements
      */
     private array $dnsByUuid = [];
 
+    /**
+     * Held only for a parent with at least one child, so one level is read without scanning every entry.
+     *
+     * @var array<string, array<string, true>> child normalised DN strings, keyed by their parent's
+     */
+    private array $childrenOf = [];
+
     private int $atomicDepth = 0;
 
     /**
@@ -131,7 +138,21 @@ final class InMemoryStorage implements
             $options,
             $this->entries,
             $this->keys,
+            $this->childrenOf,
         );
+    }
+
+    public function childDns(array $parents): array
+    {
+        $children = [];
+
+        foreach ($parents as $parent) {
+            foreach (array_keys($this->childrenOf[$parent] ?? []) as $child) {
+                $children[] = (string) $child;
+            }
+        }
+
+        return $children;
     }
 
     public function insert(Entry $entry): void
@@ -169,6 +190,10 @@ final class InMemoryStorage implements
         }
         if (($this->entries[$lcDn] ?? null)?->getUuid() !== $uuid) {
             $this->remove($entry->getDn());
+        }
+        $parent = self::parentOf($lcDn);
+        if ($parent !== null) {
+            $this->childrenOf[$parent][$lcDn] = true;
         }
 
         $this->keys[$lcDn] ??= $this->nextKey++;
@@ -220,8 +245,13 @@ final class InMemoryStorage implements
         );
 
         // A rename keeps every entry's identity, so only where each one lives changes.
+        $this->childrenOf = [];
         foreach ($this->entries as $lcDn => $entry) {
             $this->dnsByUuid[$entry->getUuidOrFail()] = $lcDn;
+            $parent = self::parentOf($lcDn);
+            if ($parent !== null) {
+                $this->childrenOf[$parent][$lcDn] = true;
+            }
         }
     }
 
@@ -234,13 +264,19 @@ final class InMemoryStorage implements
             unset($this->dnsByUuid[$uuid]);
         }
         unset($this->entries[$lcDn], $this->keys[$lcDn]);
+        $this->forgetChild($lcDn);
     }
 
-    public function removeAll(array $dns): void
+    public function removeAll(array $dns): int
     {
+        $removed = 0;
+
         foreach ($dns as $dn) {
+            $removed += isset($this->entries[$dn->normalizedString()]) ? 1 : 0;
             $this->remove($dn);
         }
+
+        return $removed;
     }
 
     /**
@@ -266,6 +302,7 @@ final class InMemoryStorage implements
         $keys = $this->keys;
         $nextKey = $this->nextKey;
         $dnsByUuid = $this->dnsByUuid;
+        $childrenOf = $this->childrenOf;
         $this->atomicDepth = 1;
 
         try {
@@ -275,6 +312,7 @@ final class InMemoryStorage implements
             $this->keys = $keys;
             $this->nextKey = $nextKey;
             $this->dnsByUuid = $dnsByUuid;
+            $this->childrenOf = $childrenOf;
 
             throw $e;
         } finally {
@@ -323,6 +361,26 @@ final class InMemoryStorage implements
         return $this->find($owner)
             ?->get($attribute, true)
             ?->getValues()[0] ?? null;
+    }
+
+    private static function parentOf(string $lcDn): ?string
+    {
+        return Dn::fromCanonical($lcDn)
+            ->getParent()
+            ?->normalizedString();
+    }
+
+    private function forgetChild(string $lcDn): void
+    {
+        $parent = self::parentOf($lcDn);
+        if ($parent === null || !isset($this->childrenOf[$parent][$lcDn])) {
+            return;
+        }
+
+        unset($this->childrenOf[$parent][$lcDn]);
+        if ($this->childrenOf[$parent] === []) {
+            unset($this->childrenOf[$parent]);
+        }
     }
 
     /**

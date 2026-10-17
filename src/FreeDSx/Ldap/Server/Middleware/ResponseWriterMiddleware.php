@@ -13,10 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Middleware;
 
-use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Exception\UnrecoverableExceptionInterface;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -27,6 +24,7 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\FailedOperationResult;
+use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
 use Throwable;
 
 /**
@@ -39,6 +37,7 @@ use Throwable;
  */
 final readonly class ResponseWriterMiddleware implements MiddlewareInterface
 {
+    use FailureAnswerTrait;
     use MatchedDnAccessFilterTrait;
 
     public function __construct(
@@ -73,33 +72,6 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
         }
 
         return ResponseStream::resolved($outcome);
-    }
-
-    /**
-     * The result to answer a thrown failure with, or null when it has to end the session instead.
-     */
-    private function answerFor(Throwable $exception): ?OperationException
-    {
-        // Returned as-is rather than rebuilt, which is the only way its matched DN survives.
-        if ($exception instanceof OperationException) {
-            return $exception;
-        }
-        if ($exception instanceof UnrecoverableExceptionInterface) {
-            return null;
-        }
-        if ($exception instanceof AnswerableExceptionInterface) {
-            return new OperationException(
-                $exception->getDiagnostic(),
-                $exception->getCode(),
-                $exception,
-            );
-        }
-
-        return new OperationException(
-            'The result could not be completed.',
-            ResultCode::OTHER,
-            $exception,
-        );
     }
 
     private function errorStream(

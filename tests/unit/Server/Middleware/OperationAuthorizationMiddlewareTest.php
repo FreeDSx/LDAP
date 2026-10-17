@@ -786,7 +786,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
     }
 
-    public function test_an_assertion_on_a_subtree_delete_authorizes_no_read(): void
+    public function test_an_assertion_on_a_subtree_delete_authorizes_a_read_of_the_base(): void
     {
         $this->routeResolvesTo(HandlerId::Dispatch);
         $seen = [];
@@ -810,7 +810,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
 
         self::assertSame(
-            [],
+            ['cn=foo,dc=bar'],
             $seen,
         );
     }

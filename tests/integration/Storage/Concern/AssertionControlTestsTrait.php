@@ -222,6 +222,48 @@ trait AssertionControlTestsTrait
         self::assertNotNull($kept);
     }
 
+    public function testAnAssertionNotMatchingTheBaseFailsTheSubtreeDelete(): void
+    {
+        $this->authenticateAdmin();
+        $this->createAssertionSubtree('assert-tree-no');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::delete('ou=assert-tree-no,dc=foo,dc=bar'),
+                Controls::subtreeDelete(),
+                Controls::assertion(Filters::equal('ou', 'nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+        $kept = $this->ldapClient()->read('cn=child,ou=assert-tree-no,dc=foo,dc=bar');
+        $this->ldapClient()->send(
+            Operations::delete('ou=assert-tree-no,dc=foo,dc=bar'),
+            Controls::subtreeDelete(),
+        );
+
+        self::assertNotNull($kept);
+    }
+
+    public function testAnAssertionMatchingTheBaseLetsTheSubtreeDeleteRun(): void
+    {
+        $this->authenticateAdmin();
+        $this->createAssertionSubtree('assert-tree-yes');
+
+        $this->ldapClient()->send(
+            Operations::delete('ou=assert-tree-yes,dc=foo,dc=bar'),
+            Controls::subtreeDelete(),
+            Controls::assertion(Filters::equal('ou', 'assert-tree-yes')),
+        );
+
+        self::assertNull($this->ldapClient()->read('ou=assert-tree-yes,dc=foo,dc=bar'));
+        self::assertNull($this->ldapClient()->read('cn=child,ou=assert-tree-yes,dc=foo,dc=bar'));
+    }
+
     public function testAnAssertionNotMatchingTheEntryFailsTheModifyDn(): void
     {
         $this->authenticateAdmin();
@@ -273,5 +315,24 @@ trait AssertionControlTestsTrait
         $this->ldapClient()->create($entry);
 
         return $entry->getDn()->toString();
+    }
+
+    private function createAssertionSubtree(string $ou): void
+    {
+        $this->ldapClient()->create(Entry::fromArray(
+            "ou={$ou},dc=foo,dc=bar",
+            [
+                'objectClass' => ['organizationalUnit'],
+                'ou' => [$ou],
+            ],
+        ));
+        $this->ldapClient()->create(Entry::fromArray(
+            "cn=child,ou={$ou},dc=foo,dc=bar",
+            [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => ['child'],
+                'sn' => ['Smith'],
+            ],
+        ));
     }
 }

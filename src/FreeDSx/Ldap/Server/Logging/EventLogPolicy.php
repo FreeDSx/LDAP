@@ -62,6 +62,7 @@ final readonly class EventLogPolicy
             ServerEvent::SchemaViolation,
             ServerEvent::SyncEntrySkipped,
             ServerEvent::PagingSessionEvicted,
+            ServerEvent::SubtreeDeleted,
             ServerEvent::JournalPruned,
             ServerEvent::JournalPruneFailed,
             ServerEvent::NoticeOfDisconnectSent,

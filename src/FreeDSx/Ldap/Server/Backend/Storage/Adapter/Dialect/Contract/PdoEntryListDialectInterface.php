@@ -39,6 +39,13 @@ interface PdoEntryListDialectInterface
     public function querySubtree(bool $withChildFlag = false): string;
 
     /**
+     * The lc_dn of every entry directly below any of $count parents.
+     *
+     * Parameters: the parents' lc_dn values
+     */
+    public function queryChildDns(int $count): string;
+
+    /**
      * A parameterless condition restricting $dnColumn to entries that lack, or carry, the subentry object class.
      */
     public function querySubentryCondition(

@@ -25,8 +25,20 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoRowLockDialectTra
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSchemaTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSidecarDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoTransactionDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use PDO;
 use PDOException;
+use PDOStatement;
+
+use function array_chunk;
+use function array_merge;
+use function array_unique;
+use function array_values;
+use function count;
+use function is_int;
+use function is_string;
+use function sort;
+use function sprintf;
 
 /**
  * MySQL/MariaDB SQL for the PDO storage; requires MySQL 8.0+ or MariaDB 10.6+.
@@ -69,6 +81,11 @@ final class MysqlDialect implements PdoDialectInterface
     private const ERROR_DATA_TOO_LONG = 1406;
 
     /**
+     * Values per locking read.
+     */
+    private const LOCK_BATCH_SIZE = 500;
+
+    /**
      * InnoDB resolves lock conflicts by failing one transaction, which is then safe to reissue unchanged.
      */
     public function isRetryableConflict(PDOException $exception): bool
@@ -100,30 +117,52 @@ final class MysqlDialect implements PdoDialectInterface
         return ($exception->errorInfo[1] ?? null) === self::ERROR_DATA_TOO_LONG;
     }
 
+    /**
+     * Sorted and taken through the key's own index, so overlapping batches always lock in the same order.
+     *
+     * @param list<string|int> $keys
+     *
+     * @return list<string|int>
+     */
     public function lockRowForWrite(
         PDO $pdo,
-        string $table,
-        string $keyColumn,
-        string|int $key,
-    ): void {
-        $statement = $pdo->prepare(<<<SQL
-            SELECT $keyColumn
-            FROM $table
-            WHERE $keyColumn = ?
-            FOR UPDATE
-            SQL);
-        $statement->execute([$key]);
+        LockableTable $table,
+        array $keys,
+    ): array {
+        $keys = array_values(array_unique($keys));
+        sort(
+            $keys,
+            SORT_STRING,
+        );
+        $statements = [];
+        $batches = [];
+
+        foreach (array_chunk($keys, self::LOCK_BATCH_SIZE) as $chunk) {
+            $count = count($chunk);
+            $statements[$count] ??= $pdo->prepare(sprintf(
+                'SELECT %s FROM %s FORCE INDEX (%s) WHERE %s IN (%s) FOR UPDATE',
+                $table->keyColumn(),
+                $table->value,
+                $table->keyIndex(),
+                $table->keyColumn(),
+                SqlFilterUtility::markers($count),
+            ));
+            $statements[$count]->execute($chunk);
+            $batches[] = $this->lockedKeys($statements[$count]);
+        }
+
+        return array_merge(...$batches);
     }
 
     public function lockRowForReference(
         PDO $pdo,
-        string $table,
-        string $keyColumn,
+        LockableTable $table,
         string|int $key,
     ): bool {
+        $keyColumn = $table->keyColumn();
         $statement = $pdo->prepare(<<<SQL
             SELECT $keyColumn
-            FROM $table
+            FROM {$table->value}
             WHERE $keyColumn = ?
             FOR SHARE
             SQL);
@@ -187,6 +226,22 @@ final class MysqlDialect implements PdoDialectInterface
     protected function schemaName(): string
     {
         return 'mysql';
+    }
+
+    /**
+     * @return list<string|int>
+     */
+    private function lockedKeys(PDOStatement $statement): array
+    {
+        $keys = [];
+
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $key) {
+            if (is_string($key) || is_int($key)) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
     }
 
     /**

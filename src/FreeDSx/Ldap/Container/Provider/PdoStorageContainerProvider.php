@@ -221,18 +221,31 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
      */
     private function makeWriterQueue(Container $container): WriterQueueInterface
     {
+        $config = $this->requirePdoConfig($container);
         $serializes = $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
-            && $this->requirePdoConfig($container)->getSerializeSwooleWrites();
+            && $config->getSerializeSwooleWrites();
 
         if (!$serializes) {
             return new ImmediateWriterQueue();
         }
-        $connection = $container->get(PdoConnection::class);
 
+        // Batched only where nothing else can commit under the batch's snapshot, so a job's lock-then-read sees current rows.
         return new SwooleWriterQueue(
-            batchWrapper: static fn(Closure $batch) => $connection->atomic(static fn() => $batch()),
+            batchWrapper: $config->getDriver()->serializesWrites()
+                ? $this->batchWrapper($container->get(PdoConnection::class))
+                : null,
             scope: $container->get(WriteScope::class),
         );
+    }
+
+    /**
+     * @return Closure(Closure(): void): void
+     */
+    private function batchWrapper(PdoConnection $connection): Closure
+    {
+        return static function (Closure $batch) use ($connection): void {
+            $connection->atomic(static fn() => $batch());
+        };
     }
 
     private function makeEntryRowCodec(Container $container): EntryRowCodec

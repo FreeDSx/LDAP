@@ -85,6 +85,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\ComputeUpdateHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteSubtreeHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeChunkRemover;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryMutation;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryPlacementGuard;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\MoveEntryHandler;
@@ -225,6 +226,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             TransactionalEntryWrite::class => $this->makeTransactionalEntryWrite(...),
             AddEntryHandler::class => $this->makeAddEntryHandler(...),
             DeleteEntryHandler::class => $this->makeDeleteEntryHandler(...),
+            SubtreeChunkRemover::class => $this->makeSubtreeChunkRemover(...),
             DeleteSubtreeHandler::class => $this->makeDeleteSubtreeHandler(...),
             UpdateEntryHandler::class => $this->makeUpdateEntryHandler(...),
             ComputeUpdateHandler::class => $this->makeComputeUpdateHandler(...),
@@ -408,12 +410,25 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeDeleteSubtreeHandler(Container $container): DeleteSubtreeHandler
     {
+        $options = $container->get(ServerOptions::class);
+
         return new DeleteSubtreeHandler(
-            storage: $container->get(WriteEntryInterface::class),
-            transaction: $container->get(TransactionalWriteInterface::class),
-            locator: $container->get(EntryLocator::class),
             placement: $container->get(EntryPlacementGuard::class),
+            chunks: $container->get(SubtreeChunkRemover::class),
+            eventLogger: new EventLogger(
+                $options->getLogger(),
+                $options->getEventLogPolicy(),
+            ),
+            sleeper: $container->get(SleeperInterface::class),
+        );
+    }
+
+    private function makeSubtreeChunkRemover(Container $container): SubtreeChunkRemover
+    {
+        return new SubtreeChunkRemover(
+            locked: $container->get(LockedEntryAccess::class),
             subtree: $container->get(SubtreeEnumerator::class),
+            storage: $container->get(WriteEntryInterface::class),
             changeRecorder: $this->changeRecorderFor($container),
         );
     }

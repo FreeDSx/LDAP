@@ -13,37 +13,61 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorderInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\UnrecordedChanges;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
+use Throwable;
 
-use function array_chunk;
+use function microtime;
+use function min;
+use function sprintf;
+
+use const PHP_INT_MAX;
 
 /**
- * Removes an entry along with everything beneath it.
+ * Removes an entry along with everything beneath it, leaves first and a bounded number of entries per transaction.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 readonly class DeleteSubtreeHandler
 {
+    use FailureAnswerTrait;
+
     /**
-     * Entries removed per transaction; bounds per-transaction work for large subtrees.
+     * Entries removed in one transaction, which bounds how long it holds their locks.
      */
-    private const BATCH_SIZE = 1000;
+    private const CHUNK_SIZE = 1000;
+
+    /**
+     * Entries one request removes before it stops short of the base and has to be resubmitted.
+     */
+    private const MAX_ENTRIES_PER_REQUEST = 25_000;
+
+    /**
+     * Transactions in a row that may remove nothing before the request gives up.
+     */
+    private const MAX_IDLE_ROUNDS = 3;
+
+    /**
+     * The pause between transactions that lets other operations in.
+     */
+    private const PAUSE_SECONDS = 0.001;
 
     public function __construct(
-        private WriteEntryInterface $storage,
-        private TransactionalWriteInterface $transaction,
-        private EntryLocator $locator,
         private EntryPlacementGuard $placement,
-        private SubtreeEnumerator $subtree,
-        private ChangeRecorderInterface $changeRecorder = new UnrecordedChanges(),
+        private SubtreeChunkRemover $chunks,
+        private EventLogger $eventLogger = new EventLogger(null),
+        private SleeperInterface $sleeper = new BlockingSleeper(),
+        private int $maxEntries = self::MAX_ENTRIES_PER_REQUEST,
     ) {}
 
     /**
@@ -54,26 +78,178 @@ readonly class DeleteSubtreeHandler
         WriteContext $context,
     ): void {
         $base = $command->dn->normalize();
-        $this->locator->findOrFail($base);
+
+        // A naming context is refused before anything beneath it is removed.
         $this->placement->assertSubtreeDeletePlacement($command->dn);
 
-        // Enumerated outside any transaction, since the removal below spans several of them.
-        $dnList = $this->subtree->dnListDeepestFirst($base);
+        $progress = new SubtreeDeleteProgress();
+        $startedAt = microtime(true);
 
-        foreach (array_chunk($dnList, self::BATCH_SIZE) as $batch) {
-            $this->transaction->atomic(function () use ($batch, $context): void {
-                $preImages = $this->changeRecorder->records()
-                    ? $this->subtree->entriesAt($batch)
-                    : [];
-                $this->storage->removeAll($batch);
-
-                foreach ($preImages as $entry) {
-                    $this->changeRecorder->recordDelete(
-                        $entry,
-                        $context,
-                    );
-                }
-            });
+        try {
+            $this->deleteInChunks(
+                $base,
+                $context,
+                $progress,
+            );
+        } catch (Throwable $e) {
+            throw $this->withProgress(
+                $e,
+                $progress,
+            );
+        } finally {
+            $this->recordProgress(
+                $command->dn,
+                $context,
+                $progress,
+                $startedAt,
+            );
         }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function deleteInChunks(
+        Dn $base,
+        WriteContext $context,
+        SubtreeDeleteProgress $progress,
+    ): void {
+        $queue = $this->chunks->queueFor($base);
+        $budget = $context->isSystem()
+            ? PHP_INT_MAX
+            : $this->maxEntries;
+        $chunkContext = $context;
+
+        while (!$progress->isComplete()) {
+            $chunk = $queue->next(min(
+                self::CHUNK_SIZE,
+                $budget - $progress->deleted(),
+            ));
+            if ($chunk === []) {
+                break;
+            }
+
+            $this->deleteNext(
+                $base,
+                $chunk,
+                $chunkContext,
+                $queue,
+                $progress,
+            );
+            $chunkContext = $context->withoutControlEvaluator();
+
+            if (!$progress->isComplete()) {
+                // gives other coroutines a chance to work (for coroutine-based runners
+                $this->sleeper->sleep(self::PAUSE_SECONDS);
+            }
+        }
+
+        $this->assertComplete($progress);
+        $context->responseControls()->add($progress->toControl());
+    }
+
+    /**
+     * @param list<string> $chunk canonical DNs, each after its children
+     *
+     * @throws OperationException
+     */
+    private function deleteNext(
+        Dn $base,
+        array $chunk,
+        WriteContext $context,
+        DeletionQueue $queue,
+        SubtreeDeleteProgress $progress,
+    ): void {
+        $outcome = $this->chunks->removeChunk(
+            $base,
+            $chunk,
+            $context,
+        );
+        // Only after the commit, so a transaction retried after a deadlock never requeues twice.
+        $queue->requeue(
+            $outcome->strays,
+            $outcome->blocked,
+        );
+        $progress->record($outcome);
+        $this->assertStillRemoving($progress);
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertStillRemoving(SubtreeDeleteProgress $progress): void
+    {
+        if ($progress->idleRounds() < self::MAX_IDLE_ROUNDS) {
+            return;
+        }
+
+        throw new OperationException(
+            'The subtree delete made no progress.',
+            ResultCode::BUSY,
+        );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertComplete(SubtreeDeleteProgress $progress): void
+    {
+        if ($progress->isComplete()) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                '%d entries deleted; resubmit to continue.',
+                $progress->deleted(),
+            ),
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+        );
+    }
+
+    /**
+     * The failure as the client would be answered, also saying how many entries the request removed before it.
+     */
+    private function withProgress(
+        Throwable $failure,
+        SubtreeDeleteProgress $progress,
+    ): Throwable {
+        $answer = $this->answerFor($failure);
+        if ($answer === null || $progress->deleted() === 0) {
+            return $failure;
+        }
+
+        return new OperationException(
+            $answer->getMessage(),
+            $answer->getCode(),
+            $failure,
+            $answer->getMatchedDn(),
+            new ControlBag(
+                $progress->toControl(),
+                ...$answer->controls()->toArray(),
+            ),
+        );
+    }
+
+    private function recordProgress(
+        Dn $dn,
+        WriteContext $context,
+        SubtreeDeleteProgress $progress,
+        float $startedAt,
+    ): void {
+        if ($progress->deleted() === 0) {
+            return;
+        }
+
+        $this->eventLogger->record(
+            ServerEvent::SubtreeDeleted,
+            [
+                EventContext::TARGET => [EventContext::DN => $dn->toString()],
+                EventContext::ENTRIES_DELETED => $progress->deleted(),
+                EventContext::COMPLETE => $progress->isComplete(),
+                EventContext::DURATION_SECONDS => microtime(true) - $startedAt,
+            ],
+            $context->getToken(),
+        );
     }
 }

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
@@ -54,6 +55,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
     ): ResponseStream {
         $controls = $message->controls();
+        $responseControls = new ControlBag();
         $schemaViolations = new SchemaViolations();
         $controlEvaluator = new WriteControlEvaluator(
             $this->assertions,
@@ -69,6 +71,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
                 $controls,
                 schemaViolations: $schemaViolations,
                 controlEvaluator: $controlEvaluator,
+                responseControls: $responseControls,
             ),
         );
 
@@ -90,7 +93,11 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
                 '',
                 null,
                 [],
-                ...$this->successControls($preRead, $postRead),
+                ...$this->successControls(
+                    $preRead,
+                    $postRead,
+                ),
+                ...$responseControls->toArray(),
             )],
             WriteOperationResult::success(
                 $message,

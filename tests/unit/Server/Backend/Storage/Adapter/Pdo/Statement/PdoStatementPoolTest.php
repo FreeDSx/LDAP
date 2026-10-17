@@ -151,6 +151,23 @@ final class PdoStatementPoolTest extends TestCase
         );
     }
 
+    public function test_a_string_column_answers_null_once_the_rows_run_out(): void
+    {
+        $statement = $this->subject->execute(
+            'SELECT name FROM t WHERE id <= ? ORDER BY id',
+            [2],
+        );
+
+        self::assertSame(
+            ['a', 'b', null],
+            [
+                $statement->fetchStringColumn(),
+                $statement->fetchStringColumn(),
+                $statement->fetchStringColumn(),
+            ],
+        );
+    }
+
     public function test_it_binds_a_null_parameter_as_sql_null(): void
     {
         $this->subject->execute(

@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
-use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -224,7 +223,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     ): array {
         $targets = [];
 
-        if ($controls->has(Control::OID_ASSERTION) && !$this->isSubtreeDelete($request, $controls)) {
+        if ($controls->has(Control::OID_ASSERTION)) {
             $targets[] = $this->targetDnFor($request);
         }
 
@@ -240,14 +239,6 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         }
 
         return array_values(array_filter($targets));
-    }
-
-    private function isSubtreeDelete(
-        RequestInterface $request,
-        ControlBag $controls,
-    ): bool {
-        return $request instanceof DeleteRequest
-            && $controls->has(Control::OID_SUBTREE_DELETE);
     }
 
     /**

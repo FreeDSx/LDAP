@@ -199,6 +199,23 @@ final class EntryRowCodecTest extends TestCase
         );
     }
 
+    public function test_a_projection_of_nothing_still_carries_a_projected_child_flag(): void
+    {
+        $entry = $this->subject->decode(
+            [
+                'dn' => self::DN,
+                'attributes' => 'NOT_VALID_BLOB',
+                'has_children' => 1,
+            ],
+            [],
+        );
+
+        self::assertSame(
+            ['TRUE'],
+            $entry->get('hasSubordinates')?->getValues(),
+        );
+    }
+
     public function test_a_row_without_the_child_flag_carries_no_has_subordinates(): void
     {
         $entry = $this->roundTrip(new Entry(new Dn(self::DN)));

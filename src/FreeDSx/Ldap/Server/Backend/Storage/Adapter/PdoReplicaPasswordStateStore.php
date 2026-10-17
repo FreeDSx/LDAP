@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -38,7 +39,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 {
     use PdoColumnCastTrait;
 
-    private const TABLE = 'ldap_replica_pwpolicy_state';
+    private const TABLE = LockableTable::ReplicaPasswordState->value;
 
     public function __construct(
         private PdoConnection $connection,
@@ -225,9 +226,8 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
     {
         $this->dialect->lockRowForWrite(
             $this->connection->pdo(),
-            self::TABLE,
-            'entry_uuid',
-            $uuid,
+            LockableTable::ReplicaPasswordState,
+            [$uuid],
         );
     }
 

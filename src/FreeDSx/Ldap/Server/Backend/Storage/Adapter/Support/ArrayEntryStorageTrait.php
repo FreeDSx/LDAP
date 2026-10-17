@@ -45,13 +45,23 @@ trait ArrayEntryStorageTrait
     /**
      * @param array<string, Entry> $entries Entries keyed by normalised DN string
      * @param array<string, int> $keys Entry key per normalised DN string
+     * @param array<string, array<string, true>> $childrenOf Child normalised DN strings, keyed by a parent's that has any
      */
     private function listFromArray(
         StorageListOptions $options,
         array $entries,
-        array $keys = [],
+        array $keys,
+        array $childrenOf,
     ): EntryStream {
-        $scoped = $this->yieldByScope($options, $entries);
+        $scoped = $this->yieldByScope(
+            $options,
+            $this->candidatesFor(
+                $options,
+                $entries,
+                $keys,
+                $childrenOf,
+            ),
+        );
         $backlinks = $this->backlinksWanted($options);
 
         if (!$backlinks->isEmpty()) {
@@ -66,7 +76,7 @@ trait ArrayEntryStorageTrait
         if ($options->projection->withHasSubordinates) {
             $scoped = $this->withChildFlag(
                 $scoped,
-                $this->parentDnsIn($entries),
+                $childrenOf,
             );
         }
         if ($options->sortKeys === []) {
@@ -261,31 +271,74 @@ trait ArrayEntryStorageTrait
     }
 
     /**
-     * The normalised DN of every entry that is some other entry's parent.
+     * The entries a list could hand over, narrowed to the base's children for one level and past the cursor for a walk.
      *
      * @param array<string, Entry> $entries
-     * @return array<string, true>
+     * @param array<string, int> $keys
+     * @param array<string, array<string, true>> $childrenOf
+     *
+     * @return Generator<string, Entry> in ascending key order
      */
-    private function parentDnsIn(array $entries): array
-    {
-        $parents = [];
+    private function candidatesFor(
+        StorageListOptions $options,
+        array $entries,
+        array $keys,
+        array $childrenOf,
+    ): Generator {
+        $dns = $options->scope->subtree
+            ? array_keys($entries)
+            : array_keys($childrenOf[$options->scope->baseDn->normalizedString()] ?? []);
+        $after = $options->bounds->resumeAfter()?->position;
+        $start = $after === null || $options->sortKeys !== []
+            ? 0
+            : self::firstPast(
+                $dns,
+                $keys,
+                $after,
+            );
 
-        foreach ($entries as $entry) {
-            $parent = $entry->getDn()
-                ->getParent()
-                ?->normalizedString();
+        foreach (array_slice($dns, $start) as $lcDn) {
+            $lcDn = (string) $lcDn;
 
-            if ($parent !== null) {
-                $parents[$parent] = true;
+            if (isset($entries[$lcDn])) {
+                yield $lcDn => $entries[$lcDn];
             }
         }
+    }
 
-        return $parents;
+    /**
+     * Where the first DN keyed past the cursor sits, found by halving since the DNs are in ascending key order.
+     *
+     * @param list<array-key> $dns
+     * @param array<string, int> $keys
+     */
+    private static function firstPast(
+        array $dns,
+        array $keys,
+        int $after,
+    ): int {
+        $low = 0;
+        $high = count($dns);
+
+        while ($low < $high) {
+            $mid = intdiv(
+                $low + $high,
+                2,
+            );
+            if (($keys[$dns[$mid]] ?? 0) <= $after) {
+                $low = $mid + 1;
+
+                continue;
+            }
+            $high = $mid;
+        }
+
+        return $low;
     }
 
     /**
      * @param iterable<Entry> $entries
-     * @param array<string, true> $parents
+     * @param array<string, mixed> $parents keyed by the normalised DN of each entry that has children
      * @return Generator<int, Entry>
      */
     private function withChildFlag(
@@ -425,12 +478,12 @@ trait ArrayEntryStorageTrait
      * Entries in scope, in insertion order, which is ascending key order since keys are handed out on insert and a
      * rename re-keys the array in place.
      *
-     * @param array<string, Entry> $entries Entries keyed by normalised DN string
+     * @param iterable<string, Entry> $entries Entries keyed by normalised DN string
      * @return Generator<int, Entry>
      */
     private function yieldByScope(
         StorageListOptions $options,
-        array $entries,
+        iterable $entries,
     ): Generator {
         $deadline = $options->bounds->deadline;
         $scope = $options->scope;

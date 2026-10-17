@@ -34,6 +34,7 @@ final readonly class WriteContext
         private SchemaViolations $schemaViolations = new SchemaViolations(),
         private ?BulkLoadOptions $bulkLoad = null,
         private ?WriteControlEvaluator $controlEvaluator = null,
+        private ControlBag $responseControls = new ControlBag(),
     ) {}
 
     /**
@@ -116,5 +117,31 @@ final readonly class WriteContext
     public function controlEvaluator(): ?WriteControlEvaluator
     {
         return $this->controlEvaluator;
+    }
+
+    /**
+     * Controls the write adds to its response when it succeeds.
+     */
+    public function responseControls(): ControlBag
+    {
+        return $this->responseControls;
+    }
+
+    /**
+     * The same context for a later transaction of one write, whose controls were evaluated in its first.
+     *
+     * @internal
+     */
+    public function withoutControlEvaluator(): self
+    {
+        return new self(
+            $this->token,
+            $this->controls,
+            $this->isSystem,
+            $this->schemaViolations,
+            $this->bulkLoad,
+            null,
+            $this->responseControls,
+        );
     }
 }

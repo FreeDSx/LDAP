@@ -86,59 +86,6 @@ trait ControlValidationTestsTrait
         }
     }
 
-    /**
-     * @return iterable<string, array{Control}>
-     */
-    public static function controlsASubtreeDeleteCannotHonor(): iterable
-    {
-        yield 'assertion' => [Controls::assertion(Filters::present('objectClass'))];
-        yield 'pre-read' => [new PreReadControl('cn')];
-    }
-
-    #[DataProvider('controlsASubtreeDeleteCannotHonor')]
-    public function testACriticalControlASubtreeDeleteCannotHonorIsRefused(Control $control): void
-    {
-        $this->authenticateAdmin();
-
-        try {
-            $this->ldapClient()->sendAndReceive(
-                Operations::delete('ou=no-such-subtree,dc=foo,dc=bar'),
-                Controls::subtreeDelete(),
-                $control->setCriticality(true),
-            );
-            self::fail('The critical control should have failed the subtree delete.');
-        } catch (OperationException $e) {
-            self::assertSame(
-                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
-                $e->getCode(),
-            );
-        }
-    }
-
-    public function testANonCriticalControlASubtreeDeleteCannotHonorIsIgnored(): void
-    {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray('ou=ignored-controls,dc=foo,dc=bar', [
-            'objectClass' => ['organizationalUnit'],
-            'ou' => ['ignored-controls'],
-        ]));
-        $this->ldapClient()->create(Entry::fromArray('cn=child,ou=ignored-controls,dc=foo,dc=bar', [
-            'objectClass' => ['inetOrgPerson'],
-            'cn' => ['child'],
-            'sn' => ['Child'],
-        ]));
-
-        $response = $this->ldapClient()->sendAndReceive(
-            Operations::delete('ou=ignored-controls,dc=foo,dc=bar'),
-            Controls::subtreeDelete(),
-            Controls::assertion(Filters::equal('ou', 'nomatch'))->setCriticality(false),
-            Controls::preRead('ou')->setCriticality(false),
-        );
-
-        self::assertNull($response->controls()->get(Control::OID_PRE_READ));
-        self::assertNull($this->ldapClient()->read('ou=ignored-controls,dc=foo,dc=bar'));
-    }
-
     #[DataProvider('repeatedControlProvider')]
     public function testASearchCarryingTheSameControlTwiceIsRefusedWithAProtocolError(
         Control $first,
