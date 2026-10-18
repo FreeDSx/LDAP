@@ -1036,7 +1036,7 @@ final class FilterEvaluatorTest extends TestCase
                     'Alice',
                 ),
                 new Attribute(
-                    $i % 2 === 0 ? 'cn;lang-en' : 'cn;lang-fr',
+                    ($i % 2 === 0 ? 'cn;lang-en' : 'cn;lang-fr') . ";x-match-{$i}",
                     'Alice',
                 ),
             );
@@ -1073,8 +1073,14 @@ final class FilterEvaluatorTest extends TestCase
         );
 
         for ($i = 0; $i < 3; $i++) {
-            self::assertTrue($this->subject->evaluate($alice, $filter));
-            self::assertFalse($this->subject->evaluate($bob, $filter));
+            self::assertTrue($this->subject->evaluate(
+                $alice,
+                $filter,
+            ));
+            self::assertFalse($this->subject->evaluate(
+                $bob,
+                $filter,
+            ));
         }
     }
 

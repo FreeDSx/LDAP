@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Seed;
 
-use function array_map;
-
 /**
  * The shape of the generated entries a test server seeds.
  */
@@ -23,17 +21,6 @@ enum SeedProfile: string
     case Minimal = 'minimal';
 
     case Person = 'person';
-
-    /**
-     * @return list<string>
-     */
-    public static function values(): array
-    {
-        return array_map(
-            static fn(self $profile): string => $profile->value,
-            self::cases(),
-        );
-    }
 
     public function generator(int $fillerAttributes): SeedEntryGeneratorInterface
     {

@@ -137,6 +137,49 @@ final class StrippedEntryMatcherTest extends TestCase
         ));
     }
 
+    public function test_losing_an_option_bearing_form_of_a_type_the_filter_reads_judges_the_stripped_entry_again(): void
+    {
+        $entry = $this->entryWithTaggedGivenName();
+
+        $this->mockEvaluator
+            ->expects(self::once())
+            ->method('evaluate')
+            ->willReturn(false);
+
+        self::assertFalse($this->subject->stillMatches(
+            $entry,
+            Entry::raw(
+                $entry->getDn(),
+                [$this->cn],
+            ),
+            Filters::equal(
+                'givenName',
+                'Ali',
+            ),
+        ));
+    }
+
+    public function test_losing_an_option_bearing_form_of_another_type_keeps_the_match_without_judging_it(): void
+    {
+        $entry = $this->entryWithTaggedGivenName();
+
+        $this->mockEvaluator
+            ->expects(self::never())
+            ->method('evaluate');
+
+        self::assertTrue($this->subject->stillMatches(
+            $entry,
+            Entry::raw(
+                $entry->getDn(),
+                [$this->cn],
+            ),
+            Filters::equal(
+                'cn',
+                'alice',
+            ),
+        ));
+    }
+
     public function test_losing_a_subtype_of_a_type_the_filter_names_judges_the_stripped_entry_again(): void
     {
         $this->mockEvaluator
@@ -224,6 +267,18 @@ final class StrippedEntryMatcherTest extends TestCase
                 'alice',
             ),
         ];
+    }
+
+    private function entryWithTaggedGivenName(): Entry
+    {
+        return new Entry(
+            new Dn('cn=alice,dc=foo,dc=bar'),
+            $this->cn,
+            new Attribute(
+                'givenName;lang-en',
+                'Ali',
+            ),
+        );
     }
 
     private function stripped(Attribute ...$kept): Entry

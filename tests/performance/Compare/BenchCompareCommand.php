@@ -33,10 +33,13 @@ use Tests\Performance\FreeDSx\Ldap\Driver;
 use Tests\Performance\FreeDSx\Ldap\Report\Report;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
 use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
+use Tests\Support\FreeDSx\Ldap\ConsoleOptionsTrait;
 use Throwable;
 
 final class BenchCompareCommand extends Command
 {
+    use ConsoleOptionsTrait;
+
     private const DEFAULT_SOURCE_LABEL = 'FreeDSx';
 
     private const DEFAULT_SOURCE_PORT = 10389;
@@ -233,10 +236,7 @@ final class BenchCompareCommand extends Command
                 'output',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Report format: ' . implode(
-                    ' | ',
-                    array_column(OutputFormat::cases(), 'value'),
-                ),
+                'Report format: ' . self::enumChoices(OutputFormat::cases()),
                 OutputFormat::Text->value,
             )
             ->addOption(

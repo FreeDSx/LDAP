@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\JsonLinesAuditSink;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
+use Generator;
 use PDO;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -44,6 +45,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Tests\Support\FreeDSx\Ldap\Seed\SeedDn;
+use Tests\Support\FreeDSx\Ldap\Seed\SeedEntryGeneratorInterface;
 use Tests\Support\FreeDSx\Ldap\Seed\SeedProfile;
 
 final class LdapBackendStorageCommand extends Command
@@ -175,7 +177,7 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 sprintf(
                     'Shape of the generated seed entries (%s)',
-                    implode(', ', SeedProfile::values()),
+                    self::enumChoices(SeedProfile::cases()),
                 ),
                 SeedProfile::Minimal->value,
             )
@@ -354,10 +356,18 @@ final class LdapBackendStorageCommand extends Command
             return Command::FAILURE;
         }
 
-        $seedProfile = SeedProfile::tryFrom($this->getStringOption($input, 'seed-profile'));
+        $seedProfileValue = $this->getStringOption(
+            $input,
+            'seed-profile',
+        );
+        $seedProfile = SeedProfile::tryFrom($seedProfileValue);
 
         if ($seedProfile === null) {
-            $io->error('Invalid --seed-profile value. Expected one of: ' . implode(', ', SeedProfile::values()) . '.');
+            $io->error(sprintf(
+                'Invalid --seed-profile value: %s. Expected one of: %s.',
+                $seedProfileValue,
+                self::enumChoices(SeedProfile::cases()),
+            ));
 
             return Command::FAILURE;
         }
@@ -375,15 +385,6 @@ final class LdapBackendStorageCommand extends Command
 
             return Command::FAILURE;
         }
-
-        // The fixed content comes from SEED_LDIF; only the generated entries are built here.
-        $entries = [
-            ...$generator->generate($seedEntries),
-            ...$this->loadGroups(
-                $seedGroups,
-                $seedGroupSize,
-            ),
-        ];
 
         $network = (new NetworkConfig())
             ->setPort($port)
@@ -486,19 +487,30 @@ final class LdapBackendStorageCommand extends Command
         $seedLdif = $this->getStringOption($input, 'seed-ldif');
         $validateSeed = !$input->getOption('no-seed-validation');
 
-        $seed = function () use ($server, $entries, $seedLdif, $validateSeed, $generator): void {
+        $seed = function () use (
+            $server,
+            $seedLdif,
+            $validateSeed,
+            $generator,
+            $seedEntries,
+            $seedGroups,
+            $seedGroupSize,
+        ): void {
             $server->seed(
                 new FileLdifLoader($seedLdif),
                 new SeedOptions(ignoreValidation: !$validateSeed),
             );
 
             // Only a profile built to satisfy the schema is validated; the others exist to widen the return path.
-            if ($entries !== []) {
-                $server->seedEntries(
-                    $entries,
-                    new SeedOptions(ignoreValidation: !$generator->isSchemaValid()),
-                );
-            }
+            $server->seedEntries(
+                $this->generatedEntries(
+                    $generator,
+                    $seedEntries,
+                    $seedGroups,
+                    $seedGroupSize,
+                ),
+                new SeedOptions(ignoreValidation: !$generator->isSchemaValid()),
+            );
         };
 
         if ($runner === 'swoole') {
@@ -510,6 +522,24 @@ final class LdapBackendStorageCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * The generated people and the load groups, built as they are seeded so none are held for the server's lifetime.
+     *
+     * @return Generator<Entry>
+     */
+    private function generatedEntries(
+        SeedEntryGeneratorInterface $generator,
+        int $count,
+        int $groups,
+        int $groupSize,
+    ): Generator {
+        yield from $generator->generate($count);
+        yield from $this->loadGroups(
+            $groups,
+            $groupSize,
+        );
     }
 
     /**

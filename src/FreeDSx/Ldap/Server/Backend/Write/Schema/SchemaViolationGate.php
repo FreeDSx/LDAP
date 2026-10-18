@@ -112,6 +112,14 @@ final readonly class SchemaViolationGate
     {
         foreach ($entry->getAttributes() as $attribute) {
             $type = $attribute->getName();
+
+            // RFC 4512 2.5: a description always names a type, whatever the validation mode allows.
+            if ($type === '') {
+                throw new OperationException(
+                    'The attribute description names no attribute type.',
+                    ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
+                );
+            }
             if (Attribute::isStorableType($type)) {
                 continue;
             }

@@ -33,7 +33,7 @@ final readonly class RunSettings
     /**
      * @param ?int $duration Seconds to sample for, or null when the run ends on its ops instead.
      * @param ?int $ops Operations per client, or null when the run ends on its duration instead.
-     * @param int $workerIdOffset Where this driver's worker ids start, so drivers sharing a server never overlap.
+     * @param int $workerIdOffset Where this driver's worker ids start, keeping drivers that share a server apart.
      * @param bool $jit Whether the PHP processes the run spawns enable the function JIT.
      */
     public function __construct(
