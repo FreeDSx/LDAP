@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -45,7 +45,7 @@ final readonly class PageFiller
 
     public function __construct(
         private ReadBackendInterface $backend,
-        private FilterEvaluatorInterface $filterEvaluator,
+        private StrippedEntryMatcher $strippedMatcher,
         private AccessControlInterface $accessControl,
         private Schema $schema,
         private SearchLimits $limits = new SearchLimits(),
@@ -253,10 +253,10 @@ final readonly class PageFiller
             return null;
         }
 
-        // Stripping an attribute can cost the entry its match, so a changed entry is judged against the filter again.
-        return $filtered !== $entry && !$this->filterEvaluator->evaluate($filtered, $filter)
-            ? null
-            : $filtered;
+        // Stripping an attribute can cost the entry its match.
+        return $this->strippedMatcher->stillMatches($entry, $filtered, $filter)
+            ? $filtered
+            : null;
     }
 
     private function projectionFor(SearchRequest $request): AttributeProjection

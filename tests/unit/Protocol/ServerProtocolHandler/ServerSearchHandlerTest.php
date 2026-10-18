@@ -44,6 +44,8 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationResult;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
@@ -1195,7 +1197,11 @@ final class ServerSearchHandlerTest extends TestCase
     ): ServerSearchHandler {
         return new ServerSearchHandler(
             backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
+            strippedMatcher: new StrippedEntryMatcher(
+                $this->mockFilterEvaluator,
+                $this->schema,
+                new LinkedAttributes($this->schema),
+            ),
             accessControl: $accessControl,
             schema: $this->schema,
             limits: $limits ?? new SearchLimits(),

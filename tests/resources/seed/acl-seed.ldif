@@ -62,6 +62,12 @@ cn: hidden
 sn: Hidden
 userPassword: {SHA}8Qf/KGk50GBzmcL51KhuYxOpMqY=
 
+dn: cn=nicknamed,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: nicknamed
+sn: Nicknamed
+givenName: Zephyrine
+
 # Carries one attribute per spelled-member group below, each denied to that group's members.
 dn: cn=spelled-target,dc=foo,dc=bar
 objectClass: inetOrgPerson

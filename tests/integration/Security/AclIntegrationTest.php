@@ -535,6 +535,45 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($delegate->get('sn'));
     }
 
+    public function testASupertypeFilterDoesNotMatchThroughAReadDeniedSubtype(): void
+    {
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            0,
+            $this->countMatching(Filters::equal(
+                'name',
+                'Zephyrine',
+            )),
+        );
+    }
+
+    public function testAFilterNotReadingAReadDeniedAttributeStillReturnsTheEntryWithoutIt(): void
+    {
+        $this->authenticateAdmin();
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal(
+                'cn',
+                'nicknamed',
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+        $entry = $results->first();
+
+        self::assertCount(
+            1,
+            $results,
+        );
+        self::assertNotNull($entry);
+        self::assertSame(
+            LdapAclCommand::NICKNAMED_DN,
+            $entry->getDn()->toString(),
+        );
+        self::assertNull($entry->get('givenName'));
+    }
+
     public function testAReadDenyAppliesToAGroupMemberSpelledByNumericOid(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
