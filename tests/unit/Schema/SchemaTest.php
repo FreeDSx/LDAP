@@ -352,6 +352,37 @@ final class SchemaTest extends TestCase
         );
     }
 
+    public function test_the_spellings_of_an_identifier_are_its_oid_and_every_name(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        self::assertSame(
+            ['2.5.4.3', 'cn', 'commonName'],
+            $this->subject->oidSpellings('commonName'),
+        );
+    }
+
+    public function test_a_name_another_kind_of_definition_claims_first_is_not_a_spelling(): void
+    {
+        $this->subject->addObjectClass(new ObjectClass(
+            oid: '1.1.1',
+            names: ['shared'],
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.1.2',
+            names: ['shared'],
+        ));
+
+        self::assertSame(
+            ['1.1.2'],
+            $this->subject->oidSpellings('1.1.2'),
+        );
+        self::assertSame(
+            ['1.1.1', 'shared'],
+            $this->subject->oidSpellings('1.1.1'),
+        );
+    }
+
     public function test_a_confidential_type_is_recognized_however_its_description_is_spelled(): void
     {
         $this->subject->addAttributeType(new AttributeType(
