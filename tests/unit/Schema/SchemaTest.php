@@ -352,6 +352,43 @@ final class SchemaTest extends TestCase
         );
     }
 
+    public function test_a_confidential_type_is_recognized_however_its_description_is_spelled(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+        $this->subject->addAttributeType($this->cn);
+
+        foreach (['userPassword', 'USERPASSWORD', 'userPassword;binary', '2.5.4.35'] as $description) {
+            self::assertTrue(
+                $this->subject->isConfidential($description),
+                $description,
+            );
+        }
+        self::assertFalse($this->subject->isConfidential('cn'));
+        self::assertFalse($this->subject->isConfidential('unknownType'));
+    }
+
+    public function test_a_type_redefined_as_confidential_is_recognized_once_it_is_added(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+        ));
+
+        self::assertFalse($this->subject->isConfidential('userPassword'));
+
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+
+        self::assertTrue($this->subject->isConfidential('userPassword'));
+    }
+
     public function test_merge_lets_the_incoming_definition_override_an_extension_value(): void
     {
         $this->subject->addAttributeType(new AttributeType(
