@@ -553,9 +553,10 @@ final class LdapBackendStorageCommand extends Command
     ): array {
         $members = [];
         $groups = [];
+        $seedDn = new SeedDn();
 
         for ($i = 1; $i <= $size; $i++) {
-            $members[] = SeedDn::person($i);
+            $members[] = $seedDn->person($i);
         }
 
         for ($g = 0; $g < $count; $g++) {

@@ -36,6 +36,9 @@ rootpw          ${ROOTPW}
 directory       /var/lib/ldap
 maxsize         1073741824
 
+# The bench administrator runs as free of limits as the rootdn and the FreeDSx side.
+limits          group/groupOfNames/member="cn=bench-admins,dc=example,dc=com" size=unlimited time=unlimited
+
 index           objectClass             eq
 index           cn,sn,uid,mail          eq,sub
 index           ou                      eq
@@ -49,11 +52,13 @@ memberof-memberof-ad memberOf
 memberof-dangling    ignore
 memberof-refint      TRUE
 
+# The bench runs as a member of bench-admins rather than the rootdn and is held to these rules like the other sides.
 access to attrs=userPassword
         by self write
         by anonymous auth
         by * none
 access to *
+        by group.exact="cn=bench-admins,dc=example,dc=com" write
         by self write
         by * read
 EOF

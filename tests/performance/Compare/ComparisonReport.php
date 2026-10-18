@@ -23,12 +23,18 @@ use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
  */
 final class ComparisonReport
 {
+    /**
+     * @param list<string> $targetAccessProblems What the target's access control got wrong for its run identity.
+     * @param list<string> $sourceAccessProblems What the source's access control got wrong for its run identity.
+     */
     public function __construct(
         private readonly ?StatsSnapshot $target,
         private readonly ?StatsSnapshot $source,
         private readonly string $format,
         private readonly string $targetLabel = 'Target',
         private readonly string $sourceLabel = 'FreeDSx',
+        private readonly array $targetAccessProblems = [],
+        private readonly array $sourceAccessProblems = [],
     ) {}
 
     public function render(OutputInterface $output): void
@@ -40,6 +46,50 @@ final class ComparisonReport
         }
 
         $this->renderText($output);
+
+        foreach ($this->invalidReasons() as $reason) {
+            $output->writeln(sprintf(
+                '<error>INVALID: %s</error>',
+                $reason,
+            ));
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function invalidReasons(): array
+    {
+        $reasons = [];
+        $sides = [
+            [$this->targetLabel, $this->target, $this->targetAccessProblems],
+            [$this->sourceLabel, $this->source, $this->sourceAccessProblems],
+        ];
+
+        foreach ($sides as [$label, $snapshot, $accessProblems]) {
+            $barren = $snapshot?->opsReturningNothing(WorkloadMix::ENTRY_OPS) ?? [];
+
+            if ($barren !== []) {
+                $reasons[] = sprintf(
+                    '%s returned no entries for %s.',
+                    $label,
+                    implode(
+                        ', ',
+                        $barren,
+                    ),
+                );
+            }
+
+            foreach ($accessProblems as $problem) {
+                $reasons[] = sprintf(
+                    '%s %s.',
+                    $label,
+                    $problem,
+                );
+            }
+        }
+
+        return $reasons;
     }
 
     /**
@@ -111,25 +161,6 @@ final class ComparisonReport
             $this->sourceLabel,
             $this->source->elapsedSeconds,
         ));
-
-        $this->warnBarrenSides($output);
-    }
-
-    private function warnBarrenSides(OutputInterface $output): void
-    {
-        foreach ([[$this->targetLabel, $this->target], [$this->sourceLabel, $this->source]] as [$label, $snapshot]) {
-            $barren = $snapshot?->opsReturningNothing(WorkloadMix::ENTRY_OPS) ?? [];
-
-            if ($barren === []) {
-                continue;
-            }
-
-            $output->writeln(sprintf(
-                '<error>INVALID: %s returned no entries for %s; the comparison above is meaningless.</error>',
-                $label,
-                implode(', ', $barren),
-            ));
-        }
     }
 
     /**
@@ -174,6 +205,7 @@ final class ComparisonReport
             [
                 'target' => $this->snapshotToArray($this->target),
                 'source' => $this->snapshotToArray($this->source),
+                'invalid' => $this->invalidReasons(),
             ],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
         );

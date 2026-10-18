@@ -24,13 +24,16 @@ final readonly class MinimalSeedEntries implements SeedEntryGeneratorInterface
 {
     use FillerAttributesTrait;
 
-    public function __construct(private int $fillerAttributes = 0) {}
+    public function __construct(
+        private int $fillerAttributes = 0,
+        private SeedDn $dn = new SeedDn(),
+    ) {}
 
     public function generate(int $count): iterable
     {
         for ($i = 1; $i <= $count; $i++) {
             yield new Entry(
-                new Dn(SeedDn::person($i)),
+                new Dn($this->dn->person($i)),
                 new Attribute(
                     'cn',
                     "seed-{$i}",
@@ -46,7 +49,7 @@ final readonly class MinimalSeedEntries implements SeedEntryGeneratorInterface
                 ),
                 new Attribute(
                     'mail',
-                    "seed-{$i}@foo.bar",
+                    "seed-{$i}@{$this->dn->mailDomain}",
                 ),
                 new Attribute(
                     'uidNumber',

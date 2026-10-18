@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\Seed\PersonSeedEntries;
+use Tests\Support\FreeDSx\Ldap\Seed\SeedDn;
 use Throwable;
 
 /**
@@ -35,6 +37,11 @@ final class TargetBench
      * Kept under the smallest default size limit the benched servers enforce.
      */
     private const CLEANUP_PAGE_SIZE = 500;
+
+    /**
+     * Seeded on every person but withheld from every run identity by each side's access control.
+     */
+    private const WITHHELD_DESCRIPTION = 'userpassword';
 
     public readonly string $benchBaseDn;
 
@@ -83,14 +90,9 @@ final class TargetBench
         $this->bindIfNeeded();
     }
 
-    public function seed(
-        int $seedEntries,
-        int $seedGroups = 0,
-        int $seedGroupSize = 0,
-    ): void {
+    public function ensureSubtree(): void
+    {
         $this->bindIfNeeded();
-
-        $mailDomain = $this->mailDomain();
 
         $this->ensureOrganizationalUnit(
             $this->benchBaseDn,
@@ -100,6 +102,16 @@ final class TargetBench
             $this->writeBaseDn,
             $this->peopleOu,
         );
+    }
+
+    public function seed(
+        int $seedEntries,
+        int $seedGroups = 0,
+        int $seedGroupSize = 0,
+    ): void {
+        $this->ensureSubtree();
+
+        $mailDomain = $this->mailDomain();
 
         $this->ensurePerson(
             $this->compareDn(),
@@ -109,17 +121,143 @@ final class TargetBench
             '1',
         );
 
-        for ($i = 1; $i <= $seedEntries; $i++) {
-            $this->ensurePerson(
-                "cn=seed-{$i},{$this->writeBaseDn}",
-                "seed-{$i}",
-                'Seed',
-                "seed-{$i}@{$mailDomain}",
-                (string) $i,
-            );
+        foreach ($this->people()->people($seedEntries) as $person) {
+            $this->createOrIgnoreExists($person);
         }
 
         $this->ensureGroups($seedGroups, $seedGroupSize);
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    public function assertBindable(
+        string $bindDn,
+        string $bindPassword,
+    ): void {
+        $client = $this->buildClient();
+
+        try {
+            $client->bind(
+                $bindDn,
+                $bindPassword,
+            );
+            $client->unbind();
+        } catch (Throwable $e) {
+            throw new RuntimeException(sprintf(
+                'Unable to bind to LDAP target at %s:%d as the run identity %s: %s',
+                $this->host,
+                $this->port,
+                $bindDn,
+                $e->getMessage(),
+            ), 0, $e);
+        }
+    }
+
+    /**
+     * Fails when the identity the workload runs as may not add and delete an entry, which the write ops need.
+     *
+     * @throws RuntimeException
+     */
+    public function assertWritableBy(
+        string $bindDn,
+        string $bindPassword,
+    ): void {
+        $probeDn = "cn=freedsx-bench-probe,{$this->writeBaseDn}";
+        $this->removeIfPresent($probeDn);
+        $client = $this->buildClient();
+        $probe = new Entry(
+            $probeDn,
+            new Attribute(
+                'objectClass',
+                'inetOrgPerson',
+            ),
+            new Attribute(
+                'cn',
+                'freedsx-bench-probe',
+            ),
+            new Attribute(
+                'sn',
+                'Probe',
+            ),
+        );
+
+        try {
+            $client->bind(
+                $bindDn,
+                $bindPassword,
+            );
+            $client->create($probe);
+            $client->delete($probeDn);
+            $client->unbind();
+        } catch (Throwable $e) {
+            throw new RuntimeException(sprintf(
+                'The run identity %s may not write below %s on %s:%d: %s',
+                $bindDn,
+                $this->writeBaseDn,
+                $this->host,
+                $this->port,
+                $e->getMessage(),
+            ), 0, $e);
+        }
+    }
+
+    /**
+     * What access control got wrong when an identity reads a seeded person's own attributes by name.
+     *
+     * @return list<string>
+     * @throws OperationException
+     */
+    public function accessProblemsFor(
+        string $bindDn,
+        string $bindPassword,
+    ): array {
+        $expected = $this->seededDescriptions();
+        $client = $this->buildClient();
+        $client->bind(
+            $bindDn,
+            $bindPassword,
+        );
+
+        try {
+            $person = $client->read(
+                "cn=seed-1,{$this->writeBaseDn}",
+                $expected,
+            );
+        } finally {
+            $client->unbind();
+        }
+
+        $visible = array_map(
+            static fn(Attribute $attribute): string => strtolower($attribute->getDescription()),
+            $person?->getAttributes() ?? [],
+        );
+        $problems = [];
+
+        if (in_array(self::WITHHELD_DESCRIPTION, $visible, true)) {
+            $problems[] = sprintf(
+                'returned %s to its run identity',
+                self::WITHHELD_DESCRIPTION,
+            );
+        }
+
+        $missing = array_diff(
+            $expected,
+            [self::WITHHELD_DESCRIPTION],
+            $visible,
+        );
+
+        if ($missing !== []) {
+            $problems[] = sprintf(
+                'withheld %s from its run identity',
+                implode(
+                    ', ',
+                    $missing,
+                ),
+            );
+        }
+
+        return $problems;
     }
 
     public function cleanup(): void
@@ -212,6 +350,49 @@ final class TargetBench
         }
 
         return $dns;
+    }
+
+    /**
+     * A probe left behind by an earlier run that kept its subtree would otherwise fail the next probe's add.
+     */
+    private function removeIfPresent(string $dn): void
+    {
+        $this->bindIfNeeded();
+
+        try {
+            $this->client->delete($dn);
+        } catch (OperationException $e) {
+            if ($e->getCode() !== ResultCode::NO_SUCH_OBJECT) {
+                throw $e;
+            }
+        }
+    }
+
+    private function people(): PersonSeedEntries
+    {
+        return new PersonSeedEntries(
+            dn: new SeedDn(
+                people: $this->writeBaseDn,
+                groups: "ou=groups,{$this->benchBaseDn}",
+                mailDomain: $this->mailDomain(),
+            ),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function seededDescriptions(): array
+    {
+        $descriptions = [];
+
+        foreach ($this->people()->people(1) as $person) {
+            foreach ($person->getAttributes() as $attribute) {
+                $descriptions[] = strtolower($attribute->getDescription());
+            }
+        }
+
+        return $descriptions;
     }
 
     private function buildClient(): LdapClient
