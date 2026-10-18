@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\Admission\SearchResultGate;
 use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -140,20 +141,19 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
             $request->getSizeLimit(),
             $this->limits->maxSearchSize(),
         );
-        $filter = $request->getFilter();
         $emitted = 0;
+        $gate = SearchResultGate::forRequest(
+            $this->accessControl,
+            $this->strippedMatcher,
+            $projection,
+            $token,
+            $request->getFilter(),
+        );
 
         foreach ($backend->entries() as $entry) {
-            $filtered = $this->accessControl->filterEntry(
-                $token,
-                $entry,
-            );
+            $returned = $gate->admit($entry);
 
-            if ($filtered === null) {
-                continue;
-            }
-
-            if (!$this->strippedMatcher->stillMatches($entry, $filtered, $filter)) {
+            if ($returned === null) {
                 continue;
             }
 
@@ -164,7 +164,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
                 return;
             }
 
-            yield $projection->project($filtered);
+            yield $returned;
             $emitted++;
             $state->entriesReturned++;
         }

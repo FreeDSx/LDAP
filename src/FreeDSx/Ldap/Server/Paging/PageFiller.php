@@ -13,14 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Paging;
 
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\Admission\SearchResultGate;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AttributeProjection;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchTrait;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
@@ -64,7 +63,13 @@ final readonly class PageFiller
         $request = $pagingRequest->getSearchRequest();
         $page = $this->startPage($pagingRequest, $resumeFrom);
         $budget = $this->budgetFor($request);
-        $projection = $this->projectionFor($request);
+        $gate = SearchResultGate::forRequest(
+            $this->accessControl,
+            $this->strippedMatcher,
+            $this->projectionFor($request),
+            $token,
+            $request->getFilter(),
+        );
         $exhausted = false;
         $hasFurtherMatch = false;
 
@@ -86,9 +91,7 @@ final readonly class PageFiller
                 $entries,
                 $page,
                 $isFilling,
-                $token,
-                $request->getFilter(),
-                $projection,
+                $gate,
             );
 
             // The stream was abandoned mid-slice and can say nothing about where it stopped.
@@ -126,17 +129,11 @@ final readonly class PageFiller
         Generator $entries,
         FillingPage $page,
         bool $isFilling,
-        TokenInterface $token,
-        FilterInterface $filter,
-        AttributeProjection $projection,
+        SearchResultGate $gate,
     ): SliceEnd {
         try {
             foreach ($entries as $fetched) {
-                $kept = $this->keepForPage(
-                    $fetched->entry,
-                    $token,
-                    $filter,
-                );
+                $kept = $gate->admit($fetched->entry);
 
                 if ($kept === null) {
                     continue;
@@ -155,7 +152,7 @@ final readonly class PageFiller
                 }
 
                 $page->add(
-                    $projection->project($kept),
+                    $kept,
                     $fetched->cursor,
                 );
             }
@@ -232,31 +229,6 @@ final readonly class PageFiller
             ),
             $slice,
         );
-    }
-
-    /**
-     * The entry as this identity may see it, or null when it may not see it at all.
-     *
-     * @throws OperationException
-     */
-    private function keepForPage(
-        Entry $entry,
-        TokenInterface $token,
-        FilterInterface $filter,
-    ): ?Entry {
-        $filtered = $this->accessControl->filterEntry(
-            $token,
-            $entry,
-        );
-
-        if ($filtered === null) {
-            return null;
-        }
-
-        // Stripping an attribute can cost the entry its match.
-        return $this->strippedMatcher->stillMatches($entry, $filtered, $filter)
-            ? $filtered
-            : null;
     }
 
     private function projectionFor(SearchRequest $request): AttributeProjection

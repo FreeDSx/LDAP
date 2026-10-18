@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
+use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -121,20 +122,9 @@ interface AccessControlInterface
     ): bool;
 
     /**
-     * Return $entry with unreadable attributes removed, or null to suppress the entry entirely.
+     * The read decisions $token holds, to be kept for one request and asked again once it is no longer current.
      */
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry;
-
-    /**
-     * Return $entry with unreadable attributes removed, for callers that have already settled visibility.
-     */
-    public function stripUnreadableAttributes(
-        TokenInterface $token,
-        Entry $entry,
-    ): Entry;
+    public function readScope(TokenInterface $token): ReadScopeInterface;
 
     /**
      * Whether $token may see $entry at all, without stripping any attributes (the entry-level gate replication uses).

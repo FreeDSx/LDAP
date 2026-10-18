@@ -89,13 +89,12 @@ final readonly class AssertionEvaluator
             return;
         }
 
-        $readable = $this->accessControl->stripUnreadableAttributes(
-            $token,
-            $this->linkedLeaves->witness(
+        $readable = $this->accessControl
+            ->readScope($token)
+            ->readable($this->linkedLeaves->witness(
                 $entry,
                 $control->getFilter(),
-            ),
-        );
+            ));
 
         if ($this->filterEvaluator->evaluate($readable, $control->getFilter())) {
             return;

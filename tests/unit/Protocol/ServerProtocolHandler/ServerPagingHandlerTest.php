@@ -37,6 +37,13 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\AclRules;
+use FreeDSx\Ldap\Server\AccessControl\Read\UnrestrictedReadScope;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
@@ -97,8 +104,11 @@ class ServerPagingHandlerTest extends TestCase
             ->willReturn(true);
 
         $this->mockAccessControl
-            ->method('filterEntry')
-            ->willReturnArgument(1);
+            ->method('readScope')
+            ->willReturn(new UnrestrictedReadScope());
+        $this->mockAccessControl
+            ->method('isEntryVisible')
+            ->willReturn(true);
 
         $this->mockQueue
             ->method('sendMessages')
@@ -122,15 +132,6 @@ class ServerPagingHandlerTest extends TestCase
         $hidden = Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']);
         $visible = Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']);
 
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(
-                static fn(TokenInterface $token, Entry $entry): ?Entry => $entry === $hidden
-                    ? null
-                    : $entry,
-            );
-
         $this->mockBackend
             ->method('search')
             ->willReturnCallback($this->sliceAware(
@@ -138,7 +139,7 @@ class ServerPagingHandlerTest extends TestCase
                 $visible,
             ));
 
-        $subject = $this->makeHandler($mockAccessControl);
+        $subject = $this->makeHandler($this->hiding($hidden));
 
         // A page of one, whose first candidate is hidden, so filling it means reading on rather than answering short.
         $this->drive(
@@ -159,26 +160,16 @@ class ServerPagingHandlerTest extends TestCase
             $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
         }
 
-        // Hiding the first two starves the opening read, so the next one is widened and overshoots the page.
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(
-                static fn(TokenInterface $token, Entry $entry): ?Entry => in_array(
-                    $entry,
-                    [$entries[0], $entries[1]],
-                    true,
-                )
-                    ? null
-                    : $entry,
-            );
-
         $this->mockBackend
             ->method('search')
             ->willReturnCallback($this->sliceAware(...$entries));
 
+        // Hiding the first two starves the opening read, so the next one is widened and overshoots the page.
         $subject = $this->makeHandler(
-            $mockAccessControl,
+            $this->hiding(
+                $entries[0],
+                $entries[1],
+            ),
             new SearchLimits(maxSearchPageSize: 10),
         );
 
@@ -221,22 +212,13 @@ class ServerPagingHandlerTest extends TestCase
             $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
         }
 
-        // Only the tenth candidate is visible, so filling the page spends the whole lookthrough.
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(
-                static fn(TokenInterface $token, Entry $entry): ?Entry => $entry === $entries[9]
-                    ? $entry
-                    : null,
-            );
-
         $this->mockBackend
             ->method('search')
             ->willReturnCallback($this->sliceAware(...$entries));
 
+        // Only the tenth candidate is visible, so filling the page spends the whole lookthrough.
         $subject = $this->makeHandler(
-            $mockAccessControl,
+            $this->showingOnly($entries[9]),
             new SearchLimits(
                 maxSearchPageSize: 1000,
                 maxSearchPagedLookthrough: 10,
@@ -270,22 +252,13 @@ class ServerPagingHandlerTest extends TestCase
             $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
         }
 
-        // The page wants two, but the only visible entry is the tenth candidate.
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(
-                static fn(TokenInterface $token, Entry $entry): ?Entry => $entry === $entries[9]
-                    ? $entry
-                    : null,
-            );
-
         $this->mockBackend
             ->method('search')
             ->willReturnCallback($this->sliceAware(...$entries));
 
+        // The page wants two, but the only visible entry is the tenth candidate.
         $subject = $this->makeHandler(
-            $mockAccessControl,
+            $this->showingOnly($entries[9]),
             new SearchLimits(
                 maxSearchPageSize: 1000,
                 maxSearchPagedLookthrough: 10,
@@ -319,26 +292,16 @@ class ServerPagingHandlerTest extends TestCase
             $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
         }
 
-        // The first two fill the page, so only the probe for a further match meets the hidden rest.
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(
-                static fn(TokenInterface $token, Entry $entry): ?Entry => in_array(
-                    $entry,
-                    [$entries[0], $entries[1]],
-                    true,
-                )
-                    ? $entry
-                    : null,
-            );
-
         $this->mockBackend
             ->method('search')
             ->willReturnCallback($this->sliceAware(...$entries));
 
+        // The first two fill the page, so only the probe for a further match meets the hidden rest.
         $subject = $this->makeHandler(
-            $mockAccessControl,
+            $this->showingOnly(
+                $entries[0],
+                $entries[1],
+            ),
             new SearchLimits(maxSearchPagedLookthrough: 3),
         );
 
@@ -655,13 +618,8 @@ class ServerPagingHandlerTest extends TestCase
             });
 
         // Access control hides every entry, so the page is filled from slice after slice until the result runs out.
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturn(null);
-
         $subject = $this->makeHandler(
-            $mockAccessControl,
+            $this->showingOnly(),
             new SearchLimits(maxSearchPageSize: 2),
         );
         $this->drive($subject, $this->makeSearchMessage(size: 2, searchRequest: $searchRequest));
@@ -943,7 +901,7 @@ class ServerPagingHandlerTest extends TestCase
         self::assertNotSame('', $this->donePagingControl()->getCookie());
     }
 
-    public function test_it_should_suppress_entry_when_filter_entry_returns_null(): void
+    public function test_it_should_suppress_an_entry_the_identity_may_not_see(): void
     {
         $entry1 = Entry::create(
             'cn=1,dc=foo,dc=bar',
@@ -955,13 +913,6 @@ class ServerPagingHandlerTest extends TestCase
         );
         $message = $this->makeSearchMessage(size: 10);
 
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(static function (TokenInterface $token, Entry $entry) use ($entry1): ?Entry {
-                return $entry === $entry1 ? null : $entry;
-            });
-
         $this->mockBackend
             ->method('search')
             ->willReturnCallback($this->sliceAware(
@@ -969,7 +920,7 @@ class ServerPagingHandlerTest extends TestCase
                 $entry2,
             ));
 
-        $subject = $this->makeHandler($mockAccessControl);
+        $subject = $this->makeHandler($this->hiding($entry1));
         $this->drive($subject, $message);
 
         self::assertEquals(
@@ -984,16 +935,10 @@ class ServerPagingHandlerTest extends TestCase
             'cn=1,dc=foo,dc=bar',
             ['cn' => '1', 'secret' => 'val'],
         );
-        $stripped = Entry::create(
-            'cn=1,dc=foo,dc=bar',
-            ['cn' => '1'],
+        $message = $this->makeSearchMessage(
+            size: 10,
+            searchRequest: $this->makeSearchRequest('(secret=val)'),
         );
-        $message = $this->makeSearchMessage(size: 10);
-
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturn($stripped);
 
         $mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $mockFilterEvaluator
@@ -1005,7 +950,14 @@ class ServerPagingHandlerTest extends TestCase
             ->willReturnCallback($this->sliceAware($entry));
 
         $subject = $this->makeHandler(
-            $mockAccessControl,
+            new RuleBasedAccessControl(AclRules::fromEmpty(
+                operations: [OperationRule::allow(Subject::anyone())],
+                attributes: [AttributeRule::deny(
+                    Subject::anyone(),
+                    Target::any(),
+                    'secret',
+                )->forRead()],
+            )),
             filterEvaluator: $mockFilterEvaluator,
         );
         $this->drive($subject, $message);
@@ -1252,12 +1204,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('get')
             ->willReturn($matchedEntry);
 
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturn(null);
-
-        $subject = $this->makeHandler($mockAccessControl);
+        $subject = $this->makeHandler($this->showingOnly());
 
         $this->drive(
             $subject,
@@ -1293,6 +1240,41 @@ class ServerPagingHandlerTest extends TestCase
             $stream,
             $message->getMessageId(),
         );
+    }
+
+    /**
+     * Rules that let anyone search every entry but the given ones.
+     */
+    private function hiding(Entry ...$hidden): AccessControlInterface
+    {
+        return new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [
+                ...array_map(
+                    static fn(Entry $entry): OperationRule => OperationRule::deny(
+                        Subject::anyone(),
+                        Target::dn($entry->getDn()->toString()),
+                    ),
+                    $hidden,
+                ),
+                OperationRule::allow(Subject::anyone()),
+            ],
+        ));
+    }
+
+    /**
+     * Rules that let anyone search just the given entries, and no entry at all when none is given.
+     */
+    private function showingOnly(Entry ...$shown): AccessControlInterface
+    {
+        return new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: array_map(
+                static fn(Entry $entry): OperationRule => OperationRule::allow(
+                    Subject::anyone(),
+                    Target::dn($entry->getDn()->toString()),
+                ),
+                $shown,
+            ),
+        ));
     }
 
     private function makeHandler(

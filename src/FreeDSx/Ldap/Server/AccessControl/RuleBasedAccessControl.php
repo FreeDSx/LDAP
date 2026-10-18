@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
+use FreeDSx\Ldap\Server\AccessControl\Read\RuleReadScope;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
@@ -190,55 +192,32 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         return true;
     }
 
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry {
-        if (!$this->isEntryVisible($token, $entry)) {
-            return null;
-        }
-
-        return $this->stripUnreadableAttributes(
+    public function readScope(TokenInterface $token): ReadScopeInterface
+    {
+        return new RuleReadScope(
+            $this,
+            $this->index,
             $token,
-            $entry,
         );
     }
 
-    public function stripUnreadableAttributes(
+    /**
+     * Whether the rules let $token read an attribute, by its lowercased base name, on the entry at $dn.
+     *
+     * @internal
+     */
+    public function isAttributeReadable(
         TokenInterface $token,
-        Entry $entry,
-    ): Entry {
-        $dn = $entry->getDn();
-
-        if (!$this->index->hasAttributeRules(AttributeAccess::Read)) {
-            return $entry;
-        }
-
-        $allAttributes = $entry->getAttributes();
-        $kept = [];
-
-        foreach ($allAttributes as $attribute) {
-            $effect = $this->resolveAttributeEffect(
-                $token,
-                $dn,
-                strtolower($attribute->getName()),
-                AttributeAccess::Read,
-                Effect::Allow,
-            );
-
-            if ($effect !== Effect::Deny) {
-                $kept[] = $attribute;
-            }
-        }
-
-        if (count($kept) === count($allAttributes)) {
-            return $entry;
-        }
-
-        return Entry::raw(
+        Dn $dn,
+        string $name,
+    ): bool {
+        return $this->resolveAttributeEffect(
+            $token,
             $dn,
-            $kept,
-        );
+            $name,
+            AttributeAccess::Read,
+            Effect::Allow,
+        ) !== Effect::Deny;
     }
 
     public function isEntryVisible(

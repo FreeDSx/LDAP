@@ -98,7 +98,7 @@ final class PrivilegedBypassAccessControlTest extends TestCase
             ->method('mayUseControl');
         $this->inner
             ->expects(self::never())
-            ->method('filterEntry');
+            ->method('readScope');
         $this->inner
             ->expects(self::never())
             ->method('isEntryVisible');
@@ -111,10 +111,9 @@ final class PrivilegedBypassAccessControlTest extends TestCase
         ));
         self::assertSame(
             $entry,
-            $this->subject->filterEntry(
-                $this->manager,
-                $entry,
-            ),
+            $this->subject
+                ->readScope($this->manager)
+                ->readable($entry),
         );
         self::assertTrue($this->subject->isEntryVisible(
             $this->manager,

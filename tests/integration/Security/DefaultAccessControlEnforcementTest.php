@@ -159,10 +159,10 @@ final class DefaultAccessControlEnforcementTest extends TestCase
         );
 
         self::assertNotNull(
-            $this->accessControl->filterEntry($manager, $entry)?->get('userPassword'),
+            $this->accessControl->readScope($manager)->readable($entry)->get('userPassword'),
         );
         self::assertNull(
-            $this->accessControl->filterEntry($user, $entry)?->get('userPassword'),
+            $this->accessControl->readScope($user)->readable($entry)->get('userPassword'),
         );
     }
 
@@ -188,7 +188,7 @@ final class DefaultAccessControlEnforcementTest extends TestCase
 
         // But self cannot read it, on search or via Compare.
         self::assertNull(
-            $this->accessControl->filterEntry($user, $ownEntry)?->get('userPassword'),
+            $this->accessControl->readScope($user)->readable($ownEntry)->get('userPassword'),
         );
 
         $this->expectException(OperationException::class);

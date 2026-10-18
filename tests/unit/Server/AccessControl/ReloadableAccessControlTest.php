@@ -60,6 +60,18 @@ final class ReloadableAccessControlTest extends TestCase
         );
     }
 
+    public function test_a_read_scope_stops_being_current_once_the_policy_is_replaced(): void
+    {
+        $scope = $this->subject->readScope(BindToken::fromDn('cn=user,dc=foo,dc=bar'));
+
+        self::assertTrue($scope->isCurrent());
+
+        $this->subject->replace(new RuleBasedAccessControl(AclRules::fromEmpty()));
+
+        self::assertFalse($scope->isCurrent());
+        self::assertTrue($this->subject->readScope(BindToken::fromDn('cn=user,dc=foo,dc=bar'))->isCurrent());
+    }
+
     public function test_a_replacing_policy_receives_the_backend_set_earlier(): void
     {
         $backend = $this->createMock(ReadBackendInterface::class);

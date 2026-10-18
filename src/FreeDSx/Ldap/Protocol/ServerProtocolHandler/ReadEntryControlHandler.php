@@ -96,14 +96,11 @@ final readonly class ReadEntryControlHandler
             return null;
         }
 
-        $readable = $this->accessControl->filterEntry(
-            $token,
-            $entry,
-        );
-
-        if ($readable === null) {
+        $scope = $this->accessControl->readScope($token);
+        if (!$scope->isEntryVisible($entry)) {
             return null;
         }
+        $readable = $scope->readable($entry);
 
         $projection = AttributeProjection::forRequest(
             array_map(

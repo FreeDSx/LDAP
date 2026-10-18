@@ -43,7 +43,7 @@ final class Schema
     private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
 
     /**
-     * Pairs grow with the stored descriptions times the names filters and selections ask for, so they get more room.
+     * Pairs grow with the stored descriptions times the names filters and selections ask for, and get more room.
      */
     private const MAX_REMEMBERED_SUBTYPE_PAIRS = 8192;
 
@@ -95,11 +95,13 @@ final class Schema
     private array $operationalDescriptions = [];
 
     /**
-     * Whether each pair of descriptions seen is a subtype pair, keyed by both joined on a NUL and dropped with the types.
+     * Whether each pair of descriptions seen is a subtype pair, by description then by the one it was tested against.
      *
-     * @var array<string, bool>
+     * @var array<string, array<string, bool>>
      */
     private array $subtypeDescriptions = [];
+
+    private int $subtypePairs = 0;
 
     /**
      * Bound to this schema, so it is built once rather than per lookup.
@@ -132,6 +134,7 @@ final class Schema
         $this->confidentialDescriptions = [];
         $this->operationalDescriptions = [];
         $this->subtypeDescriptions = [];
+        $this->subtypePairs = 0;
 
         return $this;
     }
@@ -311,18 +314,17 @@ final class Schema
         string $description,
         string $ofDescription,
     ): bool {
-        $key = $description . "\0" . $ofDescription;
-
-        if (isset($this->subtypeDescriptions[$key])) {
-            return $this->subtypeDescriptions[$key];
+        if (isset($this->subtypeDescriptions[$description][$ofDescription])) {
+            return $this->subtypeDescriptions[$description][$ofDescription];
         }
         $isSubtype = $this->decideDescriptionSubtypeOf(
             $description,
             $ofDescription,
         );
 
-        if (count($this->subtypeDescriptions) < self::MAX_REMEMBERED_SUBTYPE_PAIRS) {
-            $this->subtypeDescriptions[$key] = $isSubtype;
+        if ($this->subtypePairs < self::MAX_REMEMBERED_SUBTYPE_PAIRS) {
+            $this->subtypeDescriptions[$description][$ofDescription] = $isSubtype;
+            $this->subtypePairs++;
         }
 
         return $isSubtype;
@@ -577,9 +579,6 @@ final class Schema
             : $primary;
     }
 
-    /**
-     * Whether every option the wanted description carries is also carried by the one being tested.
-     */
     private function decideDescriptionSubtypeOf(
         string $description,
         string $ofDescription,
@@ -597,6 +596,9 @@ final class Schema
         );
     }
 
+    /**
+     * Whether every option the wanted description carries is also carried by the one being tested.
+     */
     private static function optionsCover(
         string $description,
         string $ofDescription,

@@ -86,12 +86,6 @@ readonly class AclRuleIndex
             ?? $this->anyAttributeRules[$access->name];
     }
 
-    public function hasAttributeRules(AttributeAccess $access): bool
-    {
-        return $this->namedAttributeRules[$access->name] !== []
-            || $this->anyAttributeRules[$access->name] !== [];
-    }
-
     /**
      * @return list<OperationRule>
      */

@@ -22,12 +22,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use WeakMap;
 
+use function array_diff_key;
 use function array_values;
 use function count;
-use function strtolower;
 
 /**
- * Judges an entry access control stripped against the filter again whenever an attribute it lost is one the filter reads.
+ * Tells whether withholding an attribute can change a filter's answer, and judges an entry again when it did.
  *
  * @internal
  */
@@ -49,49 +49,51 @@ class StrippedEntryMatcher
     }
 
     /**
-     * Whether the stripped entry still matches a filter the entry it was stripped from already matched.
+     * Whether withholding a lowercased base type can change what the filter answers.
+     */
+    public function concerns(
+        FilterInterface $filter,
+        string $type,
+    ): bool {
+        $readSet = $this->readSets[$filter] ??= $this->readSetOf($filter);
+        if ($readSet->types === null) {
+            return true;
+        }
+
+        if (isset($readSet->concerns[$type])) {
+            return $readSet->concerns[$type];
+        }
+        $concerns = $this->isRead(
+            $readSet,
+            $type,
+        );
+        if (count($readSet->concerns) < FilterReadSet::MAX_REMEMBERED) {
+            $readSet->concerns[$type] = $concerns;
+        }
+
+        return $concerns;
+    }
+
+    /**
+     * Whether an entry that matched the filter still does without the attributes access control withheld from it.
+     *
+     * @param array<array-key, true> $withheld The keys the entry holds its withheld attributes at.
      */
     public function stillMatches(
         Entry $entry,
-        Entry $stripped,
+        array $withheld,
         FilterInterface $filter,
     ): bool {
-        if ($stripped === $entry) {
-            return true;
-        }
-
-        if (!$this->lostAnyRead($entry, $stripped, $filter)) {
-            return true;
-        }
-
         return $this->evaluator->evaluate(
-            $stripped,
+            Entry::raw(
+                $entry->getDn(),
+                array_values(array_diff_key(
+                    $entry->getAttributes(),
+                    $withheld,
+                )),
+            ),
             $filter,
         );
-    }
-
-    private function lostAnyRead(
-        Entry $entry,
-        Entry $stripped,
-        FilterInterface $filter,
-    ): bool {
-        $readSet = $this->readSets[$filter] ??= $this->readSetOf($filter);
-        $removed = self::removed(
-            $entry,
-            $stripped,
-        );
-
-        if ($readSet->types === null || $removed === null) {
-            return true;
-        }
-
-        foreach ($removed as $attribute) {
-            if ($this->concerns($readSet, strtolower($attribute->getName()))) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function readSetOf(FilterInterface $filter): FilterReadSet
@@ -109,57 +111,18 @@ class StrippedEntryMatcher
     }
 
     /**
-     * Whether a removed type is one the filter reads, directly or as a subtype of one it names.
+     * Whether the filter reads the type, directly or as a subtype of one it names.
      */
-    private function concerns(
+    private function isRead(
         FilterReadSet $readSet,
-        string $removedType,
+        string $type,
     ): bool {
-        if (isset($readSet->concerns[$removedType])) {
-            return $readSet->concerns[$removedType];
-        }
-        $concerns = false;
-
-        foreach ($readSet->types ?? [] as $type) {
-            if ($removedType === $type || $this->schema->isTypeOrSubtypeOf($removedType, $type)) {
-                $concerns = true;
-
-                break;
+        foreach ($readSet->types ?? [] as $readType) {
+            if ($type === $readType || $this->schema->isTypeOrSubtypeOf($type, $readType)) {
+                return true;
             }
         }
 
-        if (count($readSet->concerns) < FilterReadSet::MAX_REMEMBERED) {
-            $readSet->concerns[$removedType] = $concerns;
-        }
-
-        return $concerns;
-    }
-
-    /**
-     * The attributes stripping removed, or null when the stripped entry is not an ordered subset of the original.
-     *
-     * @return list<Attribute>|null
-     */
-    private static function removed(
-        Entry $entry,
-        Entry $stripped,
-    ): ?array {
-        $kept = array_values($stripped->getAttributes());
-        $keptCount = count($kept);
-        $removed = [];
-        $next = 0;
-
-        foreach ($entry->getAttributes() as $attribute) {
-            if ($next < $keptCount && $kept[$next] === $attribute) {
-                $next++;
-
-                continue;
-            }
-            $removed[] = $attribute;
-        }
-
-        return $next === $keptCount
-            ? $removed
-            : null;
+        return false;
     }
 }

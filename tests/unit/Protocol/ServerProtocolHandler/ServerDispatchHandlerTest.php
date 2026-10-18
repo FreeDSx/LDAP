@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\Read\UnrestrictedReadScope;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -94,8 +95,8 @@ final class ServerDispatchHandlerTest extends TestCase
             ->expects(self::never())
             ->method('get');
         $this->mockAccessControl
-            ->method('filterEntry')
-            ->willReturnArgument(1);
+            ->method('readScope')
+            ->willReturn(new UnrestrictedReadScope());
         $this->mockWriteHandler
             ->method('handle')
             ->willReturnCallback(static function (WriteRequestInterface $request, WriteContext $context): void {
