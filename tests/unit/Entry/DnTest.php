@@ -259,6 +259,36 @@ class DnTest extends TestCase
         );
     }
 
+    public function test_a_stored_dn_keeps_its_spelling_and_takes_the_stored_canonical_form(): void
+    {
+        $dn = Dn::fromStored(
+            'CN=Alice,DC=Example,DC=Com',
+            'cn=alice,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            'CN=Alice,DC=Example,DC=Com',
+            $dn->toString(),
+        );
+        self::assertSame(
+            'cn=alice,dc=example,dc=com',
+            $dn->normalizedString(),
+        );
+    }
+
+    public function test_a_stored_dn_already_in_canonical_form_normalizes_to_itself(): void
+    {
+        $dn = Dn::fromStored(
+            'cn=alice,dc=example,dc=com',
+            'cn=alice,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            $dn,
+            $dn->normalize(),
+        );
+    }
+
     public function test_is_child_of_returns_true_for_direct_child(): void
     {
         $child = new Dn('cn=alice,dc=example,dc=com');

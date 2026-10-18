@@ -157,14 +157,6 @@ final class SqliteDialect implements PdoDialectInterface
         );
     }
 
-    /**
-     * Sorting reads entry_id straight off the row source, but a resumable list reads it off the row, so it is selected.
-     */
-    protected function listColumns(): string
-    {
-        return 'entry_id, dn, attributes';
-    }
-
     protected function schemaName(): string
     {
         return 'sqlite';
