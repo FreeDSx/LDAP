@@ -39,6 +39,8 @@ final class Schema
         MatchingRuleOid::OID_CASE_IGNORE_IA5_MATCH,
     ];
 
+    private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
+
     /**
      * Rules RFC 4517 and RFC 4530 define as ordering rules.
      */
@@ -71,6 +73,15 @@ final class Schema
     private ?array $orderingRuleOids = null;
 
     /**
+     * Whether each description seen names a confidential type.
+     *
+     * Dropped whenever the type set changes.
+     *
+     * @var array<string, bool>
+     */
+    private array $confidentialDescriptions = [];
+
+    /**
      * Bound to this schema, so it is built once rather than per lookup.
      */
     private ?ObjectIdentifierComparator $objectIdentifierComparator = null;
@@ -98,6 +109,7 @@ final class Schema
         }
         $this->superTypeOids = null;
         $this->orderingRuleOids = null;
+        $this->confidentialDescriptions = [];
 
         return $this;
     }
@@ -135,6 +147,26 @@ final class Schema
         return $this->attributeTypes[$nameOrOid]
             ?? $this->attributeTypes[strtolower($nameOrOid)]
             ?? null;
+    }
+
+    /**
+     * Whether a description names a type marked confidential.
+     *
+     * @internal
+     */
+    public function isConfidential(string $description): bool
+    {
+        if (isset($this->confidentialDescriptions[$description])) {
+            return $this->confidentialDescriptions[$description];
+        }
+        $confidential = $this->getAttributeType(Attribute::normalizeName($description))?->isConfidential() === true;
+
+        // Stored descriptions are arbitrary. Only remember a bound number.
+        if (count($this->confidentialDescriptions) < self::MAX_REMEMBERED_DESCRIPTIONS) {
+            $this->confidentialDescriptions[$description] = $confidential;
+        }
+
+        return $confidential;
     }
 
     /**

@@ -38,16 +38,14 @@ final readonly class WithheldAttributePolicy
         string $attribute,
         TokenInterface $token,
     ): bool {
-        // Matched on the base type, so "userPassword;binary" cannot evade a rule naming userPassword.
-        $name = Attribute::normalizeName($attribute);
-
-        if ($this->schema?->getAttributeType($name)?->isConfidential() !== true) {
+        if ($this->schema?->isConfidential($attribute) !== true) {
             return false;
         }
 
+        // Matched on the base type, so "userPassword;binary" cannot evade a rule naming userPassword.
         return !$this->accessControl->hasConfidentialAccess(
             $token,
-            $name,
+            Attribute::normalizeName($attribute),
         );
     }
 
