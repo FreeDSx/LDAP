@@ -24,13 +24,12 @@ use FreeDSx\Asn1\Type\SequenceOfType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Socket\PduInterface;
 
 use function count;
@@ -218,13 +217,13 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 $type,
                 $count,
             );
-        } catch (InvalidDnSyntaxException $e) {
+        } catch (AnswerableExceptionInterface $e) {
             throw new MessageDecodeException(
                 $messageIdValue,
                 $opTag,
-                $e->getMessage(),
+                $e->getDiagnostic(),
                 $e,
-                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
             );
         } catch (ProtocolException|EncoderException $e) {
             throw new MessageDecodeException(

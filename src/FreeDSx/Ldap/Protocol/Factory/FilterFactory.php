@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\FilterDepthExceededException;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -37,6 +38,11 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 class FilterFactory
 {
     /**
+     * The most AND, OR, or NOT filters a received filter may be nested within.
+     */
+    public const MAX_NESTING_DEPTH = 30;
+
+    /**
      * @var array<int, class-string>
      */
     private static array $map = [
@@ -54,11 +60,22 @@ class FilterFactory
 
     /**
      * @param AbstractType<mixed> $type
+     * @param int $depth How many AND, OR, or NOT filters enclose this one.
+     * @throws FilterDepthExceededException
      * @throws ProtocolException
      * @throws RuntimeException
      */
-    public static function get(AbstractType $type): FilterInterface
-    {
+    public static function get(
+        AbstractType $type,
+        int $depth = 0,
+    ): FilterInterface {
+        if ($depth > self::MAX_NESTING_DEPTH) {
+            throw new FilterDepthExceededException(sprintf(
+                'The filter is nested more than %d levels deep.',
+                self::MAX_NESTING_DEPTH,
+            ));
+        }
+
         $tagNumber = $type->getTagNumber();
         $filterClass = $tagNumber !== null ? (self::$map[$tagNumber] ?? null) : null;
         if ($filterClass === null) {
@@ -78,6 +95,7 @@ class FilterFactory
         $filter = call_user_func(
             $filterConstruct,
             $type,
+            $depth,
         );
 
         if (!$filter instanceof FilterInterface) {

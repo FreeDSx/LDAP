@@ -15,15 +15,21 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Control\AssertionControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\Filters;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -169,6 +175,39 @@ final class LdapMessageRequestTest extends TestCase
         }
     }
 
+    public function test_a_search_filter_nested_too_deeply_is_answered_as_unwilling_to_perform(): void
+    {
+        try {
+            self::decodeReceived(new LdapMessageRequest(
+                5,
+                Operations::search(self::filterNestedPastTheLimit())->base('dc=foo,dc=bar'),
+            ));
+            self::fail('The deeply nested filter should have been refused.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                [5, 3, ResultCode::UNWILLING_TO_PERFORM],
+                [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
+            );
+        }
+    }
+
+    public function test_an_assertion_filter_nested_too_deeply_is_answered_as_unwilling_to_perform(): void
+    {
+        try {
+            self::decodeReceived(new LdapMessageRequest(
+                6,
+                new DeleteRequest('dc=foo,dc=bar'),
+                new AssertionControl(self::filterNestedPastTheLimit()),
+            ));
+            self::fail('The deeply nested assertion filter should have been refused.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                [6, 10, ResultCode::UNWILLING_TO_PERFORM],
+                [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
+            );
+        }
+    }
+
     /**
      * An unrecognized operation cannot be answered, so it must stay a plain failure that ends the session.
      */
@@ -203,5 +242,22 @@ final class LdapMessageRequestTest extends TestCase
                 )),
             )),
         );
+    }
+
+    private static function filterNestedPastTheLimit(): FilterInterface
+    {
+        $filter = Filters::present('cn');
+        for ($i = 0; $i <= FilterFactory::MAX_NESTING_DEPTH; $i++) {
+            $filter = Filters::not($filter);
+        }
+
+        return $filter;
+    }
+
+    private static function decodeReceived(LdapMessageRequest $message): LdapMessageRequest
+    {
+        $encoder = new LdapEncoder();
+
+        return LdapMessageRequest::fromAsn1($encoder->decode($encoder->encode($message->toAsn1())));
     }
 }

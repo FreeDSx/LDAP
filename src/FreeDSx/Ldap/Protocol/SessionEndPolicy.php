@@ -77,6 +77,7 @@ readonly class SessionEndPolicy
             $exception instanceof EncoderException,
             $exception instanceof ProtocolException => $this->disconnect(
                 'The message could not be processed.',
+                cause: $exception,
                 closeReason: ConnectionObservation::ProtocolError,
             ),
             // RFC 4511 §4.4.1: the connection this session depended on is gone, which no result code can answer.

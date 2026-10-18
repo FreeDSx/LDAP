@@ -16,7 +16,10 @@ use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
+use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Exception\IdleTimeoutException;
@@ -24,12 +27,15 @@ use FreeDSx\Socket\Exception\WriteTimeoutException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
 
 final class SessionEndPolicyTest extends TestCase
 {
     private ServerQueue&MockObject $queue;
+
+    private LoggerInterface&MockObject $logger;
 
     private SessionEndPolicy $subject;
 
@@ -53,7 +59,11 @@ final class SessionEndPolicyTest extends TestCase
                 return $this->queue;
             });
 
-        $eventLogger = new EventLogger(null);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $eventLogger = new EventLogger(
+            $this->logger,
+            EventLogPolicy::all(),
+        );
         $this->subject = new SessionEndPolicy(
             new DisconnectSender(
                 $this->queue,
@@ -143,6 +153,23 @@ final class SessionEndPolicyTest extends TestCase
             'The message could not be processed.',
             $this->diagnosticOfOnlyNotice(),
         );
+    }
+
+    public function test_it_logs_why_a_malformed_pdu_ended_the_session(): void
+    {
+        $this->logger
+            ->expects(self::once())
+            ->method('log')
+            ->with(
+                self::anything(),
+                self::anything(),
+                self::callback(
+                    static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::NoticeOfDisconnectSent->value
+                        && $context[EventContext::EXCEPTION_MESSAGE] === 'BER tag 0x99 at offset 14',
+                ),
+            );
+
+        $this->subject->end(new ProtocolException('BER tag 0x99 at offset 14'));
     }
 
     public function test_it_answers_a_lost_dependency_as_unavailable(): void
