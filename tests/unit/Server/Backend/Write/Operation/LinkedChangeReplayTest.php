@@ -1,0 +1,200 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
+
+use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChangeReplay;
+use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
+
+final class LinkedChangeReplayTest extends TestCase
+{
+    use ServerContainerTrait;
+
+    private const ADMINS = 'cn=Admins,dc=example,dc=com';
+
+    private const BOB = 'cn=Bob,dc=example,dc=com';
+
+    private const CAROL = 'cn=Carol,dc=example,dc=com';
+
+    private LinkedChangeReplay $subject;
+
+    protected function setUp(): void
+    {
+        $storage = EntryFixture::inMemoryStorage(Entry::fromArray(
+            self::ADMINS,
+            [
+                'objectClass' => ['groupOfNames'],
+                'cn' => ['Admins'],
+                'member' => [self::BOB],
+            ],
+        ));
+        $this->subject = $this->containerFor($storage)->get(LinkedChangeReplay::class);
+    }
+
+    public function test_no_changes_leave_the_entry_the_whole_truth_for_its_links(): void
+    {
+        $delta = $this->subject->settle(
+            [],
+            new Dn(self::ADMINS),
+        );
+
+        self::assertTrue($delta->isEmpty());
+        self::assertFalse($delta->isUntouched());
+    }
+
+    public function test_a_delete_and_an_add_net_to_both(): void
+    {
+        $delta = $this->settle(
+            Change::delete('member', self::BOB),
+            Change::add('member', self::CAROL),
+        );
+
+        self::assertSame(
+            [self::CAROL],
+            $delta->added('member'),
+        );
+        self::assertSame(
+            [self::BOB],
+            $delta->removed('member'),
+        );
+    }
+
+    public function test_adding_then_deleting_a_value_leaves_the_links_untouched(): void
+    {
+        $delta = $this->settle(
+            Change::add('member', self::CAROL),
+            Change::delete('member', self::CAROL),
+        );
+
+        self::assertTrue($delta->isUntouched());
+    }
+
+    public function test_deleting_then_adding_a_held_value_leaves_the_links_untouched(): void
+    {
+        $delta = $this->settle(
+            Change::delete('member', self::BOB),
+            Change::add('member', self::BOB),
+        );
+
+        self::assertTrue($delta->isUntouched());
+    }
+
+    public function test_adding_a_value_again_after_deleting_it_links_it(): void
+    {
+        $delta = $this->settle(
+            Change::add('member', self::CAROL),
+            Change::delete('member', self::CAROL),
+            Change::add('member', self::CAROL),
+        );
+
+        self::assertSame(
+            [self::CAROL],
+            $delta->added('member'),
+        );
+        self::assertSame(
+            [],
+            $delta->removed('member'),
+        );
+    }
+
+    public function test_adding_a_value_an_earlier_change_added_is_refused(): void
+    {
+        $this->expectOperationCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->settle(
+            Change::add('member', self::CAROL),
+            Change::add('member', self::CAROL),
+        );
+    }
+
+    public function test_the_same_value_twice_in_one_add_is_refused(): void
+    {
+        $this->expectOperationCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->settle(Change::add(
+            'member',
+            self::CAROL,
+            'CN=Carol, DC=example, DC=com',
+        ));
+    }
+
+    public function test_deleting_a_value_an_earlier_change_deleted_is_refused(): void
+    {
+        $this->expectOperationCode(ResultCode::NO_SUCH_ATTRIBUTE);
+
+        $this->settle(
+            Change::delete('member', self::BOB),
+            Change::delete('member', self::BOB),
+        );
+    }
+
+    public function test_a_value_named_twice_in_one_delete_is_removed_once(): void
+    {
+        $delta = $this->settle(Change::delete(
+            'member',
+            self::BOB,
+            'CN=Bob, DC=example, DC=com',
+        ));
+
+        self::assertCount(
+            1,
+            $delta->removed('member'),
+        );
+    }
+
+    public function test_deleting_a_value_that_is_not_a_dn_is_answered_as_not_held(): void
+    {
+        $this->expectOperationCode(ResultCode::NO_SUCH_ATTRIBUTE);
+
+        $this->settle(Change::delete('member', 'not a dn'));
+    }
+
+    public function test_adding_a_value_that_is_not_a_dn_is_refused_for_its_syntax(): void
+    {
+        $this->expectOperationCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->settle(Change::add('member', 'not a dn'));
+    }
+
+    public function test_a_value_that_is_not_a_dn_added_then_deleted_is_never_held_to_its_syntax(): void
+    {
+        $delta = $this->settle(
+            Change::add('member', 'not a dn'),
+            Change::delete('member', 'not a dn'),
+        );
+
+        self::assertTrue($delta->isUntouched());
+    }
+
+    private function settle(Change ...$changes): LinkDelta
+    {
+        return $this->subject->settle(
+            array_values($changes),
+            new Dn(self::ADMINS),
+        );
+    }
+
+    private function expectOperationCode(int $code): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode($code);
+    }
+}

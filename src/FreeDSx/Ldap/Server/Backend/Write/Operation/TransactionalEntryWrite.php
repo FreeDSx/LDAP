@@ -70,8 +70,8 @@ final readonly class TransactionalEntryWrite
     /**
      * Stores the entry a modify leaves behind, with the target locked and loaded for the producer to work from.
      *
-     * @param LinkDelta $links Linked values the modify changes, which its entry is then left without.
-     * @param Closure(Entry): ?Entry $produce Answers null when the change turns out to be nothing to write.
+     * @param EntryProjection $projection What of the target the producer needs loaded.
+     * @param Closure(Entry): ?ModifiedEntry $produce Answers null when the change turns out to be nothing to write.
      *
      * @return ?Entry what was stored, or null when the producer had nothing to write
      *
@@ -79,22 +79,25 @@ final readonly class TransactionalEntryWrite
      */
     public function update(
         Dn $dn,
-        LinkDelta $links,
+        EntryProjection $projection,
         WriteContext $context,
         Closure $produce,
     ): ?Entry {
         return $this->locked->withEntry(
             $dn,
             $context,
-            fn(Entry $current): ?Entry => $this->stored(
-                $produce($current),
-                $links,
-                $context,
-            ),
-            // Only a write the entry itself is the whole truth for has to read what it links.
-            $links->isEmpty() && !$links->isUntouched()
-                ? EntryProjection::unbounded()
-                : new EntryProjection(linkCap: 0),
+            function (Entry $current) use ($produce, $context): ?Entry {
+                $modified = $produce($current);
+
+                return $modified === null
+                    ? null
+                    : $this->stored(
+                        $modified->entry,
+                        $modified->links,
+                        $context,
+                    );
+            },
+            $projection,
         );
     }
 
