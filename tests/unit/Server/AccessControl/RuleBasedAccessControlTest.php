@@ -472,6 +472,132 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertEmpty($result->getAttributes());
     }
 
+    public function test_a_rule_naming_another_attribute_never_consults_its_subject(): void
+    {
+        $spy = new class implements SubjectMatcherInterface {
+            public int $calls = 0;
+
+            public function matches(
+                TokenInterface $token,
+                ?Dn $targetDn,
+            ): bool {
+                $this->calls++;
+
+                return true;
+            }
+        };
+        $entry = Entry::create(
+            'dc=foo,dc=bar',
+            ['cn' => 'foo', 'sn' => 'bar'],
+        );
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(new AnySubjectMatcher())],
+            attributes: [
+                AttributeRule::deny(
+                    $spy,
+                    new AnyTargetMatcher(),
+                    'mail',
+                )->forRead(),
+            ],
+        ));
+
+        $result = $subject->filterEntry(
+            $this->bindToken,
+            $entry,
+        );
+
+        self::assertSame(
+            $entry,
+            $result,
+        );
+        self::assertSame(
+            0,
+            $spy->calls,
+        );
+    }
+
+    public function test_a_deny_naming_no_attribute_ahead_of_a_named_allow_withholds_it(): void
+    {
+        $entry = Entry::create(
+            'dc=foo,dc=bar',
+            ['cn' => 'foo'],
+        );
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(new AnySubjectMatcher())],
+            attributes: [
+                AttributeRule::deny(new AnySubjectMatcher())->forRead(),
+                AttributeRule::allow(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    'cn',
+                )->forRead(),
+            ],
+        ));
+
+        $result = $subject->filterEntry(
+            $this->bindToken,
+            $entry,
+        );
+
+        self::assertNotNull($result);
+        self::assertNull($result->get('cn'));
+    }
+
+    public function test_write_rules_alone_leave_a_read_entry_untouched(): void
+    {
+        $entry = Entry::create(
+            'dc=foo,dc=bar',
+            ['cn' => 'foo'],
+        );
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(new AnySubjectMatcher())],
+            attributes: [
+                AttributeRule::deny(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    'cn',
+                )->forWrite(),
+            ],
+        ));
+
+        $result = $subject->filterEntry(
+            $this->bindToken,
+            $entry,
+        );
+
+        self::assertSame(
+            $entry,
+            $result,
+        );
+    }
+
+    public function test_an_undecidable_subject_on_a_deny_naming_the_attribute_still_withholds_it(): void
+    {
+        $entry = Entry::create(
+            'dc=foo,dc=bar',
+            ['cn' => 'foo', 'sn' => 'bar'],
+        );
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(new AnySubjectMatcher())],
+            attributes: [
+                AttributeRule::deny(
+                    new CallbackSubjectMatcher(static fn(): bool => throw new OperationException('unavailable')),
+                    new AnyTargetMatcher(),
+                    'cn',
+                )->forRead(),
+            ],
+        ));
+
+        $result = $subject->filterEntry(
+            $this->bindToken,
+            $entry,
+        );
+
+        self::assertNotNull($result);
+        self::assertNull($result->get('cn'));
+        self::assertNotNull($result->get('sn'));
+    }
+
     public function test_filter_entry_returns_null_when_search_operation_is_denied_on_entry_dn(): void
     {
         $entry = Entry::create(

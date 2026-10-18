@@ -25,7 +25,6 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
-use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
@@ -42,9 +41,12 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
 {
     private AclRules $rules;
 
+    private AclRuleIndex $index;
+
     public function __construct(?AclRules $rules = null)
     {
         $this->rules = $rules ?? AclRules::secureDefault();
+        $this->index = AclRuleIndex::of($this->rules);
     }
 
     public function setBackend(ReadBackendInterface $backend): void
@@ -208,7 +210,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
     ): Entry {
         $dn = $entry->getDn();
 
-        if ($this->rules->attributes === []) {
+        if (!$this->index->hasAttributeRules(AttributeAccess::Read)) {
             return $entry;
         }
 
@@ -276,27 +278,27 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             : Effect::Allow;
     }
 
+    /**
+     * The first rule for the operation whose target and subject match decides; otherwise it is denied.
+     */
     private function isAllowed(
         OperationType $operation,
         TokenInterface $token,
         Dn $dn,
     ): bool {
-        return $this->resolveEffect(
-            $this->rules->operations,
-            $this->operationMatches(...),
-            $operation,
-            $token,
-            $dn,
-            Effect::Deny,
-        ) === Effect::Allow;
-    }
+        foreach ($this->index->operationRules($operation) as $rule) {
+            if (!$rule->target->matches($dn)) {
+                continue;
+            }
 
-    private function operationMatches(
-        OperationRule $rule,
-        OperationType $operation,
-    ): bool {
-        return $rule->operations === []
-            || in_array($operation, $rule->operations, true);
+            if (!$this->subjectMatches($rule->subject, $rule->effect, $token, $dn)) {
+                continue;
+            }
+
+            return $rule->effect === Effect::Allow;
+        }
+
+        return false;
     }
 
     private function isRelocationAllowed(
@@ -439,7 +441,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
     /**
      * Returns the effect of the first rule whose selector, target, and subject all match; otherwise $default.
      *
-     * @template TRule of OperationRule|ControlRule|RelocationRule
+     * @template TRule of ControlRule|RelocationRule
      * @template TValue
      * @param TRule[] $rules
      * @param callable(TRule, TValue): bool $selectorMatches
@@ -479,20 +481,12 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         AttributeAccess $access,
         Effect $default,
     ): Effect {
-        foreach ($this->rules->attributes as $rule) {
-            if (!$rule->access->includes($access)) {
-                continue;
-            }
-
+        foreach ($this->index->attributeRules($access, $attrName) as $rule) {
             if (!$rule->target->matches($dn)) {
                 continue;
             }
 
             if (!$this->subjectMatches($rule->subject, $rule->effect, $token, $dn)) {
-                continue;
-            }
-
-            if ($rule->attributes !== [] && !in_array($attrName, $rule->attributes, true)) {
                 continue;
             }
 
