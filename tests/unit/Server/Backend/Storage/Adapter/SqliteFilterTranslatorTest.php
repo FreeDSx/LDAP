@@ -265,6 +265,32 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
+    #[DataProvider('indexLimitLengthProvider')]
+    public function test_equality_is_exact_only_below_the_index_limit(
+        int $length,
+        bool $exact,
+    ): void {
+        $result = $this->subject->translate(new EqualityFilter(
+            'cn',
+            str_repeat('a', $length),
+        ));
+
+        self::assertSame(
+            $exact,
+            $result?->isExact,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{int, bool}>
+     */
+    public static function indexLimitLengthProvider(): iterable
+    {
+        yield 'two short of the limit' => [253, true];
+        yield 'one short of the limit' => [254, false];
+        yield 'at the limit' => [255, false];
+    }
+
     public function test_equality_on_a_dn_valued_attribute_is_exact(): void
     {
         $result = $this->subject->translate(new EqualityFilter(

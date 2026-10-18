@@ -3,7 +3,10 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'resources/**'
       - 'tests/performance/**'
+      - 'tests/support/**'
+      - 'tests/resources/seed/**'
       - 'tests/bin/ldap-*.php'
       - 'composer.json'
       - 'composer.lock'

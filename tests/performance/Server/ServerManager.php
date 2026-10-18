@@ -16,6 +16,7 @@ namespace Tests\Performance\FreeDSx\Ldap\Server;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Support\FreeDSx\Ldap\Seed\SeedProfile;
 
 /**
  * Spawns ldap-backend-storage.php, waits for the readiness marker, and stops it on destruction.
@@ -122,7 +123,13 @@ final class ServerManager
 
     private function readyDeadlineSeconds(): int
     {
-        return $this->maxWaitSeconds + (int) ceil($this->config->seed->entries / 100);
+        // Validated person entries seed several times slower than minimal ones, slowest on MySQL with the journal on.
+        $entriesPerSecond = match ($this->config->seed->profile) {
+            SeedProfile::Minimal => 100,
+            SeedProfile::Person => 40,
+        };
+
+        return $this->maxWaitSeconds + (int) ceil($this->config->seed->entries / $entriesPerSecond);
     }
 
     /**

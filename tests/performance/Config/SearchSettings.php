@@ -25,7 +25,7 @@ final readonly class SearchSettings
     public const DEFAULT_VALUE = 'seed-1';
 
     /**
-     * A sorted search models a bounded display page typically, so give it a realistic limit.
+     * A sorted search typically models one bounded display page.
      */
     public const DEFAULT_SORT_SIZE_LIMIT = 50;
 

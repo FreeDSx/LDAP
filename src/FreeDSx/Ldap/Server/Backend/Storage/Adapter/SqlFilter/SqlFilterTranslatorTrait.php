@@ -676,9 +676,10 @@ trait SqlFilterTranslatorTrait
 
     private function isExactEquality(string $value): bool
     {
+        // A cut key matches an assertion of the limit's length, or one shorter once MySQL pads a trailing space.
         return Text::isAscii($value)
             && Text::isUtf8($value)
-            && Text::lengthOf($value) <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
+            && Text::lengthOf($value) < SqlFilterUtility::MAX_INDEXED_VALUE_CHARS - 1;
     }
 
     /**

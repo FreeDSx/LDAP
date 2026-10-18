@@ -391,7 +391,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
     }
 
     /**
-     * Each manager has a fixed number of reports, and always sorts before them so it is seeded first.
+     * A manager always has a lower index than its reports and is seeded before them.
      */
     private function manager(int $i): int
     {

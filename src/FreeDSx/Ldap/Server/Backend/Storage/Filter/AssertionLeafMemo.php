@@ -37,7 +37,7 @@ class AssertionLeafMemo
 
     /**
      * @param ?string $derivedName The derived attribute the item names, if any.
-     * @param bool $keyedByType Whether the item asserts no options, so a stored description is decided by its type alone.
+     * @param bool $keyedByType Whether the item asserts no options, which lets a stored type alone decide.
      */
     public function __construct(
         public readonly ?string $derivedName,

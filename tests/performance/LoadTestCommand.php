@@ -40,6 +40,7 @@ use Tests\Performance\FreeDSx\Ldap\Threshold\ThresholdEvaluator;
 use Tests\Performance\FreeDSx\Ldap\Threshold\ThresholdResult;
 use Tests\Performance\FreeDSx\Ldap\Threshold\ThresholdSet;
 use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
+use Tests\Support\FreeDSx\Ldap\ConsoleOptionsTrait;
 use Tests\Support\FreeDSx\Ldap\Seed\SeedProfile;
 use Throwable;
 
@@ -48,6 +49,8 @@ use Throwable;
  */
 final class LoadTestCommand extends Command
 {
+    use ConsoleOptionsTrait;
+
     protected static $defaultName = 'load-test';
 
     protected static $defaultDescription = 'Run a concurrent LDAP load test against a storage backend.';
@@ -59,13 +62,13 @@ final class LoadTestCommand extends Command
                 'backend',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Storage adapter: ' . self::choices(Backend::cases()),
+                'Storage adapter: ' . self::enumChoices(Backend::cases()),
             )
             ->addOption(
                 'runner',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Server runner: ' . self::choices(RunnerMode::cases()) . ' (memory REQUIRES swoole)',
+                'Server runner: ' . self::enumChoices(RunnerMode::cases()) . ' (memory REQUIRES swoole)',
             )
             ->addOption(
                 'swoole-workers',
@@ -138,7 +141,7 @@ final class LoadTestCommand extends Command
                 'output',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Report format: ' . self::choices(OutputFormat::cases()),
+                'Report format: ' . self::enumChoices(OutputFormat::cases()),
                 OutputFormat::Text->value,
             )
             ->addOption(
@@ -216,7 +219,7 @@ final class LoadTestCommand extends Command
                 'no-jit',
                 null,
                 InputOption::VALUE_NONE,
-                'Disable opcache + tracing JIT on the spawned FreeDSx server (default: enabled for swoole, off for pcntl).',
+                'Disable opcache + function JIT on the spawned FreeDSx server (default: enabled for swoole, off for pcntl).',
             )
             ->addOption(
                 'monitor',
@@ -271,7 +274,7 @@ final class LoadTestCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 sprintf(
                     'Shape of the seeded entries: %s.',
-                    self::choices(SeedProfile::cases()),
+                    self::enumChoices(SeedProfile::cases()),
                 ),
                 SeedSettings::DEFAULT_PROFILE->value,
             )
@@ -481,7 +484,11 @@ final class LoadTestCommand extends Command
             seed: new SeedSettings(
                 entries: $this->requireInt($input, 'seed-entries'),
                 attributes: $this->requireInt($input, 'seed-attributes'),
-                profile: $this->requireEnum($input, 'seed-profile', SeedProfile::class),
+                profile: $this->requireEnum(
+                    $input,
+                    'seed-profile',
+                    SeedProfile::class,
+                ),
                 groups: $this->requireInt($input, 'seed-groups'),
                 groupSize: $this->requireInt($input, 'seed-group-size'),
             ),
@@ -498,16 +505,32 @@ final class LoadTestCommand extends Command
                 attributes: $this->optionalString($input, 'search-attributes'),
                 attributesOnly: (bool) $input->getOption('attributes-only'),
             ),
-            output: $this->requireEnum($input, 'output', OutputFormat::class),
+            output: $this->requireEnum(
+                $input,
+                'output',
+                OutputFormat::class,
+            ),
         );
     }
 
     private function buildServerSettings(InputInterface $input): ServerSettings
     {
         return new ServerSettings(
-            backend: $this->requireEnum($input, 'backend', Backend::class),
-            runner: $this->requireEnum($input, 'runner', RunnerMode::class),
-            mode: $this->requireEnum($input, 'server', ServerMode::class),
+            backend: $this->requireEnum(
+                $input,
+                'backend',
+                Backend::class,
+            ),
+            runner: $this->requireEnum(
+                $input,
+                'runner',
+                RunnerMode::class,
+            ),
+            mode: $this->requireEnum(
+                $input,
+                'server',
+                ServerMode::class,
+            ),
             host: $this->requireString($input, 'host'),
             port: $this->requireInt($input, 'port'),
             swooleWorkers: $this->requireInt($input, 'swoole-workers'),
@@ -521,8 +544,14 @@ final class LoadTestCommand extends Command
         InputInterface $input,
         RunnerMode $runner,
     ): RunSettings {
-        $ops = $this->parseInt($input->getOption('ops'), 'ops');
-        $duration = $this->parseInt($input->getOption('duration'), 'duration');
+        $ops = $this->parseInt(
+            $input->getOption('ops'),
+            'ops',
+        );
+        $duration = $this->parseInt(
+            $input->getOption('duration'),
+            'duration',
+        );
 
         return new RunSettings(
             clients: $this->requireInt($input, 'clients'),
@@ -532,7 +561,7 @@ final class LoadTestCommand extends Command
             warmup: $this->requireInt($input, 'warmup'),
             mix: $this->requireString($input, 'mix'),
             rngSeed: $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
-            // Tracing JIT can crash forked pcntl workers under load, so only Swoole keeps it; --no-jit forces it off.
+            // The spawned server runs JIT only on Swoole, and --no-jit turns it off there too.
             jit: !(bool) $input->getOption('no-jit') && $runner !== RunnerMode::Pcntl,
         );
     }
@@ -558,22 +587,8 @@ final class LoadTestCommand extends Command
             'Invalid --%s value "%s". Expected one of: %s.',
             $name,
             $value,
-            self::choices($enum::cases()),
+            self::enumChoices($enum::cases()),
         ));
-    }
-
-    /**
-     * @param list<BackedEnum> $cases
-     */
-    private static function choices(array $cases): string
-    {
-        return implode(
-            ' | ',
-            array_map(
-                static fn(BackedEnum $case): string => (string) $case->value,
-                $cases,
-            ),
-        );
     }
 
     private function optionalString(InputInterface $input, string $name): ?string

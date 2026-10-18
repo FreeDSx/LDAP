@@ -149,6 +149,44 @@ trait StorageBoundsTestsTrait
         }
     }
 
+    public function testAnEqualityAssertionAtTheIndexLimitDoesNotMatchALongerValue(): void
+    {
+        $this->authenticateAdmin();
+        // The second key is cut just after a space, which MySQL compares as equal to the prefix without it.
+        $entries = [
+            'cutatlimit' => str_repeat('l', 255) . 'tail',
+            'cutafterspace' => str_repeat('l', 254) . ' tail',
+        ];
+
+        foreach ($entries as $cn => $description) {
+            $this->ldapClient()->create(new Entry(
+                "cn={$cn},dc=foo,dc=bar",
+                new Attribute('objectClass', 'top', 'inetOrgPerson'),
+                new Attribute('cn', $cn),
+                new Attribute('sn', 'Cut'),
+                new Attribute('description', $description),
+            ));
+        }
+
+        try {
+            foreach ([255, 254] as $length) {
+                self::assertSame(
+                    [],
+                    $this->ldapClient()->search(
+                        Operations::search(Filters::equal('description', str_repeat('l', $length)), 'cn')
+                            ->base('dc=foo,dc=bar')
+                            ->useSubtreeScope(),
+                    )->toArray(),
+                    "assertion of {$length} characters",
+                );
+            }
+        } finally {
+            foreach (array_keys($entries) as $cn) {
+                $this->ldapClient()->delete("cn={$cn},dc=foo,dc=bar");
+            }
+        }
+    }
+
     public function testAnAttributeTypeWithinTheStorageBoundIsStored(): void
     {
         // The type is undefined, which only a lenient policy waives.
@@ -205,5 +243,53 @@ trait StorageBoundsTestsTrait
 
         // The refusal answers the operation rather than dropping the connection, so the session still serves.
         self::assertNotNull($this->ldapClient()->read('cn=admin,dc=foo,dc=bar'));
+    }
+
+    public function testAnAttributeDescriptionNamingNoTypeIsRefusedWithValidationOff(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--validation-mode=off',
+            ],
+        );
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->send(Operations::add(new Entry(
+            'cn=notype,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'notype'),
+            new Attribute('sn', 'No Type'),
+            new Attribute(';sn', 'value'),
+        )));
+    }
+
+    public function testAModifyAddingADescriptionNamingNoTypeIsRefusedWithValidationOff(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--validation-mode=off',
+            ],
+        );
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->send(Operations::modify(
+            'cn=user,dc=foo,dc=bar',
+            Change::add(
+                ';cn',
+                'value',
+            ),
+        ));
     }
 }

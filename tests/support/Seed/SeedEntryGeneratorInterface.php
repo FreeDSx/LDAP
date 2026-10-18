@@ -26,7 +26,7 @@ interface SeedEntryGeneratorInterface
     public function generate(int $count): iterable;
 
     /**
-     * Whether the generated entries satisfy the schema, so they can be seeded with validation on.
+     * Whether the generated entries satisfy the schema and can be seeded with validation on.
      */
     public function isSchemaValid(): bool;
 }

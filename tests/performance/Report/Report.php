@@ -132,12 +132,31 @@ final class Report
                 $this->snapshot->elapsedSeconds,
             );
 
+        // A compared server seeds its own content, which these settings do not describe.
+        if (!$this->external) {
+            $lines[] = $this->describeSeed();
+        }
+
         $lines[] = sprintf(
             'Mix: %s',
             $this->mix->describe(),
         );
 
         return implode(PHP_EOL, $lines);
+    }
+
+    private function describeSeed(): string
+    {
+        $seed = $this->config->seed;
+
+        return sprintf(
+            'Seed: %d %s entries   Filler attributes: %d   Groups: %d of %d members',
+            $seed->entries,
+            $seed->profile->value,
+            $seed->attributes,
+            $seed->groups,
+            $seed->groupSize,
+        );
     }
 
     private function renderTotals(): string
@@ -224,6 +243,13 @@ final class Report
                 'mix' => $this->mix->weights(),
                 'host' => $this->config->server->host,
                 'port' => $this->config->server->port,
+                'seed' => [
+                    'entries' => $this->config->seed->entries,
+                    'profile' => $this->config->seed->profile->value,
+                    'attributes' => $this->config->seed->attributes,
+                    'groups' => $this->config->seed->groups,
+                    'group_size' => $this->config->seed->groupSize,
+                ],
             ],
             'elapsed_seconds' => $this->snapshot->elapsedSeconds,
             'operations' => $ops,

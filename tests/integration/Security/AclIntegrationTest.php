@@ -535,17 +535,69 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($delegate->get('sn'));
     }
 
-    public function testASupertypeFilterDoesNotMatchThroughAReadDeniedSubtype(): void
+    #[DataProvider('readDeniedGivenNameFilterProvider')]
+    public function testAFilterCannotMatchThroughAReadDeniedAttributeHoweverItIsSpelled(FilterInterface $filter): void
     {
         $this->authenticateAdmin();
 
         self::assertSame(
             0,
+            $this->countMatching($filter),
+        );
+    }
+
+    /**
+     * @return Generator<string, array{FilterInterface}>
+     */
+    public static function readDeniedGivenNameFilterProvider(): Generator
+    {
+        yield 'its name' => [Filters::equal('givenName', 'Zephyrine')];
+        yield 'its name in another case' => [Filters::equal('GIVENNAME', 'Zephyrine')];
+        yield 'its oid' => [Filters::equal('2.5.4.42', 'Zephyrine')];
+        yield 'its supertype' => [Filters::equal('name', 'Zephyrine')];
+        yield 'its supertype by oid' => [Filters::equal('2.5.4.41', 'Zephyrine')];
+    }
+
+    public function testASupertypeFilterStillMatchesTheEntryThroughAReadableSubtype(): void
+    {
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            1,
             $this->countMatching(Filters::equal(
+                'name',
+                'Nicknamed',
+            )),
+        );
+    }
+
+    public function testAPagedSearchCannotMatchThroughAReadDeniedSubtype(): void
+    {
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            [],
+            $this->pagedEntries(Filters::equal(
                 'name',
                 'Zephyrine',
             )),
         );
+    }
+
+    public function testAPagedSearchNotReadingAReadDeniedAttributeReturnsTheEntryWithoutIt(): void
+    {
+        $this->authenticateAdmin();
+
+        $entries = $this->pagedEntries(Filters::equal(
+            'cn',
+            'nicknamed',
+        ));
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+        self::assertNull($entries[0]->get('givenName'));
     }
 
     public function testAFilterNotReadingAReadDeniedAttributeStillReturnsTheEntryWithoutIt(): void
@@ -1377,5 +1429,28 @@ final class AclIntegrationTest extends ServerTestCase
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         )->toArray());
+    }
+
+    /**
+     * @return list<Entry>
+     */
+    private function pagedEntries(FilterInterface $filter): array
+    {
+        $paging = $this->ldapClient()->paging(
+            Operations::search($filter)
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            2,
+        );
+        $entries = [];
+
+        while ($paging->hasEntries()) {
+            array_push(
+                $entries,
+                ...$paging->getEntries()->toArray(),
+            );
+        }
+
+        return $entries;
     }
 }
