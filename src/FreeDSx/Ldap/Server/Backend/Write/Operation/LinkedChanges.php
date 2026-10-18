@@ -13,22 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
-use function array_diff;
 use function array_filter;
 use function array_values;
-use function sprintf;
 
 /**
  * Separates the linked values a modify changes from the changes its entry is still stored whole for.
@@ -37,59 +29,22 @@ use function sprintf;
  */
 final readonly class LinkedChanges
 {
-    public function __construct(
-        private LinkedAttributes $linked,
-        private LinkedValueLookupInterface $lookup,
-        private SchemaValidator $schema,
-    ) {}
+    public function __construct(private LinkedAttributes $linked) {}
 
     /**
-     * Holds the delta to what the owner links, which the entry is no longer carrying for the validator to see.
+     * The linked changes applied apart from the entry, or none when the modify has to be applied to the whole entry.
      *
-     * @throws OperationException when a value is already linked, is not linked, or is not a DN
+     * @return list<Change>
      */
-    public function assertApplicable(
-        LinkDelta $delta,
-        Dn $owner,
-    ): void {
-        foreach ($delta->names() as $name) {
-            $added = $delta->added($name);
-            $removed = $delta->removed($name);
-
-            $this->assertDistinctDns($name, $added);
-            $this->assertDistinctDns($name, $removed);
-
-            $this->refuse(
-                $name,
-                $this->lookup->heldLinkValues($owner, $name, $added),
-                'already holds',
-                ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
-            );
-            $this->refuse(
-                $name,
-                array_values(array_diff(
-                    $removed,
-                    $this->lookup->heldLinkValues($owner, $name, $removed),
-                )),
-                'does not hold',
-                ResultCode::NO_SUCH_ATTRIBUTE,
-            );
-        }
-    }
-
-    /**
-     * The values the modify links and unlinks or nothing when it has to be applied to the whole entry.
-     */
-    public function delta(
+    public function changesApart(
         UpdateCommand $command,
         WriteContext $context,
-    ): LinkDelta {
+    ): array {
         // A control reading the entry needs every value it holds, which only the whole-entry path materializes.
         if ($this->linked->isEmpty() || $context->controlEvaluator()?->inspectsEntry() === true) {
-            return new LinkDelta();
+            return [];
         }
-        $added = [];
-        $removed = [];
+        $apart = [];
 
         foreach ($command->changes as $change) {
             if (!$this->linked->links($change->getAttribute())) {
@@ -98,31 +53,25 @@ final readonly class LinkedChanges
 
             // One change the attribute has to be written whole for settles it for every value of that attribute.
             if (!$this->isApplicable($change, $command->dn)) {
-                return new LinkDelta();
-            }
-            $name = Attribute::normalizeName($change->getAttribute()->getName());
-            $values = array_values($change->getAttribute()->getValues());
-
-            if ($change->isAdd()) {
-                $added[$name] = [...$added[$name] ?? [], ...$values];
-
-                continue;
+                return [];
             }
 
-            $removed[$name] = [...$removed[$name] ?? [], ...$values];
+            $apart[] = $change;
         }
 
-        return new LinkDelta($added, $removed);
+        return $apart;
     }
 
     /**
-     * The command without the changes the delta carries, which is what the entry is still stored for.
+     * The command without the changes applied apart, which is what the entry is still stored for.
+     *
+     * @param list<Change> $apart
      */
     public function remaining(
         UpdateCommand $command,
-        LinkDelta $delta,
+        array $apart,
     ): UpdateCommand {
-        if ($delta->isEmpty()) {
+        if ($apart === []) {
             return $command;
         }
 
@@ -133,60 +82,6 @@ final readonly class LinkedChanges
                 fn(Change $change): bool => !$this->linked->links($change->getAttribute()),
             )),
             $command->systemChanges,
-        );
-    }
-
-    /**
-     * Every value has to be a DN the attribute does not already name twice in the one request.
-     *
-     * @param list<string> $values
-     *
-     * @throws OperationException
-     */
-    private function assertDistinctDns(
-        string $name,
-        array $values,
-    ): void {
-        if ($values === []) {
-            return;
-        }
-
-        // Held to the same syntax the whole entry would have been, which no longer carries these values.
-        $this->schema->validateValues(new Attribute($name, ...$values));
-        $seen = [];
-
-        foreach ($values as $value) {
-            $normalized = Dn::normalizedOrNull($value) ?? $value;
-
-            if (isset($seen[$normalized])) {
-                throw new OperationException(
-                    sprintf('The attribute "%s" was given the same value twice.', $name),
-                    ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
-                );
-            }
-
-            $seen[$normalized] = true;
-        }
-    }
-
-    /**
-     * @param list<string> $offending
-     *
-     * @throws OperationException
-     */
-    private function refuse(
-        string $name,
-        array $offending,
-        string $reason,
-        int $code,
-    ): void {
-        if ($offending === []) {
-            return;
-        }
-
-        throw new OperationException(
-            sprintf('The entry %s a value given for the attribute "%s".', $reason, $name),
-            $code,
         );
     }
 

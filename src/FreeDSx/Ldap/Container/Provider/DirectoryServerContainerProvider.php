@@ -89,6 +89,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeChunkRemover;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryMutation;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryPlacementGuard;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\MoveEntryHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChangeReplay;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChanges;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\UpdateEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;
@@ -439,6 +440,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
             linkedChanges: $container->get(LinkedChanges::class),
+            replay: $container->get(LinkedChangeReplay::class),
         );
     }
 

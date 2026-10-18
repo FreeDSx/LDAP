@@ -85,6 +85,57 @@ trait LinkedAttributeTestsTrait
         );
     }
 
+    public function testAddingAndDeletingAMemberInOneModifyKeepsTheOthers(): void
+    {
+        $group = $this->seedGroup(
+            'link-add-delete',
+            self::LINKED_ADMIN,
+        );
+
+        $this->ldapClient()->send(Operations::modify(
+            $group,
+            Change::add('member', self::LINKED_ALICE),
+            Change::delete('member', self::LINKED_ALICE),
+        ));
+
+        self::assertEqualsCanonicalizing(
+            [self::LINKED_USER, self::LINKED_ADMIN],
+            $this->membersOf($group),
+        );
+    }
+
+    public function testDeletingAndAddingAMemberInOneModifyKeepsIt(): void
+    {
+        $group = $this->seedGroup(
+            'link-delete-add',
+            self::LINKED_ADMIN,
+        );
+
+        $this->ldapClient()->send(Operations::modify(
+            $group,
+            Change::delete('member', self::LINKED_USER),
+            Change::add('member', self::LINKED_USER),
+        ));
+
+        self::assertEqualsCanonicalizing(
+            [self::LINKED_USER, self::LINKED_ADMIN],
+            $this->membersOf($group),
+        );
+    }
+
+    public function testDeletingAMemberTwiceInOneModifyIsRefused(): void
+    {
+        $group = $this->seedGroup('link-delete-twice');
+
+        $this->expectOperationCode(ResultCode::NO_SUCH_ATTRIBUTE);
+
+        $this->ldapClient()->send(Operations::modify(
+            $group,
+            Change::delete('member', self::LINKED_USER),
+            Change::delete('member', self::LINKED_USER),
+        ));
+    }
+
     public function testReplacingTheMembersWritesThemWhole(): void
     {
         $group = $this->seedGroup('link-replace');

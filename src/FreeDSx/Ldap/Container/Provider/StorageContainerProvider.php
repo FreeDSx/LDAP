@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\ResolvedReferences;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\UnlockedRows;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChangeReplay;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChanges;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -76,6 +77,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             LinkedValueLookupInterface::class => $this->makeLinkedValueLookup(...),
             LinkedLeafWitness::class => $this->makeLinkedLeafWitness(...),
             LinkedChanges::class => $this->makeLinkedChanges(...),
+            LinkedChangeReplay::class => $this->makeLinkedChangeReplay(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
@@ -144,8 +146,12 @@ final class StorageContainerProvider implements ContainerProviderInterface
 
     private function makeLinkedChanges(Container $container): LinkedChanges
     {
-        return new LinkedChanges(
-            $container->get(LinkedAttributes::class),
+        return new LinkedChanges($container->get(LinkedAttributes::class));
+    }
+
+    private function makeLinkedChangeReplay(Container $container): LinkedChangeReplay
+    {
+        return new LinkedChangeReplay(
             $this->isPdo($container)
                 ? $container->get(EntryLinkWriter::class)
                 : $container->get(InMemoryStorage::class),

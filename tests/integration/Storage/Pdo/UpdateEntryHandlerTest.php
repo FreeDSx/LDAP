@@ -81,6 +81,19 @@ final class UpdateEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_adding_and_deleting_a_member_in_one_modify_keeps_the_others(): void
+    {
+        $this->modify(
+            new Change(Change::TYPE_ADD, 'member', $this->dnOf('Carol')),
+            new Change(Change::TYPE_DELETE, 'member', $this->dnOf('Carol')),
+        );
+
+        self::assertSame(
+            [$this->dnOf('Bob')],
+            $this->members(),
+        );
+    }
+
     public function test_replacing_the_members_writes_the_attribute_whole(): void
     {
         $this->modify(new Change(Change::TYPE_REPLACE, 'member', $this->dnOf('Carol')));

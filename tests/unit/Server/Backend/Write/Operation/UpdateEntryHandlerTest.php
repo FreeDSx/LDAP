@@ -90,6 +90,36 @@ final class UpdateEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_adding_then_deleting_a_member_in_one_modify_keeps_the_others(): void
+    {
+        $this->seedAdmins();
+
+        $this->modifyAdmins(
+            new Change(Change::TYPE_ADD, 'member', self::ALICE),
+            new Change(Change::TYPE_DELETE, 'member', self::ALICE),
+        );
+
+        self::assertSame(
+            ['cn=Bob,ou=People,dc=example,dc=com'],
+            array_values($this->find(self::ADMINS)?->get('member')?->getValues() ?? []),
+        );
+    }
+
+    public function test_deleting_then_adding_a_member_in_one_modify_keeps_it(): void
+    {
+        $this->seedAdmins(self::ALICE);
+
+        $this->modifyAdmins(
+            new Change(Change::TYPE_DELETE, 'member', self::ALICE),
+            new Change(Change::TYPE_ADD, 'member', self::ALICE),
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn=Bob,ou=People,dc=example,dc=com', self::ALICE],
+            $this->find(self::ADMINS)?->get('member')?->getValues(),
+        );
+    }
+
     public function test_it_replaces_a_linked_attribute_through_the_whole_entry(): void
     {
         $this->seedAdmins(self::ALICE);

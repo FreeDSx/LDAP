@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -32,6 +33,7 @@ readonly class UpdateEntryHandler
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
         private LinkedChanges $linkedChanges,
+        private LinkedChangeReplay $replay,
     ) {}
 
     /**
@@ -41,23 +43,34 @@ readonly class UpdateEntryHandler
         UpdateCommand $command,
         WriteContext $context,
     ): void {
-        $links = $this->linkedChanges->delta($command, $context);
-        $remaining = $this->linkedChanges->remaining($command, $links);
+        $apart = $this->linkedChanges->changesApart(
+            $command,
+            $context,
+        );
+        $remaining = $this->linkedChanges->remaining(
+            $command,
+            $apart,
+        );
 
         $this->writes->update(
             $command->dn->normalize(),
-            $links,
+            $apart === []
+                ? EntryProjection::unbounded()
+                : new EntryProjection(linkCap: 0),
             $context,
-            function (Entry $current) use ($remaining, $links, $context): Entry {
-                $this->linkedChanges->assertApplicable(
-                    $links,
+            function (Entry $current) use ($apart, $remaining, $context): ModifiedEntry {
+                $links = $this->replay->settle(
+                    $apart,
                     $current->getDn(),
                 );
 
-                return $this->updated(
-                    $remaining,
-                    $context,
-                    $current,
+                return new ModifiedEntry(
+                    $this->updated(
+                        $remaining,
+                        $context,
+                        $current,
+                    ),
+                    $links,
                 );
             },
         );
