@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
@@ -263,7 +264,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
 
         return new ServerSearchHandler(
             backend: $container->get(ReadBackendInterface::class),
-            filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+            strippedMatcher: $this->makeStrippedEntryMatcher($container),
             accessControl: $container->get(AccessControlInterface::class),
             schema: $options->getSchema(),
             limits: $searchLimits ?? $options->makeSearchLimits(),
@@ -287,13 +288,22 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             schema: $options->getSchema(),
             pageFiller: new PageFiller(
                 $backend,
-                $container->get(FilterEvaluatorInterface::class),
+                $this->makeStrippedEntryMatcher($container),
                 $accessControl,
                 $options->getSchema(),
                 $limits,
             ),
             limits: $limits,
             eventLogger: $context->eventLogger,
+        );
+    }
+
+    private function makeStrippedEntryMatcher(Container $container): StrippedEntryMatcher
+    {
+        return new StrippedEntryMatcher(
+            $container->get(FilterEvaluatorInterface::class),
+            $container->get(ServerOptions::class)->getSchema(),
+            $container->get(LinkedAttributes::class),
         );
     }
 

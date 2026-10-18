@@ -47,6 +47,8 @@ use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationResult;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
@@ -1308,7 +1310,11 @@ class ServerPagingHandlerTest extends TestCase
             schema: $this->schema,
             pageFiller: new PageFiller(
                 $this->mockBackend,
-                $filterEvaluator ?? $this->mockFilterEvaluator,
+                new StrippedEntryMatcher(
+                    $filterEvaluator ?? $this->mockFilterEvaluator,
+                    $this->schema,
+                    new LinkedAttributes($this->schema),
+                ),
                 $accessControl,
                 $this->schema,
                 $limits,

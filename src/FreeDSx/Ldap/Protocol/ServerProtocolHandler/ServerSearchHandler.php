@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -43,7 +43,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 
     public function __construct(
         private readonly ReadBackendInterface $backend,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
+        private readonly StrippedEntryMatcher $strippedMatcher,
         private readonly AccessControlInterface $accessControl,
         private readonly Schema $schema,
         private readonly SearchLimits $limits = new SearchLimits(),
@@ -153,7 +153,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
                 continue;
             }
 
-            if ($filtered !== $entry && !$this->filterEvaluator->evaluate($filtered, $filter)) {
+            if (!$this->strippedMatcher->stillMatches($entry, $filtered, $filter)) {
                 continue;
             }
 

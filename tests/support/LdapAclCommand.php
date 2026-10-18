@@ -48,6 +48,11 @@ class LdapAclCommand extends Command
     public const DELEGATE_PASSWORD = 'delegatepass';
 
     /**
+     * Holds a read-denied givenName, the only value a filter on its supertype name could match it by.
+     */
+    public const NICKNAMED_DN = 'cn=nicknamed,dc=foo,dc=bar';
+
+    /**
      * Carries one attribute per spelled-member group, each denied to that group's members.
      */
     public const SPELLED_TARGET_DN = 'cn=spelled-target,dc=foo,dc=bar';
@@ -194,6 +199,11 @@ class LdapAclCommand extends Command
                                 Subject::anyone(),
                                 Target::dn(self::DELEGATE_DN),
                                 'surname',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::anyone(),
+                                Target::dn(self::NICKNAMED_DN),
+                                'givenName',
                             )->forRead(),
                             // Built through the public constructor with a mixed-case name, so the rule only bites
                             // if names are normalized wherever a rule is made.
