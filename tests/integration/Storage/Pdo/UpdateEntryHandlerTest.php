@@ -84,8 +84,14 @@ final class UpdateEntryHandlerTest extends TestCase
     public function test_adding_and_deleting_a_member_in_one_modify_keeps_the_others(): void
     {
         $this->modify(
-            new Change(Change::TYPE_ADD, 'member', $this->dnOf('Carol')),
-            new Change(Change::TYPE_DELETE, 'member', $this->dnOf('Carol')),
+            Change::add(
+                'member',
+                $this->dnOf('Carol'),
+            ),
+            Change::delete(
+                'member',
+                $this->dnOf('Carol'),
+            ),
         );
 
         self::assertSame(

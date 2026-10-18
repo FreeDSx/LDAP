@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDia
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueCountInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -35,7 +36,7 @@ use function ksort;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EntryLinkWriter implements LinkedValueLookupInterface
+final readonly class EntryLinkWriter implements LinkedValueLookupInterface, LinkedValueCountInterface
 {
     use PdoColumnCastTrait;
 
@@ -173,19 +174,51 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         }
         $held = [];
 
-        foreach (array_chunk(array_keys($asked), self::DNS_PER_STATEMENT) as $chunk) {
-            $params = [
-                $owner->normalizedString(),
-                Attribute::normalizeName($attribute),
-                ...$chunk,
-            ];
+        $chunks = array_chunk(
+            array_keys($asked),
+            self::DNS_PER_STATEMENT,
+        );
 
-            foreach ($this->rowsOf($this->dialect->queryHeldLinkValues(count($chunk)), $params) as $row) {
+        foreach ($chunks as $chunk) {
+            $rows = $this->rowsOf(
+                $this->dialect->queryHeldLinkValues(count($chunk)),
+                [
+                    $owner->normalizedString(),
+                    Attribute::normalizeName($attribute),
+                    ...$chunk,
+                ],
+            );
+
+            foreach ($rows as $row) {
                 $held[] = $asked[$this->stringColumn($row['lc_dn'] ?? null)] ?? null;
             }
         }
 
         return array_values(array_filter($held));
+    }
+
+    /**
+     * How many values the owner links, counted on the connection its own write runs on.
+     */
+    public function linkCount(
+        Dn $owner,
+        string $attribute,
+        int $upTo,
+    ): int {
+        $row = $this->connection
+            ->execute(
+                $this->dialect->queryLinkCount(),
+                [
+                    $owner->normalizedString(),
+                    Attribute::normalizeName($attribute),
+                    $upTo,
+                ],
+            )
+            ->fetch();
+
+        return is_array($row)
+            ? $this->intColumn($row['link_count'] ?? null)
+            : 0;
     }
 
     /**

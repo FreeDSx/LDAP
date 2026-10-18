@@ -50,7 +50,7 @@ readonly class EquivalentValuesCheck implements SchemaCheckInterface
             if ($only !== null && !isset($only[Attribute::normalizeName($attribute->getDescription())])) {
                 continue;
             }
-            if (!$this->hasEquivalentValues($attribute)) {
+            if ($write->hasLinkedCount($attribute) || !$this->hasEquivalentValues($attribute)) {
                 continue;
             }
 

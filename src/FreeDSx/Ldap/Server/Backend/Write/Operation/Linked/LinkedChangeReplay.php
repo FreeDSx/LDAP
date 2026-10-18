@@ -19,11 +19,15 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueCountInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 
 use function array_diff_key;
+use function array_keys;
 use function array_values;
+use function count;
+use function min;
 use function sprintf;
 
 /**
@@ -35,8 +39,13 @@ use function sprintf;
  */
 readonly class LinkedChangeReplay
 {
+    /**
+     * A count only has to tell none, one, and more than one value apart.
+     */
+    private const COUNTED_UP_TO = 2;
+
     public function __construct(
-        private LinkedValueLookupInterface $lookup,
+        private LinkedValueLookupInterface&LinkedValueCountInterface $lookup,
         private SchemaValidator $schema,
     ) {}
 
@@ -50,9 +59,9 @@ readonly class LinkedChangeReplay
     public function settle(
         array $changes,
         Dn $owner,
-    ): LinkDelta {
+    ): SettledLinks {
         if ($changes === []) {
-            return new LinkDelta();
+            return new SettledLinks();
         }
         $before = $this->heldBefore(
             $changes,
@@ -65,13 +74,81 @@ readonly class LinkedChangeReplay
             $values = array_values($change->getAttribute()->getValues());
 
             $state[$name] = $change->isAdd()
-                ? $this->withAdded($name, $state[$name] ?? [], $values)
-                : $this->withRemoved($name, $state[$name] ?? [], $values);
+                ? $this->withAdded(
+                    $name,
+                    $state[$name] ?? [],
+                    $values,
+                )
+                : $this->withRemoved(
+                    $name,
+                    $state[$name] ?? [],
+                    $values,
+                );
         }
 
-        return $this->netOf(
+        $delta = $this->netOf(
             $before,
             $state,
+        );
+
+        return new SettledLinks(
+            $delta,
+            $changes,
+            $this->countsAfter(
+                array_keys($state),
+                $delta,
+                $owner,
+            ),
+        );
+    }
+
+    /**
+     * What each attribute holds once the delta applies.
+     *
+     * @param list<string> $names
+     *
+     * @return array<string, int>
+     */
+    private function countsAfter(
+        array $names,
+        LinkDelta $delta,
+        Dn $owner,
+    ): array {
+        $counts = [];
+
+        foreach ($names as $name) {
+            $counts[$name] = $this->countAfter(
+                $owner,
+                $name,
+                count($delta->added($name)),
+                count($delta->removed($name)),
+            );
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Stored values are counted only as far as the ones removed plus the bound, whatever the attribute holds.
+     */
+    private function countAfter(
+        Dn $owner,
+        string $name,
+        int $adding,
+        int $removing,
+    ): int {
+        if ($adding >= self::COUNTED_UP_TO) {
+            return self::COUNTED_UP_TO;
+        }
+        $stored = $this->lookup->linkCount(
+            $owner,
+            $name,
+            $removing + self::COUNTED_UP_TO,
+        );
+
+        return min(
+            self::COUNTED_UP_TO,
+            $stored - $removing + $adding,
         );
     }
 
@@ -98,7 +175,13 @@ readonly class LinkedChangeReplay
         $held = [];
 
         foreach ($named as $name => $values) {
-            foreach ($this->lookup->heldLinkValues($owner, $name, array_values($values)) as $value) {
+            $heldValues = $this->lookup->heldLinkValues(
+                $owner,
+                $name,
+                array_values($values),
+            );
+
+            foreach ($heldValues as $value) {
                 $held[$name][self::keyOf($value)] = $value;
             }
         }
@@ -126,13 +209,19 @@ readonly class LinkedChangeReplay
 
             if (isset($adding[$key])) {
                 throw new OperationException(
-                    sprintf('The attribute "%s" was given the same value twice.', $name),
+                    sprintf(
+                        'The attribute "%s" was given the same value twice.',
+                        $name,
+                    ),
                     ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
                 );
             }
             if (isset($current[$key])) {
                 throw new OperationException(
-                    sprintf('The entry already holds a value given for the attribute "%s".', $name),
+                    sprintf(
+                        'The entry already holds a value given for the attribute "%s".',
+                        $name,
+                    ),
                     ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
                 );
             }
@@ -165,7 +254,10 @@ readonly class LinkedChangeReplay
 
             if (!isset($current[$key])) {
                 throw new OperationException(
-                    sprintf('The entry does not hold a value given for the attribute "%s".', $name),
+                    sprintf(
+                        'The entry does not hold a value given for the attribute "%s".',
+                        $name,
+                    ),
                     ResultCode::NO_SUCH_ATTRIBUTE,
                 );
             }
@@ -196,11 +288,20 @@ readonly class LinkedChangeReplay
 
         foreach ($after as $name => $values) {
             $held = $before[$name] ?? [];
-            $linking = array_values(array_diff_key($values, $held));
-            $unlinking = array_values(array_diff_key($held, $values));
+            $linking = array_values(array_diff_key(
+                $values,
+                $held,
+            ));
+            $unlinking = array_values(array_diff_key(
+                $held,
+                $values,
+            ));
 
             if ($linking !== []) {
-                $this->schema->validateValues(new Attribute($name, ...$linking));
+                $this->schema->validateValues(new Attribute(
+                    $name,
+                    ...$linking,
+                ));
                 $added[$name] = $linking;
             }
             if ($unlinking !== []) {

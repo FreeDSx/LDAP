@@ -91,6 +91,20 @@ trait PdoLinkReadDialectTrait
         SQL;
     }
 
+    public function queryLinkCount(): string
+    {
+        return <<<SQL
+            SELECT COUNT(*) AS link_count
+            FROM (
+                SELECT 1
+                FROM entry_attribute_links l
+                JOIN entries o ON o.entry_id = l.owner_entry_id
+                WHERE o.lc_dn = ? AND l.attr_name_lower = ?
+                LIMIT ?
+            ) bounded
+        SQL;
+    }
+
     public function queryLinksForAttribute(): string
     {
         return <<<SQL

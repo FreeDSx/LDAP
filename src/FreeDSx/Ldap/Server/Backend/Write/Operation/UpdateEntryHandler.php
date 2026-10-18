@@ -71,8 +71,9 @@ readonly class UpdateEntryHandler
                         $remaining,
                         $context,
                         $current,
+                        $links,
                     ),
-                    $links,
+                    $links->delta,
                 );
             },
         );

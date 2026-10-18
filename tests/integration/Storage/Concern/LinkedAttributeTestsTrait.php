@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -39,7 +40,10 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::add('member', self::LINKED_ADMIN),
+            Change::add(
+                'member',
+                self::LINKED_ADMIN,
+            ),
         ));
 
         self::assertEqualsCanonicalizing(
@@ -54,11 +58,17 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::add('member', self::LINKED_ADMIN),
+            Change::add(
+                'member',
+                self::LINKED_ADMIN,
+            ),
         ));
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::delete('member', self::LINKED_USER),
+            Change::delete(
+                'member',
+                self::LINKED_USER,
+            ),
         ));
 
         self::assertSame(
@@ -76,7 +86,10 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::delete('member', 'CN=User, DC=foo, DC=bar'),
+            Change::delete(
+                'member',
+                'CN=User, DC=foo, DC=bar',
+            ),
         ));
 
         self::assertSame(
@@ -94,8 +107,14 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::add('member', self::LINKED_ALICE),
-            Change::delete('member', self::LINKED_ALICE),
+            Change::add(
+                'member',
+                self::LINKED_ALICE,
+            ),
+            Change::delete(
+                'member',
+                self::LINKED_ALICE,
+            ),
         ));
 
         self::assertEqualsCanonicalizing(
@@ -113,8 +132,14 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::delete('member', self::LINKED_USER),
-            Change::add('member', self::LINKED_USER),
+            Change::delete(
+                'member',
+                self::LINKED_USER,
+            ),
+            Change::add(
+                'member',
+                self::LINKED_USER,
+            ),
         ));
 
         self::assertEqualsCanonicalizing(
@@ -131,8 +156,85 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::delete('member', self::LINKED_USER),
-            Change::delete('member', self::LINKED_USER),
+            Change::delete(
+                'member',
+                self::LINKED_USER,
+            ),
+            Change::delete(
+                'member',
+                self::LINKED_USER,
+            ),
+        ));
+    }
+
+    public function testALinkedValueTheObjectClassesDoNotPermitIsRefused(): void
+    {
+        $person = $this->seedPerson('link-person');
+
+        $this->expectOperationCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::add(
+                'member',
+                self::LINKED_ADMIN,
+            ),
+        ));
+    }
+
+    public function testALinkedValueTheObjectClassesDoNotPermitIsRefusedWhenAControlReadsTheEntry(): void
+    {
+        $person = $this->seedPerson('link-person-read');
+
+        $this->expectOperationCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                $person,
+                Change::add(
+                    'member',
+                    self::LINKED_ADMIN,
+                ),
+            ),
+            Controls::preRead('cn'),
+        );
+    }
+
+    public function testAUserAddingAPasswordPolicyPointerIsRefused(): void
+    {
+        $person = $this->seedPerson('link-policy');
+
+        $this->expectOperationCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::add(
+                'pwdPolicySubentry',
+                self::LINKED_ADMIN,
+            ),
+        ));
+    }
+
+    public function testDroppingTheClassThatPermitsAKeptLinkedValueIsRefused(): void
+    {
+        $person = $this->seedPerson(
+            'link-classes',
+            ['extensibleObject'],
+            ['member' => self::LINKED_USER],
+        );
+
+        $this->expectOperationCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::delete(
+                'objectClass',
+                'extensibleObject',
+            ),
+            Change::add(
+                'seeAlso',
+                self::LINKED_ADMIN,
+            ),
         ));
     }
 
@@ -142,7 +244,10 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::replace('member', self::LINKED_ADMIN),
+            Change::replace(
+                'member',
+                self::LINKED_ADMIN,
+            ),
         ));
 
         self::assertSame(
@@ -159,7 +264,10 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::add('member', self::LINKED_USER),
+            Change::add(
+                'member',
+                self::LINKED_USER,
+            ),
         ));
     }
 
@@ -171,7 +279,10 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::delete('member', self::LINKED_ADMIN),
+            Change::delete(
+                'member',
+                self::LINKED_ADMIN,
+            ),
         ));
     }
 
@@ -183,7 +294,11 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::add('member', self::LINKED_ADMIN, self::LINKED_ADMIN),
+            Change::add(
+                'member',
+                self::LINKED_ADMIN,
+                self::LINKED_ADMIN,
+            ),
         ));
     }
 
@@ -195,7 +310,10 @@ trait LinkedAttributeTestsTrait
 
         $this->ldapClient()->send(Operations::modify(
             $group,
-            Change::add('member', 'not a dn'),
+            Change::add(
+                'member',
+                'not a dn',
+            ),
         ));
     }
 
@@ -206,7 +324,10 @@ trait LinkedAttributeTestsTrait
         try {
             $this->ldapClient()->send(Operations::modify(
                 $group,
-                Change::add('member', self::LINKED_USER),
+                Change::add(
+                    'member',
+                    self::LINKED_USER,
+                ),
             ));
         } catch (OperationException) {
         }
@@ -352,6 +473,31 @@ trait LinkedAttributeTestsTrait
                 'cn' => $cn,
                 'objectClass' => 'groupOfNames',
                 'member' => [self::LINKED_USER, ...$members],
+            ],
+        ));
+
+        return $dn;
+    }
+
+    /**
+     * @param list<string> $auxiliaries
+     * @param array<string, string> $attributes
+     */
+    private function seedPerson(
+        string $cn,
+        array $auxiliaries = [],
+        array $attributes = [],
+    ): string {
+        $this->authenticateAdmin();
+        $dn = "cn={$cn},dc=foo,dc=bar";
+
+        $this->ldapClient()->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => $cn,
+                'sn' => $cn,
+                'objectClass' => ['person', ...$auxiliaries],
+                ...$attributes,
             ],
         ));
 
