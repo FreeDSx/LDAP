@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
 use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
@@ -748,6 +749,71 @@ final class SchemaTest extends TestCase
                 $ofDescription,
             ),
         );
+    }
+
+    public function test_a_subtype_answer_follows_a_type_redefined_after_it_was_asked(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.41',
+            names: ['name'],
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn'],
+        ));
+
+        self::assertFalse($this->subject->isDescriptionSubtypeOf(
+            'cn',
+            'name',
+        ));
+
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn'],
+            superTypeOid: '2.5.4.41',
+        ));
+
+        self::assertTrue($this->subject->isDescriptionSubtypeOf(
+            'cn',
+            'name',
+        ));
+    }
+
+    public function test_an_operational_type_is_recognized_however_its_description_is_spelled(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.3.6.1.1.16.4',
+            names: ['entryUUID'],
+            usage: AttributeUsage::DirectoryOperation,
+        ));
+        $this->subject->addAttributeType($this->cn);
+
+        foreach (['entryUUID', 'ENTRYUUID', 'entryUUID;x-tag', '1.3.6.1.1.16.4'] as $description) {
+            self::assertTrue(
+                $this->subject->isOperational($description),
+                $description,
+            );
+        }
+        self::assertFalse($this->subject->isOperational('cn'));
+        self::assertFalse($this->subject->isOperational('unknownType'));
+    }
+
+    public function test_a_type_redefined_as_operational_is_recognized_once_it_is_added(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.4',
+            names: ['tracked'],
+        ));
+
+        self::assertFalse($this->subject->isOperational('tracked'));
+
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.4',
+            names: ['tracked'],
+            usage: AttributeUsage::DsaOperation,
+        ));
+
+        self::assertTrue($this->subject->isOperational('tracked'));
     }
 
     public function test_a_standard_ordering_rule_is_an_ordering_rule_when_no_type_names_it(): void
