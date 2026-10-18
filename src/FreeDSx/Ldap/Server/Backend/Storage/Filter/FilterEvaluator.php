@@ -99,6 +99,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private WeakMap $substringRuleCache;
 
+    /**
+     * @var WeakMap<FilterAttributeInterface, AssertionLeafMemo>
+     */
+    private WeakMap $leafCache;
+
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
     public function __construct(
@@ -115,6 +120,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $this->recognizedAttributeCache = new WeakMap();
         $this->recognizedDescriptorCache = new WeakMap();
         $this->substringRuleCache = new WeakMap();
+        $this->leafCache = new WeakMap();
     }
 
     public function evaluate(
@@ -233,7 +239,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         PresentFilter $filter,
     ): FilterResult {
         // RFC 4511 4.5.1.7.5: true when the type or a subtype of it is present.
-        return $this->valuesForAssertion($entry, $filter->getAttribute()) !== []
+        $values = $this->valuesForAssertion(
+            $entry,
+            $filter,
+            $filter->getAttribute(),
+        );
+
+        return $values !== []
             ? FilterResult::True
             : FilterResult::False;
     }
@@ -245,13 +257,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         if (!$this->assertionSyntaxIsValid($filter)) {
             return FilterResult::Undefined;
         }
-
         if (!$this->assertionDescriptorIsRecognized($filter)) {
             return FilterResult::Undefined;
         }
-
         $values = $this->valuesForAssertion(
             $entry,
+            $filter,
             $filter->getAttribute(),
         );
 
@@ -284,7 +295,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::Undefined;
         }
 
-        $values = $this->valuesForAssertion($entry, $filter->getAttribute());
+        $values = $this->valuesForAssertion(
+            $entry,
+            $filter,
+            $filter->getAttribute(),
+        );
 
         // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
@@ -317,6 +332,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         $values = $this->valuesForAssertion(
             $entry,
+            $filter,
             $filter->getAttribute(),
         );
 
@@ -348,7 +364,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::Undefined;
         }
 
-        $values = $this->valuesForAssertion($entry, $filter->getAttribute());
+        $values = $this->valuesForAssertion(
+            $entry,
+            $filter,
+            $filter->getAttribute(),
+        );
 
         // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
@@ -416,6 +436,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         if ($filterAttributeName !== null) {
             $values = $this->valuesForAssertion(
                 $entry,
+                $filter,
                 $filterAttributeName,
             );
         } else {
@@ -574,24 +595,68 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private function valuesForAssertion(
         Entry $entry,
+        FilterAttributeInterface $item,
         string $filterAttributeName,
     ): array {
-        // Derived rather than stored, so it is matchable whether or not the request asked for it.
-        $derived = $this->derivedValues($entry, $filterAttributeName);
-
-        if ($derived !== null) {
-            return $derived;
+        // The filter may spell the type as a name or an OID, so it is canonicalized before being resolved.
+        $memo = $this->leafCache[$item] ??= new AssertionLeafMemo(
+            self::derivedTypeName($filterAttributeName),
+            !(new Attribute($filterAttributeName))->hasOptions(),
+        );
+        if ($memo->derivedName !== null) {
+            return [
+                $this->derivedResolver->resolve(
+                    $memo->derivedName,
+                    $entry,
+                ),
+            ];
         }
 
+        // An item tested against a single entry gains nothing from remembering its answers.
+        $remember = $memo->evaluations++ > 0;
         $values = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            if ($this->schema->isDescriptionSubtypeOf($attribute->getDescription(), $filterAttributeName)) {
-                array_push($values, ...$attribute->getValues());
+            $feeds = $remember
+                ? $this->feedsAssertion($memo, $attribute, $filterAttributeName)
+                : $this->schema->isDescriptionSubtypeOf($attribute->getDescription(), $filterAttributeName);
+
+            if ($feeds) {
+                array_push(
+                    $values,
+                    ...$attribute->getValues(),
+                );
             }
         }
 
         return $values;
+    }
+
+    /**
+     * Whether the item tests values stored under the attribute's description, memoized per item.
+     */
+    private function feedsAssertion(
+        AssertionLeafMemo $memo,
+        Attribute $attribute,
+        string $filterAttributeName,
+    ): bool {
+        $key = $memo->keyedByType
+            ? $attribute->getName()
+            : $attribute->getDescription();
+
+        if (isset($memo->feeds[$key])) {
+            return $memo->feeds[$key];
+        }
+        $feeds = $this->schema->isDescriptionSubtypeOf(
+            $attribute->getDescription(),
+            $filterAttributeName,
+        );
+
+        if (count($memo->feeds) < AssertionLeafMemo::MAX_DESCRIPTIONS) {
+            $memo->feeds[$key] = $feeds;
+        }
+
+        return $feeds;
     }
 
     /**
@@ -616,30 +681,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         return self::describesAnyDerivedAttribute($attributeDescription)
             || $this->schema->getAttributeType(Attribute::normalizeName($attributeDescription)) !== null;
-    }
-
-    /**
-     * Values for an attribute no entry stores, or null when the description names none of them.
-     *
-     * @return list<string>|null
-     */
-    private function derivedValues(
-        Entry $entry,
-        string $attributeDescription,
-    ): ?array {
-        // The filter may spell the type as a name or an OID, so it is canonicalized before being resolved.
-        $name = self::derivedTypeName($attributeDescription);
-
-        if ($name === null) {
-            return null;
-        }
-
-        return [
-            $this->derivedResolver->resolve(
-                $name,
-                $entry,
-            ),
-        ];
     }
 
     /**
