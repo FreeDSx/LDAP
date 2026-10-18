@@ -29,6 +29,11 @@ final class ServerManager
 
     private const BOOTSTRAP_PATH = __DIR__ . '/../../bin/ldap-backend-storage.php';
 
+    /**
+     * Limits the memory a worker is allowed to consume for the test.
+     */
+    private const MEMORY_LIMIT = '1G';
+
     private ?Process $process = null;
 
     public function __construct(
@@ -49,12 +54,13 @@ final class ServerManager
 
         $server = $this->config->server;
         $seed = $this->config->seed;
-        $command = ['php', '-dpcov.enabled=0', '-dmemory_limit=-1'];
-        if ($this->config->run->jit) {
-            $command[] = '-dopcache.enable_cli=1';
-            $command[] = '-dopcache.jit_buffer_size=128M';
-            $command[] = '-dopcache.jit=function';
-        }
+        // The driver's own binary, so the opcache checks below describe the server too.
+        $command = [
+            PHP_BINARY,
+            '-dpcov.enabled=0',
+            '-dmemory_limit=' . self::MEMORY_LIMIT,
+            ...$this->opcacheFlags(),
+        ];
         $command[] = self::BOOTSTRAP_PATH;
         $command[] = '--transport=tcp';
         $command[] = '--storage=' . $server->backend->value;
@@ -119,6 +125,32 @@ final class ServerManager
         } catch (\Throwable) {
             //possible race conditions; safe to ignore.
         }
+    }
+
+    /**
+     * Opcache whenever this PHP loads it, with the function JIT only when the run asks for it and the build has one.
+     *
+     * @return list<string>
+     */
+    private function opcacheFlags(): array
+    {
+        if (!extension_loaded('Zend OPcache')) {
+            return [];
+        }
+
+        // The opcache.jit setting exists only in builds compiled with JIT support.
+        if (!$this->config->run->jit || ini_get('opcache.jit') === false) {
+            return [
+                '-dopcache.enable_cli=1',
+                '-dopcache.jit=disable',
+            ];
+        }
+
+        return [
+            '-dopcache.enable_cli=1',
+            '-dopcache.jit_buffer_size=128M',
+            '-dopcache.jit=function',
+        ];
     }
 
     private function readyDeadlineSeconds(): int

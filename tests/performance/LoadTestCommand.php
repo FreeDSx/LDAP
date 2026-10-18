@@ -219,7 +219,7 @@ final class LoadTestCommand extends Command
                 'no-jit',
                 null,
                 InputOption::VALUE_NONE,
-                'Disable opcache + function JIT on the spawned FreeDSx server (default: enabled for swoole, off for pcntl).',
+                'Disable the function JIT on the spawned FreeDSx server (on for swoole, always off for pcntl); opcache stays on.',
             )
             ->addOption(
                 'monitor',
@@ -561,7 +561,7 @@ final class LoadTestCommand extends Command
             warmup: $this->requireInt($input, 'warmup'),
             mix: $this->requireString($input, 'mix'),
             rngSeed: $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
-            // The spawned server runs JIT only on Swoole, and --no-jit turns it off there too.
+            // Forked pcntl workers break under the JIT, which leaves it to Swoole; --no-jit turns it off there too.
             jit: !(bool) $input->getOption('no-jit') && $runner !== RunnerMode::Pcntl,
         );
     }
