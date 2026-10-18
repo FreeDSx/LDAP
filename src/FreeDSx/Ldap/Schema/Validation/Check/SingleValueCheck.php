@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
 
+use function count;
 use function sprintf;
 
 /**
@@ -37,8 +38,9 @@ readonly class SingleValueCheck implements SchemaCheckInterface
         SchemaWrite $write,
         ObjectClassChain $classes,
     ): array {
-        foreach ($write->valueCounts() as $name => $count) {
-            $attrType = $this->schema->getAttributeType($name);
+        foreach ($write->entry->getAttributes() as $attribute) {
+            $attrType = $this->schema->getAttributeType($attribute->getName());
+            $count = count($attribute->getValues());
 
             if ($attrType === null || !$attrType->singleValue || $count <= 1) {
                 continue;
@@ -49,8 +51,9 @@ readonly class SingleValueCheck implements SchemaCheckInterface
                     SchemaRule::SingleValue,
                     ResultCode::CONSTRAINT_VIOLATION,
                     sprintf(
-                        'Attribute "%s" is single-valued but has more than one value.',
-                        $attrType->primaryName(),
+                        'Attribute "%s" is single-valued but has %d values.',
+                        $attribute->getName(),
+                        $count,
                     ),
                 ),
             ];

@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChangeReplay;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChanges;
@@ -56,9 +55,7 @@ readonly class UpdateEntryHandler
 
         $this->writes->update(
             $command->dn->normalize(),
-            $apart === []
-                ? EntryProjection::unbounded()
-                : new EntryProjection(linkCap: 0),
+            $this->replay->projectionFor($apart),
             $context,
             function (Entry $current) use ($apart, $remaining, $context): ModifiedEntry {
                 $links = $this->replay->settle(
@@ -73,7 +70,7 @@ readonly class UpdateEntryHandler
                         $current,
                         $links,
                     ),
-                    $links->delta,
+                    $links,
                 );
             },
         );

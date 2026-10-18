@@ -55,13 +55,13 @@ readonly class AllowedAttributesCheck implements SchemaCheckInterface
             $classes->may,
         ));
 
-        foreach ($write->valueCounts() as $name => $count) {
-            $attrType = $this->schema->getAttributeType($name);
+        foreach ($write->entry->getAttributes() as $attribute) {
+            $attrType = $this->schema->getAttributeType($attribute->getName());
 
-            if ($count === 0 || $attrType === null || $attrType->usage !== AttributeUsage::UserApplications) {
+            if ($attrType === null || $attrType->usage !== AttributeUsage::UserApplications) {
                 continue;
             }
-            if (isset($allowed[strtolower($attrType->names[0] ?? $name)])) {
+            if (isset($allowed[strtolower($attrType->names[0] ?? $attribute->getName())])) {
                 continue;
             }
 
@@ -71,7 +71,7 @@ readonly class AllowedAttributesCheck implements SchemaCheckInterface
                     ResultCode::OBJECT_CLASS_VIOLATION,
                     sprintf(
                         'Attribute "%s" is not permitted by any object class.',
-                        $attrType->primaryName(),
+                        $attribute->getName(),
                     ),
                 ),
             ];

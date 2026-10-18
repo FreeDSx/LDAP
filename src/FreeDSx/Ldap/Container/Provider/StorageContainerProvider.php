@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
-use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
@@ -146,7 +145,10 @@ final class StorageContainerProvider implements ContainerProviderInterface
 
     private function makeLinkedChanges(Container $container): LinkedChanges
     {
-        return new LinkedChanges($container->get(LinkedAttributes::class));
+        return new LinkedChanges(
+            $container->get(LinkedAttributes::class),
+            $container->get(ServerOptions::class)->getSchema(),
+        );
     }
 
     private function makeLinkedChangeReplay(Container $container): LinkedChangeReplay
@@ -155,7 +157,6 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $this->isPdo($container)
                 ? $container->get(EntryLinkWriter::class)
                 : $container->get(InMemoryStorage::class),
-            $container->get(SchemaValidator::class),
         );
     }
 

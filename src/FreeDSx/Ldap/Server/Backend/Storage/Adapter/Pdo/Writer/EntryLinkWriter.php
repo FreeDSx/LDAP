@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDia
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueCountInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -36,7 +35,7 @@ use function ksort;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EntryLinkWriter implements LinkedValueLookupInterface, LinkedValueCountInterface
+final readonly class EntryLinkWriter implements LinkedValueLookupInterface
 {
     use PdoColumnCastTrait;
 
@@ -195,30 +194,6 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface, Link
         }
 
         return array_values(array_filter($held));
-    }
-
-    /**
-     * How many values the owner links, counted on the connection its own write runs on.
-     */
-    public function linkCount(
-        Dn $owner,
-        string $attribute,
-        int $upTo,
-    ): int {
-        $row = $this->connection
-            ->execute(
-                $this->dialect->queryLinkCount(),
-                [
-                    $owner->normalizedString(),
-                    Attribute::normalizeName($attribute),
-                    $upTo,
-                ],
-            )
-            ->fetch();
-
-        return is_array($row)
-            ? $this->intColumn($row['link_count'] ?? null)
-            : 0;
     }
 
     /**

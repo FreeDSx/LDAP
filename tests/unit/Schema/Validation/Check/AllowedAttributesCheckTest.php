@@ -78,63 +78,6 @@ final class AllowedAttributesCheckTest extends TestCase
         );
     }
 
-    public function test_a_linked_count_names_an_attribute_the_entry_does_not_carry(): void
-    {
-        self::assertEquals(
-            [
-                new RuleViolation(
-                    SchemaRule::AllowedAttributes,
-                    ResultCode::OBJECT_CLASS_VIOLATION,
-                    'Attribute "member" is not permitted by any object class.',
-                ),
-            ],
-            $this->checkWithLinkedCounts(
-                $this->personOf(['top', 'person']),
-                ['member' => 1],
-            ),
-        );
-    }
-
-    public function test_a_linked_count_of_none_stands_in_for_values_the_entry_carries(): void
-    {
-        self::assertSame(
-            [],
-            $this->checkWithLinkedCounts(
-                $this->personOf(
-                    ['top', 'person'],
-                    new Attribute(
-                        'member',
-                        'cn=Bob,dc=example,dc=com',
-                    ),
-                ),
-                ['member' => 0],
-            ),
-        );
-    }
-
-    /**
-     * @param array<string, int> $linkedCounts
-     *
-     * @return list<RuleViolation>
-     */
-    private function checkWithLinkedCounts(
-        Entry $entry,
-        array $linkedCounts,
-    ): array {
-        return $this->subject->check(
-            SchemaWrite::modify(
-                $entry,
-                [],
-                false,
-                $linkedCounts,
-            ),
-            ObjectClassChain::forEntry(
-                $this->schema,
-                $entry,
-            ),
-        );
-    }
-
     /**
      * @return list<RuleViolation>
      */

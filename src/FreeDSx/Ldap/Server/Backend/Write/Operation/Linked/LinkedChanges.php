@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -32,7 +33,10 @@ use function strtolower;
  */
 final readonly class LinkedChanges
 {
-    public function __construct(private LinkedAttributes $linked) {}
+    public function __construct(
+        private LinkedAttributes $linked,
+        private Schema $schema,
+    ) {}
 
     /**
      * The linked changes applied apart from the entry, or none when the modify has to be applied to the whole entry.
@@ -109,6 +113,9 @@ final readonly class LinkedChanges
         if ($dn->getRdn()->has($change->getAttribute()->getName())) {
             return false;
         }
+        if ($this->isHeldToEveryValue($change)) {
+            return false;
+        }
 
         if ($change->isAdd()) {
             return $change->getAttribute()->getValues() !== [];
@@ -116,5 +123,13 @@ final readonly class LinkedChanges
 
         // A delete naming no value empties the attribute, which takes knowing everything it holds.
         return $change->isDelete() && !$change->isReset();
+    }
+
+    private function isHeldToEveryValue(Change $change): bool
+    {
+        $type = $this->schema->getAttributeType($change->getAttribute()->getName());
+
+        return $type !== null
+            && ($type->singleValue || $type->noUserModification);
     }
 }

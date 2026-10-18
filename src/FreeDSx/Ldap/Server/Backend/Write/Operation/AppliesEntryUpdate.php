@@ -15,8 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
-use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\SettledLinks;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
@@ -39,7 +39,7 @@ trait AppliesEntryUpdate
         UpdateCommand $command,
         WriteContext $context,
         Entry $current,
-        SettledLinks $links = new SettledLinks(),
+        LinkDelta $links = new LinkDelta(),
     ): Entry {
         $updated = $this->mutation->forUpdate(
             $current,

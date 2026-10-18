@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Schema;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SchemaRuleException;
@@ -54,24 +53,18 @@ final readonly class SchemaViolationGate
     }
 
     /**
-     * @param list<Change> $linkedChanges Changes to linked values, which the command no longer carries.
-     * @param array<string, int> $linkedCounts What those linked attributes come to, by lowercased name.
-     *
      * @throws OperationException
      */
     public function assertModifyAllowed(
         UpdateCommand $command,
         Entry $updated,
         WriteContext $context,
-        array $linkedChanges = [],
-        array $linkedCounts = [],
     ): void {
         $this->assertAllowed(
             SchemaWrite::modify(
                 $updated,
-                [...$command->changes, ...$linkedChanges],
+                $command->changes,
                 $context->isSystem(),
-                $linkedCounts,
             ),
             $context,
         );

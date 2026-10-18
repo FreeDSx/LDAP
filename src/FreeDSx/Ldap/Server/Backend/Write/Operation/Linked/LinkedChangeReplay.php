@@ -18,16 +18,12 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueCountInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
 use function array_diff_key;
-use function array_keys;
 use function array_values;
-use function count;
-use function min;
 use function sprintf;
 
 /**
@@ -39,36 +35,60 @@ use function sprintf;
  */
 readonly class LinkedChangeReplay
 {
-    /**
-     * A count only has to tell none, one, and more than one value apart.
-     */
-    private const COUNTED_UP_TO = 2;
+    public function __construct(private LinkedValueLookupInterface $lookup) {}
 
-    public function __construct(
-        private LinkedValueLookupInterface&LinkedValueCountInterface $lookup,
-        private SchemaValidator $schema,
-    ) {}
+    /**
+     * What of the target the modify needs loaded: none of its links when changes are applied apart, all otherwise.
+     *
+     * @param list<Change> $changes
+     */
+    public function projectionFor(array $changes): EntryProjection
+    {
+        return $changes === []
+            ? EntryProjection::unbounded()
+            : new EntryProjection(linkCap: 0);
+    }
 
     /**
      * RFC 4511 4.6: each change applies to the state the ones before it left.
      *
      * @param list<Change> $changes
      *
-     * @throws OperationException when a value is already linked, is not linked, or is not a DN
+     * @throws OperationException when a value is already linked or is not linked
      */
     public function settle(
         array $changes,
         Dn $owner,
-    ): SettledLinks {
+    ): LinkDelta {
         if ($changes === []) {
-            return new SettledLinks();
+            return new LinkDelta();
         }
         $before = $this->heldBefore(
             $changes,
             $owner,
         );
-        $state = $before;
 
+        return $this->netOf(
+            $before,
+            $this->replayed(
+                $before,
+                $changes,
+            ),
+        );
+    }
+
+    /**
+     * @param array<string, array<string, string>> $state
+     * @param list<Change> $changes
+     *
+     * @return array<string, array<string, string>>
+     *
+     * @throws OperationException
+     */
+    private function replayed(
+        array $state,
+        array $changes,
+    ): array {
         foreach ($changes as $change) {
             $name = Attribute::normalizeName($change->getAttribute()->getName());
             $values = array_values($change->getAttribute()->getValues());
@@ -86,70 +106,7 @@ readonly class LinkedChangeReplay
                 );
         }
 
-        $delta = $this->netOf(
-            $before,
-            $state,
-        );
-
-        return new SettledLinks(
-            $delta,
-            $changes,
-            $this->countsAfter(
-                array_keys($state),
-                $delta,
-                $owner,
-            ),
-        );
-    }
-
-    /**
-     * What each attribute holds once the delta applies.
-     *
-     * @param list<string> $names
-     *
-     * @return array<string, int>
-     */
-    private function countsAfter(
-        array $names,
-        LinkDelta $delta,
-        Dn $owner,
-    ): array {
-        $counts = [];
-
-        foreach ($names as $name) {
-            $counts[$name] = $this->countAfter(
-                $owner,
-                $name,
-                count($delta->added($name)),
-                count($delta->removed($name)),
-            );
-        }
-
-        return $counts;
-    }
-
-    /**
-     * Stored values are counted only as far as the ones removed plus the bound, whatever the attribute holds.
-     */
-    private function countAfter(
-        Dn $owner,
-        string $name,
-        int $adding,
-        int $removing,
-    ): int {
-        if ($adding >= self::COUNTED_UP_TO) {
-            return self::COUNTED_UP_TO;
-        }
-        $stored = $this->lookup->linkCount(
-            $owner,
-            $name,
-            $removing + self::COUNTED_UP_TO,
-        );
-
-        return min(
-            self::COUNTED_UP_TO,
-            $stored - $removing + $adding,
-        );
+        return $state;
     }
 
     /**
@@ -272,12 +229,10 @@ readonly class LinkedChangeReplay
     }
 
     /**
-     * Values the replay left changed, held to the syntax the whole entry would have been for the ones it adds.
+     * The values the replay left changed.
      *
      * @param array<string, array<string, string>> $before
      * @param array<string, array<string, string>> $after
-     *
-     * @throws OperationException
      */
     private function netOf(
         array $before,
@@ -298,10 +253,6 @@ readonly class LinkedChangeReplay
             ));
 
             if ($linking !== []) {
-                $this->schema->validateValues(new Attribute(
-                    $name,
-                    ...$linking,
-                ));
                 $added[$name] = $linking;
             }
             if ($unlinking !== []) {

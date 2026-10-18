@@ -29,8 +29,6 @@ final class EntryLinkWriterTest extends TestCase
 
     private const BOB = 'cn=Bob,dc=example,dc=com';
 
-    private const CAROL = 'cn=Carol,dc=example,dc=com';
-
     private EntryLinkWriter $subject;
 
     protected function setUp(): void
@@ -52,19 +50,11 @@ final class EntryLinkWriterTest extends TestCase
                 ],
             ),
             Entry::fromArray(
-                self::CAROL,
-                [
-                    'objectClass' => ['person'],
-                    'cn' => ['Carol'],
-                    'sn' => ['Carol'],
-                ],
-            ),
-            Entry::fromArray(
                 self::ADMINS,
                 [
                     'objectClass' => ['groupOfNames'],
                     'cn' => ['Admins'],
-                    'member' => [self::BOB, self::CAROL],
+                    'member' => [self::BOB],
                 ],
             ),
         ]);
@@ -97,43 +87,7 @@ final class EntryLinkWriterTest extends TestCase
             $this->subject->heldLinkValues(
                 new Dn(self::ADMINS),
                 'member',
-                ['cn=Dan,' . self::BASE],
-            ),
-        );
-    }
-
-    public function test_a_count_under_its_bound_is_every_value_linked(): void
-    {
-        self::assertSame(
-            2,
-            $this->subject->linkCount(
-                new Dn(self::ADMINS),
-                'member',
-                5,
-            ),
-        );
-    }
-
-    public function test_a_count_stops_at_its_bound(): void
-    {
-        self::assertSame(
-            1,
-            $this->subject->linkCount(
-                new Dn(self::ADMINS),
-                'member',
-                1,
-            ),
-        );
-    }
-
-    public function test_an_attribute_linking_nothing_counts_none(): void
-    {
-        self::assertSame(
-            0,
-            $this->subject->linkCount(
-                new Dn(self::ADMINS),
-                'seeAlso',
-                5,
+                ['cn=Carol,' . self::BASE],
             ),
         );
     }

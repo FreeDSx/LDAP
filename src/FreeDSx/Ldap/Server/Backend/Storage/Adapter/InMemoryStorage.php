@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueCountInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
@@ -47,8 +46,7 @@ final class InMemoryStorage implements
     ListEntryInterface,
     WriteEntryInterface,
     TransactionalWriteInterface,
-    LinkedValueLookupInterface,
-    LinkedValueCountInterface
+    LinkedValueLookupInterface
 {
     use ArrayEntryStorageTrait;
 
@@ -369,17 +367,6 @@ final class InMemoryStorage implements
                 true,
             ),
         ));
-    }
-
-    public function linkCount(
-        Dn $owner,
-        string $attribute,
-        int $upTo,
-    ): int {
-        return min(
-            count($this->linkedValuesOf($owner, $attribute)),
-            $upTo,
-        );
     }
 
     public function anyLinkValue(

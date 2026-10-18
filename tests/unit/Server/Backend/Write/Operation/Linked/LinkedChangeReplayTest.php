@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChangeReplay;
-use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\SettledLinks;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
@@ -35,95 +34,40 @@ final class LinkedChangeReplayTest extends TestCase
 
     private const CAROL = 'cn=Carol,dc=example,dc=com';
 
-    private const DAN = 'cn=Dan,dc=example,dc=com';
-
-    private const STAFF = 'cn=Staff,dc=example,dc=com';
-
     private LinkedChangeReplay $subject;
 
     protected function setUp(): void
     {
-        $storage = EntryFixture::inMemoryStorage(
-            Entry::fromArray(
-                self::ADMINS,
-                [
-                    'objectClass' => ['groupOfNames'],
-                    'cn' => ['Admins'],
-                    'member' => [self::BOB],
-                ],
-            ),
-            Entry::fromArray(
-                self::STAFF,
-                [
-                    'objectClass' => ['groupOfNames'],
-                    'cn' => ['Staff'],
-                    'member' => [self::BOB, self::CAROL, self::DAN],
-                ],
-            ),
-        );
+        $storage = EntryFixture::inMemoryStorage(Entry::fromArray(
+            self::ADMINS,
+            [
+                'objectClass' => ['groupOfNames'],
+                'cn' => ['Admins'],
+                'member' => [self::BOB],
+            ],
+        ));
         $this->subject = $this->containerFor($storage)->get(LinkedChangeReplay::class);
+    }
+
+    public function test_changes_applied_apart_load_none_of_the_links(): void
+    {
+        self::assertSame(
+            0,
+            $this->subject->projectionFor([self::adding(self::CAROL)])->linkCap,
+        );
+    }
+
+    public function test_no_changes_applied_apart_load_every_link(): void
+    {
+        self::assertNull($this->subject->projectionFor([])->linkCap);
     }
 
     public function test_no_changes_leave_the_entry_the_whole_truth_for_its_links(): void
     {
-        $delta = $this->subject->settle(
-            [],
-            new Dn(self::ADMINS),
-        )->delta;
+        $delta = $this->settle();
 
         self::assertTrue($delta->isEmpty());
         self::assertFalse($delta->isUntouched());
-    }
-
-    public function test_the_changes_are_kept_as_supplied(): void
-    {
-        $changes = [
-            self::adding(self::CAROL),
-            self::deleting(self::CAROL),
-        ];
-
-        self::assertSame(
-            $changes,
-            $this->settled(...$changes)->changes,
-        );
-    }
-
-    public function test_adding_to_a_held_value_counts_more_than_one(): void
-    {
-        self::assertSame(
-            ['member' => 2],
-            $this->settled(self::adding(self::CAROL))->counts,
-        );
-    }
-
-    public function test_deleting_the_only_held_value_counts_none(): void
-    {
-        self::assertSame(
-            ['member' => 0],
-            $this->settled(self::deleting(self::BOB))->counts,
-        );
-    }
-
-    public function test_replacing_the_only_held_value_counts_one(): void
-    {
-        self::assertSame(
-            ['member' => 1],
-            $this->settled(
-                self::deleting(self::BOB),
-                self::adding(self::CAROL),
-            )->counts,
-        );
-    }
-
-    public function test_a_count_stops_once_it_is_more_than_one(): void
-    {
-        self::assertSame(
-            ['member' => 2],
-            $this->subject->settle(
-                [self::deleting(self::BOB)],
-                new Dn(self::STAFF),
-            )->counts,
-        );
     }
 
     public function test_a_delete_and_an_add_net_to_both(): void
@@ -231,23 +175,6 @@ final class LinkedChangeReplayTest extends TestCase
         $this->settle(self::deleting('not a dn'));
     }
 
-    public function test_adding_a_value_that_is_not_a_dn_is_refused_for_its_syntax(): void
-    {
-        $this->expectOperationCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
-
-        $this->settle(self::adding('not a dn'));
-    }
-
-    public function test_a_value_that_is_not_a_dn_added_then_deleted_is_never_held_to_its_syntax(): void
-    {
-        $delta = $this->settle(
-            self::adding('not a dn'),
-            self::deleting('not a dn'),
-        );
-
-        self::assertTrue($delta->isUntouched());
-    }
-
     private static function adding(string ...$members): Change
     {
         return Change::add(
@@ -265,11 +192,6 @@ final class LinkedChangeReplayTest extends TestCase
     }
 
     private function settle(Change ...$changes): LinkDelta
-    {
-        return $this->settled(...$changes)->delta;
-    }
-
-    private function settled(Change ...$changes): SettledLinks
     {
         return $this->subject->settle(
             array_values($changes),
