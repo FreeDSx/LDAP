@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
 use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
@@ -40,6 +41,11 @@ final class Schema
     ];
 
     private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
+
+    /**
+     * Pairs grow with the stored descriptions times the names filters and selections ask for, so they get more room.
+     */
+    private const MAX_REMEMBERED_SUBTYPE_PAIRS = 8192;
 
     /**
      * Rules RFC 4517 and RFC 4530 define as ordering rules.
@@ -82,6 +88,20 @@ final class Schema
     private array $confidentialDescriptions = [];
 
     /**
+     * Whether each description seen names a type with operational usage, dropped whenever the type set changes.
+     *
+     * @var array<string, bool>
+     */
+    private array $operationalDescriptions = [];
+
+    /**
+     * Whether each pair of descriptions seen is a subtype pair, keyed by both joined on a NUL and dropped with the types.
+     *
+     * @var array<string, bool>
+     */
+    private array $subtypeDescriptions = [];
+
+    /**
      * Bound to this schema, so it is built once rather than per lookup.
      */
     private ?ObjectIdentifierComparator $objectIdentifierComparator = null;
@@ -110,6 +130,8 @@ final class Schema
         $this->superTypeOids = null;
         $this->orderingRuleOids = null;
         $this->confidentialDescriptions = [];
+        $this->operationalDescriptions = [];
+        $this->subtypeDescriptions = [];
 
         return $this;
     }
@@ -167,6 +189,26 @@ final class Schema
         }
 
         return $confidential;
+    }
+
+    /**
+     * Whether a description names a type with operational usage, which an undefined type never has.
+     *
+     * @internal
+     */
+    public function isOperational(string $description): bool
+    {
+        if (isset($this->operationalDescriptions[$description])) {
+            return $this->operationalDescriptions[$description];
+        }
+        $usage = $this->getAttributeType(Attribute::normalizeName($description))?->usage;
+        $operational = $usage !== null && $usage !== AttributeUsage::UserApplications;
+
+        if (count($this->operationalDescriptions) < self::MAX_REMEMBERED_DESCRIPTIONS) {
+            $this->operationalDescriptions[$description] = $operational;
+        }
+
+        return $operational;
     }
 
     /**
@@ -269,17 +311,21 @@ final class Schema
         string $description,
         string $ofDescription,
     ): bool {
-        $type = Attribute::normalizeName($description);
-        $ofType = Attribute::normalizeName($ofDescription);
+        $key = $description . "\0" . $ofDescription;
 
-        if ($type !== $ofType && !$this->isTypeOrSubtypeOf($type, $ofType)) {
-            return false;
+        if (isset($this->subtypeDescriptions[$key])) {
+            return $this->subtypeDescriptions[$key];
         }
-
-        return self::optionsCover(
+        $isSubtype = $this->decideDescriptionSubtypeOf(
             $description,
             $ofDescription,
         );
+
+        if (count($this->subtypeDescriptions) < self::MAX_REMEMBERED_SUBTYPE_PAIRS) {
+            $this->subtypeDescriptions[$key] = $isSubtype;
+        }
+
+        return $isSubtype;
     }
 
     /**
@@ -534,6 +580,23 @@ final class Schema
     /**
      * Whether every option the wanted description carries is also carried by the one being tested.
      */
+    private function decideDescriptionSubtypeOf(
+        string $description,
+        string $ofDescription,
+    ): bool {
+        $type = Attribute::normalizeName($description);
+        $ofType = Attribute::normalizeName($ofDescription);
+
+        if ($type !== $ofType && !$this->isTypeOrSubtypeOf($type, $ofType)) {
+            return false;
+        }
+
+        return self::optionsCover(
+            $description,
+            $ofDescription,
+        );
+    }
+
     private static function optionsCover(
         string $description,
         string $ofDescription,
