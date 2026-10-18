@@ -314,7 +314,7 @@ final class RuleBasedAccessControlTest extends TestCase
         ));
     }
 
-    public function test_filter_entry_returns_same_instance_when_no_attribute_rules(): void
+    public function test_readable_keeps_the_same_entry_when_there_are_no_attribute_rules(): void
     {
         $entry = Entry::create('dc=foo,dc=bar', ['cn' => 'foo']);
 
@@ -322,7 +322,8 @@ final class RuleBasedAccessControlTest extends TestCase
             operations: [OperationRule::allow(new AnySubjectMatcher())],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -330,7 +331,7 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertSame($entry, $result);
     }
 
-    public function test_filter_entry_removes_attribute_when_deny_rule_matches(): void
+    public function test_readable_drops_an_attribute_a_deny_rule_matches(): void
     {
         $entry = Entry::create(
             'dc=foo,dc=bar',
@@ -348,7 +349,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -358,7 +360,7 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertNotNull($result->get('cn'));
     }
 
-    public function test_filter_entry_keeps_attribute_when_allow_rule_precedes_deny_rule(): void
+    public function test_readable_keeps_an_attribute_when_an_allow_rule_precedes_a_deny_rule(): void
     {
         $matchingSubject = $this->createMock(SubjectMatcherInterface::class);
         $matchingSubject->method('matches')->willReturn(true);
@@ -384,7 +386,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -393,7 +396,7 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertNotNull($result->get('userPassword'));
     }
 
-    public function test_filter_entry_keeps_attribute_when_no_rule_matches(): void
+    public function test_readable_keeps_an_attribute_no_rule_matches(): void
     {
         $nonMatchingSubject = $this->createMock(SubjectMatcherInterface::class);
         $nonMatchingSubject->method('matches')->willReturn(false);
@@ -414,7 +417,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -423,7 +427,7 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertNotNull($result->get('cn'));
     }
 
-    public function test_filter_entry_returns_same_instance_when_all_attributes_kept(): void
+    public function test_readable_keeps_the_same_entry_when_every_attribute_is_allowed(): void
     {
         $entry = Entry::create(
             'dc=foo,dc=bar',
@@ -441,7 +445,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -449,7 +454,7 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertSame($entry, $result);
     }
 
-    public function test_filter_entry_empty_attributes_list_on_deny_rule_matches_all_attributes(): void
+    public function test_readable_drops_every_attribute_for_a_deny_rule_naming_none(): void
     {
         $entry = Entry::create(
             'dc=foo,dc=bar',
@@ -463,7 +468,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -501,7 +507,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -534,7 +541,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -560,7 +568,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -588,7 +597,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -598,7 +608,7 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertNotNull($result->get('sn'));
     }
 
-    public function test_filter_entry_returns_null_when_search_operation_is_denied_on_entry_dn(): void
+    public function test_a_read_scope_hides_an_entry_when_search_is_denied_on_its_dn(): void
     {
         $entry = Entry::create(
             'dc=foo,dc=bar',
@@ -615,7 +625,8 @@ final class RuleBasedAccessControlTest extends TestCase
             ],
         ));
 
-        $result = $subject->filterEntry(
+        $result = self::readableOrNull(
+            $subject,
             $this->bindToken,
             $entry,
         );
@@ -1235,6 +1246,18 @@ final class RuleBasedAccessControlTest extends TestCase
             $this->dn,
             RelocationAccess::Out,
         );
+    }
+
+    private static function readableOrNull(
+        RuleBasedAccessControl $subject,
+        TokenInterface $token,
+        Entry $entry,
+    ): ?Entry {
+        $scope = $subject->readScope($token);
+
+        return $scope->isEntryVisible($entry)
+            ? $scope->readable($entry)
+            : null;
     }
 
     private function rulesDenyingFilterOn(string ...$attributes): AclRules

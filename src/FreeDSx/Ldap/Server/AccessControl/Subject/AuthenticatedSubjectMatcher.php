@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class AuthenticatedSubjectMatcher implements SubjectMatcherInterface
+final class AuthenticatedSubjectMatcher implements TokenDecidedSubjectInterface
 {
     public function matches(
         TokenInterface $token,

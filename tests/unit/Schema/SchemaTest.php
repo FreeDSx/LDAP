@@ -779,6 +779,24 @@ final class SchemaTest extends TestCase
         ));
     }
 
+    public function test_a_remembered_subtype_answer_is_never_given_to_a_different_pair(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.4',
+            names: ['sn'],
+        ));
+
+        self::assertTrue($this->subject->isDescriptionSubtypeOf(
+            "sn;p\0cn;q",
+            'sn',
+        ));
+        self::assertFalse($this->subject->isDescriptionSubtypeOf(
+            'sn;p',
+            "cn;q\0sn",
+        ));
+    }
+
     public function test_an_operational_type_is_recognized_however_its_description_is_spelled(): void
     {
         $this->subject->addAttributeType(new AttributeType(

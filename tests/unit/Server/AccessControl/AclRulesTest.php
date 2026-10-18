@@ -395,25 +395,24 @@ final class AclRulesTest extends TestCase
 
     public function test_secureDefault_strips_userPassword_from_another_users_read(): void
     {
-        $filtered = $this->subject->filterEntry(
-            $this->user(),
-            $this->entry(self::OTHER_DN),
-        );
+        $scope = $this->subject->readScope($this->user());
+        $entry = $this->entry(self::OTHER_DN);
 
-        self::assertNotNull($filtered);
-        self::assertNull($filtered->get('userPassword'));
-        self::assertNotNull($filtered->get('cn'));
+        self::assertTrue($scope->isEntryVisible($entry));
+
+        $readable = $scope->readable($entry);
+
+        self::assertNull($readable->get('userPassword'));
+        self::assertNotNull($readable->get('cn'));
     }
 
     public function test_secureDefault_strips_userPassword_from_self_read(): void
     {
-        $filtered = $this->subject->filterEntry(
-            $this->user(),
-            $this->entry(self::USER_DN),
-        );
+        $scope = $this->subject->readScope($this->user());
+        $entry = $this->entry(self::USER_DN);
 
-        self::assertNotNull($filtered);
-        self::assertNull($filtered->get('userPassword'));
+        self::assertTrue($scope->isEntryVisible($entry));
+        self::assertNull($scope->readable($entry)->get('userPassword'));
     }
 
     public function test_secureDefault_lets_self_write_but_not_read_its_userPassword(): void

@@ -174,13 +174,25 @@ final class AclRuleIndexTest extends TestCase
         );
     }
 
-    public function test_read_rules_are_absent_when_only_write_rules_exist(): void
+    public function test_a_name_with_only_write_rules_has_no_read_rules(): void
     {
         $subject = AclRuleIndex::of(AclRules::fromEmpty(
             attributes: [$this->denyCnWrite],
         ));
 
-        self::assertFalse($subject->hasAttributeRules(AttributeAccess::Read));
-        self::assertTrue($subject->hasAttributeRules(AttributeAccess::Write));
+        self::assertSame(
+            [],
+            $subject->attributeRules(
+                AttributeAccess::Read,
+                'cn',
+            ),
+        );
+        self::assertSame(
+            [$this->denyCnWrite],
+            $subject->attributeRules(
+                AttributeAccess::Write,
+                'cn',
+            ),
+        );
     }
 }

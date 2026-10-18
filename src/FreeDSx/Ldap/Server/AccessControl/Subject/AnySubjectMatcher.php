@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class AnySubjectMatcher implements SubjectMatcherInterface
+final class AnySubjectMatcher implements TokenDecidedSubjectInterface
 {
     public function matches(
         TokenInterface $token,

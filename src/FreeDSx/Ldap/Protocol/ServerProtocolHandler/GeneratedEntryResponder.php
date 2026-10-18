@@ -52,10 +52,9 @@ final readonly class GeneratedEntryResponder
         Entry $entry,
         TokenInterface $token,
     ): Entry {
-        return $this->accessControl->stripUnreadableAttributes(
-            $token,
-            $entry,
-        );
+        return $this->accessControl
+            ->readScope($token)
+            ->readable($entry);
     }
 
     /**

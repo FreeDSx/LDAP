@@ -33,7 +33,7 @@ use FreeDSx\Ldap\Schema\Schema;
 final class AttributeProjection
 {
     /**
-     * Selectors that name no attribute type, so a list of only these is decided by usage alone.
+     * Selectors that name no attribute type, which leave a list of only these to be decided by usage alone.
      */
     private const SELECTORS = [
         SearchRequest::ATTRIBUTES_ALL_USER,
@@ -82,7 +82,10 @@ final class AttributeProjection
             in_array(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL, $names, true),
             count($names) === 1 && $names[0] === SearchRequest::ATTRIBUTES_NONE,
             $typesOnly,
-            array_diff($names, self::SELECTORS) === [],
+            array_diff(
+                $names,
+                self::SELECTORS,
+            ) === [],
             self::rangeSliceTypes($requestedAttrs),
             $schema,
         );

@@ -47,8 +47,13 @@ trait MatchedDnAccessFilterTrait
             return new Dn('');
         }
 
-        return $accessControl->filterEntry($token, $entry) === null
-            ? new Dn('')
-            : $matchedDn;
+        $visible = $accessControl->isEntryVisible(
+            $token,
+            $entry,
+        );
+
+        return $visible
+            ? $matchedDn
+            : new Dn('');
     }
 }

@@ -16,6 +16,8 @@ namespace FreeDSx\Ldap\Server\AccessControl;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
+use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
+use FreeDSx\Ldap\Server\AccessControl\Read\ReloadableReadScope;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -30,6 +32,8 @@ final class ReloadableAccessControl implements AccessControlInterface, BackendAw
 {
     private ?ReadBackendInterface $backend = null;
 
+    private int $generation = 0;
+
     public function __construct(private AccessControlInterface $current) {}
 
     /**
@@ -42,6 +46,17 @@ final class ReloadableAccessControl implements AccessControlInterface, BackendAw
         }
 
         $this->current = $policy;
+        $this->generation++;
+    }
+
+    /**
+     * How many times the policy has been replaced. This tells a held read scope it is out of date.
+     *
+     * @internal
+     */
+    public function generation(): int
+    {
+        return $this->generation;
     }
 
     public function setBackend(ReadBackendInterface $backend): void
@@ -143,23 +158,12 @@ final class ReloadableAccessControl implements AccessControlInterface, BackendAw
         );
     }
 
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry {
-        return $this->current->filterEntry(
-            $token,
-            $entry,
-        );
-    }
-
-    public function stripUnreadableAttributes(
-        TokenInterface $token,
-        Entry $entry,
-    ): Entry {
-        return $this->current->stripUnreadableAttributes(
-            $token,
-            $entry,
+    public function readScope(TokenInterface $token): ReadScopeInterface
+    {
+        return new ReloadableReadScope(
+            $this,
+            $this->generation,
+            $this->current->readScope($token),
         );
     }
 

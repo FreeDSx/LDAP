@@ -32,13 +32,21 @@ final readonly class WithheldAttributePolicy
     ) {}
 
     /**
+     * Whether the schema marks the attribute confidential, whoever is asking.
+     */
+    public function isConfidential(string $attribute): bool
+    {
+        return $this->schema?->isConfidential($attribute) === true;
+    }
+
+    /**
      * Whether the schema marks the attribute confidential, and the token holds no grant over it.
      */
     public function isWithheldFromResult(
         string $attribute,
         TokenInterface $token,
     ): bool {
-        if ($this->schema?->isConfidential($attribute) !== true) {
+        if (!$this->isConfidential($attribute)) {
             return false;
         }
 

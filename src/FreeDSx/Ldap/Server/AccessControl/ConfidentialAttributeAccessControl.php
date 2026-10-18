@@ -16,12 +16,12 @@ namespace FreeDSx\Ldap\Server\AccessControl;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
+use FreeDSx\Ldap\Server\AccessControl\Read\ConfidentialReadScope;
+use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-
-use function count;
 
 /**
  * Wraps a policy so withheld confidential attributes are stripped from results whatever its own rules allow.
@@ -42,23 +42,11 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
         }
     }
 
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry {
-        $filtered = $this->inner->filterEntry($token, $entry);
-
-        return $filtered === null
-            ? null
-            : $this->stripWithheld($filtered, $token);
-    }
-
-    public function stripUnreadableAttributes(
-        TokenInterface $token,
-        Entry $entry,
-    ): Entry {
-        return $this->stripWithheld(
-            $this->inner->stripUnreadableAttributes($token, $entry),
+    public function readScope(TokenInterface $token): ReadScopeInterface
+    {
+        return new ConfidentialReadScope(
+            $this->inner->readScope($token),
+            $this->policy,
             $token,
         );
     }
@@ -158,31 +146,5 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
         Entry $entry,
     ): bool {
         return $this->inner->isEntryVisible($token, $entry);
-    }
-
-    /**
-     * The entry itself is returned when nothing was withheld, so a caller can still tell it went untouched.
-     */
-    private function stripWithheld(
-        Entry $entry,
-        TokenInterface $token,
-    ): Entry {
-        $all = $entry->getAttributes();
-        $kept = [];
-
-        foreach ($all as $attribute) {
-            if (!$this->policy->isWithheldFromResult($attribute->getName(), $token)) {
-                $kept[] = $attribute;
-            }
-        }
-
-        if (count($kept) === count($all)) {
-            return $entry;
-        }
-
-        return Entry::raw(
-            $entry->getDn(),
-            $kept,
-        );
     }
 }

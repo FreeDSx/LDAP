@@ -195,8 +195,8 @@ final class ResponseWriterMiddlewareTest extends TestCase
             ->method('get')
             ->willReturn(Entry::create('dc=bar'));
         $this->mockAccessControl
-            ->method('filterEntry')
-            ->willReturn(Entry::create('dc=bar'));
+            ->method('isEntryVisible')
+            ->willReturn(true);
 
         $this->subject->process(
             $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
@@ -217,8 +217,8 @@ final class ResponseWriterMiddlewareTest extends TestCase
             ->method('get')
             ->willReturn(Entry::create('dc=bar'));
         $this->mockAccessControl
-            ->method('filterEntry')
-            ->willReturn(null);
+            ->method('isEntryVisible')
+            ->willReturn(false);
 
         $this->subject->process(
             $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),

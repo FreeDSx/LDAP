@@ -41,6 +41,13 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\AclRules;
+use FreeDSx\Ldap\Server\AccessControl\Read\UnrestrictedReadScope;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -88,8 +95,8 @@ final class ServerSearchHandlerTest extends TestCase
         $this->sentMessages = [];
 
         $this->mockAccessControl
-            ->method('filterEntry')
-            ->willReturnArgument(1);
+            ->method('readScope')
+            ->willReturn(new UnrestrictedReadScope());
 
         $this->mockQueue
             ->method('sendMessages')
@@ -275,17 +282,13 @@ final class ServerSearchHandlerTest extends TestCase
     public function test_entry_stripped_by_acl_is_excluded_when_it_no_longer_matches_filter(): void
     {
         $entry = Entry::create('dc=foo,dc=bar', ['userPassword' => 'secret', 'cn' => 'foo']);
-        $stripped = Entry::create('dc=foo,dc=bar', ['cn' => 'foo']);
 
         $search = new LdapMessageRequest(
             2,
             (new SearchRequest(Filters::present('userPassword')))->base('dc=foo,dc=bar'),
         );
 
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl->method('filterEntry')->willReturn($stripped);
-
-        $subject = $this->makeHandler($mockAccessControl);
+        $subject = $this->makeHandler($this->withholding('userPassword'));
 
         $this->mockBackend
             ->method('search')
@@ -547,7 +550,7 @@ final class ServerSearchHandlerTest extends TestCase
         ]);
     }
 
-    public function test_it_should_suppress_entry_when_filter_entry_returns_null(): void
+    public function test_it_should_suppress_an_entry_the_identity_may_not_see(): void
     {
         $entry1 = Entry::create(
             'dc=foo,dc=bar',
@@ -563,12 +566,15 @@ final class ServerSearchHandlerTest extends TestCase
             (new SearchRequest(Filters::equal('foo', 'bar')))->base('dc=foo,dc=bar'),
         );
 
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturnCallback(static function (TokenInterface $token, Entry $entry) use ($entry1): ?Entry {
-                return $entry === $entry1 ? null : $entry;
-            });
+        $accessControl = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [
+                OperationRule::deny(
+                    Subject::anyone(),
+                    Target::dn('dc=foo,dc=bar'),
+                ),
+                OperationRule::allow(Subject::anyone()),
+            ],
+        ));
 
         $this->mockBackend
             ->method('search')
@@ -581,7 +587,7 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('evaluate')
             ->willReturn(true);
 
-        $subject = $this->makeHandler($mockAccessControl);
+        $subject = $this->makeHandler($accessControl);
         $this->drive($subject, $search);
 
         $this->assertSentMessages([
@@ -599,20 +605,13 @@ final class ServerSearchHandlerTest extends TestCase
             'dc=foo,dc=bar',
             ['cn' => 'foo', 'secret' => 'val'],
         );
-        $stripped = Entry::create(
-            'dc=foo,dc=bar',
-            ['cn' => 'foo'],
-        );
 
         $search = new LdapMessageRequest(
             2,
             (new SearchRequest(Filters::equal('secret', 'val')))->base('dc=foo,dc=bar'),
         );
 
-        $mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $mockAccessControl
-            ->method('filterEntry')
-            ->willReturn($stripped);
+        $accessControl = $this->withholding('secret');
 
         $this->mockBackend
             ->method('search')
@@ -622,7 +621,7 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('evaluate')
             ->willReturnCallback(static fn(Entry $e): bool => $e === $entry);
 
-        $subject = $this->makeHandler($mockAccessControl);
+        $subject = $this->makeHandler($accessControl);
         $this->drive($subject, $search);
 
         $this->assertSentMessages([
@@ -1189,6 +1188,21 @@ final class ServerSearchHandlerTest extends TestCase
     {
         return (new SearchRequest(Filters::equal('foo', 'bar')))
             ->base('dc=foo,dc=bar');
+    }
+
+    /**
+     * Rules that let anyone search but withhold the named attribute from every result.
+     */
+    private function withholding(string $attribute): AccessControlInterface
+    {
+        return new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(Subject::anyone())],
+            attributes: [AttributeRule::deny(
+                Subject::anyone(),
+                Target::any(),
+                $attribute,
+            )->forRead()],
+        ));
     }
 
     private function makeHandler(

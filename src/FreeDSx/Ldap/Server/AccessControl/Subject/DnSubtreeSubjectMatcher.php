@@ -23,9 +23,9 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class DnSubtreeSubjectMatcher implements SubjectMatcherInterface
+final readonly class DnSubtreeSubjectMatcher implements TokenDecidedSubjectInterface
 {
-    private readonly Dn $subtreeDn;
+    private Dn $subtreeDn;
 
     public function __construct(string $dn)
     {

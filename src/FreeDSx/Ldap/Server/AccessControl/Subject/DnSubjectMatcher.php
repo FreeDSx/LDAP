@@ -22,9 +22,9 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class DnSubjectMatcher implements SubjectMatcherInterface
+final readonly class DnSubjectMatcher implements TokenDecidedSubjectInterface
 {
-    private readonly string $normalizedDn;
+    private string $normalizedDn;
 
     public function __construct(string $dn)
     {

@@ -34,14 +34,6 @@ final class StrippedEntryMatcherTest extends TestCase
 
     private StrippedEntryMatcher $subject;
 
-    private Attribute $cn;
-
-    private Attribute $sn;
-
-    private Attribute $userPassword;
-
-    private Entry $entry;
-
     protected function setUp(): void
     {
         $schema = SchemaResource::Core->load();
@@ -51,199 +43,131 @@ final class StrippedEntryMatcherTest extends TestCase
             $schema,
             new LinkedAttributes($schema),
         );
-
-        $this->cn = new Attribute(
-            'cn',
-            'alice',
-        );
-        $this->sn = new Attribute(
-            'sn',
-            'smith',
-        );
-        $this->userPassword = new Attribute(
-            'userPassword',
-            'secret',
-        );
-        $this->entry = new Entry(
-            new Dn('cn=alice,dc=foo,dc=bar'),
-            $this->cn,
-            $this->sn,
-            $this->userPassword,
-        );
     }
 
-    public function test_an_entry_nothing_was_stripped_from_still_matches_without_being_judged(): void
+    public function test_withholding_a_type_the_filter_does_not_read_does_not_concern_it(): void
     {
-        $this->mockEvaluator
-            ->expects(self::never())
-            ->method('evaluate');
-
-        self::assertTrue($this->subject->stillMatches(
-            $this->entry,
-            $this->entry,
+        self::assertFalse($this->subject->concerns(
             Filters::equal(
                 'cn',
                 'alice',
             ),
+            'userpassword',
         ));
     }
 
-    public function test_losing_an_attribute_the_filter_does_not_read_keeps_the_match_without_judging_it(): void
+    public function test_withholding_a_type_the_filter_reads_concerns_it(): void
     {
-        $this->mockEvaluator
-            ->expects(self::never())
-            ->method('evaluate');
-
-        self::assertTrue($this->subject->stillMatches(
-            $this->entry,
-            $this->stripped(
-                $this->cn,
-                $this->sn,
+        self::assertTrue($this->subject->concerns(
+            Filters::and(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::present('userPassword'),
             ),
-            Filters::equal(
-                'cn',
-                'alice',
-            ),
+            'userpassword',
         ));
     }
 
-    public function test_losing_an_attribute_the_filter_reads_judges_the_stripped_entry_again(): void
+    public function test_withholding_the_type_an_option_bearing_assertion_names_concerns_it(): void
     {
-        $stripped = $this->stripped(
-            $this->cn,
-            $this->sn,
-        );
-        $filter = Filters::and(
+        self::assertTrue($this->subject->concerns(
             Filters::equal(
-                'cn',
-                'alice',
-            ),
-            Filters::present('userPassword'),
-        );
-
-        $this->mockEvaluator
-            ->expects(self::once())
-            ->method('evaluate')
-            ->with(
-                $stripped,
-                $filter,
-            )
-            ->willReturn(false);
-
-        self::assertFalse($this->subject->stillMatches(
-            $this->entry,
-            $stripped,
-            $filter,
-        ));
-    }
-
-    public function test_losing_an_option_bearing_form_of_a_type_the_filter_reads_judges_the_stripped_entry_again(): void
-    {
-        $entry = $this->entryWithTaggedGivenName();
-
-        $this->mockEvaluator
-            ->expects(self::once())
-            ->method('evaluate')
-            ->willReturn(false);
-
-        self::assertFalse($this->subject->stillMatches(
-            $entry,
-            Entry::raw(
-                $entry->getDn(),
-                [$this->cn],
-            ),
-            Filters::equal(
-                'givenName',
+                'givenName;lang-en',
                 'Ali',
             ),
+            'givenname',
         ));
     }
 
-    public function test_losing_an_option_bearing_form_of_another_type_keeps_the_match_without_judging_it(): void
+    public function test_withholding_another_type_than_the_filter_reads_does_not_concern_it(): void
     {
-        $entry = $this->entryWithTaggedGivenName();
-
-        $this->mockEvaluator
-            ->expects(self::never())
-            ->method('evaluate');
-
-        self::assertTrue($this->subject->stillMatches(
-            $entry,
-            Entry::raw(
-                $entry->getDn(),
-                [$this->cn],
-            ),
+        self::assertFalse($this->subject->concerns(
             Filters::equal(
                 'cn',
                 'alice',
             ),
+            'givenname',
         ));
     }
 
-    public function test_losing_a_subtype_of_a_type_the_filter_names_judges_the_stripped_entry_again(): void
+    public function test_withholding_a_subtype_of_a_type_the_filter_names_concerns_it(): void
     {
-        $this->mockEvaluator
-            ->expects(self::once())
-            ->method('evaluate')
-            ->willReturn(false);
-
-        self::assertFalse($this->subject->stillMatches(
-            $this->entry,
-            $this->stripped(
-                $this->sn,
-                $this->userPassword,
-            ),
+        self::assertTrue($this->subject->concerns(
             Filters::equal(
                 'name',
                 'alice',
             ),
+            'cn',
         ));
     }
 
-    public function test_a_stripped_entry_rebuilt_from_other_attributes_is_judged_again(): void
+    public function test_an_answer_is_the_same_when_asked_again(): void
     {
-        $this->mockEvaluator
-            ->expects(self::once())
-            ->method('evaluate')
-            ->willReturn(true);
+        $filter = Filters::equal(
+            'name',
+            'alice',
+        );
 
-        self::assertTrue($this->subject->stillMatches(
-            $this->entry,
-            new Entry(
-                new Dn('cn=alice,dc=foo,dc=bar'),
-                new Attribute(
-                    'cn',
-                    'alice',
-                ),
-                new Attribute(
-                    'sn',
-                    'smith',
-                ),
-            ),
-            Filters::equal(
+        self::assertSame(
+            $this->subject->concerns(
+                $filter,
                 'cn',
-                'alice',
             ),
-        ));
+            $this->subject->concerns(
+                $filter,
+                'cn',
+            ),
+        );
     }
 
     #[DataProvider('alwaysJudgedFilterProvider')]
-    public function test_a_filter_whose_values_are_not_read_off_the_entry_alone_is_always_judged_again(
+    public function test_withholding_anything_concerns_a_filter_whose_values_are_not_read_off_the_entry_alone(
         FilterInterface $filter,
     ): void {
+        self::assertTrue($this->subject->concerns(
+            $filter,
+            'sn',
+        ));
+    }
+
+    public function test_the_entry_is_judged_against_the_filter_without_what_was_withheld(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice,dc=foo,dc=bar'),
+            new Attribute(
+                'cn',
+                'alice',
+            ),
+            new Attribute(
+                'userPassword',
+                'secret',
+            ),
+        );
+        $filter = Filters::present('userPassword');
+        $judged = null;
+
         $this->mockEvaluator
             ->expects(self::once())
             ->method('evaluate')
-            ->willReturn(true);
+            ->willReturnCallback(static function (Entry $stripped) use (&$judged): bool {
+                $judged = $stripped;
 
-        self::assertTrue($this->subject->stillMatches(
-            $this->entry,
-            $this->stripped(
-                $this->cn,
-                $this->sn,
-            ),
+                return false;
+            });
+
+        self::assertFalse($this->subject->stillMatches(
+            $entry,
+            [1 => true],
             $filter,
         ));
+        self::assertInstanceOf(
+            Entry::class,
+            $judged,
+        );
+        self::assertTrue($judged->has('cn'));
+        self::assertFalse($judged->has('userPassword'));
     }
 
     public static function alwaysJudgedFilterProvider(): Generator
@@ -267,25 +191,5 @@ final class StrippedEntryMatcherTest extends TestCase
                 'alice',
             ),
         ];
-    }
-
-    private function entryWithTaggedGivenName(): Entry
-    {
-        return new Entry(
-            new Dn('cn=alice,dc=foo,dc=bar'),
-            $this->cn,
-            new Attribute(
-                'givenName;lang-en',
-                'Ali',
-            ),
-        );
-    }
-
-    private function stripped(Attribute ...$kept): Entry
-    {
-        return Entry::raw(
-            $this->entry->getDn(),
-            $kept,
-        );
     }
 }

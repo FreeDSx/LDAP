@@ -16,6 +16,8 @@ namespace FreeDSx\Ldap\Server\AccessControl;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
+use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
+use FreeDSx\Ldap\Server\AccessControl\Read\UnrestrictedReadScope;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -151,32 +153,13 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
             );
     }
 
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry {
+    public function readScope(TokenInterface $token): ReadScopeInterface
+    {
         if ($token instanceof PrivilegedTokenInterface) {
-            return $entry;
+            return new UnrestrictedReadScope();
         }
 
-        return $this->inner->filterEntry(
-            $token,
-            $entry,
-        );
-    }
-
-    public function stripUnreadableAttributes(
-        TokenInterface $token,
-        Entry $entry,
-    ): Entry {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return $entry;
-        }
-
-        return $this->inner->stripUnreadableAttributes(
-            $token,
-            $entry,
-        );
+        return $this->inner->readScope($token);
     }
 
     public function isEntryVisible(

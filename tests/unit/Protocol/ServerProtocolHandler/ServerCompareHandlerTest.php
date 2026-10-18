@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\Read\UnrestrictedReadScope;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
@@ -152,8 +153,8 @@ final class ServerCompareHandlerTest extends TestCase
                 ['foo' => ['bar']],
             ));
         $this->mockAccessControl
-            ->method('stripUnreadableAttributes')
-            ->willReturnArgument(1);
+            ->method('readScope')
+            ->willReturn(new UnrestrictedReadScope());
         $this->mockFilterEvaluator
             ->method('evaluate')
             ->willReturn(false);
@@ -212,8 +213,8 @@ final class ServerCompareHandlerTest extends TestCase
                 ],
             ));
         $this->mockAccessControl
-            ->method('stripUnreadableAttributes')
-            ->willReturnArgument(1);
+            ->method('readScope')
+            ->willReturn(new UnrestrictedReadScope());
         $this->mockFilterEvaluator
             ->method('evaluate')
             ->willReturn(false);
