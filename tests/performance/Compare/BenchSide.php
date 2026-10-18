@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Performance\FreeDSx\Ldap\Compare;
 
 /**
- * One server participating in a comparison run.
+ * One server participating in a comparison run, seeded as one identity and measured as another bound by its ACLs.
  */
 final readonly class BenchSide
 {
@@ -25,5 +25,7 @@ final readonly class BenchSide
         public string $bindDn,
         public string $bindPassword,
         public string $baseDn,
+        public string $runBindDn,
+        public string $runBindPassword,
     ) {}
 }

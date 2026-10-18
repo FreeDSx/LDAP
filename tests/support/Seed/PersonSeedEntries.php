@@ -119,20 +119,21 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
         ['Raleigh', 'NC', '27601'],
     ];
 
-    public function __construct(private int $fillerAttributes = 0) {}
+    public function __construct(
+        private int $fillerAttributes = 0,
+        private SeedDn $dn = new SeedDn(),
+    ) {}
 
     public function generate(int $count): iterable
     {
-        for ($i = 1; $i <= $count; $i++) {
-            yield $this->person($i);
-        }
+        yield from $this->people($count);
 
         if ($count === 0) {
             return;
         }
 
         yield new Entry(
-            new Dn(SeedDn::GROUPS),
+            new Dn($this->dn->groups),
             new Attribute(
                 'objectClass',
                 'organizationalUnit',
@@ -150,6 +151,18 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
     public function isSchemaValid(): bool
     {
         return true;
+    }
+
+    /**
+     * Just the people, each seeded after the manager it names, without the groups that list them.
+     *
+     * @return iterable<Entry>
+     */
+    public function people(int $count): iterable
+    {
+        for ($i = 1; $i <= $count; $i++) {
+            yield $this->person($i);
+        }
     }
 
     private function person(int $i): Entry
@@ -170,7 +183,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
         }
 
         return new Entry(
-            new Dn(SeedDn::person($i)),
+            new Dn($this->dn->person($i)),
             ...$attributes,
             ...$this->fillers(
                 $i,
@@ -231,8 +244,8 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
 
         return [
             'mail' => [
-                "seed-{$i}@foo.bar",
-                "{$alias}.{$i}@foo.bar",
+                "seed-{$i}@{$this->dn->mailDomain}",
+                "{$alias}.{$i}@{$this->dn->mailDomain}",
             ],
             'telephoneNumber' => [
                 $this->phone('010', $i),
@@ -248,7 +261,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
             'postalAddress' => ["$street\$$city, $state $postalCode"],
             'physicalDeliveryOfficeName' => ['Building ' . ($i % 12 + 1)],
             'postOfficeBox' => ['PO Box ' . (1000 + $i % 9000)],
-            'labeledURI' => ["https://foo.bar/~seed-{$i} Home page"],
+            'labeledURI' => ["https://{$this->dn->mailDomain}/~seed-{$i} Home page"],
         ];
     }
 
@@ -261,7 +274,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
             return [];
         }
 
-        return ['seeAlso' => [SeedDn::person($this->manager($i))]];
+        return ['seeAlso' => [$this->dn->person($this->manager($i))]];
     }
 
     /**
@@ -273,7 +286,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
             $members = [];
 
             for ($i = $first; $i <= min($first + self::TEAM_SIZE - 1, $count); $i++) {
-                $members[] = SeedDn::person($i);
+                $members[] = $this->dn->person($i);
             }
             $team = intdiv($first - 1, self::TEAM_SIZE) + 1;
 
@@ -296,7 +309,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
         $members = [];
 
         for ($i = 1; $i <= $count; $i++) {
-            $members[$this->departmentIndex($i)][] = SeedDn::person($i);
+            $members[$this->departmentIndex($i)][] = $this->dn->person($i);
         }
 
         foreach ($members as $index => $departmentMembers) {
@@ -317,7 +330,7 @@ final readonly class PersonSeedEntries implements SeedEntryGeneratorInterface
         array $members,
     ): Entry {
         return new Entry(
-            new Dn(SeedDn::group($cn)),
+            new Dn($this->dn->group($cn)),
             new Attribute(
                 'objectClass',
                 'groupOfNames',

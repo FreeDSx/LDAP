@@ -14,21 +14,29 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Seed;
 
 /**
- * Where generated seed entries live, matching the DNs the load-test workloads address.
+ * Where generated seed entries live and the mail domain they use, defaulting to what the load-test workloads address.
  */
-final class SeedDn
+final readonly class SeedDn
 {
     public const PEOPLE = 'ou=people,dc=foo,dc=bar';
 
     public const GROUPS = 'ou=groups,dc=foo,dc=bar';
 
-    public static function person(int $index): string
+    public const MAIL_DOMAIN = 'foo.bar';
+
+    public function __construct(
+        public string $people = self::PEOPLE,
+        public string $groups = self::GROUPS,
+        public string $mailDomain = self::MAIL_DOMAIN,
+    ) {}
+
+    public function person(int $index): string
     {
-        return 'cn=seed-' . $index . ',' . self::PEOPLE;
+        return 'cn=seed-' . $index . ',' . $this->people;
     }
 
-    public static function group(string $cn): string
+    public function group(string $cn): string
     {
-        return 'cn=' . $cn . ',' . self::GROUPS;
+        return 'cn=' . $cn . ',' . $this->groups;
     }
 }

@@ -14,6 +14,9 @@
 # --jit (function, tracing, or off) is the same for every runner, so a runner comparison is not also a JIT one.
 # --search-value is the cn prefix the subtree searches filter on (--search-value=seed- matches all).
 #
+# Every side seeds as its root identity but runs the workload as a non-root bench administrator held to its own access
+# control: a group with full access and userPassword withheld from everyone, mirroring FreeDSx's secure default.
+#
 # Examples:
 #
 #   # FreeDSx (sqlite) vs OpenDJ at 25k, with search-sub kept selective on OpenDJ's substring index
@@ -82,30 +85,113 @@ case "$JIT" in
     *) echo "unknown --jit value: $JIT (expected off, function, or tracing)" >&2; exit 2 ;;
 esac
 
-# Resolve a service key to its compose service, container, internal LDAP port, admin bind, base DN, display
-# label, and per-service setup hook. Sets ${prefix}_SVC / _CONT / _PORT / _BIND / _PW / _BASE / _LABEL / _SETUP.
+# The non-root identity a reference side runs the workload as, created by its setup hook.
+BENCH_RUN_PW="P@ssword12345"
+# Pre-encoded {SSHA} of BENCH_RUN_PW: every side verifies binds with a hash as cheap as FreeDSx's {SHA} admin.
+BENCH_RUN_PW_HASH="{SSHA}sSdiTIT0MbdlzPesoNF+lJtOcJRmZHhiZW5jaA=="
+# Setup hook output, kept for when a run identity check fails.
+SETUP_LOG="tests/profile/out/compare-setup.log"
+
+# Resolve a service key to its compose service, container, internal LDAP port, root bind, run bind, base DN, display
+# label, and per-service setup hook. Sets ${prefix}_SVC / _CONT / _PORT / _BIND / _PW / _RUN_BIND / _RUN_PW / _BASE /
+# _LABEL / _SETUP.
 resolve_svc() {
     local key="$1" p="$2"
     case "$key" in
         freedsx)
-            # Seeding and the write ops need an administrator, matching the root identity the other two sides bind as.
+            # The admin is a member of cn=admins and held to the rules, unlike the privileged manager.
             declare -g "${p}_SVC=freedsx-server" "${p}_CONT=freedsx-profile-server" "${p}_PORT=10389" \
                 "${p}_BIND=cn=admin,dc=foo,dc=bar" "${p}_PW=12345" "${p}_BASE=dc=foo,dc=bar" \
+                "${p}_RUN_BIND=cn=admin,dc=foo,dc=bar" "${p}_RUN_PW=12345" \
                 "${p}_LABEL=FreeDSx/$STORAGE" "${p}_SETUP=none" ;;
         openldap)
             declare -g "${p}_SVC=openldap" "${p}_CONT=freedsx-profile-openldap" "${p}_PORT=389" \
                 "${p}_BIND=cn=admin,dc=example,dc=com" "${p}_PW=P@ssword12345" "${p}_BASE=dc=example,dc=com" \
-                "${p}_LABEL=OpenLDAP" "${p}_SETUP=none" ;;
+                "${p}_RUN_BIND=cn=bench-admin,dc=example,dc=com" "${p}_RUN_PW=$BENCH_RUN_PW" \
+                "${p}_LABEL=OpenLDAP" "${p}_SETUP=openldap" ;;
         opendj)
             declare -g "${p}_SVC=opendj" "${p}_CONT=freedsx-profile-opendj" "${p}_PORT=1389" \
                 "${p}_BIND=cn=Directory Manager" "${p}_PW=P@ssword12345" "${p}_BASE=dc=example,dc=com" \
+                "${p}_RUN_BIND=cn=bench-admin,dc=example,dc=com" "${p}_RUN_PW=$BENCH_RUN_PW" \
                 "${p}_LABEL=OpenDJ" "${p}_SETUP=opendj" ;;
         389ds)
             declare -g "${p}_SVC=389ds" "${p}_CONT=freedsx-profile-389ds" "${p}_PORT=3389" \
                 "${p}_BIND=cn=Directory Manager" "${p}_PW=P@ssword12345" "${p}_BASE=dc=example,dc=com" \
+                "${p}_RUN_BIND=cn=bench-admin,dc=example,dc=com" "${p}_RUN_PW=$BENCH_RUN_PW" \
                 "${p}_LABEL=389DS" "${p}_SETUP=389ds" ;;
         *) echo "unknown service: $key (expected freedsx, openldap, opendj, or 389ds)" >&2; exit 2 ;;
     esac
+}
+
+# The bench administrator and its group, its password and limits replaced on every replay of a reused container.
+bench_identity_ldif() {
+    local base="$1"
+    cat <<EOF
+dn: cn=bench-admin,$base
+changetype: add
+objectClass: inetOrgPerson
+cn: bench-admin
+sn: Bench
+userPassword: $BENCH_RUN_PW_HASH
+
+dn: cn=bench-admins,$base
+changetype: add
+objectClass: groupOfNames
+cn: bench-admins
+member: cn=bench-admin,$base
+
+dn: cn=bench-admin,$base
+changetype: modify
+replace: userPassword
+userPassword: $BENCH_RUN_PW_HASH
+EOF
+}
+
+# Root bound without the size, lookthrough and time limits a plain identity gets, and FreeDSx runs without them too.
+bench_unlimited_ldif() {
+    local base="$1" flavor="$2"
+    echo ""
+    echo "dn: cn=bench-admin,$base"
+    echo "changetype: modify"
+
+    case "$flavor" in
+        389ds)
+            printf 'replace: %s\n%s: -1\n-\n' nsSizeLimit nsSizeLimit nsLookThroughLimit nsLookThroughLimit \
+                nsPagedSizeLimit nsPagedSizeLimit nsTimeLimit nsTimeLimit ;;
+        opendj)
+            printf 'replace: %s\n%s: 0\n-\n' ds-rlim-size-limit ds-rlim-size-limit \
+                ds-rlim-lookthrough-limit ds-rlim-lookthrough-limit ds-rlim-time-limit ds-rlim-time-limit
+            printf 'replace: ds-privilege-name\nds-privilege-name: unindexed-search\n-\n' ;;
+    esac
+}
+
+# Full access through the group and userPassword withheld from everyone.
+bench_aci_ldif() {
+    local base="$1"
+    cat <<EOF
+
+dn: $base
+changetype: modify
+add: aci
+aci: (targetattr="userPassword")(version 3.0; acl "freedsx-bench password reads"; deny (read,search,compare) userdn="ldap:///anyone";)
+aci: (targetattr="*")(version 3.0; acl "freedsx-bench administrators"; allow (all) groupdn="ldap:///cn=bench-admins,$base";)
+EOF
+}
+
+# Logs every loader message, since entries and values that already exist are expected errors on a reused container.
+load_ldif() {
+    local label="$1"
+    shift
+    echo "--- $label" >>"$SETUP_LOG"
+    "$@" >>"$SETUP_LOG" 2>&1 || true
+}
+
+# slapd.conf already grants the group write and lifts its limits, while withholding userPassword.
+setup_openldap() {
+    local bind="$1" pw="$2" base="$3"
+    echo "==> adding the bench administrator to openldap"
+    bench_identity_ldif "$base" \
+        | load_ldif openldap docker exec -i freedsx-profile-openldap ldapmodify -x -c -H ldap://localhost -D "$bind" -w "$pw"
 }
 
 if [[ "$SOURCE" == "$TARGET" ]]; then
@@ -148,6 +234,17 @@ setup_opendj() {
         --backend-name userRoot --index-name objectClass --set index-entry-limit:200000 \
         -h localhost -p 4444 -D "$bind" -w "$pw" -X -n >/dev/null 2>&1 \
     || echo "   (index-limit tweak skipped)"
+
+    # The seeded people carry {SSHA} values, which the default policy refuses as pre-encoded.
+    docker exec freedsx-profile-opendj /opt/opendj/bin/dsconfig set-password-policy-prop \
+        --policy-name "Default Password Policy" --set allow-pre-encoded-passwords:true \
+        -h localhost -p 4444 -D "$bind" -w "$pw" -X -n >/dev/null 2>&1 \
+    || echo "   (pre-encoded password tweak skipped)"
+
+    echo "==> adding the bench administrator and its ACIs to opendj"
+    { bench_identity_ldif "$base"; bench_unlimited_ldif "$base" opendj; bench_aci_ldif "$base"; } \
+        | load_ldif opendj docker exec -i freedsx-profile-opendj /opt/opendj/bin/ldapmodify -c \
+            -h localhost -p 1389 -D "$bind" -w "$pw"
 }
 
 # The image creates the instance but not the suffix, so create the backend, silence the per-op access log, and raise
@@ -182,6 +279,10 @@ setup_389ds() {
     docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend config set \
         --idlistscanlimit 200000 --lookthroughlimit 200000 >/dev/null 2>&1 \
     || echo "   (scan-limit tweak skipped)"
+    # A bind otherwise rewrites the bench administrator's {SSHA} as PBKDF2, which every later bind then pays for.
+    docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" \
+        config replace nsslapd-enable-upgrade-hash=off >/dev/null 2>&1 \
+    || echo "   (hash-upgrade tweak skipped)"
 
     # A plugin only loads at startup, and the bench seeds after this returns...
     if [[ "$needs_restart" -eq 1 ]]; then
@@ -189,6 +290,10 @@ setup_389ds() {
         docker restart freedsx-profile-389ds >/dev/null
         await_389ds "$bind" "$pw" "$uri"
     fi
+
+    echo "==> adding the bench administrator and its ACIs to 389ds"
+    { bench_identity_ldif "$base"; bench_unlimited_ldif "$base" 389ds; bench_aci_ldif "$base"; } \
+        | load_ldif 389ds docker exec -i freedsx-profile-389ds ldapmodify -x -c -H "$uri" -D "$bind" -w "$pw"
 }
 
 await_389ds() {
@@ -206,10 +311,16 @@ await_389ds() {
 
 run_setup() {
     case "$1" in
-        opendj) setup_opendj "${@:2}" ;;
-        389ds)  setup_389ds "${@:2}" ;;
+        openldap) setup_openldap "${@:2}" ;;
+        opendj)   setup_opendj "${@:2}" ;;
+        389ds)    setup_389ds "${@:2}" ;;
     esac
 }
+
+# The OpenLDAP image bakes in its bootstrap, whose access rules a stale image would not have.
+if [[ "$SOURCE" == "openldap" || "$TARGET" == "openldap" ]]; then
+    docker compose -f "$COMPOSE" build openldap
+fi
 
 echo "==> up $SRC_LABEL ($SRC_SVC) + $TGT_LABEL ($TGT_SVC) (cpuset=$SERVER_CPUSET each, driver on $DRIVER_CPUSET, seed=$SEED)"
 # Sharing cores with the driver can reverse which server looks faster, so each side is pinned to its own.
@@ -217,22 +328,32 @@ PROFILE_CPUS="$CPUS" FREEDSX_STORAGE="$STORAGE" FREEDSX_RUNNER="$RUNNER" SEED_EN
 SERVER_CPUSET="$SERVER_CPUSET" SWOOLE_WORKERS="$WORKERS" FREEDSX_JIT="$JIT" \
     docker compose -f "$COMPOSE" up -d --wait "$SRC_SVC" "$TGT_SVC"
 
+mkdir -p "$(dirname "$SETUP_LOG")"
+: >"$SETUP_LOG"
 run_setup "$SRC_SETUP" "$SRC_BIND" "$SRC_PW" "$SRC_BASE"
 run_setup "$TGT_SETUP" "$TGT_BIND" "$TGT_PW" "$TGT_BASE"
+echo "==> setup loader output is in $SETUP_LOG"
 
 NET=$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$SRC_CONT")
 
 echo "==> running comparison (driver container on '$NET')"
+# An invalid or failed comparison still tears the stack down, then exits with the driver's status.
+STATUS=0
 docker run --rm --network "$NET" --cpuset-cpus="$DRIVER_CPUSET" -v "$PWD":/app -w /app --entrypoint php \
     freedsx-profile:latest -d xdebug.mode=off -d opcache.enable_cli=1 -d opcache.jit=off \
     tests/bin/ldap-bench-compare.php \
     --source-host="$SRC_SVC" --source-port="$SRC_PORT" --source-bind-dn="$SRC_BIND" --source-bind-password="$SRC_PW" --source-base-dn="$SRC_BASE" --source-label="$SRC_LABEL" \
+    --source-run-bind-dn="$SRC_RUN_BIND" --source-run-bind-password="$SRC_RUN_PW" \
     --target-host="$TGT_SVC" --target-port="$TGT_PORT" --target-bind-dn="$TGT_BIND" --target-bind-password="$TGT_PW" --target-base-dn="$TGT_BASE" --target-label="$TGT_LABEL" \
+    --target-run-bind-dn="$TGT_RUN_BIND" --target-run-bind-password="$TGT_RUN_PW" \
     --seed-entries="$SEED" --seed-groups="$SEED_GROUPS" --seed-group-size="$SEED_GROUP_SIZE" \
     --mix="$MIX" --search-value="$SEARCHVAL" --duration="$DURATION" --warmup="$WARMUP" \
-    --clients="$CLIENTS" --driver-processes="$DRIVER_PROCS"
+    --clients="$CLIENTS" --driver-processes="$DRIVER_PROCS" \
+|| STATUS=$?
 
 if [[ "$KEEP_UP" -eq 0 ]]; then
     echo "==> tearing down (pass --keep-up to skip)"
     docker compose -f "$COMPOSE" down
 fi
+
+exit "$STATUS"

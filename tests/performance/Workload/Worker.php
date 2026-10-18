@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Performance\FreeDSx\Ldap\Workload;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
@@ -283,7 +284,10 @@ final class Worker
             ->base($this->randomReadDn())
             ->useBaseScope();
 
-        return count($client->search($request));
+        return $this->countEntries(
+            $client,
+            $request,
+        );
     }
 
     private function doSearchEq(LdapClient $client): int
@@ -292,7 +296,10 @@ final class Worker
             ->base($this->config->directory->baseDn)
             ->useSubtreeScope();
 
-        return count($client->search($request));
+        return $this->countEntries(
+            $client,
+            $request,
+        );
     }
 
     private function doSearchSub(LdapClient $client): int
@@ -302,7 +309,10 @@ final class Worker
             ->useSubtreeScope();
         $this->applySearchSizeLimit($request);
 
-        return count($client->search($request));
+        return $this->countEntries(
+            $client,
+            $request,
+        );
     }
 
     private function doSearchList(LdapClient $client): int
@@ -312,7 +322,37 @@ final class Worker
             ->useSingleLevelScope();
         $this->applySearchSizeLimit($request);
 
-        return count($client->search($request));
+        return $this->countEntries(
+            $client,
+            $request,
+        );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function countEntries(
+        LdapClient $client,
+        SearchRequest $request,
+        Control ...$controls,
+    ): int {
+        $delivered = 0;
+        $request->useEntryHandler(static function () use (&$delivered): void {
+            $delivered++;
+        });
+
+        try {
+            $client->search(
+                $request,
+                ...$controls,
+            );
+        } catch (OperationException $e) {
+            if ($e->getCode() !== ResultCode::SIZE_LIMIT_EXCEEDED) {
+                throw $e;
+            }
+        }
+
+        return $delivered;
     }
 
     /**
@@ -338,11 +378,12 @@ final class Worker
             ? Filters::contains('cn', (string) mt_rand(100, $this->config->seed->entries))
             : Filters::contains('cn', 'eed');
 
-        return count($client->search(
+        return $this->countEntries(
+            $client,
             $this->newSearch($filter)
                 ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
-        ));
+        );
     }
 
     private function doSearchSuffix(LdapClient $client): int
@@ -351,11 +392,12 @@ final class Worker
             ? Filters::endsWith('cn', "d-{$this->randomSeedIdx()}")
             : Filters::endsWith('cn', 'e');
 
-        return count($client->search(
+        return $this->countEntries(
+            $client,
             $this->newSearch($filter)
                 ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
-        ));
+        );
     }
 
     private function doSearchRange(LdapClient $client): int
@@ -364,11 +406,12 @@ final class Worker
             ? 1000 + max(1, $this->config->seed->entries - 99)
             : 1000;
 
-        return count($client->search(
+        return $this->countEntries(
+            $client,
             $this->newSearch(Filters::greaterThanOrEqual('uidNumber', (string) $threshold))
                 ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
-        ));
+        );
     }
 
     /**
@@ -381,11 +424,12 @@ final class Worker
             $this->randomEqualityFilter(),
         );
 
-        return count($client->search(
+        return $this->countEntries(
+            $client,
             $this->newSearch($filter)
                 ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
-        ));
+        );
     }
 
     /**
@@ -398,11 +442,12 @@ final class Worker
             $this->randomEqualityFilter(),
         );
 
-        return count($client->search(
+        return $this->countEntries(
+            $client,
             $this->newSearch($filter)
                 ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
-        ));
+        );
     }
 
     /**
@@ -418,10 +463,11 @@ final class Worker
             $request->sizeLimit($this->config->search->sortSizeLimit);
         }
 
-        return count($client->search(
+        return $this->countEntries(
+            $client,
             $request,
             Controls::sort('sn'),
-        ));
+        );
     }
 
     /**

@@ -159,6 +159,18 @@ final class BenchCompareCommand extends Command
                 self::DEFAULT_SOURCE_BIND_PASSWORD,
             )
             ->addOption(
+                'source-run-bind-dn',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'DN the workload binds to the source as, subject to its access control (defaults to --source-bind-dn)',
+            )
+            ->addOption(
+                'source-run-bind-password',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Password paired with --source-run-bind-dn',
+            )
+            ->addOption(
                 'source-base-dn',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -199,6 +211,18 @@ final class BenchCompareCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Password paired with --target-bind-dn',
                 self::DEFAULT_TARGET_BIND_PASSWORD,
+            )
+            ->addOption(
+                'target-run-bind-dn',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'DN the workload binds to the target as, subject to its access control (defaults to --target-bind-dn)',
+            )
+            ->addOption(
+                'target-run-bind-password',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Password paired with --target-run-bind-dn',
             )
             ->addOption(
                 'target-base-dn',
@@ -294,8 +318,8 @@ final class BenchCompareCommand extends Command
         $targetSide = $this->sideFromOptions($input, 'target');
         $sourceSide = $this->sideFromOptions($input, 'source');
 
-        $targetSnapshot = null;
-        $sourceSnapshot = null;
+        $targetRun = null;
+        $sourceRun = null;
         $benches = [];
 
         // Both sides are contacted first: seeding one side is wasted work if the other turns out to be unreachable.
@@ -319,10 +343,22 @@ final class BenchCompareCommand extends Command
 
         try {
             if (!$skipTarget) {
-                $targetSnapshot = $this->runSide($output, $progress, $targetSide, $params, $benches);
+                $targetRun = $this->runSide(
+                    $output,
+                    $progress,
+                    $targetSide,
+                    $params,
+                    $benches,
+                );
             }
             if (!$skipSource) {
-                $sourceSnapshot = $this->runSide($output, $progress, $sourceSide, $params, $benches);
+                $sourceRun = $this->runSide(
+                    $output,
+                    $progress,
+                    $sourceSide,
+                    $params,
+                    $benches,
+                );
             }
         } catch (Throwable $e) {
             $output->writeln('<error>Benchmark failed: ' . $e->getMessage() . '</error>');
@@ -333,15 +369,20 @@ final class BenchCompareCommand extends Command
         }
 
         $format = $this->requireString($input, 'output');
-        (new ComparisonReport(
-            target: $targetSnapshot,
-            source: $sourceSnapshot,
+        $report = new ComparisonReport(
+            target: $targetRun?->snapshot,
+            source: $sourceRun?->snapshot,
             format: $format,
             targetLabel: $targetSide->label,
             sourceLabel: $sourceSide->label,
-        ))->render($output);
+            targetAccessProblems: $targetRun->accessProblems ?? [],
+            sourceAccessProblems: $sourceRun->accessProblems ?? [],
+        );
+        $report->render($output);
 
-        return Command::SUCCESS;
+        return $report->invalidReasons() === []
+            ? Command::SUCCESS
+            : Command::FAILURE;
     }
 
     /**
@@ -357,6 +398,10 @@ final class BenchCompareCommand extends Command
 
             try {
                 $bench->preflight();
+                $bench->assertBindable(
+                    $side->runBindDn,
+                    $side->runBindPassword,
+                );
             } catch (Throwable $e) {
                 $reasons[] = $e->getMessage();
             } finally {
@@ -388,9 +433,15 @@ final class BenchCompareCommand extends Command
         BenchSide $side,
         array $params,
         array &$benches,
-    ): StatsSnapshot {
+    ): SideRun {
         $bench = $this->makeBench($side);
         $benches[] = $bench;
+
+        $bench->ensureSubtree();
+        $bench->assertWritableBy(
+            $side->runBindDn,
+            $side->runBindPassword,
+        );
 
         $this->seedSide(
             $progress,
@@ -400,6 +451,13 @@ final class BenchCompareCommand extends Command
             $params['seedGroups'],
             $params['seedGroupSize'],
         );
+
+        $accessProblems = $params['seedEntries'] > 0
+            ? $bench->accessProblemsFor(
+                $side->runBindDn,
+                $side->runBindPassword,
+            )
+            : ['had nothing seeded to check access control against'];
 
         $config = $this->buildConfig(
             $side,
@@ -428,7 +486,10 @@ final class BenchCompareCommand extends Command
             true,
         );
 
-        return $snapshot;
+        return new SideRun(
+            $snapshot,
+            $accessProblems,
+        );
     }
 
     private function seedSide(
@@ -495,8 +556,8 @@ final class BenchCompareCommand extends Command
                 groupSize: $params['seedGroupSize'],
             ),
             directory: new DirectorySettings(
-                bindDn: $side->bindDn,
-                bindPassword: $side->bindPassword,
+                bindDn: $side->runBindDn,
+                bindPassword: $side->runBindPassword,
                 baseDn: $bench->benchBaseDn,
                 writeBase: $bench->writeBaseDn,
             ),
@@ -535,13 +596,24 @@ final class BenchCompareCommand extends Command
         InputInterface $input,
         string $prefix,
     ): BenchSide {
+        $bindDn = $this->requireString($input, "{$prefix}-bind-dn");
+        $bindPassword = $this->requireString($input, "{$prefix}-bind-password");
+        $runBindDn = $input->getOption("{$prefix}-run-bind-dn");
+        $runBindDn = is_string($runBindDn) && $runBindDn !== ''
+            ? $runBindDn
+            : null;
+
         return new BenchSide(
             label: $this->requireString($input, "{$prefix}-label"),
             host: $this->requireString($input, "{$prefix}-host"),
             port: $this->requireInt($input, "{$prefix}-port"),
-            bindDn: $this->requireString($input, "{$prefix}-bind-dn"),
-            bindPassword: $this->requireString($input, "{$prefix}-bind-password"),
+            bindDn: $bindDn,
+            bindPassword: $bindPassword,
             baseDn: $this->requireString($input, "{$prefix}-base-dn"),
+            runBindDn: $runBindDn ?? $bindDn,
+            runBindPassword: $runBindDn === null
+                ? $bindPassword
+                : $this->requireString($input, "{$prefix}-run-bind-password"),
         );
     }
 
