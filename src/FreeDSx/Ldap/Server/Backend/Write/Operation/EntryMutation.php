@@ -13,13 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
-use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\SettledLinks;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -37,7 +38,7 @@ readonly class EntryMutation
     ) {}
 
     /**
-     * @param SettledLinks $links Linked changes the command no longer carries, held to the schema with it.
+     * @param LinkDelta $links Linked values applied apart from the entry, whose additions are held to the schema with it.
      *
      * @throws OperationException
      */
@@ -45,15 +46,16 @@ readonly class EntryMutation
         Entry $entry,
         UpdateCommand $command,
         WriteContext $context,
-        SettledLinks $links = new SettledLinks(),
+        LinkDelta $links = new LinkDelta(),
     ): Entry {
         $updated = $this->entryHandler->apply($entry, $command);
         $this->schemaGate->assertModifyAllowed(
             $command,
-            $updated,
+            self::withLinkedAdditions(
+                $updated,
+                $links,
+            ),
             $context,
-            $links->changes,
-            $links->counts,
         );
         $this->operationalAttrs->applyForModify(
             $updated,
@@ -83,5 +85,30 @@ readonly class EntryMutation
         );
 
         return $moved;
+    }
+
+    private static function withLinkedAdditions(
+        Entry $entry,
+        LinkDelta $links,
+    ): Entry {
+        if ($links->isEmpty()) {
+            return $entry;
+        }
+        $copy = $entry->makeCopy();
+
+        foreach ($links->names() as $name) {
+            $added = $links->added($name);
+
+            if ($added === []) {
+                continue;
+            }
+
+            $copy->add(new Attribute(
+                $name,
+                ...$added,
+            ));
+        }
+
+        return $copy;
     }
 }

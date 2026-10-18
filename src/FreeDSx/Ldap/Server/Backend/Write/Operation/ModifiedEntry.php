@@ -25,8 +25,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
  */
 readonly class ModifiedEntry
 {
+    /**
+     * @param LinkDelta $links Stated by every producer, since a plain delta rewrites the links from the entry itself.
+     */
     public function __construct(
         public Entry $entry,
-        public LinkDelta $links = new LinkDelta(),
+        public LinkDelta $links,
     ) {}
 }

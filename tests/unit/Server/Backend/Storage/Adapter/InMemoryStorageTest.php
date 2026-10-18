@@ -148,11 +148,17 @@ final class InMemoryStorageTest extends TestCase
     {
         $this->subject->store(EntryFixture::withUuid(Entry::fromArray(
             'cn=admins,dc=ex,dc=com',
-            ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com', 'cn=carol,dc=ex,dc=com']],
+            [
+                'cn' => ['admins'],
+                'member' => ['cn=bob,dc=ex,dc=com', 'cn=carol,dc=ex,dc=com'],
+            ],
         )));
 
         $this->subject->store(
-            EntryFixture::withUuid(Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']])),
+            EntryFixture::withUuid(Entry::fromArray(
+                'cn=admins,dc=ex,dc=com',
+                ['cn' => ['admins']],
+            )),
             links: new LinkDelta(removed: ['member' => ['CN=Bob, DC=ex, DC=com']]),
         );
 

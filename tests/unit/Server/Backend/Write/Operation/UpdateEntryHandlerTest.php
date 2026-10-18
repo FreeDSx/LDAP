@@ -417,6 +417,27 @@ final class UpdateEntryHandlerTest extends TestCase
         ));
     }
 
+    public function test_a_linked_value_that_is_not_a_dn_is_refused_for_its_syntax(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+        $this->storage->store(EntryFixture::withUuid(Entry::fromArray(
+            self::ADMINS,
+            [
+                'objectClass' => ['groupOfNames'],
+                'cn' => ['Admins'],
+                'member' => [self::ALICE],
+            ],
+        )));
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->modifyAdmins(Change::add(
+            'member',
+            'not a dn',
+        ));
+    }
+
     public function test_a_linked_value_the_object_classes_do_not_permit_is_refused_when_a_control_reads_the_entry(): void
     {
         $this->validatedGraph(SchemaValidationMode::Strict);

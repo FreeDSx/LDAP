@@ -56,11 +56,24 @@ final class TestServerOptions
         SchemaValidationMode $mode,
         SchemaSourceInterface ...$sources,
     ): ServerOptions {
-        return new ServerOptions(
+        return self::validatedOn(
             self::transientStorage(),
-            schemaConfig: (new SchemaConfig())
-                ->setSources(...$sources)
-                ->setValidationMode($mode),
+            $mode,
+            ...$sources,
+        );
+    }
+
+    /**
+     * A transient database whose writes are held to the given definitions at the given mode.
+     */
+    public static function validatedSqlite(
+        SchemaValidationMode $mode,
+        SchemaSourceInterface ...$sources,
+    ): ServerOptions {
+        return self::validatedOn(
+            PdoConfig::forSqlite(':memory:'),
+            $mode,
+            ...$sources,
         );
     }
 
@@ -120,6 +133,19 @@ final class TestServerOptions
             self::transientStorage(),
             schemaConfig: self::unvalidatedCoreSchema(),
             passwordConfig: (new PasswordConfig())->setHashCost(self::TEST_HASH_COST),
+        );
+    }
+
+    private static function validatedOn(
+        StorageConfigInterface $storageConfig,
+        SchemaValidationMode $mode,
+        SchemaSourceInterface ...$sources,
+    ): ServerOptions {
+        return new ServerOptions(
+            $storageConfig,
+            schemaConfig: (new SchemaConfig())
+                ->setSources(...$sources)
+                ->setValidationMode($mode),
         );
     }
 
