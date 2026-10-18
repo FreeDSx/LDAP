@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -33,6 +34,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\ServerOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -94,6 +96,35 @@ final class MoveEntryHandlerTest extends TestCase
         self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
         $this->rename('cn=Nobody,dc=example,dc=com', 'cn=Ghost');
+    }
+
+    #[DataProvider('validationModeProvider')]
+    public function test_a_rename_naming_the_entry_by_an_entry_uuid_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->writeGraph(
+            EntryFixture::inMemoryStorage(...$this->fixture()),
+            TestServerOptions::validatedCore($mode),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->rename(
+            self::ALICE,
+            'entryUUID=a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            deleteOldRdn: false,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode}>
+     */
+    public static function validationModeProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield $mode->name => [$mode];
+        }
     }
 
     public function test_a_failing_assertion_refuses_the_rename_and_leaves_the_entry(): void

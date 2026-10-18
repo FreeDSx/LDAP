@@ -595,7 +595,8 @@ Seeding never overwrites an existing entry. To change one, modify it, or delete 
 is logged, with a record of the counts once the import commits.
 
 Supplied operational attributes such as `entryUUID` are kept, as the
-[Relax Rules control](Schema.md#validation-mode) allows a client's Add.
+[Relax Rules control](Schema.md#validation-mode) allows a client's Add. Attributes the server derives, such as
+`hasSubordinates` or a back-link like `memberOf`, are refused with `constraintViolation` even when validation is ignored.
 
 `seed()` accepts only content records (entries without `changetype:`) and requires depth-first input (parents first,
 then children entries). LDIF produced by `dump()` is already in this order.

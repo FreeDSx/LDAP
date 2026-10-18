@@ -13,9 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Validation;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Operation\OperationType;
+
+use function array_map;
+use function array_values;
 
 /**
  * The entry a write leaves behind, and what the client supplied to get there.
@@ -84,5 +89,28 @@ final readonly class SchemaWrite
     public function namesEntry(): bool
     {
         return $this->operation !== OperationType::Modify;
+    }
+
+    /**
+     * The names the client supplied: the entry's on an Add, the changes' on a Modify, the new RDN's on a rename.
+     *
+     * @return list<string>
+     */
+    public function suppliedNames(): array
+    {
+        return match ($this->operation) {
+            OperationType::Add => array_map(
+                static fn(Attribute $attribute): string => $attribute->getName(),
+                array_values($this->entry->getAttributes()),
+            ),
+            OperationType::Modify => array_map(
+                static fn(Change $change): string => $change->getAttribute()->getName(),
+                array_values($this->changes),
+            ),
+            default => array_map(
+                static fn(Rdn $component): string => $component->getName(),
+                array_values($this->entry->getDn()->getRdn()->getAll()),
+            ),
+        };
     }
 }

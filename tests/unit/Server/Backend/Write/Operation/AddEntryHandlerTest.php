@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\ServerOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -403,6 +404,39 @@ final class AddEntryHandlerTest extends TestCase
         );
 
         self::assertNotNull($this->find('cn=Alice,dc=example,dc=com'));
+    }
+
+    #[DataProvider('validationModeProvider')]
+    public function test_an_add_supplying_a_derived_attribute_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                'cn=Alice,dc=example,dc=com',
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Alice'],
+                    'sn' => ['Smith'],
+                    'hasSubordinates' => ['TRUE'],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode}>
+     */
+    public static function validationModeProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield $mode->name => [$mode];
+        }
     }
 
     public function test_a_lenient_validator_records_the_violation_and_writes_anyway(): void

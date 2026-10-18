@@ -13,9 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Validation\Check;
 
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Change;
-use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
@@ -25,7 +22,6 @@ use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
 
-use function array_map;
 use function in_array;
 use function sprintf;
 
@@ -109,7 +105,7 @@ readonly class NoUserModificationCheck implements SchemaCheckInterface
         $wantSettable = $rule === SchemaRule::SettableOperationalAttribute;
         $settable = $this->settableOn($write->operation);
 
-        foreach ($this->suppliedNames($write) as $name) {
+        foreach ($write->suppliedNames() as $name) {
             $attrType = $this->schema->getAttributeType($name);
 
             if ($attrType === null || !$attrType->noUserModification) {
@@ -123,28 +119,6 @@ readonly class NoUserModificationCheck implements SchemaCheckInterface
         }
 
         return null;
-    }
-
-    /**
-     * @return array<string>
-     */
-    private function suppliedNames(SchemaWrite $write): array
-    {
-        return match ($write->operation) {
-            OperationType::Add => array_map(
-                static fn(Attribute $attribute): string => $attribute->getName(),
-                $write->entry->getAttributes(),
-            ),
-            OperationType::Modify => array_map(
-                static fn(Change $change): string => $change->getAttribute()->getName(),
-                $write->changes,
-            ),
-            // A rename supplies only the values its new RDN puts on the entry.
-            default => array_map(
-                static fn(Rdn $component): string => $component->getName(),
-                $write->entry->getDn()->getRdn()->getAll(),
-            ),
-        };
     }
 
     /**
