@@ -149,6 +149,33 @@ final class EquivalentValuesCheckTest extends TestCase
         );
     }
 
+    public function test_modify_leaves_an_attribute_with_a_linked_count_unchecked(): void
+    {
+        $write = SchemaWrite::modify(
+            $this->widgetEntry(new Attribute(
+                'widgetLabel',
+                'same',
+                'SAME',
+            )),
+            [
+                Change::add(new Attribute(
+                    'widgetLabel',
+                    'other',
+                )),
+            ],
+            false,
+            ['widgetlabel' => 2],
+        );
+
+        self::assertSame(
+            [],
+            $this->checkWidget(
+                self::never(),
+                $write,
+            ),
+        );
+    }
+
     /**
      * @return list<RuleViolation>
      */

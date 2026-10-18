@@ -43,10 +43,23 @@ final class TestServerOptions
      */
     public static function validatedCore(SchemaValidationMode $mode): ServerOptions
     {
+        return self::validated(
+            $mode,
+            SchemaResource::Core,
+        );
+    }
+
+    /**
+     * The given definitions enforced at the given mode, merged in order.
+     */
+    public static function validated(
+        SchemaValidationMode $mode,
+        SchemaSourceInterface ...$sources,
+    ): ServerOptions {
         return new ServerOptions(
             self::transientStorage(),
             schemaConfig: (new SchemaConfig())
-                ->setSources(SchemaResource::Core)
+                ->setSources(...$sources)
                 ->setValidationMode($mode),
         );
     }

@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Pdo;
 
 use FreeDSx\Ldap\Container;
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
@@ -30,6 +29,8 @@ final class EntryLinkWriterTest extends TestCase
 
     private const BOB = 'cn=Bob,dc=example,dc=com';
 
+    private const CAROL = 'cn=Carol,dc=example,dc=com';
+
     private EntryLinkWriter $subject;
 
     protected function setUp(): void
@@ -38,21 +39,33 @@ final class EntryLinkWriterTest extends TestCase
         $this->subject = $container->get(EntryLinkWriter::class);
 
         $container->get(LdapImporter::class)->importEntries([
-            new Entry(
-                new Dn(self::BASE),
-                new Attribute('dc', 'example'),
+            Entry::fromArray(
+                self::BASE,
+                ['dc' => ['example']],
             ),
-            new Entry(
-                new Dn(self::BOB),
-                new Attribute('objectClass', 'person'),
-                new Attribute('cn', 'Bob'),
-                new Attribute('sn', 'Bob'),
+            Entry::fromArray(
+                self::BOB,
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Bob'],
+                    'sn' => ['Bob'],
+                ],
             ),
-            new Entry(
-                new Dn(self::ADMINS),
-                new Attribute('objectClass', 'groupOfNames'),
-                new Attribute('cn', 'Admins'),
-                new Attribute('member', self::BOB),
+            Entry::fromArray(
+                self::CAROL,
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Carol'],
+                    'sn' => ['Carol'],
+                ],
+            ),
+            Entry::fromArray(
+                self::ADMINS,
+                [
+                    'objectClass' => ['groupOfNames'],
+                    'cn' => ['Admins'],
+                    'member' => [self::BOB, self::CAROL],
+                ],
             ),
         ]);
     }
@@ -84,7 +97,43 @@ final class EntryLinkWriterTest extends TestCase
             $this->subject->heldLinkValues(
                 new Dn(self::ADMINS),
                 'member',
-                ['cn=Carol,' . self::BASE],
+                ['cn=Dan,' . self::BASE],
+            ),
+        );
+    }
+
+    public function test_a_count_under_its_bound_is_every_value_linked(): void
+    {
+        self::assertSame(
+            2,
+            $this->subject->linkCount(
+                new Dn(self::ADMINS),
+                'member',
+                5,
+            ),
+        );
+    }
+
+    public function test_a_count_stops_at_its_bound(): void
+    {
+        self::assertSame(
+            1,
+            $this->subject->linkCount(
+                new Dn(self::ADMINS),
+                'member',
+                1,
+            ),
+        );
+    }
+
+    public function test_an_attribute_linking_nothing_counts_none(): void
+    {
+        self::assertSame(
+            0,
+            $this->subject->linkCount(
+                new Dn(self::ADMINS),
+                'seeAlso',
+                5,
             ),
         );
     }

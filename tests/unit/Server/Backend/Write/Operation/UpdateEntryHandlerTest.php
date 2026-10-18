@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
@@ -95,8 +96,14 @@ final class UpdateEntryHandlerTest extends TestCase
         $this->seedAdmins();
 
         $this->modifyAdmins(
-            new Change(Change::TYPE_ADD, 'member', self::ALICE),
-            new Change(Change::TYPE_DELETE, 'member', self::ALICE),
+            Change::add(
+                'member',
+                self::ALICE,
+            ),
+            Change::delete(
+                'member',
+                self::ALICE,
+            ),
         );
 
         self::assertSame(
@@ -110,8 +117,14 @@ final class UpdateEntryHandlerTest extends TestCase
         $this->seedAdmins(self::ALICE);
 
         $this->modifyAdmins(
-            new Change(Change::TYPE_DELETE, 'member', self::ALICE),
-            new Change(Change::TYPE_ADD, 'member', self::ALICE),
+            Change::delete(
+                'member',
+                self::ALICE,
+            ),
+            Change::add(
+                'member',
+                self::ALICE,
+            ),
         );
 
         self::assertEqualsCanonicalizing(
@@ -391,6 +404,89 @@ final class UpdateEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_a_linked_value_the_object_classes_do_not_permit_is_refused(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->modify(Change::add(
+            'member',
+            self::ALICE,
+        ));
+    }
+
+    public function test_a_linked_value_the_object_classes_do_not_permit_is_refused_when_a_control_reads_the_entry(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ALICE),
+                [
+                    Change::add(
+                        'member',
+                        self::ALICE,
+                    ),
+                ],
+            ),
+            $this->controlledContext(Controls::preRead('cn')),
+        );
+    }
+
+    public function test_a_user_adding_a_password_policy_pointer_is_refused(): void
+    {
+        $this->validatedGraph(
+            SchemaValidationMode::Strict,
+            SchemaResource::PasswordPolicy,
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->modify(Change::add(
+            'pwdPolicySubentry',
+            'dc=example,dc=com',
+        ));
+    }
+
+    public function test_a_system_write_adding_a_second_password_policy_pointer_is_refused(): void
+    {
+        $this->validatedGraph(
+            SchemaValidationMode::Strict,
+            SchemaResource::PasswordPolicy,
+        );
+        $this->storage->store(EntryFixture::withUuid(Entry::fromArray(
+            self::ALICE,
+            [
+                'objectClass' => ['top', 'person'],
+                'cn' => ['Alice'],
+                'sn' => ['Smith'],
+                'pwdPolicySubentry' => ['dc=example,dc=com'],
+            ],
+        )));
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ALICE),
+                [
+                    Change::add(
+                        'pwdPolicySubentry',
+                        self::ALICE,
+                    ),
+                ],
+            ),
+            $this->systemContext(),
+        );
+    }
+
     public function test_it_is_journaled(): void
     {
         $journal = $this->journaledGraph();
@@ -466,8 +562,10 @@ final class UpdateEntryHandlerTest extends TestCase
     /**
      * A validated fixture needs an entry the core schema actually accepts.
      */
-    private function validatedGraph(SchemaValidationMode $mode): void
-    {
+    private function validatedGraph(
+        SchemaValidationMode $mode,
+        SchemaResource ...$extra,
+    ): void {
         $this->writeGraph(
             EntryFixture::inMemoryStorage(
                 new Entry(
@@ -482,7 +580,11 @@ final class UpdateEntryHandlerTest extends TestCase
                     new Attribute('sn', 'Smith'),
                 ),
             ),
-            TestServerOptions::validatedCore($mode),
+            TestServerOptions::validated(
+                $mode,
+                SchemaResource::Core,
+                ...$extra,
+            ),
         );
     }
 

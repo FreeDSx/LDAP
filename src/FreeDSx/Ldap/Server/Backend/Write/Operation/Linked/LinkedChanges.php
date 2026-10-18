@@ -13,14 +13,17 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation\Linked;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 use function array_filter;
 use function array_values;
+use function strtolower;
 
 /**
  * Separates the linked values a modify changes from the changes its entry is still stored whole for.
@@ -47,6 +50,10 @@ final readonly class LinkedChanges
         $apart = [];
 
         foreach ($command->changes as $change) {
+            // Changed classes are held to every linked value the entry keeps, which only the whole entry carries.
+            if (self::changesObjectClass($change)) {
+                return [];
+            }
             if (!$this->linked->links($change->getAttribute())) {
                 continue;
             }
@@ -83,6 +90,12 @@ final readonly class LinkedChanges
             )),
             $command->systemChanges,
         );
+    }
+
+    private static function changesObjectClass(Change $change): bool
+    {
+        return Attribute::normalizeName($change->getAttribute()->getName())
+            === strtolower(AttributeTypeOid::NAME_OBJECT_CLASS);
     }
 
     /**

@@ -70,4 +70,11 @@ interface PdoLinkReadDialectInterface
      * Parameters: [owner lc_dn, attr_name_lower]
      */
     public function queryAnyLinkValue(): string;
+
+    /**
+     * How many DNs an owner links under an attribute, counted no further than the bound.
+     *
+     * Parameters: [owner lc_dn, attr_name_lower, bound]
+     */
+    public function queryLinkCount(): string;
 }

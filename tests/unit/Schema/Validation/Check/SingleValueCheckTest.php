@@ -45,7 +45,7 @@ final class SingleValueCheckTest extends TestCase
                 new RuleViolation(
                     SchemaRule::SingleValue,
                     ResultCode::CONSTRAINT_VIOLATION,
-                    'Attribute "employeeNumber" is single-valued but has 2 values.',
+                    'Attribute "employeeNumber" is single-valued but has more than one value.',
                 ),
             ],
             $this->check($this->inetOrgPersonWith(new Attribute('employeeNumber', '001', '002'))),
@@ -57,6 +57,64 @@ final class SingleValueCheckTest extends TestCase
         self::assertSame(
             [],
             $this->check($this->inetOrgPersonWith(new Attribute('employeeNumber', '001'))),
+        );
+    }
+
+    public function test_a_linked_count_of_more_than_one_breaks_a_single_valued_attribute(): void
+    {
+        self::assertEquals(
+            [
+                new RuleViolation(
+                    SchemaRule::SingleValue,
+                    ResultCode::CONSTRAINT_VIOLATION,
+                    'Attribute "employeeNumber" is single-valued but has more than one value.',
+                ),
+            ],
+            $this->checkWithLinkedCounts(
+                $this->inetOrgPersonWith(new Attribute(
+                    'description',
+                    'linked elsewhere',
+                )),
+                ['employeenumber' => 2],
+            ),
+        );
+    }
+
+    public function test_a_linked_count_stands_in_for_the_values_the_entry_carries(): void
+    {
+        self::assertSame(
+            [],
+            $this->checkWithLinkedCounts(
+                $this->inetOrgPersonWith(new Attribute(
+                    'employeeNumber',
+                    '001',
+                    '002',
+                )),
+                ['employeenumber' => 1],
+            ),
+        );
+    }
+
+    /**
+     * @param array<string, int> $linkedCounts
+     *
+     * @return list<RuleViolation>
+     */
+    private function checkWithLinkedCounts(
+        Entry $entry,
+        array $linkedCounts,
+    ): array {
+        return $this->subject->check(
+            SchemaWrite::modify(
+                $entry,
+                [],
+                false,
+                $linkedCounts,
+            ),
+            ObjectClassChain::forEntry(
+                $this->schema,
+                $entry,
+            ),
         );
     }
 

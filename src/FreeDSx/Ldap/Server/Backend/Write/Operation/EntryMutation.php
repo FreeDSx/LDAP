@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHan
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\SettledLinks;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -36,18 +37,23 @@ readonly class EntryMutation
     ) {}
 
     /**
+     * @param SettledLinks $links Linked changes the command no longer carries, held to the schema with it.
+     *
      * @throws OperationException
      */
     public function forUpdate(
         Entry $entry,
         UpdateCommand $command,
         WriteContext $context,
+        SettledLinks $links = new SettledLinks(),
     ): Entry {
         $updated = $this->entryHandler->apply($entry, $command);
         $this->schemaGate->assertModifyAllowed(
             $command,
             $updated,
             $context,
+            $links->changes,
+            $links->counts,
         );
         $this->operationalAttrs->applyForModify(
             $updated,
