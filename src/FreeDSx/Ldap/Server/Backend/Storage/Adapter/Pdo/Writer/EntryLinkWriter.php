@@ -172,14 +172,17 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
             return [];
         }
         $held = [];
-        $params = [
-            $owner->normalizedString(),
-            Attribute::normalizeName($attribute),
-            ...array_keys($asked),
-        ];
 
-        foreach ($this->rowsOf($this->dialect->queryHeldLinkValues(count($asked)), $params) as $row) {
-            $held[] = $asked[$this->stringColumn($row['lc_dn'] ?? null)] ?? null;
+        foreach (array_chunk(array_keys($asked), self::DNS_PER_STATEMENT) as $chunk) {
+            $params = [
+                $owner->normalizedString(),
+                Attribute::normalizeName($attribute),
+                ...$chunk,
+            ];
+
+            foreach ($this->rowsOf($this->dialect->queryHeldLinkValues(count($chunk)), $params) as $row) {
+                $held[] = $asked[$this->stringColumn($row['lc_dn'] ?? null)] ?? null;
+            }
         }
 
         return array_values(array_filter($held));

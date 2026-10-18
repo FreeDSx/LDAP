@@ -439,6 +439,28 @@ final class InMemoryStorage implements
     }
 
     /**
+     * @param array<string> $held
+     * @param list<string> $removed
+     *
+     * @return list<string>
+     */
+    private static function withoutLinkValues(
+        array $held,
+        array $removed,
+    ): array {
+        $gone = [];
+
+        foreach ($removed as $value) {
+            $gone[Dn::normalizedOrNull($value) ?? $value] = true;
+        }
+
+        return array_values(array_filter(
+            $held,
+            static fn(string $value): bool => !isset($gone[Dn::normalizedOrNull($value) ?? $value]),
+        ));
+    }
+
+    /**
      * The entry carrying the linked values the one it replaces held.
      */
     private function withStoredLinks(
@@ -479,7 +501,7 @@ final class InMemoryStorage implements
 
         foreach ($links->names() as $name) {
             $values = array_merge(
-                array_diff(
+                self::withoutLinkValues(
                     $previous?->get($name, true)?->getValues() ?? [],
                     $links->removed($name),
                 ),

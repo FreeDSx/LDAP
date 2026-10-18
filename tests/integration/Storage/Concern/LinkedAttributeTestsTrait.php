@@ -67,6 +67,24 @@ trait LinkedAttributeTestsTrait
         );
     }
 
+    public function testDeletingAMemberInAnotherSpellingRemovesIt(): void
+    {
+        $group = $this->seedGroup(
+            'link-delete-spelling',
+            self::LINKED_ADMIN,
+        );
+
+        $this->ldapClient()->send(Operations::modify(
+            $group,
+            Change::delete('member', 'CN=User, DC=foo, DC=bar'),
+        ));
+
+        self::assertSame(
+            [self::LINKED_ADMIN],
+            $this->membersOf($group),
+        );
+    }
+
     public function testReplacingTheMembersWritesThemWhole(): void
     {
         $group = $this->seedGroup('link-replace');

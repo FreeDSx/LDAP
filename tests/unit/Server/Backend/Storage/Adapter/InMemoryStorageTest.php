@@ -144,6 +144,26 @@ final class InMemoryStorageTest extends TestCase
         );
     }
 
+    public function test_a_delta_removes_a_member_named_in_another_spelling(): void
+    {
+        $this->subject->store(EntryFixture::withUuid(Entry::fromArray(
+            'cn=admins,dc=ex,dc=com',
+            ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com', 'cn=carol,dc=ex,dc=com']],
+        )));
+
+        $this->subject->store(
+            EntryFixture::withUuid(Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']])),
+            links: new LinkDelta(removed: ['member' => ['CN=Bob, DC=ex, DC=com']]),
+        );
+
+        self::assertSame(
+            ['cn=carol,dc=ex,dc=com'],
+            $this->subject->find(new Dn('cn=admins,dc=ex,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
     public function test_a_delta_emptying_an_attribute_drops_it(): void
     {
         $this->subject->store(EntryFixture::withUuid(Entry::fromArray(
