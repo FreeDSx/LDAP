@@ -151,6 +151,7 @@ class LdapQueue extends Asn1MessageQueue
      * {@inheritDoc}
      *
      * @throws RequestSizeExceededException
+     * @throws ProtocolException
      */
     protected function decode(string $bytes): Message
     {
@@ -158,6 +159,11 @@ class LdapQueue extends Asn1MessageQueue
             $message = parent::decode($bytes);
         } catch (PduLengthException $e) {
             throw new RequestSizeExceededException(
+                $e->getMessage(),
+                previous: $e,
+            );
+        } catch (EncoderException $e) {
+            throw new ProtocolException(
                 $e->getMessage(),
                 previous: $e,
             );

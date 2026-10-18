@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Queue;
 
+use Closure;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Asn1\Exception\PduDepthException;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
@@ -30,6 +32,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
@@ -39,6 +42,7 @@ use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
@@ -724,6 +728,46 @@ final class ServerQueueTest extends TestCase
         $this->expectException(RequestSizeExceededException::class);
 
         $queue->getMessage();
+    }
+
+    /**
+     * @return iterable<string, array{Closure(ServerQueue): mixed}>
+     */
+    public static function requestReadProvider(): iterable
+    {
+        yield 'a read' => [static fn(ServerQueue $queue): mixed => $queue->getMessage()];
+        yield 'a peek' => [static fn(ServerQueue $queue): mixed => $queue->peekForCancelSignal(2)];
+    }
+
+    /**
+     * @param Closure(ServerQueue): mixed $read
+     */
+    #[DataProvider('requestReadProvider')]
+    public function test_a_request_nested_past_the_decode_depth_limit_is_a_protocol_failure(Closure $read): void
+    {
+        $nested = Asn1::null();
+        for ($i = 0; $i < 20; $i++) {
+            $nested = Asn1::sequence($nested);
+        }
+        $encoder = new LdapEncoder();
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn($encoder->encode(Asn1::sequence(
+            Asn1::integer(1),
+            $nested,
+        )));
+
+        try {
+            $read(new ServerQueue(
+                $socket,
+                $encoder,
+            ));
+            self::fail('The deeply nested request should have been refused.');
+        } catch (ProtocolException $e) {
+            self::assertInstanceOf(
+                PduDepthException::class,
+                $e->getPrevious(),
+            );
+        }
     }
 
     public function test_it_should_decode_a_request_within_the_max_receive_size(): void

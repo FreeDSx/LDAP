@@ -100,7 +100,7 @@ class ClientQueue extends LdapQueue
      * Decodes search result entries directly from BER, and anything else through the ASN.1 type graph.
      *
      * @throws PartialMessageException
-     * @throws EncoderException
+     * @throws ProtocolException
      */
     protected function decode(string $bytes): Message
     {

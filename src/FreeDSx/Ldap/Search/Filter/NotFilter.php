@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\FilterDepthExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
@@ -82,12 +83,16 @@ class NotFilter implements FilterInterface, Stringable
      * {@inheritDoc}
      *
      * @param AbstractType<mixed> $type
+     * @param int $depth How many AND, OR, or NOT filters enclose this one.
      * @throws ProtocolException
      * @throws EncoderException
+     * @throws FilterDepthExceededException
      * @throws RuntimeException
      */
-    public static function fromAsn1(AbstractType $type): static
-    {
+    public static function fromAsn1(
+        AbstractType $type,
+        int $depth = 0,
+    ): static {
         $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && count($type) === 1)) {
             throw new ProtocolException('The not filter is malformed');
@@ -97,6 +102,9 @@ class NotFilter implements FilterInterface, Stringable
             throw new ProtocolException('The "not" filter is malformed.');
         }
 
-        return new static(FilterFactory::get($child));
+        return new static(FilterFactory::get(
+            $child,
+            $depth + 1,
+        ));
     }
 }

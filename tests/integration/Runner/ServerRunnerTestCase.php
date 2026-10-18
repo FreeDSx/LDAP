@@ -13,17 +13,22 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\NestedSequenceRequest;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 use function extension_loaded;
@@ -93,6 +98,70 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         } finally {
             $queue->close();
         }
+    }
+
+    public function testASearchFilterNestedPastTheLimitIsRefusedAsUnwillingToPerformAndTheSessionContinues(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(self::filterNestedWithin(FilterFactory::MAX_NESTING_DEPTH + 1))->base('dc=foo,dc=bar'),
+            );
+            self::fail('The deeply nested filter should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNWILLING_TO_PERFORM,
+                $e->getCode(),
+            );
+        }
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(self::filterNestedWithin(FilterFactory::MAX_NESTING_DEPTH))->base('dc=foo,dc=bar'),
+        );
+        self::assertGreaterThan(
+            0,
+            $entries->count(),
+        );
+    }
+
+    public function testAnAssertionFilterNestedPastTheLimitIsRefusedAsUnwillingToPerform(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $this->ldapClient()->compare(
+            'cn=user,dc=foo,dc=bar',
+            'cn',
+            'user',
+            Controls::assertion(self::filterNestedWithin(FilterFactory::MAX_NESTING_DEPTH + 1)),
+        );
+    }
+
+    public function testARequestNestedPastTheDecodeDepthLimitEndsTheSessionWithAProtocolError(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new NestedSequenceRequest(20),
+        ));
+
+        try {
+            $queue->getMessage();
+            self::fail('The connection ended without a notice of disconnection.');
+        } catch (UnsolicitedNotificationException $e) {
+            self::assertTrue($e->isNoticeOfDisconnection());
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        } finally {
+            $queue->close();
+        }
+
+        self::assertTrue($this->bindsUser($this->buildClient('tcp')));
     }
 
     public function testTheConnectionLimitHoldsAcrossTheWholeServer(): void
@@ -249,6 +318,16 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         return true;
+    }
+
+    private static function filterNestedWithin(int $depth): FilterInterface
+    {
+        $filter = Filters::present('objectClass');
+        for ($i = 0; $i < $depth; $i++) {
+            $filter = Filters::not($filter);
+        }
+
+        return $filter;
     }
 
     /**

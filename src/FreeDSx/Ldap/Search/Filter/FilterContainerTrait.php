@@ -20,6 +20,7 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetOfType;
 use FreeDSx\Asn1\Type\SetType;
+use FreeDSx\Ldap\Exception\FilterDepthExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -142,11 +143,15 @@ trait FilterContainerTrait
      * @api
      *
      * @param AbstractType<mixed> $type
+     * @param int $depth How many AND, OR, or NOT filters enclose this one.
      * @throws EncoderException
+     * @throws FilterDepthExceededException
      * @throws ProtocolException
      */
-    public static function fromAsn1(AbstractType $type): self
-    {
+    public static function fromAsn1(
+        AbstractType $type,
+        int $depth = 0,
+    ): self {
         if ($type instanceof IncompleteType) {
             $type = (new LdapEncoder())->complete(
                 type: $type,
@@ -160,7 +165,10 @@ trait FilterContainerTrait
 
         $filters = [];
         foreach ($type->getChildren() as $child) {
-            $filters[] = FilterFactory::get($child);
+            $filters[] = FilterFactory::get(
+                $child,
+                $depth + 1,
+            );
         }
 
         return new self(...$filters);
