@@ -847,6 +847,40 @@ trait FilterEvaluationTestsTrait
             ),
             1,
         ];
+        yield 'objectClass matches a descriptor spelled in another case' => [
+            Filters::equal(
+                'objectClass',
+                'GROUPOFNAMES',
+            ),
+            3,
+        ];
+        yield 'a negated objectClass descriptor leaves the rest' => [
+            Filters::not(Filters::equal(
+                'objectClass',
+                'groupOfNames',
+            )),
+            5,
+        ];
+        yield 'an objectClass alternative beside its own negation matches every entry' => [
+            Filters::or(
+                Filters::equal(
+                    'objectClass',
+                    'groupOfNames',
+                ),
+                Filters::not(Filters::equal(
+                    'objectClass',
+                    '2.5.6.9',
+                )),
+            ),
+            8,
+        ];
+        yield 'an objectClass item asserting an option no value carries matches nothing' => [
+            Filters::equal(
+                'objectClass;x-option',
+                'groupOfNames',
+            ),
+            0,
+        ];
 
         // RFC 4517 4.2.26: a descriptor the schema does not define makes the item Undefined, not merely unmatched.
         yield 'an unknown objectClass descriptor matches nothing' => [

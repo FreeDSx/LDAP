@@ -1003,7 +1003,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         yield 'option-bearing equality' => [new EqualityFilter('cn;lang-en', 'alice')];
         yield 'non-ascii equality' => [new EqualityFilter('cn', 'Café')];
-        yield 'oid spellings' => [new EqualityFilter('objectClass', 'top')];
+        yield 'option-bearing oid spellings' => [new EqualityFilter('objectClass;x-option', 'top')];
         yield 'option-bearing presence' => [new PresentFilter('cn;lang-en')];
         yield 'contains with no substring index' => [(new SubstringFilter('cn'))->setContains('zzz')];
     }
@@ -1016,6 +1016,32 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         self::assertFalse($this->subject->translate($filter)?->isExact);
         self::assertNull($this->subject->translate(new NotFilter($filter)));
+    }
+
+    public function test_equality_on_an_object_identifier_is_exact_however_it_is_spelled(): void
+    {
+        foreach (['top', 'TOP', '2.5.6.0'] as $value) {
+            $result = $this->subject->translate(new EqualityFilter(
+                'objectClass',
+                $value,
+            ));
+
+            self::assertTrue(
+                $result?->isExact,
+                $value,
+            );
+        }
+    }
+
+    public function test_a_negated_object_identifier_equality_is_translatable(): void
+    {
+        $result = $this->subject->translate(new NotFilter(new EqualityFilter(
+            'objectClass',
+            'top',
+        )));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
     }
 
     public function test_matching_rule_filter_always_returns_null(): void

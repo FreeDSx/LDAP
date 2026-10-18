@@ -362,8 +362,7 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
         $value = $filter->getValue();
 
-        // One object identifier has several spellings, so every one of them has to be offered to the index. Which
-        // of them the stored value uses is left to the evaluator.
+        // One object identifier has several spellings, and every one of them is offered to the index.
         $spellings = $this->attributeContext->oidSpellings(
             $filter->getAttribute(),
             $value,
@@ -382,7 +381,9 @@ trait SqlFilterTranslatorTrait
                     fn(string $spelling): string => $this->prepareMatchValue($spelling),
                     $spellings,
                 ),
-                isExact: false,
+                // Exact for stored values in the OID syntax, which is every value validation lets through.
+                isExact: !$this->attributeHasOption($filter->getAttribute())
+                    && $this->spellingsIndexWhole($spellings),
                 sidecarCondition: $this->sidecarCondition(
                     $attribute,
                     $condition,
@@ -655,6 +656,22 @@ trait SqlFilterTranslatorTrait
         }
 
         return $fragments;
+    }
+
+    /**
+     * Whether every spelling is indexed whole, so matching one of them is matching the identifier.
+     *
+     * @param list<string> $spellings
+     */
+    private function spellingsIndexWhole(array $spellings): bool
+    {
+        foreach ($spellings as $spelling) {
+            if (!$this->isExactEquality($spelling)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isExactEquality(string $value): bool

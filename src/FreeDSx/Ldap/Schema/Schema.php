@@ -357,7 +357,7 @@ final class Schema
     }
 
     /**
-     * Every spelling of one object identifier, so a store comparing text can still be asked about it.
+     * Every spelling that resolves to one object identifier, so a store comparing text can still be asked about it.
      *
      * @return list<string>|null null when nothing here defines the value
      */
@@ -372,10 +372,11 @@ final class Schema
             return null;
         }
 
-        return array_values(array_unique([
-            $oid,
-            ...($names ?? []),
-        ]));
+        // A name that another kind of definition claims first resolves elsewhere and is left out.
+        return array_values(array_unique(array_filter(
+            [$oid, ...($names ?? [])],
+            fn(string $spelling): bool => $this->oidFor($spelling) === $oid,
+        )));
     }
 
     /**
