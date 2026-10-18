@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
+namespace FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeDelete;
 
 /**
  * What one transaction of a subtree delete removed, and what it left for a later one.

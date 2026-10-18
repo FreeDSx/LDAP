@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation\Linked;
 
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
-use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChangeReplay;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChangeReplay;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
