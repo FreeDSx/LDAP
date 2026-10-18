@@ -17,6 +17,7 @@ use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
 use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerMode;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
 use Throwable;
 
@@ -42,7 +43,7 @@ final class MultiDriverCoordinator
         Config $childConfig,
         OutputInterface $progress,
     ): StatsSnapshot {
-        if ($childConfig->serverMode !== 'external') {
+        if ($childConfig->server->mode !== ServerMode::External) {
             throw new RuntimeException(
                 'MultiDriverCoordinator requires the child config to use serverMode=external; '
                 . 'the parent must own the server lifecycle.',
@@ -79,13 +80,13 @@ final class MultiDriverCoordinator
     private function startChild(Config $config): Process
     {
         $command = [PHP_BINARY];
-        if ($config->jit) {
+        if ($config->run->jit) {
             $command[] = '-dopcache.enable_cli=1';
             $command[] = '-dopcache.jit_buffer_size=128M';
             $command[] = '-dopcache.jit=function';
         }
         $command[] = self::WORKER_PATH;
-        if (!$config->jit) {
+        if (!$config->run->jit) {
             $command[] = '--no-jit';
         }
 
@@ -168,38 +169,13 @@ final class MultiDriverCoordinator
     }
 
     /**
-     * Derives a per-child Config. RNG seed is offset per child so reproducibility is
-     * preserved while children don't all hammer the same DNs in lockstep.
+     * The base config with its run seeded and numbered apart from the other children.
      */
-    private function configForChild(Config $base, int $childIndex): Config
-    {
-        $seed = $base->rngSeed !== null
-            ? $base->rngSeed + $childIndex
-            : null;
-
-        return new Config(
-            backend: $base->backend,
-            runner: $base->runner,
-            clients: $base->clients,
-            duration: $base->duration,
-            ops: $base->ops,
-            mix: $base->mix,
-            host: $base->host,
-            port: $base->port,
-            warmup: $base->warmup,
-            serverMode: $base->serverMode,
-            rngSeed: $seed,
-            output: $base->output,
-            seedEntries: $base->seedEntries,
-            bindDn: $base->bindDn,
-            bindPassword: $base->bindPassword,
-            baseDn: $base->baseDn,
-            writeBase: $base->writeBase,
-            jit: $base->jit,
-            searchSizeLimit: $base->searchSizeLimit,
-            searchValue: $base->searchValue,
-            workerIdOffset: $childIndex * $base->clients,
-        );
+    private function configForChild(
+        Config $base,
+        int $childIndex,
+    ): Config {
+        return $base->withRun($base->run->forChild($childIndex));
     }
 
     /**

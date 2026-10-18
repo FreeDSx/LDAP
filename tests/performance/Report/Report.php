@@ -16,6 +16,7 @@ namespace Tests\Performance\FreeDSx\Ldap\Report;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Performance\FreeDSx\Ldap\Config\OutputFormat;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
 use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 
@@ -47,7 +48,7 @@ final class Report
 
     public function render(OutputInterface $output): void
     {
-        if ($this->config->output === 'json') {
+        if ($this->config->output === OutputFormat::Json) {
             $output->writeln($this->renderJson());
 
             return;
@@ -100,9 +101,10 @@ final class Report
 
     private function renderBanner(): string
     {
-        $duration = $this->config->duration !== null
-            ? sprintf('%ds', $this->config->duration)
-            : sprintf('%d ops/client', $this->config->ops);
+        $run = $this->config->run;
+        $duration = $run->duration !== null
+            ? sprintf('%ds', $run->duration)
+            : sprintf('%d ops/client', $run->ops);
 
         $title = $this->subject ?? 'FreeDSx LDAP load test';
 
@@ -115,18 +117,18 @@ final class Report
         $lines[] = $this->external
             ? sprintf(
                 'Clients: %d   Duration: %s   Warmup: %ds   Elapsed: %.1fs',
-                $this->config->clients,
+                $run->clients,
                 $duration,
-                $this->config->warmup,
+                $run->warmup,
                 $this->snapshot->elapsedSeconds,
             )
             : sprintf(
                 'Backend: %s (%s runner)   Clients: %d   Duration: %s   Warmup: %ds   Elapsed: %.1fs',
-                $this->config->backend,
-                $this->config->runner,
-                $this->config->clients,
+                $this->config->server->backend->value,
+                $this->config->server->runner->value,
+                $run->clients,
                 $duration,
-                $this->config->warmup,
+                $run->warmup,
                 $this->snapshot->elapsedSeconds,
             );
 
@@ -213,15 +215,15 @@ final class Report
 
         return json_encode([
             'config' => [
-                'backend' => $this->config->backend,
-                'runner' => $this->config->runner,
-                'clients' => $this->config->clients,
-                'duration' => $this->config->duration,
-                'ops' => $this->config->ops,
-                'warmup' => $this->config->warmup,
+                'backend' => $this->config->server->backend->value,
+                'runner' => $this->config->server->runner->value,
+                'clients' => $this->config->run->clients,
+                'duration' => $this->config->run->duration,
+                'ops' => $this->config->run->ops,
+                'warmup' => $this->config->run->warmup,
                 'mix' => $this->mix->weights(),
-                'host' => $this->config->host,
-                'port' => $this->config->port,
+                'host' => $this->config->server->host,
+                'port' => $this->config->server->port,
             ],
             'elapsed_seconds' => $this->snapshot->elapsedSeconds,
             'operations' => $ops,

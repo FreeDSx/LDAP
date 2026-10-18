@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerMode;
 use Tests\Performance\FreeDSx\Ldap\Driver;
 
 require __DIR__ . '/bench_bootstrap.php';
@@ -28,7 +29,7 @@ if ($payload === false || $payload === '') {
 }
 
 $config = @unserialize($payload, [
-    'allowed_classes' => [Config::class],
+    'allowed_classes' => Config::serializedClasses(),
 ]);
 
 if (!$config instanceof Config) {
@@ -37,7 +38,7 @@ if (!$config instanceof Config) {
     exit(2);
 }
 
-if ($config->serverMode !== 'external') {
+if ($config->server->mode !== ServerMode::External) {
     fwrite(STDERR, "bench-driver-worker: child Config must use serverMode=external\n");
 
     exit(2);

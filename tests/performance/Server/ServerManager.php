@@ -46,29 +46,32 @@ final class ServerManager
             throw new RuntimeException('ServerManager::start() called twice.');
         }
 
+        $server = $this->config->server;
+        $seed = $this->config->seed;
         $command = ['php', '-dpcov.enabled=0', '-dmemory_limit=-1'];
-        if ($this->config->jit) {
+        if ($this->config->run->jit) {
             $command[] = '-dopcache.enable_cli=1';
             $command[] = '-dopcache.jit_buffer_size=128M';
             $command[] = '-dopcache.jit=function';
         }
         $command[] = self::BOOTSTRAP_PATH;
         $command[] = '--transport=tcp';
-        $command[] = '--storage=' . $this->config->backend;
-        $command[] = '--runner=' . $this->config->runner;
-        $command[] = '--swoole-workers=' . $this->config->swooleWorkers;
-        $command[] = '--port=' . $this->config->port;
-        $command[] = '--seed-entries=' . $this->config->seedEntries;
-        $command[] = '--seed-attributes=' . $this->config->seedAttributes;
-        $command[] = '--seed-groups=' . $this->config->seedGroups;
-        $command[] = '--seed-group-size=' . $this->config->seedGroupSize;
-        $command[] = '--max-search-lookthrough=' . $this->config->maxSearchLookthrough;
+        $command[] = '--storage=' . $server->backend->value;
+        $command[] = '--runner=' . $server->runner->value;
+        $command[] = '--swoole-workers=' . $server->swooleWorkers;
+        $command[] = '--port=' . $server->port;
+        $command[] = '--seed-entries=' . $seed->entries;
+        $command[] = '--seed-attributes=' . $seed->attributes;
+        $command[] = '--seed-profile=' . $seed->profile->value;
+        $command[] = '--seed-groups=' . $seed->groups;
+        $command[] = '--seed-group-size=' . $seed->groupSize;
+        $command[] = '--max-search-lookthrough=' . $server->maxSearchLookthrough;
 
-        if ($this->config->monitor) {
+        if ($server->monitor) {
             $command[] = '--monitor';
         }
 
-        if ($this->config->journal) {
+        if ($server->journal) {
             $command[] = '--journal';
         }
 
@@ -119,7 +122,7 @@ final class ServerManager
 
     private function readyDeadlineSeconds(): int
     {
-        return $this->maxWaitSeconds + (int) ceil($this->config->seedEntries / 100);
+        return $this->maxWaitSeconds + (int) ceil($this->config->seed->entries / 100);
     }
 
     /**

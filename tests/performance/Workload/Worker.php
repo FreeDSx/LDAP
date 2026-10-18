@@ -94,19 +94,19 @@ final class Worker
         private readonly StatsCollector $stats,
         private readonly ?int $opsCap,
     ) {
-        $this->compareDn = 'cn=alice,' . $this->config->writeBase;
-        $this->mailDomain = $this->deriveMailDomain($this->config->baseDn);
-        $this->groupDn = $this->config->seedGroups > 0
+        $this->compareDn = 'cn=alice,' . $this->config->directory->writeBase;
+        $this->mailDomain = $this->deriveMailDomain($this->config->directory->baseDn);
+        $this->groupDn = $this->config->seed->groups > 0
             ? sprintf(
                 'cn=load-group-%d,%s',
-                $this->workerId % $this->config->seedGroups,
-                $this->config->writeBase,
+                $this->workerId % $this->config->seed->groups,
+                $this->config->directory->writeBase,
             )
             : '';
         $this->spareMembers = $this->buildSpareMembers();
         $this->fixedReadDns = [
-            $this->config->baseDn,
-            $this->config->writeBase,
+            $this->config->directory->baseDn,
+            $this->config->directory->writeBase,
             $this->compareDn,
         ];
     }
@@ -118,8 +118,8 @@ final class Worker
     {
         $client = $this->buildClient();
         $client->bind(
-            $this->config->bindDn,
-            $this->config->bindPassword,
+            $this->config->directory->bindDn,
+            $this->config->directory->bindPassword,
         );
 
         return $client;
@@ -270,8 +270,8 @@ final class Worker
     private function doBind(LdapClient $client): int
     {
         $client->bind(
-            $this->config->bindDn,
-            $this->config->bindPassword,
+            $this->config->directory->bindDn,
+            $this->config->directory->bindPassword,
         );
 
         return 0;
@@ -289,7 +289,7 @@ final class Worker
     private function doSearchEq(LdapClient $client): int
     {
         $request = $this->newSearch($this->randomEqualityFilter())
-            ->base($this->config->baseDn)
+            ->base($this->config->directory->baseDn)
             ->useSubtreeScope();
 
         return count($client->search($request));
@@ -298,7 +298,7 @@ final class Worker
     private function doSearchSub(LdapClient $client): int
     {
         $request = $this->newSearch($this->searchValueFilter())
-            ->base($this->config->baseDn)
+            ->base($this->config->directory->baseDn)
             ->useSubtreeScope();
         $this->applySearchSizeLimit($request);
 
@@ -308,7 +308,7 @@ final class Worker
     private function doSearchList(LdapClient $client): int
     {
         $request = $this->newSearch(Filters::equal('objectClass', 'inetOrgPerson'))
-            ->base($this->config->writeBase)
+            ->base($this->config->directory->writeBase)
             ->useSingleLevelScope();
         $this->applySearchSizeLimit($request);
 
@@ -320,53 +320,53 @@ final class Worker
      */
     private function applySearchSizeLimit(SearchRequest $request): void
     {
-        if ($this->config->searchSizeLimit > 0) {
-            $request->sizeLimit($this->config->searchSizeLimit);
+        if ($this->config->search->sizeLimit > 0) {
+            $request->sizeLimit($this->config->search->sizeLimit);
         }
     }
 
     private function searchValueFilter(): FilterInterface
     {
-        return $this->config->seedEntries > 0
-            ? Filters::startsWith('cn', $this->config->searchValue)
+        return $this->config->seed->entries > 0
+            ? Filters::startsWith('cn', $this->config->search->value)
             : Filters::present('cn');
     }
 
     private function doSearchSubstr(LdapClient $client): int
     {
-        $filter = $this->config->seedEntries >= 100
-            ? Filters::contains('cn', (string) mt_rand(100, $this->config->seedEntries))
+        $filter = $this->config->seed->entries >= 100
+            ? Filters::contains('cn', (string) mt_rand(100, $this->config->seed->entries))
             : Filters::contains('cn', 'eed');
 
         return count($client->search(
             $this->newSearch($filter)
-                ->base($this->config->baseDn)
+                ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
         ));
     }
 
     private function doSearchSuffix(LdapClient $client): int
     {
-        $filter = $this->config->seedEntries > 0
+        $filter = $this->config->seed->entries > 0
             ? Filters::endsWith('cn', "d-{$this->randomSeedIdx()}")
             : Filters::endsWith('cn', 'e');
 
         return count($client->search(
             $this->newSearch($filter)
-                ->base($this->config->baseDn)
+                ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
         ));
     }
 
     private function doSearchRange(LdapClient $client): int
     {
-        $threshold = $this->config->seedEntries > 0
-            ? 1000 + max(1, $this->config->seedEntries - 99)
+        $threshold = $this->config->seed->entries > 0
+            ? 1000 + max(1, $this->config->seed->entries - 99)
             : 1000;
 
         return count($client->search(
             $this->newSearch(Filters::greaterThanOrEqual('uidNumber', (string) $threshold))
-                ->base($this->config->baseDn)
+                ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
         ));
     }
@@ -383,7 +383,7 @@ final class Worker
 
         return count($client->search(
             $this->newSearch($filter)
-                ->base($this->config->baseDn)
+                ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
         ));
     }
@@ -400,7 +400,7 @@ final class Worker
 
         return count($client->search(
             $this->newSearch($filter)
-                ->base($this->config->baseDn)
+                ->base($this->config->directory->baseDn)
                 ->useSubtreeScope(),
         ));
     }
@@ -411,11 +411,11 @@ final class Worker
     private function doSearchSort(LdapClient $client): int
     {
         $request = $this->newSearch($this->searchValueFilter())
-            ->base($this->config->baseDn)
+            ->base($this->config->directory->baseDn)
             ->useSubtreeScope();
 
-        if ($this->config->searchSortSizeLimit > 0) {
-            $request->sizeLimit($this->config->searchSortSizeLimit);
+        if ($this->config->search->sortSizeLimit > 0) {
+            $request->sizeLimit($this->config->search->sortSizeLimit);
         }
 
         return count($client->search(
@@ -433,10 +433,10 @@ final class Worker
         if ($this->paging === null || !$this->paging->hasEntries()) {
             $this->paging = $client->paging(
                 $this->newSearch($this->searchValueFilter())
-                    ->base($this->config->baseDn)
+                    ->base($this->config->directory->baseDn)
                     ->useSubtreeScope(),
-                $this->config->searchSizeLimit > 0
-                    ? $this->config->searchSizeLimit
+                $this->config->search->sizeLimit > 0
+                    ? $this->config->search->sizeLimit
                     : null,
             );
         }
@@ -457,7 +457,7 @@ final class Worker
     private function newSearch(FilterInterface $filter): SearchRequest
     {
         $request = Operations::search($filter);
-        $attributes = $this->config->searchAttributes;
+        $attributes = $this->config->search->attributes;
 
         if ($attributes !== null && strcasecmp($attributes, 'ALL') !== 0) {
             $request->select(...array_map(
@@ -469,7 +469,7 @@ final class Worker
             ));
         }
 
-        if ($this->config->attributesOnly) {
+        if ($this->config->search->attributesOnly) {
             $request->setAttributesOnly(true);
         }
 
@@ -480,16 +480,16 @@ final class Worker
     {
         return mt_rand(
             1,
-            $this->config->seedEntries,
+            $this->config->seed->entries,
         );
     }
 
     private function randomReadDn(): string
     {
-        if ($this->config->seedEntries > 0 && mt_rand(1, 100) <= 80) {
-            $idx = mt_rand(1, $this->config->seedEntries);
+        if ($this->config->seed->entries > 0 && mt_rand(1, 100) <= 80) {
+            $idx = mt_rand(1, $this->config->seed->entries);
 
-            return "cn=seed-{$idx}," . $this->config->writeBase;
+            return "cn=seed-{$idx}," . $this->config->directory->writeBase;
         }
 
         return $this->fixedReadDns[array_rand($this->fixedReadDns)];
@@ -497,8 +497,8 @@ final class Worker
 
     private function randomEqualityFilter(): FilterInterface
     {
-        if ($this->config->seedEntries > 0 && mt_rand(1, 100) <= 80) {
-            $idx = mt_rand(1, $this->config->seedEntries);
+        if ($this->config->seed->entries > 0 && mt_rand(1, 100) <= 80) {
+            $idx = mt_rand(1, $this->config->seed->entries);
 
             return mt_rand(0, 1) === 0
                 ? Filters::equal('cn', "seed-{$idx}")
@@ -521,7 +521,7 @@ final class Worker
     {
         $seq = ++$this->addSeq;
         $cn = "load-w{$this->workerId}-{$seq}";
-        $dn = "cn={$cn}," . $this->config->writeBase;
+        $dn = "cn={$cn}," . $this->config->directory->writeBase;
 
         $client->create(new Entry(
             $dn,
@@ -613,7 +613,7 @@ final class Worker
                     Filters::equal('memberOf', $this->groupDn),
                     SearchRequest::ATTRIBUTES_NONE,
                 )
-                    ->base($this->config->baseDn)
+                    ->base($this->config->directory->baseDn)
                     ->useSubtreeScope(),
                 self::MEMBERSHIP_PAGE,
             );
@@ -660,12 +660,12 @@ final class Worker
      */
     private function buildSpareMembers(): array
     {
-        $clients = max($this->config->clients, 1);
+        $clients = max($this->config->run->clients, 1);
         $spare = [];
 
-        for ($i = $this->config->seedGroupSize + 1; $i <= $this->config->seedEntries; $i++) {
+        for ($i = $this->config->seed->groupSize + 1; $i <= $this->config->seed->entries; $i++) {
             if ($i % $clients === $this->workerId % $clients) {
-                $spare[] = "cn=seed-{$i}," . $this->config->writeBase;
+                $spare[] = "cn=seed-{$i}," . $this->config->directory->writeBase;
             }
         }
 
@@ -679,8 +679,8 @@ final class Worker
     {
         $members = [];
 
-        for ($i = 1; $i <= $this->config->seedGroupSize; $i++) {
-            $members[] = "cn=seed-{$i}," . $this->config->writeBase;
+        for ($i = 1; $i <= $this->config->seed->groupSize; $i++) {
+            $members[] = "cn=seed-{$i}," . $this->config->directory->writeBase;
         }
 
         return $members;
@@ -702,8 +702,8 @@ final class Worker
     {
         return new LdapClient(
             (new ClientOptions())
-                ->setServers([$this->config->host])
-                ->setPort($this->config->port)
+                ->setServers([$this->config->server->host])
+                ->setPort($this->config->server->port)
                 ->setTransport('tcp')
                 ->setTimeoutConnect(5)
                 ->setTimeoutRead(30),
