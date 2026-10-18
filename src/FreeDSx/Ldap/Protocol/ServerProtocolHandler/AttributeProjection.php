@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Schema;
 
 /**
@@ -34,11 +33,13 @@ use FreeDSx\Ldap\Schema\Schema;
 final class AttributeProjection
 {
     /**
-     * Per-instance memo of operational classification keyed on lowercased attribute name.
-     *
-     * @var array<string, bool>
+     * Selectors that name no attribute type, so a list of only these is decided by usage alone.
      */
-    private array $operationalByName = [];
+    private const SELECTORS = [
+        SearchRequest::ATTRIBUTES_ALL_USER,
+        SearchRequest::ATTRIBUTES_ALL_OPERATIONAL,
+        SearchRequest::ATTRIBUTES_NONE,
+    ];
 
     /**
      * Per-instance memo of the selection decision keyed on attribute description.
@@ -49,6 +50,7 @@ final class AttributeProjection
 
     /**
      * @param string[] $names
+     * @param array<string, true> $rangeSliceTypes Lowercased base types a requested range slice asks for.
      */
     private function __construct(
         private readonly array $names,
@@ -56,6 +58,8 @@ final class AttributeProjection
         private readonly bool $wantsOperational,
         private readonly bool $returnNone,
         private readonly bool $typesOnly,
+        private readonly bool $namesNoType,
+        private readonly array $rangeSliceTypes,
         private readonly Schema $schema,
     ) {}
 
@@ -78,6 +82,8 @@ final class AttributeProjection
             in_array(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL, $names, true),
             count($names) === 1 && $names[0] === SearchRequest::ATTRIBUTES_NONE,
             $typesOnly,
+            array_diff($names, self::SELECTORS) === [],
+            self::rangeSliceTypes($requestedAttrs),
             $schema,
         );
     }
@@ -92,31 +98,71 @@ final class AttributeProjection
         }
 
         $attributes = $entry->getAttributes();
-        $selected = array_filter(
+        $selected = array_values(array_filter(
             $attributes,
-            $this->shouldInclude(...),
-        );
+            $this->includes(...),
+        ));
 
-        // Nothing was withheld, so the entry already is its own projection.
-        if (!$this->typesOnly && count($selected) === count($attributes)) {
+        return $this->withAttributes(
+            $entry,
+            $selected,
+            count($selected) === count($attributes),
+        );
+    }
+
+    /**
+     * Whether the request selects the attribute.
+     */
+    public function includes(Attribute $attribute): bool
+    {
+        return $this->includeByDescription[$attribute->getDescription()]
+            ??= $this->decideInclude($attribute);
+    }
+
+    /**
+     * The entry as returned with just the attributes kept.
+     *
+     * @param list<Attribute> $kept
+     */
+    public function withAttributes(
+        Entry $entry,
+        array $kept,
+        bool $keptAll,
+    ): Entry {
+        if (!$this->typesOnly && $keptAll) {
             return $entry;
         }
 
         return Entry::raw(
             $entry->getDn(),
-            array_values(
-                $this->typesOnly
-                    ? $this->withoutValues($selected)
-                    : $selected,
-            ),
+            $this->typesOnly
+                ? $this->withoutValues($kept)
+                : $kept,
         );
+    }
+
+    /**
+     * @param Attribute[] $requestedAttrs
+     * @return array<string, true>
+     */
+    private static function rangeSliceTypes(array $requestedAttrs): array
+    {
+        $types = [];
+
+        foreach ($requestedAttrs as $requested) {
+            if (self::namesRange($requested)) {
+                $types[Attribute::normalizeName($requested->getName())] = true;
+            }
+        }
+
+        return $types;
     }
 
     /**
      * Options are part of the description a client asked for, so they survive a types-only request.
      *
-     * @param array<Attribute> $attributes
-     * @return array<Attribute>
+     * @param list<Attribute> $attributes
+     * @return list<Attribute>
      */
     private function withoutValues(array $attributes): array
     {
@@ -126,15 +172,17 @@ final class AttributeProjection
         );
     }
 
-    private function shouldInclude(Attribute $attribute): bool
-    {
-        return $this->includeByDescription[$attribute->getDescription()]
-            ??= $this->decideInclude($attribute);
-    }
-
     private function decideInclude(Attribute $attribute): bool
     {
-        if ($this->names !== [] && in_array(strtolower($attribute->getDescription()), $this->names, true)) {
+        if ($this->returnNone) {
+            return false;
+        }
+
+        if ($this->namesNoType) {
+            return $this->wantsByUsage($attribute);
+        }
+
+        if (in_array(strtolower($attribute->getDescription()), $this->names, true)) {
             return true;
         }
 
@@ -146,7 +194,12 @@ final class AttributeProjection
             return true;
         }
 
-        return $this->isOperational($attribute)
+        return $this->wantsByUsage($attribute);
+    }
+
+    private function wantsByUsage(Attribute $attribute): bool
+    {
+        return $this->schema->isOperational($attribute->getDescription())
             ? $this->wantsOperational
             : $this->wantsUser;
     }
@@ -175,17 +228,7 @@ final class AttributeProjection
      */
     private function isNamedSlice(Attribute $attribute): bool
     {
-        $held = Attribute::normalizeName($attribute->getName());
-
-        foreach ($this->names as $name) {
-            $wanted = new Attribute($name);
-
-            if (self::namesRange($wanted) && Attribute::normalizeName($wanted->getName()) === $held) {
-                return true;
-            }
-        }
-
-        return false;
+        return isset($this->rangeSliceTypes[Attribute::normalizeName($attribute->getName())]);
     }
 
     private static function namesRange(Attribute $attribute): bool
@@ -197,19 +240,5 @@ final class AttributeProjection
         }
 
         return false;
-    }
-
-    private function isOperational(Attribute $attribute): bool
-    {
-        $key = strtolower($attribute->getName());
-
-        if (isset($this->operationalByName[$key])) {
-            return $this->operationalByName[$key];
-        }
-
-        $type = $this->schema->getAttributeType($attribute->getName());
-
-        return $this->operationalByName[$key] = $type !== null
-            && $type->usage !== AttributeUsage::UserApplications;
     }
 }

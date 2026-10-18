@@ -256,6 +256,72 @@ final class AttributeProjectionTest extends TestCase
         );
     }
 
+    public function test_the_entry_itself_is_returned_when_every_attribute_is_selected(): void
+    {
+        $projection = AttributeProjection::forRequest(
+            [
+                new Attribute('*'),
+                new Attribute('+'),
+            ],
+            false,
+            $this->schema,
+        );
+
+        self::assertSame(
+            $this->entry,
+            $projection->project($this->entry),
+        );
+    }
+
+    public function test_a_requested_range_slice_selects_the_values_held_under_its_type(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=staff,dc=example,dc=com'),
+            new Attribute('cn', 'staff'),
+            new Attribute('member', 'cn=Alice,dc=example,dc=com'),
+        );
+        $projection = AttributeProjection::forRequest(
+            [new Attribute('member;range=0-*')],
+            false,
+            $this->schema,
+        );
+
+        self::assertSame(
+            ['member'],
+            $this->attributeNames($projection->project($entry)),
+        );
+    }
+
+    public function test_none_selector_includes_no_attribute(): void
+    {
+        $projection = AttributeProjection::forRequest(
+            [new Attribute('1.1')],
+            false,
+            $this->schema,
+        );
+
+        foreach ($this->entry->getAttributes() as $attribute) {
+            self::assertFalse($projection->includes($attribute));
+        }
+    }
+
+    public function test_none_selector_named_with_a_wildcard_is_ignored(): void
+    {
+        $projection = AttributeProjection::forRequest(
+            [
+                new Attribute('1.1'),
+                new Attribute('*'),
+            ],
+            false,
+            $this->schema,
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn', 'sn', 'userPassword'],
+            $this->attributeNames($projection->project($this->entry)),
+        );
+    }
+
     public function test_repeated_projection_returns_consistent_results(): void
     {
         $projection = AttributeProjection::forRequest(
