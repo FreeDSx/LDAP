@@ -162,11 +162,13 @@ existing entry.
 | Changing the structural object class                                                                                                         | Waived              | Waived    |
 | Writing `createTimestamp`, `modifyTimestamp`, `creatorsName` or `modifiersName`                                                              | Waived              | Waived    |
 | Writing `entryUUID` on Add                                                                                                                   | Waived              | Waived    |
-| Writing `entryUUID` on Modify, or any other `NO-USER-MODIFICATION` attribute                                                                 | Refused             | Waived    |
+| Changing `entryUUID`, writing a derived attribute (`entryDN`, `hasSubordinates`, `subschemaSubentry`) or a back-link such as `memberOf`      | Refused             | Refused   |
+| Writing any other `NO-USER-MODIFICATION` attribute                                                                                           | Refused             | Waived    |
 | Required and allowed attributes, a structural object class, undefined types, undefined object classes, single-valued types, naming attributes | Refused             | Waived    |
 | Attribute syntax, the value limit, equivalent values, an attribute description given twice                                                   | Refused             | Refused   |
 
-Each violation is logged and the first that is not waived decides the result code.
+Each violation is logged and the first that is not waived decides the result code. An entry's identity and the values
+the server derives for it are refused with `constraintViolation` in every mode, `Off` included.
 
 A value a relaxed write supplies for one of these attributes is stored as given. A timestamp may not be in the future,
 and `createTimestamp` may not be later than `modifyTimestamp`. A supplied `entryUUID` may not be one another entry holds.

@@ -202,6 +202,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             ),
             SchemaViolationGate::class => static fn(Container $c): SchemaViolationGate => new SchemaViolationGate(
                 $c->get(SchemaValidator::class),
+                $c->get(LinkedAttributes::class),
             ),
             RdnAttributeValues::class => static fn(Container $c): RdnAttributeValues => new RdnAttributeValues(
                 $c->get(EqualityComparatorResolver::class),

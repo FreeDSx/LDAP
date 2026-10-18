@@ -324,6 +324,27 @@ final class LdapImporterTest extends TestCase
         );
     }
 
+    public function test_importEntries_ignoreValidation_still_refuses_a_derived_attribute(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->importerFor(
+            $this->storage,
+            TestServerOptions::validatedCore(SchemaValidationMode::Strict),
+        )->importEntries(
+            entries: [
+                new Entry(
+                    new Dn('dc=example,dc=com'),
+                    new Attribute('dc', 'example'),
+                    new Attribute('objectClass', 'top', 'domain'),
+                    new Attribute('hasSubordinates', 'TRUE'),
+                ),
+            ],
+            ignoreValidation: true,
+        );
+    }
+
     public function test_importEntries_stores_an_entry_spelled_with_aliases_under_the_primary_names(): void
     {
         $this->importer()->importEntries([

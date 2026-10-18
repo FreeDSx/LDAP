@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Schema;
 
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -127,5 +128,86 @@ final class LdapSchemaValidationTest extends ServerTestCase
                 'description' => ['same', 'SAME'],
             ],
         ));
+    }
+
+    public function test_lenient_mode_refuses_replacing_the_entry_uuid(): void
+    {
+        $person = $this->createPerson('drift-uuid');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::replace(
+                'entryUUID',
+                'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            ),
+        ));
+    }
+
+    public function test_lenient_mode_refuses_writing_a_derived_attribute(): void
+    {
+        $person = $this->createPerson('drift-derived');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::add(
+                'hasSubordinates',
+                'TRUE',
+            ),
+        ));
+    }
+
+    public function test_lenient_mode_refuses_renaming_an_entry_to_an_entry_uuid(): void
+    {
+        $person = $this->createPerson('drift-uuid-rdn');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->rename(
+            $person,
+            'entryUUID=a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            false,
+        );
+    }
+
+    public function test_lenient_mode_refuses_adding_an_entry_carrying_a_derived_attribute(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=drift-derived-add,dc=foo,dc=bar',
+            [
+                'cn' => 'drift-derived-add',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+                'hasSubordinates' => 'TRUE',
+            ],
+        ));
+    }
+
+    private function createPerson(string $cn): string
+    {
+        $this->authenticateAdmin();
+        $dn = "cn={$cn},dc=foo,dc=bar";
+
+        $this->ldapClient()->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => $cn,
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        return $dn;
     }
 }

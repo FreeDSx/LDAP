@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\ServerOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -370,6 +371,49 @@ final class UpdateEntryHandlerTest extends TestCase
         );
     }
 
+    #[DataProvider('serverOwnedChangeProvider')]
+    public function test_a_change_to_a_server_owned_attribute_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+        Change $change,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->modify($change);
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode, Change}>
+     */
+    public static function serverOwnedChangeProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield "replace entryUUID under {$mode->name}" => [
+                $mode,
+                Change::replace(
+                    'entryUUID',
+                    'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+                ),
+            ];
+            yield "add hasSubordinates under {$mode->name}" => [
+                $mode,
+                Change::add(
+                    'hasSubordinates',
+                    'TRUE',
+                ),
+            ];
+            yield "add memberOf under {$mode->name}" => [
+                $mode,
+                Change::add(
+                    'memberOf',
+                    self::ADMINS,
+                ),
+            ];
+        }
+    }
+
     public function test_a_system_write_bypasses_the_no_user_modification_check(): void
     {
         $this->validatedGraph(SchemaValidationMode::Strict);
@@ -385,6 +429,22 @@ final class UpdateEntryHandlerTest extends TestCase
         self::assertSame(
             '20240101000000Z',
             $this->find(self::ALICE)?->get('createTimestamp')?->firstValue(),
+        );
+    }
+
+    public function test_a_system_write_still_refuses_a_server_owned_attribute(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ALICE),
+                [Change::add(new Attribute('hasSubordinates', 'TRUE'))],
+            ),
+            $this->systemContext(),
         );
     }
 

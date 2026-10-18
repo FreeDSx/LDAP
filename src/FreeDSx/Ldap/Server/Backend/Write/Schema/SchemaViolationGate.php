@@ -19,11 +19,15 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SchemaRuleException;
 use FreeDSx\Ldap\Exception\SchemaValidationException;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -34,7 +38,12 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 final readonly class SchemaViolationGate
 {
-    public function __construct(private SchemaValidator $validator) {}
+    use DerivedAttributeTrait;
+
+    public function __construct(
+        private SchemaValidator $validator,
+        private LinkedAttributes $linked,
+    ) {}
 
     /**
      * @throws OperationException
@@ -94,6 +103,7 @@ final readonly class SchemaViolationGate
         WriteContext $context,
     ): void {
         $this->assertTypesStorable($write->entry);
+        $this->assertServerOwnedUntouched($write);
 
         try {
             $this->validator->validate($write);
@@ -133,6 +143,46 @@ final readonly class SchemaViolationGate
                 ResultCode::ADMIN_LIMIT_EXCEEDED,
             );
         }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertServerOwnedUntouched(SchemaWrite $write): void
+    {
+        foreach ($write->suppliedNames() as $name) {
+            if (!$this->isServerOwned($name, $write->operation)) {
+                continue;
+            }
+
+            throw new OperationException(
+                sprintf(
+                    'The attribute "%s" is maintained by the server and cannot be written.',
+                    $name,
+                ),
+                ResultCode::CONSTRAINT_VIOLATION,
+            );
+        }
+    }
+
+    /**
+     * An Add may still supply its entryUUID, since that is where an entry's identity begins.
+     */
+    private function isServerOwned(
+        string $name,
+        OperationType $operation,
+    ): bool {
+        if ($operation !== OperationType::Add && self::namesEntryUuid($name)) {
+            return true;
+        }
+
+        return self::describesAnyDerivedAttribute($name)
+            || $this->linked->linkedBy($name) !== null;
+    }
+
+    private static function namesEntryUuid(string $name): bool
+    {
+        return Attribute::normalizeName($name) === strtolower(AttributeTypeOid::NAME_ENTRY_UUID);
     }
 
     /**
