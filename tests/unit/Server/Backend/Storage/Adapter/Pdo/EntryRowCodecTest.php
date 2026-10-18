@@ -97,6 +97,33 @@ final class EntryRowCodecTest extends TestCase
         );
     }
 
+    public function test_a_selected_canonical_dn_is_taken_as_stored(): void
+    {
+        $entry = $this->subject->decode([
+            'dn' => 'CN=Alice, DC=Example,DC=com',
+            'lc_dn' => 'cn=stored,dc=example,dc=com',
+        ]);
+
+        self::assertSame(
+            'CN=Alice, DC=Example,DC=com',
+            $entry->getDn()->toString(),
+        );
+        self::assertSame(
+            'cn=stored,dc=example,dc=com',
+            $entry->getDn()->normalizedString(),
+        );
+    }
+
+    public function test_without_a_selected_canonical_dn_it_is_canonicalized_on_demand(): void
+    {
+        $entry = $this->subject->decode(['dn' => 'CN=Alice, DC=Example,DC=com']);
+
+        self::assertSame(
+            'cn=alice,dc=example,dc=com',
+            $entry->getDn()->normalizedString(),
+        );
+    }
+
     public function test_a_projection_of_nothing_keeps_only_the_dn(): void
     {
         $entry = $this->subject->decode(

@@ -67,6 +67,25 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Wrap a DN read back from storage together with the canonical form stored beside it, skipping re-normalization.
+     *
+     * Note: This is a storage performance optimization and should not be used to construct DNs normally.
+     *
+     * @internal
+     */
+    public static function fromStored(
+        string $dn,
+        string $canonical,
+    ): self {
+        $stored = new self($dn);
+        $stored->normalized = $canonical === $dn
+            ? $stored
+            : self::fromCanonical($canonical);
+
+        return $stored;
+    }
+
+    /**
      * Where an RDN sits under $parent, or at the root when there is none.
      */
     public static function fromRdn(

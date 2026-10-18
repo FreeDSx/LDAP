@@ -61,10 +61,7 @@ readonly class EntryRowCodec
         ?array $allowed = null,
         array $links = [],
     ): Entry {
-        $dn = new Dn(isset($row['dn']) && is_string($row['dn'])
-            ? $row['dn']
-            : '');
-
+        $dn = $this->dnOf($row);
         $childFlag = $this->childFlag($row);
 
         // A projection that materializes nothing, such as a 1.1 request, never reads the blob.
@@ -89,6 +86,22 @@ readonly class EntryRowCodec
                 ...$childFlag,
             ],
         );
+    }
+
+    /**
+     * The row's DN, carrying its stored canonical form when the query selected it.
+     *
+     * @param array<array-key, mixed> $row
+     */
+    private function dnOf(array $row): Dn
+    {
+        $dn = isset($row['dn']) && is_string($row['dn'])
+            ? $row['dn']
+            : '';
+
+        return isset($row['lc_dn']) && is_string($row['lc_dn'])
+            ? Dn::fromStored($dn, $row['lc_dn'])
+            : new Dn($dn);
     }
 
     /**
