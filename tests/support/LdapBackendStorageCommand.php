@@ -43,6 +43,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Tests\Support\FreeDSx\Ldap\Seed\SeedDn;
+use Tests\Support\FreeDSx\Ldap\Seed\SeedProfile;
 
 final class LdapBackendStorageCommand extends Command
 {
@@ -166,6 +168,16 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Filler attributes added to each seed entry to widen the return path (0 = none)',
                 '0',
+            )
+            ->addOption(
+                'seed-profile',
+                null,
+                InputOption::VALUE_REQUIRED,
+                sprintf(
+                    'Shape of the generated seed entries (%s)',
+                    implode(', ', SeedProfile::values()),
+                ),
+                SeedProfile::Minimal->value,
             )
             ->addOption(
                 'seed-groups',
@@ -342,6 +354,15 @@ final class LdapBackendStorageCommand extends Command
             return Command::FAILURE;
         }
 
+        $seedProfile = SeedProfile::tryFrom($this->getStringOption($input, 'seed-profile'));
+
+        if ($seedProfile === null) {
+            $io->error('Invalid --seed-profile value. Expected one of: ' . implode(', ', SeedProfile::values()) . '.');
+
+            return Command::FAILURE;
+        }
+        $generator = $seedProfile->generator($seedAttributes);
+
         $validationMode = match ($this->getStringOption($input, 'validation-mode')) {
             'strict' => SchemaValidationMode::Strict,
             'lenient' => SchemaValidationMode::Lenient,
@@ -356,48 +377,13 @@ final class LdapBackendStorageCommand extends Command
         }
 
         // The fixed content comes from SEED_LDIF; only the generated entries are built here.
-        $entries = [];
-
-        for ($i = 1; $i <= $seedEntries; $i++) {
-            $attributes = [
-                new Attribute('cn', "seed-{$i}"),
-                new Attribute('objectClass', 'inetOrgPerson', 'extensibleObject'),
-                new Attribute('sn', 'Seeded'),
-                new Attribute('mail', "seed-{$i}@foo.bar"),
-                new Attribute('uidNumber', (string) (1000 + $i)),
-            ];
-
-            // Distinct option subtypes of a defined, non-filtered, non-indexed base type widen the return path.
-            for ($k = 1; $k <= $seedAttributes; $k++) {
-                $attributes[] = new Attribute("initials;filler-{$k}", "filler-{$i}-{$k}");
-            }
-
-            $entries[] = new Entry(
-                new Dn("cn=seed-{$i},ou=people,dc=foo,dc=bar"),
-                ...$attributes,
-            );
-        }
-
-        $members = [];
-        for ($i = 1; $i <= $seedGroupSize; $i++) {
-            $members[] = "cn=seed-{$i},ou=people,dc=foo,dc=bar";
-        }
-
-        for ($g = 0; $g < $seedGroups; $g++) {
-            $groupAttributes = [
-                new Attribute('cn', "load-group-{$g}"),
-                new Attribute('objectClass', 'groupOfNames'),
-            ];
-
-            if ($members !== []) {
-                $groupAttributes[] = new Attribute('member', ...$members);
-            }
-
-            $entries[] = new Entry(
-                new Dn("cn=load-group-{$g},ou=people,dc=foo,dc=bar"),
-                ...$groupAttributes,
-            );
-        }
+        $entries = [
+            ...$generator->generate($seedEntries),
+            ...$this->loadGroups(
+                $seedGroups,
+                $seedGroupSize,
+            ),
+        ];
 
         $network = (new NetworkConfig())
             ->setPort($port)
@@ -500,18 +486,17 @@ final class LdapBackendStorageCommand extends Command
         $seedLdif = $this->getStringOption($input, 'seed-ldif');
         $validateSeed = !$input->getOption('no-seed-validation');
 
-        $seed = function () use ($server, $entries, $seedLdif, $validateSeed): void {
+        $seed = function () use ($server, $entries, $seedLdif, $validateSeed, $generator): void {
             $server->seed(
                 new FileLdifLoader($seedLdif),
                 new SeedOptions(ignoreValidation: !$validateSeed),
             );
 
-            // The generated entries skip validation, since they exist to widen the return path rather than to be
-            // valid directory content.
+            // Only a profile built to satisfy the schema is validated; the others exist to widen the return path.
             if ($entries !== []) {
                 $server->seedEntries(
                     $entries,
-                    new SeedOptions(ignoreValidation: true),
+                    new SeedOptions(ignoreValidation: !$generator->isSchemaValid()),
                 );
             }
         };
@@ -525,6 +510,47 @@ final class LdapBackendStorageCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Groups the group ops work against, each holding the first $size generated people.
+     *
+     * @return list<Entry>
+     */
+    private function loadGroups(
+        int $count,
+        int $size,
+    ): array {
+        $members = [];
+        $groups = [];
+
+        for ($i = 1; $i <= $size; $i++) {
+            $members[] = SeedDn::person($i);
+        }
+
+        for ($g = 0; $g < $count; $g++) {
+            $group = new Entry(
+                new Dn('cn=load-group-' . $g . ',' . SeedDn::PEOPLE),
+                new Attribute(
+                    'cn',
+                    "load-group-{$g}",
+                ),
+                new Attribute(
+                    'objectClass',
+                    'groupOfNames',
+                ),
+            );
+
+            if ($members !== []) {
+                $group->add(
+                    'member',
+                    ...$members,
+                );
+            }
+            $groups[] = $group;
+        }
+
+        return $groups;
     }
 
     /**

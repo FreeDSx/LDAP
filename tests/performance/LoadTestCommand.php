@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Performance\FreeDSx\Ldap;
 
+use BackedEnum;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\Table;
@@ -24,12 +26,21 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Performance\FreeDSx\Ldap\Config\Backend;
+use Tests\Performance\FreeDSx\Ldap\Config\DirectorySettings;
+use Tests\Performance\FreeDSx\Ldap\Config\OutputFormat;
+use Tests\Performance\FreeDSx\Ldap\Config\RunSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\SearchSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\SeedSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerMode;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerSettings;
 use Tests\Performance\FreeDSx\Ldap\Report\Report;
 use Tests\Performance\FreeDSx\Ldap\Threshold\CiThresholds;
 use Tests\Performance\FreeDSx\Ldap\Threshold\ThresholdEvaluator;
 use Tests\Performance\FreeDSx\Ldap\Threshold\ThresholdResult;
 use Tests\Performance\FreeDSx\Ldap\Threshold\ThresholdSet;
 use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
+use Tests\Support\FreeDSx\Ldap\Seed\SeedProfile;
 use Throwable;
 
 /**
@@ -48,13 +59,13 @@ final class LoadTestCommand extends Command
                 'backend',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Storage adapter: ' . implode(' | ', Config::BACKENDS),
+                'Storage adapter: ' . self::choices(Backend::cases()),
             )
             ->addOption(
                 'runner',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Server runner: ' . implode(' | ', Config::RUNNERS) . ' (memory REQUIRES swoole)',
+                'Server runner: ' . self::choices(RunnerMode::cases()) . ' (memory REQUIRES swoole)',
             )
             ->addOption(
                 'swoole-workers',
@@ -68,7 +79,7 @@ final class LoadTestCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Concurrent coroutines',
-                '16',
+                (string) RunSettings::DEFAULT_CLIENTS,
             )
             ->addOption(
                 'duration',
@@ -87,35 +98,35 @@ final class LoadTestCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Op mix, comma-separated weights',
-                Config::DEFAULT_MIX,
+                RunSettings::DEFAULT_MIX,
             )
             ->addOption(
                 'host',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Bind host',
-                '127.0.0.1',
+                ServerSettings::DEFAULT_HOST,
             )
             ->addOption(
                 'port',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Listen port',
-                '10389',
+                (string) ServerSettings::DEFAULT_PORT,
             )
             ->addOption(
                 'warmup',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Warmup seconds before sampling',
-                '2',
+                (string) RunSettings::DEFAULT_WARMUP,
             )
             ->addOption(
                 'server',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'spawn = script manages server; external = already running',
-                'spawn',
+                ServerMode::Spawn->value,
             )
             ->addOption(
                 'rng-seed',
@@ -127,43 +138,43 @@ final class LoadTestCommand extends Command
                 'output',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Report format: ' . implode(' | ', Config::OUTPUTS),
-                'text',
+                'Report format: ' . self::choices(OutputFormat::cases()),
+                OutputFormat::Text->value,
             )
             ->addOption(
                 'seed-entries',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Extra fixture entries to pre-seed under ou=people before the run',
-                '100',
+                (string) SeedSettings::DEFAULT_ENTRIES,
             )
             ->addOption(
                 'bind-dn',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'DN used to bind each worker client',
-                Config::DEFAULT_BIND_DN,
+                DirectorySettings::DEFAULT_BIND_DN,
             )
             ->addOption(
                 'bind-password',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Password paired with --bind-dn',
-                Config::DEFAULT_BIND_PASSWORD,
+                DirectorySettings::DEFAULT_BIND_PASSWORD,
             )
             ->addOption(
                 'base-dn',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Search base for read/eq/sub operations',
-                Config::DEFAULT_BASE_DN,
+                DirectorySettings::DEFAULT_BASE_DN,
             )
             ->addOption(
                 'write-base',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Parent DN for add/modify/delete + seed-N entries',
-                Config::DEFAULT_WRITE_BASE,
+                DirectorySettings::DEFAULT_WRITE_BASE,
             )
             ->addOption(
                 'ci-profile',
@@ -219,21 +230,21 @@ final class LoadTestCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Per-request size limit applied to search-list and search-sub ops (0 = unlimited)',
-                (string) Config::DEFAULT_SEARCH_SIZE_LIMIT,
+                (string) SearchSettings::DEFAULT_SIZE_LIMIT,
             )
             ->addOption(
                 'search-value',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'cn prefix the subtree searches filter on; a broader value (e.g. "seed-") matches more entries',
-                Config::DEFAULT_SEARCH_VALUE,
+                SearchSettings::DEFAULT_VALUE,
             )
             ->addOption(
                 'search-sort-size-limit',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Per-request size limit applied to search-sort ops (0 = unlimited)',
-                (string) Config::DEFAULT_SEARCH_SORT_SIZE_LIMIT,
+                (string) SearchSettings::DEFAULT_SORT_SIZE_LIMIT,
             )
             ->addOption(
                 'search-attributes',
@@ -255,6 +266,16 @@ final class LoadTestCommand extends Command
                 '0',
             )
             ->addOption(
+                'seed-profile',
+                null,
+                InputOption::VALUE_REQUIRED,
+                sprintf(
+                    'Shape of the seeded entries: %s.',
+                    self::choices(SeedProfile::cases()),
+                ),
+                SeedSettings::DEFAULT_PROFILE->value,
+            )
+            ->addOption(
                 'seed-groups',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -273,7 +294,7 @@ final class LoadTestCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Max entries examined per search before adminLimitExceeded (0 = unbounded; default mirrors the server).',
-                (string) Config::DEFAULT_MAX_SEARCH_LOOKTHROUGH,
+                (string) ServerSettings::DEFAULT_MAX_SEARCH_LOOKTHROUGH,
             )
             ->addOption(
                 'journal',
@@ -301,7 +322,7 @@ final class LoadTestCommand extends Command
         }
 
         $monitorEntry = null;
-        $afterRun = $config->monitor
+        $afterRun = $config->server->monitor
             ? function () use ($config, &$monitorEntry, $errorOutput): void {
                 $monitorEntry = $this->readMonitorEntry($config, $errorOutput);
             }
@@ -318,7 +339,7 @@ final class LoadTestCommand extends Command
             return Command::FAILURE;
         }
 
-        $mix = new WorkloadMix($config->mix);
+        $mix = new WorkloadMix($config->run->mix);
         (new Report($config, $mix, $snapshot))->render($output);
 
         if ($monitorEntry !== null) {
@@ -369,12 +390,12 @@ final class LoadTestCommand extends Command
         try {
             $client = new LdapClient(
                 (new ClientOptions())
-                    ->setServers([$config->host])
-                    ->setPort($config->port),
+                    ->setServers([$config->server->host])
+                    ->setPort($config->server->port),
             );
             $client->bind(
-                $config->bindDn,
-                $config->bindPassword,
+                $config->directory->bindDn,
+                $config->directory->bindPassword,
             );
             $entries = $client->search(
                 Operations::search(Filters::present('objectClass'))
@@ -449,54 +470,109 @@ final class LoadTestCommand extends Command
 
     private function buildConfig(InputInterface $input): Config
     {
-        $backend = $this->requireString($input, 'backend');
-        $runner = $this->requireString($input, 'runner');
-
-        $opsOpt = $input->getOption('ops');
-        $durationOpt = $input->getOption('duration');
-        $ops = $this->parseInt($opsOpt, 'ops');
-
-        if ($durationOpt !== null) {
-            $duration = $this->parseInt($durationOpt, 'duration');
-        } elseif ($ops !== null) {
-            $duration = null;
-        } else {
-            $duration = 10;
-        }
+        $server = $this->buildServerSettings($input);
 
         return new Config(
-            backend: $backend,
-            runner: $runner,
-            clients: $this->requireInt($input, 'clients'),
-            duration: $duration,
-            ops: $ops,
-            mix: $this->requireString($input, 'mix'),
+            server: $server,
+            run: $this->buildRunSettings(
+                $input,
+                $server->runner,
+            ),
+            seed: new SeedSettings(
+                entries: $this->requireInt($input, 'seed-entries'),
+                attributes: $this->requireInt($input, 'seed-attributes'),
+                profile: $this->requireEnum($input, 'seed-profile', SeedProfile::class),
+                groups: $this->requireInt($input, 'seed-groups'),
+                groupSize: $this->requireInt($input, 'seed-group-size'),
+            ),
+            directory: new DirectorySettings(
+                bindDn: $this->requireString($input, 'bind-dn'),
+                bindPassword: $this->requireString($input, 'bind-password'),
+                baseDn: $this->requireString($input, 'base-dn'),
+                writeBase: $this->requireString($input, 'write-base'),
+            ),
+            search: new SearchSettings(
+                sizeLimit: $this->requireInt($input, 'search-size-limit'),
+                value: $this->requireString($input, 'search-value'),
+                sortSizeLimit: $this->requireInt($input, 'search-sort-size-limit'),
+                attributes: $this->optionalString($input, 'search-attributes'),
+                attributesOnly: (bool) $input->getOption('attributes-only'),
+            ),
+            output: $this->requireEnum($input, 'output', OutputFormat::class),
+        );
+    }
+
+    private function buildServerSettings(InputInterface $input): ServerSettings
+    {
+        return new ServerSettings(
+            backend: $this->requireEnum($input, 'backend', Backend::class),
+            runner: $this->requireEnum($input, 'runner', RunnerMode::class),
+            mode: $this->requireEnum($input, 'server', ServerMode::class),
             host: $this->requireString($input, 'host'),
             port: $this->requireInt($input, 'port'),
-            warmup: $this->requireInt($input, 'warmup'),
-            serverMode: $this->requireString($input, 'server'),
-            rngSeed: $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
-            output: $this->requireString($input, 'output'),
-            seedEntries: $this->requireInt($input, 'seed-entries'),
-            bindDn: $this->requireString($input, 'bind-dn'),
-            bindPassword: $this->requireString($input, 'bind-password'),
-            baseDn: $this->requireString($input, 'base-dn'),
-            writeBase: $this->requireString($input, 'write-base'),
-            // The spawned server defaults JIT off for pcntl (tracing JIT can crash forked workers under load)
-            // Swoole keeps it. --no-jit forces it off either way.
-            jit: !(bool) $input->getOption('no-jit') && $runner !== 'pcntl',
-            searchSizeLimit: $this->requireInt($input, 'search-size-limit'),
-            searchValue: $this->requireString($input, 'search-value'),
-            searchSortSizeLimit: $this->requireInt($input, 'search-sort-size-limit'),
-            monitor: (bool) $input->getOption('monitor'),
-            searchAttributes: $this->optionalString($input, 'search-attributes'),
-            attributesOnly: (bool) $input->getOption('attributes-only'),
-            seedAttributes: $this->requireInt($input, 'seed-attributes'),
-            maxSearchLookthrough: $this->requireInt($input, 'max-search-lookthrough'),
-            journal: (bool) $input->getOption('journal'),
             swooleWorkers: $this->requireInt($input, 'swoole-workers'),
-            seedGroups: $this->requireInt($input, 'seed-groups'),
-            seedGroupSize: $this->requireInt($input, 'seed-group-size'),
+            monitor: (bool) $input->getOption('monitor'),
+            journal: (bool) $input->getOption('journal'),
+            maxSearchLookthrough: $this->requireInt($input, 'max-search-lookthrough'),
+        );
+    }
+
+    private function buildRunSettings(
+        InputInterface $input,
+        RunnerMode $runner,
+    ): RunSettings {
+        $ops = $this->parseInt($input->getOption('ops'), 'ops');
+        $duration = $this->parseInt($input->getOption('duration'), 'duration');
+
+        return new RunSettings(
+            clients: $this->requireInt($input, 'clients'),
+            // A run bounded by --ops alone has no deadline.
+            duration: $duration ?? ($ops === null ? RunSettings::DEFAULT_DURATION : null),
+            ops: $ops,
+            warmup: $this->requireInt($input, 'warmup'),
+            mix: $this->requireString($input, 'mix'),
+            rngSeed: $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
+            // Tracing JIT can crash forked pcntl workers under load, so only Swoole keeps it; --no-jit forces it off.
+            jit: !(bool) $input->getOption('no-jit') && $runner !== RunnerMode::Pcntl,
+        );
+    }
+
+    /**
+     * @template T of BackedEnum
+     *
+     * @param class-string<T> $enum
+     *
+     * @return T
+     */
+    private function requireEnum(
+        InputInterface $input,
+        string $name,
+        string $enum,
+    ): BackedEnum {
+        $value = $this->requireString(
+            $input,
+            $name,
+        );
+
+        return $enum::tryFrom($value) ?? throw new InvalidArgumentException(sprintf(
+            'Invalid --%s value "%s". Expected one of: %s.',
+            $name,
+            $value,
+            self::choices($enum::cases()),
+        ));
+    }
+
+    /**
+     * @param list<BackedEnum> $cases
+     */
+    private static function choices(array $cases): string
+    {
+        return implode(
+            ' | ',
+            array_map(
+                static fn(BackedEnum $case): string => (string) $case->value,
+                $cases,
+            ),
         );
     }
 

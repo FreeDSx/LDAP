@@ -14,148 +14,66 @@ declare(strict_types=1);
 namespace Tests\Performance\FreeDSx\Ldap;
 
 use InvalidArgumentException;
+use Tests\Performance\FreeDSx\Ldap\Config\DirectorySettings;
+use Tests\Performance\FreeDSx\Ldap\Config\OutputFormat;
+use Tests\Performance\FreeDSx\Ldap\Config\RunSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\SearchSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\SeedSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerSettings;
 use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 
 /**
- * Immutable configuration for the load-test driver; built by LoadTestCommand from CLI input.
+ * Immutable configuration for the load-test driver, one part per concern, each validating its own settings.
  */
-final class Config
+final readonly class Config
 {
-    /**
-     * @var list<string>
-     */
-    public const BACKENDS = [
-        'memory',
-        'sqlite',
-        'mysql',
-    ];
-
-    /**
-     * @var list<string>
-     */
-    public const RUNNERS = [
-        'pcntl',
-        'swoole',
-    ];
-
-    /**
-     * @var list<string>
-     */
-    public const SERVER_MODES = [
-        'spawn',
-        'external',
-    ];
-
-    /**
-     * @var list<string>
-     */
-    public const OUTPUTS = [
-        'text',
-        'json',
-    ];
-
-    public const DEFAULT_MIX = 'bind=5,search-read=50,search-eq=25,search-sub=10,search-list=5,search-sort=3,add=2,modify=2,delete=1';
-
-    /**
-     * The write mixes need an identity the harness treats as an administrator.
-     */
-    public const DEFAULT_BIND_DN = 'cn=admin,dc=foo,dc=bar';
-
-    public const DEFAULT_BIND_PASSWORD = '12345';
-
-    public const DEFAULT_BASE_DN = 'dc=foo,dc=bar';
-
-    public const DEFAULT_WRITE_BASE = 'ou=people,dc=foo,dc=bar';
-
-    public const DEFAULT_SEARCH_SIZE_LIMIT = 500;
-
-    public const DEFAULT_SEARCH_VALUE = 'seed-1';
-
-    /**
-     * A sorted search models a bounded display page typically, so give it a realistic limit.
-     */
-    public const DEFAULT_SEARCH_SORT_SIZE_LIMIT = 50;
-
-    /**
-     * Mirrors the realistic ServerOptions default so load tests run bounded rather than with lookthrough disabled.
-     */
-    public const DEFAULT_MAX_SEARCH_LOOKTHROUGH = 5000;
-
     public function __construct(
-        public readonly string $backend,
-        public readonly string $runner,
-        public readonly int $clients = 16,
-        public readonly ?int $duration = 10,
-        public readonly ?int $ops = null,
-        public readonly string $mix = self::DEFAULT_MIX,
-        public readonly string $host = '127.0.0.1',
-        public readonly int $port = 10389,
-        public readonly int $warmup = 2,
-        public readonly string $serverMode = 'spawn',
-        public readonly ?int $rngSeed = null,
-        public readonly string $output = 'text',
-        public readonly int $seedEntries = 100,
-        public readonly string $bindDn = self::DEFAULT_BIND_DN,
-        public readonly string $bindPassword = self::DEFAULT_BIND_PASSWORD,
-        public readonly string $baseDn = self::DEFAULT_BASE_DN,
-        public readonly string $writeBase = self::DEFAULT_WRITE_BASE,
-        public readonly bool $jit = true,
-        public readonly int $searchSizeLimit = self::DEFAULT_SEARCH_SIZE_LIMIT,
-        public readonly string $searchValue = self::DEFAULT_SEARCH_VALUE,
-        public readonly int $searchSortSizeLimit = self::DEFAULT_SEARCH_SORT_SIZE_LIMIT,
-        public readonly bool $monitor = true,
-        public readonly ?string $searchAttributes = null,
-        public readonly bool $attributesOnly = false,
-        public readonly int $seedAttributes = 0,
-        public readonly int $maxSearchLookthrough = self::DEFAULT_MAX_SEARCH_LOOKTHROUGH,
-        public readonly bool $journal = false,
-        public readonly int $swooleWorkers = 0,
-        public readonly int $workerIdOffset = 0,
-        public readonly int $seedGroups = 0,
-        public readonly int $seedGroupSize = 0,
+        public ServerSettings $server,
+        public RunSettings $run = new RunSettings(),
+        public SeedSettings $seed = new SeedSettings(),
+        public DirectorySettings $directory = new DirectorySettings(),
+        public SearchSettings $search = new SearchSettings(),
+        public OutputFormat $output = OutputFormat::Text,
     ) {
-        $this->assertEnum('backend', $backend, self::BACKENDS);
-        $this->assertEnum('runner', $runner, self::RUNNERS);
-        $this->assertEnum('server', $serverMode, self::SERVER_MODES);
-        $this->assertEnum('output', $output, self::OUTPUTS);
-        $this->assertPositive('clients', $clients);
-        $this->assertPositive('port', $port);
-        $this->assertNonNegative('warmup', $warmup);
-        $this->assertNonNegative('seed-entries', $seedEntries);
-        $this->assertNonNegative('search-size-limit', $searchSizeLimit);
-        $this->assertNonNegative('search-sort-size-limit', $searchSortSizeLimit);
-        $this->assertNonNegative('seed-attributes', $seedAttributes);
-        $this->assertNonNegative('max-search-lookthrough', $maxSearchLookthrough);
-        $this->assertNonNegative('swoole-workers', $swooleWorkers);
-        $this->assertNonNegative('worker-id-offset', $workerIdOffset);
-        $this->assertNonNegative('seed-groups', $seedGroups);
-        $this->assertNonNegative('seed-group-size', $seedGroupSize);
-        $this->assertGroupsSeeded($mix, $seedGroups);
-
-        if ($duration !== null) {
-            $this->assertPositive('duration', $duration);
-        }
-        if ($ops !== null) {
-            $this->assertPositive('ops', $ops);
-        }
-        if ($duration === null && $ops === null) {
-            throw new InvalidArgumentException('One of --duration or --ops must be set.');
-        }
-        if ($backend === 'memory' && $runner === 'pcntl') {
-            throw new InvalidArgumentException(
-                'InMemoryStorage requires the Swoole runner: pcntl fork children each hold their own copy '
-                . 'of the seed entries, so writes never propagate between connections.',
-            );
-        }
+        $this->assertGroupsSeeded();
     }
 
-    private function assertGroupsSeeded(string $mix, int $seedGroups): void
+    /**
+     * Every class a serialized Config holds, for a reader that restricts what it unserializes.
+     *
+     * @return list<class-string>
+     */
+    public static function serializedClasses(): array
     {
-        if (!(new WorkloadMix($mix))->drawsAny(WorkloadMix::GROUP_OPS)) {
+        return [
+            self::class,
+            ServerSettings::class,
+            RunSettings::class,
+            SeedSettings::class,
+            DirectorySettings::class,
+            SearchSettings::class,
+        ];
+    }
+
+    public function withRun(RunSettings $run): self
+    {
+        return new self(
+            server: $this->server,
+            run: $run,
+            seed: $this->seed,
+            directory: $this->directory,
+            search: $this->search,
+            output: $this->output,
+        );
+    }
+
+    private function assertGroupsSeeded(): void
+    {
+        if (!(new WorkloadMix($this->run->mix))->drawsAny(WorkloadMix::GROUP_OPS)) {
             return;
         }
 
-        if ($seedGroups < 1) {
+        if ($this->seed->groups < 1) {
             throw new InvalidArgumentException(sprintf(
                 'The mix draws a group op. Set --seed-groups to at least 1. Group ops: %s.',
                 implode(', ', WorkloadMix::GROUP_OPS),
@@ -163,45 +81,10 @@ final class Config
         }
 
         // Members are drawn from the seeded entries the groups were not seeded holding.
-        if ($this->seedGroupSize >= $this->seedEntries) {
+        if ($this->seed->groupSize >= $this->seed->entries) {
             throw new InvalidArgumentException(
                 '--seed-entries must exceed --seed-group-size, or no member is left to add.',
             );
         }
-    }
-
-    /**
-     * @param list<string> $allowed
-     */
-    private function assertEnum(string $name, string $value, array $allowed): void
-    {
-        if (in_array($value, $allowed, true)) {
-            return;
-        }
-
-        throw new InvalidArgumentException(sprintf(
-            'Invalid --%s value "%s". Expected one of: %s.',
-            $name,
-            $value,
-            implode(', ', $allowed),
-        ));
-    }
-
-    private function assertPositive(string $name, int $value): void
-    {
-        if ($value > 0) {
-            return;
-        }
-
-        throw new InvalidArgumentException("--{$name} must be greater than zero, got {$value}.");
-    }
-
-    private function assertNonNegative(string $name, int $value): void
-    {
-        if ($value >= 0) {
-            return;
-        }
-
-        throw new InvalidArgumentException("--{$name} must be zero or greater, got {$value}.");
     }
 }

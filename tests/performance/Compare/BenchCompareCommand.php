@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Performance\FreeDSx\Ldap\Compare;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,6 +21,14 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Performance\FreeDSx\Ldap\Config\Backend;
+use Tests\Performance\FreeDSx\Ldap\Config\DirectorySettings;
+use Tests\Performance\FreeDSx\Ldap\Config\OutputFormat;
+use Tests\Performance\FreeDSx\Ldap\Config\RunSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\SearchSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\SeedSettings;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerMode;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerSettings;
 use Tests\Performance\FreeDSx\Ldap\Driver;
 use Tests\Performance\FreeDSx\Ldap\Report\Report;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
@@ -224,8 +233,11 @@ final class BenchCompareCommand extends Command
                 'output',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Report format: ' . implode(' | ', Config::OUTPUTS),
-                'text',
+                'Report format: ' . implode(
+                    ' | ',
+                    array_column(OutputFormat::cases(), 'value'),
+                ),
+                OutputFormat::Text->value,
             )
             ->addOption(
                 'no-jit',
@@ -238,14 +250,14 @@ final class BenchCompareCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Per-request size limit applied to search-list and search-sub ops (0 = unlimited)',
-                (string) Config::DEFAULT_SEARCH_SIZE_LIMIT,
+                (string) SearchSettings::DEFAULT_SIZE_LIMIT,
             )
             ->addOption(
                 'search-value',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'cn prefix the subtree searches filter on; a broader value (e.g. "seed-") matches more entries',
-                Config::DEFAULT_SEARCH_VALUE,
+                SearchSettings::DEFAULT_VALUE,
             )
             ->addOption(
                 'driver-processes',
@@ -459,30 +471,39 @@ final class BenchCompareCommand extends Command
     ): Config {
         return new Config(
             // Backend/runner are FreeDSx-internal knobs; the driver only connects to host:port, so external runs pass
-            // innocuous placeholders that satisfy Config validation without affecting the workload.
-            backend: 'sqlite',
-            runner: 'pcntl',
-            clients: $params['clients'],
-            duration: $params['duration'],
-            ops: $params['ops'],
-            mix: $params['mix'],
-            host: $side->host,
-            port: $side->port,
-            warmup: $params['warmup'],
-            serverMode: 'external',
-            rngSeed: $params['rngSeed'],
-            output: 'text',
+            // innocuous placeholders that satisfy validation without affecting the workload.
+            server: new ServerSettings(
+                backend: Backend::Sqlite,
+                runner: RunnerMode::Pcntl,
+                mode: ServerMode::External,
+                host: $side->host,
+                port: $side->port,
+            ),
+            run: new RunSettings(
+                clients: $params['clients'],
+                duration: $params['duration'],
+                ops: $params['ops'],
+                warmup: $params['warmup'],
+                mix: $params['mix'],
+                rngSeed: $params['rngSeed'],
+                jit: $params['jit'],
+            ),
             // External mode never seeds, so this only tells the workload how many fixtures its filters may target.
-            seedEntries: $params['seedEntries'],
-            seedGroups: $params['seedGroups'],
-            seedGroupSize: $params['seedGroupSize'],
-            bindDn: $side->bindDn,
-            bindPassword: $side->bindPassword,
-            baseDn: $bench->benchBaseDn,
-            writeBase: $bench->writeBaseDn,
-            jit: $params['jit'],
-            searchSizeLimit: $params['searchSizeLimit'],
-            searchValue: $params['searchValue'],
+            seed: new SeedSettings(
+                entries: $params['seedEntries'],
+                groups: $params['seedGroups'],
+                groupSize: $params['seedGroupSize'],
+            ),
+            directory: new DirectorySettings(
+                bindDn: $side->bindDn,
+                bindPassword: $side->bindPassword,
+                baseDn: $bench->benchBaseDn,
+                writeBase: $bench->writeBaseDn,
+            ),
+            search: new SearchSettings(
+                sizeLimit: $params['searchSizeLimit'],
+                value: $params['searchValue'],
+            ),
         );
     }
 
@@ -575,7 +596,7 @@ final class BenchCompareCommand extends Command
         $output->writeln(sprintf('--- %s results ---', $label));
         (new Report(
             $config,
-            new WorkloadMix($config->mix),
+            new WorkloadMix($config->run->mix),
             $snapshot,
             $subject,
             $external,

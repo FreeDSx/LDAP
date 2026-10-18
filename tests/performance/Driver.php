@@ -16,6 +16,7 @@ namespace Tests\Performance\FreeDSx\Ldap;
 use RuntimeException;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Performance\FreeDSx\Ldap\Config\ServerMode;
 use Tests\Performance\FreeDSx\Ldap\Server\ServerManager;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsCollector;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
@@ -45,8 +46,8 @@ final class Driver
         $this->assertPcntlAvailable();
 
         $progress = $this->progressChannel($output);
-        $mix = new WorkloadMix($this->config->mix);
-        $serverManager = $this->config->serverMode === 'spawn'
+        $mix = new WorkloadMix($this->config->run->mix);
+        $serverManager = $this->config->server->mode === ServerMode::Spawn
             ? new ServerManager($this->config)
             : null;
 
@@ -57,8 +58,8 @@ final class Driver
         } else {
             $progress->writeln(sprintf(
                 'Using external server at %s:%d.',
-                $this->config->host,
-                $this->config->port,
+                $this->config->server->host,
+                $this->config->server->port,
             ));
         }
 
@@ -110,29 +111,30 @@ final class Driver
 
     private function describeServerStart(): string
     {
-        $seedSuffix = $this->config->seedEntries > 0
-            ? sprintf(', seed-entries=%d', $this->config->seedEntries)
+        $seedSuffix = $this->config->seed->entries > 0
+            ? sprintf(', seed-entries=%d', $this->config->seed->entries)
             : '';
 
         return sprintf(
             'Starting server (backend=%s, runner=%s, port=%d%s)...',
-            $this->config->backend,
-            $this->config->runner,
-            $this->config->port,
+            $this->config->server->backend->value,
+            $this->config->server->runner->value,
+            $this->config->server->port,
             $seedSuffix,
         );
     }
 
     private function describeRunStart(): string
     {
-        $budget = $this->config->duration !== null
-            ? sprintf('duration=%ds', $this->config->duration)
-            : sprintf('ops/client=%d', $this->config->ops);
+        $run = $this->config->run;
+        $budget = $run->duration !== null
+            ? sprintf('duration=%ds', $run->duration)
+            : sprintf('ops/client=%d', $run->ops);
 
         return sprintf(
             'Running load test: clients=%d (forked), warmup=%ds, %s...',
-            $this->config->clients,
-            $this->config->warmup,
+            $run->clients,
+            $run->warmup,
             $budget,
         );
     }
@@ -148,9 +150,9 @@ final class Driver
         $allReady = $this->awaitReady($children);
 
         $goTime = microtime(true);
-        $recordStart = $goTime + $this->config->warmup;
-        $deadline = $this->config->duration !== null
-            ? $recordStart + (float) $this->config->duration
+        $recordStart = $goTime + $this->config->run->warmup;
+        $deadline = $this->config->run->duration !== null
+            ? $recordStart + (float) $this->config->run->duration
             : null;
 
         $this->broadcastGo(
@@ -166,7 +168,7 @@ final class Driver
         if (!$allReady) {
             throw new RuntimeException(sprintf(
                 'One or more of the %d load-test workers failed to connect to the server.',
-                $this->config->clients,
+                $this->config->run->clients,
             ));
         }
 
@@ -174,7 +176,7 @@ final class Driver
             throw new RuntimeException(sprintf(
                 '%d of %d load-test workers terminated abnormally: %s',
                 count($failures),
-                $this->config->clients,
+                $this->config->run->clients,
                 implode('; ', $failures),
             ));
         }
@@ -192,7 +194,7 @@ final class Driver
     {
         $children = [];
 
-        for ($i = 0; $i < $this->config->clients; $i++) {
+        for ($i = 0; $i < $this->config->run->clients; $i++) {
             [$parentReady, $childReady] = $this->socketPair();
             [$parentGo, $childGo] = $this->socketPair();
             $resultPath = sprintf(
@@ -211,7 +213,7 @@ final class Driver
                 fclose($parentReady);
                 fclose($parentGo);
                 $this->runChild(
-                    $this->config->workerIdOffset + $i,
+                    $this->config->run->workerIdOffset + $i,
                     $mix,
                     $childReady,
                     $childGo,
@@ -254,7 +256,7 @@ final class Driver
             config: $this->config,
             mix: $mix,
             stats: $stats,
-            opsCap: $this->config->ops,
+            opsCap: $this->config->run->ops,
         );
 
         try {
@@ -295,8 +297,8 @@ final class Driver
 
     private function seedChildRng(int $workerId): void
     {
-        if ($this->config->rngSeed !== null) {
-            mt_srand($this->config->rngSeed + $workerId);
+        if ($this->config->run->rngSeed !== null) {
+            mt_srand($this->config->run->rngSeed + $workerId);
 
             return;
         }
