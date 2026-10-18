@@ -41,7 +41,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteSubtreeHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryPlacementGuard;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\LockedEntryAccess;
-use FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeChunkRemover;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeDelete\SubtreeChunkRemover;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;

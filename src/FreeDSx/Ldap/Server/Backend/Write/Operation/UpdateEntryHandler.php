@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChangeReplay;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChanges;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**

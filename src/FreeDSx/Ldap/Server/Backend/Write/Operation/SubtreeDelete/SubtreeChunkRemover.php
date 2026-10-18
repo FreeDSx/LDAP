@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
+namespace FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeDelete;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\UnrecordedChanges;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\LockedEntryAccess;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 use function array_filter;

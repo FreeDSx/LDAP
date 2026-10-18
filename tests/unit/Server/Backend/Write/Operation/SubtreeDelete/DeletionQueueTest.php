@@ -11,12 +11,12 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeDelete;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
-use FreeDSx\Ldap\Server\Backend\Write\Operation\DeletionQueue;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\SubtreeDelete\DeletionQueue;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
