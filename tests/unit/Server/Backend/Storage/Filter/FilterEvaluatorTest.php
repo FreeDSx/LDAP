@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\AssertionLeafMemo;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
 use Generator;
@@ -971,6 +972,112 @@ final class FilterEvaluatorTest extends TestCase
         }
     }
 
+    public function test_a_reused_filter_with_options_matches_only_entries_holding_those_options(): void
+    {
+        $this->assertReusedFilterMatches(
+            Filters::equal(
+                'cn;lang-en',
+                'Alice',
+            ),
+            [
+                'cn;lang-en' => true,
+                'cn;lang-en;x-extra' => true,
+                'cn;lang-fr' => false,
+                'cn' => false,
+            ],
+        );
+    }
+
+    public function test_a_reused_filter_without_options_matches_every_option_variant_and_alias_of_its_type(): void
+    {
+        $this->assertReusedFilterMatches(
+            Filters::equal(
+                'cn',
+                'Alice',
+            ),
+            [
+                'cn' => true,
+                'cn;lang-en' => true,
+                'commonName' => true,
+                'CN' => true,
+                'sn' => false,
+            ],
+        );
+    }
+
+    public function test_a_reused_supertype_filter_matches_the_values_of_each_subtype(): void
+    {
+        $this->assertReusedFilterMatches(
+            Filters::equal(
+                'name',
+                'Alice',
+            ),
+            [
+                'cn' => true,
+                'sn' => true,
+                'cn;lang-en' => true,
+                'mail' => false,
+            ],
+        );
+    }
+
+    public function test_a_reused_filter_still_matches_after_more_descriptions_than_are_remembered(): void
+    {
+        $filter = Filters::equal(
+            'cn;lang-en',
+            'Alice',
+        );
+
+        for ($i = 0; $i < AssertionLeafMemo::MAX_DESCRIPTIONS + 50; $i++) {
+            $entry = new Entry(
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute(
+                    "cn;x-option-{$i}",
+                    'Alice',
+                ),
+                new Attribute(
+                    $i % 2 === 0 ? 'cn;lang-en' : 'cn;lang-fr',
+                    'Alice',
+                ),
+            );
+
+            self::assertSame(
+                $i % 2 === 0,
+                $this->subject->evaluate(
+                    $entry,
+                    $filter,
+                ),
+            );
+        }
+    }
+
+    public function test_a_reused_derived_attribute_filter_named_by_oid_answers_for_each_entry(): void
+    {
+        $filter = Filters::equal(
+            '1.3.6.1.1.20',
+            'cn=Alice,dc=example,dc=com',
+        );
+        $alice = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute(
+                'cn',
+                'Alice',
+            ),
+        );
+        $bob = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute(
+                'cn',
+                'Bob',
+            ),
+        );
+
+        for ($i = 0; $i < 3; $i++) {
+            self::assertTrue($this->subject->evaluate($alice, $filter));
+            self::assertFalse($this->subject->evaluate($bob, $filter));
+        }
+    }
+
     /**
      * Guards against evaluate() stashing compiled state on the filter; serialize catches nested composite mutations too.
      */
@@ -1511,5 +1618,34 @@ final class FilterEvaluatorTest extends TestCase
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '100'),
         );
+    }
+
+    /**
+     * @param array<string, bool> $expected Whether an entry holding the value under each description matches.
+     */
+    private function assertReusedFilterMatches(
+        FilterInterface $filter,
+        array $expected,
+    ): void {
+        for ($pass = 0; $pass < 2; $pass++) {
+            foreach ($expected as $description => $matches) {
+                $entry = new Entry(
+                    new Dn('cn=Alice,dc=example,dc=com'),
+                    new Attribute(
+                        $description,
+                        'Alice',
+                    ),
+                );
+
+                self::assertSame(
+                    $matches,
+                    $this->subject->evaluate(
+                        $entry,
+                        $filter,
+                    ),
+                    $description,
+                );
+            }
+        }
     }
 }

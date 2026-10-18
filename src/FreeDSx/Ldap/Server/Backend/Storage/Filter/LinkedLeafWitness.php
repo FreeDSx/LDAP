@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use WeakMap;
 
 /**
  * Puts the linked values a filter asks about onto the entry it is judged against.
@@ -30,10 +31,17 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
  */
 final readonly class LinkedLeafWitness
 {
+    /**
+     * @var WeakMap<FilterInterface, array<string, list<string>>>
+     */
+    private WeakMap $assertedCache;
+
     public function __construct(
         private LinkedValueLookupInterface $links,
         private LinkedAttributes $linked,
-    ) {}
+    ) {
+        $this->assertedCache = new WeakMap();
+    }
 
     /**
      * The entry as the filter needs to see it, also holding whichever of the asserted values it links.
@@ -45,14 +53,28 @@ final readonly class LinkedLeafWitness
         if ($this->linked->isEmpty()) {
             return $entry;
         }
-        $asserted = [];
-        $this->collect($filter, $asserted);
+        // The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
+        $asserted = $this->assertedCache[$filter] ??= $this->assertedBy($filter);
 
         if ($asserted === []) {
             return $entry;
         }
 
         return $this->answering($entry, $asserted);
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function assertedBy(FilterInterface $filter): array
+    {
+        $asserted = [];
+        $this->collect(
+            $filter,
+            $asserted,
+        );
+
+        return $asserted;
     }
 
     /**
