@@ -143,13 +143,13 @@ final readonly class OperationalAttributeGenerator
             true,
         );
 
-        if (!isset($supplied[strtolower(AttributeTypeOid::NAME_MODIFY_TIMESTAMP)])) {
+        if (!self::keepsSupplied($entry, $supplied, AttributeTypeOid::NAME_MODIFY_TIMESTAMP)) {
             $entry->set(
                 AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
                 $this->generateTimestamp(),
             );
         }
-        if (!isset($supplied[strtolower(AttributeTypeOid::NAME_MODIFIERS_NAME)])) {
+        if (!self::keepsSupplied($entry, $supplied, AttributeTypeOid::NAME_MODIFIERS_NAME)) {
             $entry->set(
                 AttributeTypeOid::NAME_MODIFIERS_NAME,
                 $context->getBoundDn() ?? '',
@@ -163,6 +163,20 @@ final readonly class OperationalAttributeGenerator
         if ($suppliesTimestamp) {
             $this->assertTimestampsAppropriate($entry);
         }
+    }
+
+    /**
+     * The value a change supplies stands only while the updated entry still holds it.
+     *
+     * @param array<string, true> $supplied
+     */
+    private static function keepsSupplied(
+        Entry $entry,
+        array $supplied,
+        string $name,
+    ): bool {
+        return isset($supplied[strtolower($name)])
+            && $entry->has($name);
     }
 
     /**

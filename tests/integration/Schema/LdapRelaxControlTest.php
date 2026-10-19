@@ -134,6 +134,68 @@ final class LdapRelaxControlTest extends ServerTestCase
         );
     }
 
+    public function test_a_relaxed_modify_removing_the_modify_bookkeeping_restamps_it(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-modify-removal,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-modify-removal',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=relax-modify-removal,dc=foo,dc=bar',
+                Change::delete('modifyTimestamp'),
+                Change::delete('modifiersName'),
+            ),
+            Controls::relaxRules(),
+        );
+
+        $values = $this->operationalValuesOf('cn=relax-modify-removal,dc=foo,dc=bar');
+
+        self::assertNotNull($values['modifyTimestamp']);
+        self::assertNotNull($values['modifiersName']);
+    }
+
+    public function test_a_relaxed_modify_replacing_then_removing_the_modify_bookkeeping_restamps_it(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-modify-late-removal,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-modify-late-removal',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=relax-modify-late-removal,dc=foo,dc=bar',
+                Change::replace(
+                    'modifyTimestamp',
+                    '20200102000000Z',
+                ),
+                Change::delete('modifyTimestamp'),
+                Change::replace(
+                    'modifiersName',
+                    'cn=joe,dc=foo,dc=bar',
+                ),
+                Change::delete('modifiersName'),
+            ),
+            Controls::relaxRules(),
+        );
+
+        $values = $this->operationalValuesOf('cn=relax-modify-late-removal,dc=foo,dc=bar');
+
+        self::assertNotNull($values['modifyTimestamp']);
+        self::assertNotNull($values['modifiersName']);
+    }
+
     public function test_a_relaxed_add_refuses_a_create_timestamp_in_the_future(): void
     {
         $this->authenticateAdmin();
