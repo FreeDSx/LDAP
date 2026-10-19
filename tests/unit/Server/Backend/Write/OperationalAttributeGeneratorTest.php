@@ -384,6 +384,50 @@ final class OperationalAttributeGeneratorTest extends TestCase
         );
     }
 
+    public function test_apply_for_modify_restamps_the_modify_bookkeeping_the_changes_remove(): void
+    {
+        $this->subject->applyForModify(
+            $this->entry,
+            $this->boundContext('cn=admin,dc=example,dc=com'),
+            [
+                Change::delete('modifyTimestamp'),
+                Change::replace('modifiersName'),
+            ],
+        );
+
+        self::assertMatchesRegularExpression(
+            '/^\d{14}Z$/',
+            $this->entry->get('modifyTimestamp')?->firstValue() ?? '',
+        );
+        self::assertSame(
+            'cn=admin,dc=example,dc=com',
+            $this->entry->get('modifiersName')?->firstValue(),
+        );
+    }
+
+    public function test_apply_for_modify_restamps_the_modify_bookkeeping_a_later_change_removes(): void
+    {
+        $this->subject->applyForModify(
+            $this->entry,
+            $this->boundContext('cn=admin,dc=example,dc=com'),
+            [
+                Change::replace('modifyTimestamp', '20200102000000Z'),
+                Change::delete('modifyTimestamp'),
+                Change::replace('modifiersName', 'cn=Joe,dc=example,dc=com'),
+                Change::delete('modifiersName'),
+            ],
+        );
+
+        self::assertMatchesRegularExpression(
+            '/^\d{14}Z$/',
+            $this->entry->get('modifyTimestamp')?->firstValue() ?? '',
+        );
+        self::assertSame(
+            'cn=admin,dc=example,dc=com',
+            $this->entry->get('modifiersName')?->firstValue(),
+        );
+    }
+
     public function test_apply_for_modify_refuses_a_supplied_create_timestamp_in_the_future(): void
     {
         $this->entry->set('createTimestamp', '20990101000000Z');
