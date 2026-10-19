@@ -21,9 +21,11 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use RuntimeException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
+use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -252,6 +254,62 @@ final class ResponseWriterMiddlewareTest extends TestCase
         );
     }
 
+    public function test_a_matched_dn_is_spelled_as_the_request_named_it(): void
+    {
+        $this->givenTheMatchedEntryIsVisible();
+
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,OU=People,DC=Bar')),
+            new ThrowingMiddlewareHandler($this->noSuchObject(new Dn('ou=people,dc=bar'))),
+        );
+
+        $response = $this->firstSent()?->getResponse();
+        self::assertInstanceOf(DeleteResponse::class, $response);
+        self::assertSame(
+            'OU=People,DC=Bar',
+            $response->getDn()->toString(),
+        );
+    }
+
+    public function test_a_matched_dn_above_a_new_superior_is_spelled_as_the_request_named_it(): void
+    {
+        $this->givenTheMatchedEntryIsVisible();
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest(
+                'cn=moving,dc=bar',
+                'cn=moving',
+                true,
+                'OU=Missing,OU=Moved,DC=Bar',
+            )),
+            new ThrowingMiddlewareHandler($this->noSuchObject(new Dn('ou=moved,dc=bar'))),
+        );
+
+        $response = $this->firstSent()?->getResponse();
+        self::assertInstanceOf(ModifyDnResponse::class, $response);
+        self::assertSame(
+            'OU=Moved,DC=Bar',
+            $response->getDn()->toString(),
+        );
+    }
+
+    public function test_a_matched_dn_the_request_did_not_name_is_kept_as_given(): void
+    {
+        $this->givenTheMatchedEntryIsVisible();
+
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
+            new ThrowingMiddlewareHandler($this->noSuchObject(new Dn('dc=elsewhere'))),
+        );
+
+        $response = $this->firstSent()?->getResponse();
+        self::assertInstanceOf(DeleteResponse::class, $response);
+        self::assertSame(
+            'dc=elsewhere',
+            $response->getDn()->toString(),
+        );
+    }
+
     public function test_it_answers_a_storage_failure_without_naming_the_internals(): void
     {
         $this->subject->process(
@@ -319,6 +377,16 @@ final class ResponseWriterMiddlewareTest extends TestCase
             $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
             new ThrowingMiddlewareHandler(new ProtocolException('The response could not be encoded.')),
         );
+    }
+
+    private function givenTheMatchedEntryIsVisible(): void
+    {
+        $this->mockBackend
+            ->method('get')
+            ->willReturn(Entry::create('dc=bar'));
+        $this->mockAccessControl
+            ->method('isEntryVisible')
+            ->willReturn(true);
     }
 
     private function noSuchObject(Dn $matchedDn): OperationException

@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -483,5 +484,82 @@ trait DnSpellingTestsTrait
             ['Smith, John'],
             $entries->first()?->get(new Attribute('cn'), true)?->getValues(),
         );
+    }
+
+    public function testAnAddUnderAMissingParentMatchesTheAncestorAsTheRequestSpelledIt(): void
+    {
+        self::assertSame(
+            'OU=People,DC=Foo,DC=Bar',
+            $this->matchedDnOf(Operations::add(Entry::fromArray(
+                'cn=orphan,OU=Missing,OU=People,DC=Foo,DC=Bar',
+                [
+                    'objectClass' => 'person',
+                    'cn' => 'orphan',
+                    'sn' => 'Orphan',
+                ],
+            ))),
+        );
+    }
+
+    public function testAModifyOfAMissingEntryMatchesTheParentAsTheRequestSpelledIt(): void
+    {
+        self::assertSame(
+            'OU=People,DC=Foo,DC=Bar',
+            $this->matchedDnOf(Operations::modify(
+                'cn=missing,OU=People,DC=Foo,DC=Bar',
+                Change::replace(
+                    'description',
+                    'changed',
+                ),
+            )),
+        );
+    }
+
+    public function testADeleteOfAMissingEntryMatchesTheParentAsTheRequestSpelledIt(): void
+    {
+        self::assertSame(
+            'OU=People,DC=Foo,DC=Bar',
+            $this->matchedDnOf(Operations::delete('cn=missing,OU=People,DC=Foo,DC=Bar')),
+        );
+    }
+
+    public function testARenameOfAMissingEntryMatchesTheParentAsTheRequestSpelledIt(): void
+    {
+        self::assertSame(
+            'OU=People,DC=Foo,DC=Bar',
+            $this->matchedDnOf(Operations::rename(
+                'cn=missing,OU=People,DC=Foo,DC=Bar',
+                'cn=renamed',
+            )),
+        );
+    }
+
+    public function testAMoveUnderAMissingSuperiorMatchesItsAncestorAsTheRequestSpelledIt(): void
+    {
+        self::assertSame(
+            'OU=People,DC=Foo,DC=Bar',
+            $this->matchedDnOf(Operations::move(
+                'cn=user,dc=foo,dc=bar',
+                'OU=Missing,OU=People,DC=Foo,DC=Bar',
+            )),
+        );
+    }
+
+    private function matchedDnOf(RequestInterface $request): ?string
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->send($request);
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $e->getCode(),
+            );
+
+            return $e->getMatchedDn()?->toString();
+        }
+
+        self::fail('The request should have been refused as naming no such object.');
     }
 }
