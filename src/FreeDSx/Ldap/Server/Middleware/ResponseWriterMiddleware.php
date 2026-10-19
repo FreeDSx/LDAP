@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Middleware;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\MatchedDnAccessFilterTrait;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
@@ -84,7 +87,10 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
                 $exception->getCode(),
                 $exception->getMessage(),
                 $this->filterMatchedDn(
-                    $exception->getMatchedDn(),
+                    self::asProvided(
+                        $exception->getMatchedDn(),
+                        $context->message->getRequest(),
+                    ),
                     $context->tokenOrFail(),
                     $this->backend,
                     $this->accessControl,
@@ -97,5 +103,47 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
                 $exception,
             ),
         );
+    }
+
+    /**
+     * RFC 4511 4.1.9: the matchedDN is a truncated form of the provided name, in the spelling the request used.
+     */
+    private static function asProvided(
+        ?Dn $matchedDn,
+        RequestInterface $request,
+    ): ?Dn {
+        if ($matchedDn === null) {
+            return null;
+        }
+        $matched = $matchedDn->normalizedString();
+
+        foreach (OperationTargetDn::named($request) as $provided) {
+            $truncated = self::truncatedTo(
+                $provided,
+                $matched,
+            );
+
+            if ($truncated !== null) {
+                return $truncated;
+            }
+        }
+
+        return $matchedDn;
+    }
+
+    /**
+     * The provided DN, or the ancestor of it, that names the same entry as the matched one.
+     */
+    private static function truncatedTo(
+        Dn $provided,
+        string $matched,
+    ): ?Dn {
+        for ($candidate = $provided; $candidate !== null; $candidate = $candidate->getParent()) {
+            if ($candidate->normalizedString() === $matched) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }

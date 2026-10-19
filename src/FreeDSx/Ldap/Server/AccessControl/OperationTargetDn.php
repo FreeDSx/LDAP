@@ -20,6 +20,10 @@ use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+
+use function array_filter;
+use function array_values;
 
 /**
  * Resolves the primary target DN an operation request acts on.
@@ -38,6 +42,24 @@ final class OperationTargetDn
             $request instanceof CompareRequest => $request->getDn(),
             default => null,
         };
+    }
+
+    /**
+     * @return list<Dn>
+     */
+    public static function named(RequestInterface $request): array
+    {
+        $dns = [
+            $request instanceof SearchRequest
+                ? $request->getBaseDn()
+                : self::of($request),
+        ];
+
+        if ($request instanceof ModifyDnRequest) {
+            $dns[] = $request->getNewParentDn();
+        }
+
+        return array_values(array_filter($dns));
     }
 
     /**
