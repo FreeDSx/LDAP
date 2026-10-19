@@ -439,6 +439,70 @@ final class AddEntryHandlerTest extends TestCase
         }
     }
 
+    #[DataProvider('undefinableTypeProvider')]
+    public function test_an_add_naming_a_type_no_schema_can_define_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+        string $type,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                'cn=Alice,dc=example,dc=com',
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Alice'],
+                    'sn' => ['Smith'],
+                    $type => ['value'],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode, string}>
+     */
+    public static function undefinableTypeProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield "non-ASCII under {$mode->name}" => [
+                $mode,
+                'café',
+            ];
+            yield "control character under {$mode->name}" => [
+                $mode,
+                "a\tb",
+            ];
+        }
+    }
+
+    #[DataProvider('validationModeProvider')]
+    public function test_an_add_naming_a_type_beyond_the_storage_bound_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                'cn=Alice,dc=example,dc=com',
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Alice'],
+                    'sn' => ['Smith'],
+                    'a' . str_repeat('b', Attribute::MAX_TYPE_LENGTH) => ['value'],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
     public function test_a_lenient_validator_records_the_violation_and_writes_anyway(): void
     {
         $this->validatedGraph(SchemaValidationMode::Lenient);

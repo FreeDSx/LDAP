@@ -30,6 +30,17 @@ final class TextTest extends TestCase
         );
     }
 
+    #[DataProvider('printableAsciiProvider')]
+    public function test_is_printable_ascii(
+        string $value,
+        bool $expected,
+    ): void {
+        self::assertSame(
+            $expected,
+            Text::isPrintableAscii($value),
+        );
+    }
+
     #[DataProvider('utf8Provider')]
     public function test_is_utf8(
         string $value,
@@ -64,6 +75,22 @@ final class TextTest extends TestCase
             'accented letter' => ['café', false],
             'emoji' => ['😀', false],
             'high byte' => ["\xFF", false],
+        ];
+    }
+
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function printableAsciiProvider(): array
+    {
+        return [
+            'plain ascii' => ['user@example.com', true],
+            'empty' => ['', true],
+            'space' => ['a b', true],
+            'tab' => ["a\tb", false],
+            'trailing newline' => ["cn\n", false],
+            'delete' => ["a\x7Fb", false],
+            'accented letter' => ['café', false],
         ];
     }
 

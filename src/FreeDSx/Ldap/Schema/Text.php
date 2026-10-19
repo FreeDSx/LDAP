@@ -29,6 +29,14 @@ final class Text
     }
 
     /**
+     * Whether the value contains only printable ASCII bytes, without control characters.
+     */
+    public static function isPrintableAscii(string $value): bool
+    {
+        return preg_match('/[^\x20-\x7E]/', $value) === 0;
+    }
+
+    /**
      * Whether the value is well-formed UTF-8.
      */
     public static function isUtf8(string $value): bool

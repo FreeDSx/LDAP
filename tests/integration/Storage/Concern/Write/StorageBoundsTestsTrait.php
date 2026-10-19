@@ -269,6 +269,30 @@ trait StorageBoundsTestsTrait
         )));
     }
 
+    public function testANonAsciiAttributeTypeIsRefusedAsUndefinedWithValidationOff(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--validation-mode=off',
+            ],
+        );
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->send(Operations::add(new Entry(
+            'cn=nonascii,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'nonascii'),
+            new Attribute('sn', 'Non Ascii'),
+            new Attribute('café', 'value'),
+        )));
+    }
+
     public function testAModifyAddingADescriptionNamingNoTypeIsRefusedWithValidationOff(): void
     {
         $this->stopServer();

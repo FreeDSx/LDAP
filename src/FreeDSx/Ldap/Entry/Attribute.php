@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Entry;
 
 use ArrayIterator;
 use Countable;
+use FreeDSx\Ldap\Schema\Text;
 use IteratorAggregate;
 use Stringable;
 use Traversable;
@@ -219,7 +220,7 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     public static function isStorableType(string $type): bool
     {
         return strlen($type) <= self::MAX_TYPE_LENGTH
-            && preg_match('/^[\x20-\x7E]*$/D', $type) === 1;
+            && Text::isPrintableAscii($type);
     }
 
     /**
