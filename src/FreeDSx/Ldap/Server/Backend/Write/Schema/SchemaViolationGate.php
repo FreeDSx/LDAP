@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
@@ -121,28 +122,35 @@ final readonly class SchemaViolationGate
     private function assertTypesStorable(Entry $entry): void
     {
         foreach ($entry->getAttributes() as $attribute) {
-            $type = $attribute->getName();
+            $this->assertTypeStorable($attribute->getName());
+        }
+    }
 
-            // RFC 4512 2.5: a description always names a type, whatever the validation mode allows.
-            if ($type === '') {
-                throw new OperationException(
-                    'The attribute description names no attribute type.',
-                    ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
-                );
-            }
-            if (Attribute::isStorableType($type)) {
-                continue;
-            }
-
+    /**
+     * RFC 4512 2.5: a description names a type, and only printable ASCII spells one, whatever the mode allows.
+     *
+     * @throws OperationException
+     */
+    private function assertTypeStorable(string $type): void
+    {
+        if ($type === '' || !Text::isPrintableAscii($type)) {
             throw new OperationException(
-                sprintf(
-                    'The attribute type is %d bytes, beyond the %d the directory stores, or is not ASCII.',
-                    strlen($type),
-                    Attribute::MAX_TYPE_LENGTH,
-                ),
-                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                'The attribute description names no type a schema can define.',
+                ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
             );
         }
+        if (strlen($type) <= Attribute::MAX_TYPE_LENGTH) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'The attribute type is %d bytes, beyond the %d the directory stores.',
+                strlen($type),
+                Attribute::MAX_TYPE_LENGTH,
+            ),
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+        );
     }
 
     /**
