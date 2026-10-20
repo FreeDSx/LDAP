@@ -240,6 +240,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             readEntryControlHandler: new ReadEntryControlHandler(
                 $container->get(ServerOptions::class)->getSchema(),
                 $container->get(AccessControlInterface::class),
+                $container->get(LinkedAttributes::class),
             ),
         );
     }

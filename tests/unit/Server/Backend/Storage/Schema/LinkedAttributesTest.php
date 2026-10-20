@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
@@ -148,12 +149,74 @@ final class LinkedAttributesTest extends TestCase
     public function test_it_reports_the_backlink_reversing_each_linked_name(): void
     {
         self::assertSame(
-            ['memberof'],
+            ['memberOf'],
             $this->subject->backlinks()->reversing('member'),
         );
         self::assertSame(
             ['member'],
             $this->subject->backlinks()->linkedNames(),
+        );
+    }
+
+    public function test_a_request_matches_the_backlink_names_lowercased(): void
+    {
+        self::assertSame(
+            ['memberof'],
+            $this->subject->backlinks()->names(),
+        );
+        self::assertSame(
+            ['memberOf'],
+            $this->subject->backlinks()->only(['memberof'])->reversing('member'),
+        );
+    }
+
+    public function test_a_linked_attribute_or_backlink_is_named_by_its_primary_name(): void
+    {
+        self::assertSame(
+            'seeAlso',
+            $this->subject->primaryName('SEEALSO'),
+        );
+        self::assertSame(
+            'memberOf',
+            $this->subject->primaryName('memberof'),
+        );
+    }
+
+    public function test_an_entry_naming_its_links_as_the_schema_does_is_returned_as_is(): void
+    {
+        $entry = Entry::fromArray(
+            'cn=foo,dc=example,dc=com',
+            [
+                'cn' => 'foo',
+                'seeAlso' => 'cn=bar,dc=example,dc=com',
+            ],
+        );
+
+        self::assertSame(
+            $entry,
+            $this->subject->withSchemaNames($entry),
+        );
+    }
+
+    public function test_only_a_linked_attribute_spelled_otherwise_is_renamed_and_on_a_copy(): void
+    {
+        $entry = Entry::fromArray(
+            'cn=foo,dc=example,dc=com',
+            [
+                'CN' => 'foo',
+                'SEEALSO' => 'cn=bar,dc=example,dc=com',
+            ],
+        );
+
+        self::assertSame(
+            [
+                ['CN', 'seeAlso'],
+                ['CN', 'SEEALSO'],
+            ],
+            [
+                self::namesOf($this->subject->withSchemaNames($entry)),
+                self::namesOf($entry),
+            ],
         );
     }
 
@@ -209,7 +272,7 @@ final class LinkedAttributesTest extends TestCase
         $subject->assertBacklinksAreDerivable();
 
         self::assertEqualsCanonicalizing(
-            ['memberof', 'ismemberof'],
+            ['memberOf', 'isMemberOf'],
             $subject->backlinks()->reversing('member'),
         );
         self::assertSame(
@@ -230,7 +293,7 @@ final class LinkedAttributesTest extends TestCase
         );
 
         self::assertSame(
-            ['ownedby'],
+            ['ownedBy'],
             $subject->backlinks()->reversing('owner'),
         );
         // Either name still resolves, so a filter naming the alias is answered from the same rows.
@@ -299,5 +362,16 @@ final class LinkedAttributesTest extends TestCase
     private function links(string $description): bool
     {
         return $this->subject->links(new Attribute($description));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function namesOf(Entry $entry): array
+    {
+        return array_map(
+            static fn(Attribute $attribute): string => $attribute->getName(),
+            array_values($entry->getAttributes()),
+        );
     }
 }

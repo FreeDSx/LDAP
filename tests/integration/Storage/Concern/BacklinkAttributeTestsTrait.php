@@ -66,12 +66,22 @@ trait BacklinkAttributeTestsTrait
         $entry = $this->ldapClient()->read($member, ['memberOf;range=1-2']);
 
         self::assertSame(
-            ['memberof;range=1-*'],
+            ['memberOf;range=1-*'],
             $this->backlinkNamesOf($entry),
         );
         self::assertCount(
             2,
-            $entry?->get('memberof;range=1-*')?->getValues() ?? [],
+            $entry?->get('memberOf;range=1-*')?->getValues() ?? [],
+        );
+    }
+
+    public function testABacklinkIsReturnedUnderItsSchemaName(): void
+    {
+        [$member] = $this->seedBacklinkPair('backlink-name');
+
+        self::assertSame(
+            ['memberOf'],
+            $this->backlinkNamesOf($this->ldapClient()->read($member, ['MEMBEROF'])),
         );
     }
 

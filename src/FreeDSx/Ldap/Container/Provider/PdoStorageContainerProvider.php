@@ -296,12 +296,13 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
                 $dialect,
                 $connection,
                 LinkDirection::Forward,
+                $linked,
             ),
             new LinkSpanReader(
                 $dialect,
                 $connection,
                 LinkDirection::Backward,
-                $linked->backlinks(),
+                $linked,
             ),
         );
     }

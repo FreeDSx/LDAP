@@ -89,6 +89,14 @@ final class LinkedAttributes
     }
 
     /**
+     * The name a linked attribute or back-link is returned under. This is its type's primary name.
+     */
+    public function primaryName(string $name): string
+    {
+        return $this->schema->getAttributeType($name)?->primaryName() ?? $name;
+    }
+
+    /**
      * Whether values live in the link table rather than on the entry.
      */
     public function heldApart(Attribute $attribute): bool
@@ -188,6 +196,40 @@ final class LinkedAttributes
         return $values;
     }
 
+    /**
+     * The entry with its linked attributes under their schema names, copied only when one is spelled otherwise.
+     */
+    public function withSchemaNames(Entry $entry): Entry
+    {
+        foreach ($entry->getAttributes() as $attribute) {
+            if ($this->isSpelledOtherwise($attribute)) {
+                return $this->respelled($entry);
+            }
+        }
+
+        return $entry;
+    }
+
+    private function isSpelledOtherwise(Attribute $attribute): bool
+    {
+        return $this->links($attribute)
+            && $attribute->getName() !== $this->primaryName($attribute->getName());
+    }
+
+    private function respelled(Entry $entry): Entry
+    {
+        $respelled = $entry->makeCopy();
+
+        foreach ($this->valuesOf($entry) as $name => $values) {
+            $respelled->set(
+                $this->primaryName($name),
+                ...$values,
+            );
+        }
+
+        return $respelled;
+    }
+
     private function resolveBacklinks(): Backlinks
     {
         $reverses = [];
@@ -205,7 +247,7 @@ final class LinkedAttributes
             }
 
             // Values come back under one name per type, since repeating them under every alias would only duplicate.
-            $read[Attribute::normalizeName($type->primaryName())] = $linked;
+            $read[$type->primaryName()] = $linked;
         }
 
         return new Backlinks(

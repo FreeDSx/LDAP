@@ -85,6 +85,7 @@ final class ServerDispatchHandlerTest extends TestCase
             readEntryControlHandler: new ReadEntryControlHandler(
                 new Schema(),
                 $this->mockAccessControl,
+                new LinkedAttributes(new Schema()),
             ),
         );
     }

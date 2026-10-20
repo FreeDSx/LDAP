@@ -12,6 +12,7 @@ use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
@@ -19,6 +20,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\TestCase;
@@ -31,13 +33,17 @@ final class ReadEntryControlHandlerTest extends TestCase
 
     private TokenInterface $token;
 
+    private LinkedAttributes $linked;
+
     protected function setUp(): void
     {
         $this->entry = Entry::fromArray('cn=foo,dc=ex,dc=com', ['cn' => ['foo']]);
         $this->token = BindToken::fromDn('cn=foo,dc=ex,dc=com');
+        $this->linked = new LinkedAttributes(SchemaResource::Core->load());
         $this->subject = new ReadEntryControlHandler(
             new Schema(),
             new RuleBasedAccessControl(AclRules::fromEmpty(operations: self::searchAllowed())),
+            $this->linked,
         );
     }
 
@@ -91,6 +97,27 @@ final class ReadEntryControlHandlerTest extends TestCase
         self::assertInstanceOf(PostReadResponseControl::class, $control);
         self::assertSame(
             ['cn'],
+            array_map(
+                static fn($attr): string => $attr->getName(),
+                $control->getEntry()->getAttributes(),
+            ),
+        );
+    }
+
+    public function test_post_read_names_a_linked_attribute_as_the_schema_does(): void
+    {
+        $control = $this->subject->postRead(
+            Entry::fromArray('cn=foo,dc=ex,dc=com', [
+                'cn' => ['foo'],
+                'MEMBER' => ['cn=bar,dc=ex,dc=com'],
+            ]),
+            new ControlBag(new PostReadControl('member')),
+            $this->token,
+        );
+
+        self::assertInstanceOf(PostReadResponseControl::class, $control);
+        self::assertSame(
+            ['member'],
             array_map(
                 static fn($attr): string => $attr->getName(),
                 $control->getEntry()->getAttributes(),
@@ -157,6 +184,7 @@ final class ReadEntryControlHandlerTest extends TestCase
         $subject = new ReadEntryControlHandler(
             new Schema(),
             new RuleBasedAccessControl(AclRules::fromEmpty()),
+            $this->linked,
         );
 
         self::assertNull($subject->preRead(
@@ -194,6 +222,7 @@ final class ReadEntryControlHandlerTest extends TestCase
                     )->forRead(),
                 ],
             )),
+            $this->linked,
         );
     }
 }

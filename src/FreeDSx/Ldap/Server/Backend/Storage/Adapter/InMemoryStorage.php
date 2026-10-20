@@ -461,19 +461,26 @@ final class InMemoryStorage implements
     }
 
     /**
-     * The entry carrying the linked values the one it replaces held.
+     * The entry carrying the linked values another holds, under the names a read from storage returns them by.
      */
-    private function withStoredLinks(
+    private function withLinksOf(
         Entry $entry,
-        ?Entry $previous,
+        ?Entry $holder,
     ): Entry {
-        if ($previous === null) {
+        $held = $holder === null
+            ? []
+            : $this->linkedAttributes->valuesOf($holder);
+
+        if ($held === []) {
             return $entry;
         }
         $restored = $entry->makeCopy();
 
-        foreach ($this->linkedAttributes->valuesOf($previous) as $name => $values) {
-            $restored->set($name, ...$values);
+        foreach ($held as $name => $values) {
+            $restored->set(
+                $this->linkedAttributes->primaryName($name),
+                ...$values,
+            );
         }
 
         return $restored;
@@ -488,14 +495,15 @@ final class InMemoryStorage implements
         ?Entry $previous,
     ): Entry {
         if ($links->isUntouched()) {
-            return $this->withStoredLinks(
+            return $this->withLinksOf(
                 $entry,
                 $previous,
             );
         }
 
+        // Written whole, the entry holds every value it links, though under the client's spelling.
         if ($links->isEmpty()) {
-            return $entry;
+            return $this->linkedAttributes->withSchemaNames($entry);
         }
         $updated = $entry->makeCopy();
 
@@ -510,7 +518,10 @@ final class InMemoryStorage implements
 
             $values === []
                 ? $updated->reset($name)
-                : $updated->set($name, ...$values);
+                : $updated->set(
+                    $this->linkedAttributes->primaryName($name),
+                    ...$values,
+                );
         }
 
         return $updated;

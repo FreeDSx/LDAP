@@ -16,12 +16,13 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 use FreeDSx\Ldap\Entry\Attribute;
 
 use function array_keys;
+use function array_map;
 use function array_unique;
 use function array_values;
 use function in_array;
 
 /**
- * Which attributes reverse which linked ones.
+ * Which attributes reverse which linked ones, looked up by lowercased name and read back under the schema's spelling.
  *
  * @internal
  *
@@ -30,8 +31,8 @@ use function in_array;
 final readonly class Backlinks
 {
     /**
-     * @param array<string, string> $reverses Every back-link name, aliases included, to the linked name it reverses.
-     * @param array<string, string> $read The name each back-link is read under, to the linked name it reverses.
+     * @param array<string, string> $reverses Each lowercased back-link name or alias, to the linked name it reverses.
+     * @param array<string, string> $read The schema name each back-link is read under, to the linked name it reverses.
      */
     public function __construct(
         private array $reverses = [],
@@ -84,20 +85,23 @@ final readonly class Backlinks
      */
     public function names(): array
     {
-        return array_keys($this->read);
+        return array_map(
+            Attribute::normalizeName(...),
+            array_keys($this->read),
+        );
     }
 
     /**
      * Only the back-links among those named.
      *
-     * @param list<string> $wanted
+     * @param list<string> $wanted Lowercased names.
      */
     public function only(array $wanted): self
     {
         $read = [];
 
         foreach ($this->read as $backlink => $reverses) {
-            if (in_array($backlink, $wanted, true)) {
+            if (in_array(Attribute::normalizeName($backlink), $wanted, true)) {
                 $read[$backlink] = $reverses;
             }
         }

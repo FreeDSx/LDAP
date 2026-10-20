@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -429,6 +430,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
             readEntryControlHandler: new ReadEntryControlHandler(
                 new Schema(),
                 $this->createMock(AccessControlInterface::class),
+                $container->get(LinkedAttributes::class),
             ),
         );
     }
