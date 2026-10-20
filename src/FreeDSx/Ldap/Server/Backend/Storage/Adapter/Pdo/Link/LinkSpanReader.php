@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\Backlinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
 
 use function array_map;
@@ -48,18 +49,27 @@ final readonly class LinkSpanReader
 
     private string $attributeFrom;
 
+    private Backlinks $backlinks;
+
     /**
-     * @param Backlinks $namedAs What each stored attribute is read back under, which reading forwards is nothing.
+     * @var array<string, list<string>> The names each stored attribute's values are returned under.
      */
+    private array $returnedAs;
+
     public function __construct(
         private PdoLinkReadDialectInterface&PdoBacklinkReadDialectInterface $dialect,
         private PdoConnection $connection,
         private LinkDirection $direction,
-        private Backlinks $namedAs = new Backlinks(),
+        LinkedAttributes $linked,
     ) {
         // Resolved here rather than in a method of its own because PhpStan doesn't support that :/
         $backward = $direction === LinkDirection::Backward;
-        $names = $namedAs->linkedNames();
+        $this->backlinks = $linked->backlinks();
+        $this->returnedAs = self::returnedAs(
+            $direction,
+            $linked,
+        );
+        $names = $this->backlinks->linkedNames();
 
         $this->attribute = $backward
             ? $dialect->queryBacklinksForAttribute()
@@ -86,7 +96,7 @@ final readonly class LinkSpanReader
     public function isIdle(): bool
     {
         return $this->direction === LinkDirection::Backward
-            && $this->namedAs->isEmpty();
+            && $this->backlinks->isEmpty();
     }
 
     /**
@@ -179,7 +189,7 @@ final readonly class LinkSpanReader
         return match ($this->direction) {
             LinkDirection::Forward => $this->dialect->queryLinksForRangeExcept($count),
             LinkDirection::Backward => $this->dialect->queryBacklinksForRangeExcept(
-                $this->namedAs->linkedNames(),
+                $this->backlinks->linkedNames(),
                 $count,
             ),
         };
@@ -269,8 +279,7 @@ final readonly class LinkSpanReader
             $entryId = $this->intColumn($row['key_entry_id'] ?? null);
             $dn = $this->stringColumn($row['dn'] ?? null);
 
-            // Reading forwards the stored name is the one it is read under; reading backwards, every back-link's.
-            foreach ($this->namedAs->reversing($stored) ?: [$stored] as $name) {
+            foreach ($this->returnedAs[$stored] ?? [$stored] as $name) {
                 $links[$entryId][$name][] = $dn;
             }
         }
@@ -312,6 +321,31 @@ final readonly class LinkSpanReader
         }
 
         return $bounded;
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private static function returnedAs(
+        LinkDirection $direction,
+        LinkedAttributes $linked,
+    ): array {
+        $returnedAs = [];
+        $backlinks = $linked->backlinks();
+
+        if ($direction === LinkDirection::Backward) {
+            foreach ($backlinks->linkedNames() as $stored) {
+                $returnedAs[$stored] = $backlinks->reversing($stored);
+            }
+
+            return $returnedAs;
+        }
+
+        foreach ($linked->names() as $stored) {
+            $returnedAs[$stored] = [$linked->primaryName($stored)];
+        }
+
+        return $returnedAs;
     }
 
     /**

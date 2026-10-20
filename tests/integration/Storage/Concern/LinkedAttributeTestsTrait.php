@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
@@ -338,6 +341,122 @@ trait LinkedAttributeTestsTrait
         );
     }
 
+    public function testALinkedAttributeIsReturnedUnderItsSchemaName(): void
+    {
+        $person = $this->seedPerson(
+            'link-name',
+            [],
+            ['SEEALSO' => self::LINKED_ADMIN],
+        );
+
+        self::assertSame(
+            ['seeAlso'],
+            $this->attributeNamesOf($this->ldapClient()->read($person, ['seeAlso'])),
+        );
+    }
+
+    public function testAValueAddedToALinkedAttributeIsReturnedUnderItsSchemaName(): void
+    {
+        $person = $this->seedPerson(
+            'link-name-add',
+            [],
+            ['seeAlso' => self::LINKED_ADMIN],
+        );
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::add(
+                'SEEALSO',
+                self::LINKED_USER,
+            ),
+        ));
+
+        self::assertSame(
+            ['seeAlso'],
+            $this->attributeNamesOf($this->ldapClient()->read($person, ['seeAlso'])),
+        );
+    }
+
+    public function testAChangeLeavingALinkedAttributeAloneKeepsItsSchemaName(): void
+    {
+        $person = $this->seedPerson(
+            'link-name-kept',
+            [],
+            ['seeAlso' => self::LINKED_ADMIN],
+        );
+
+        $this->ldapClient()->send(Operations::modify(
+            $person,
+            Change::replace(
+                'description',
+                'Renamed',
+            ),
+        ));
+
+        self::assertSame(
+            ['seeAlso'],
+            $this->attributeNamesOf($this->ldapClient()->read($person, ['seeAlso'])),
+        );
+    }
+
+    public function testASliceOfALinkedAttributeIsNamedUnderItsSchemaName(): void
+    {
+        $person = $this->seedPerson(
+            'link-name-slice',
+            [],
+            ['seeAlso' => [self::LINKED_ADMIN, self::LINKED_USER]],
+        );
+
+        self::assertSame(
+            ['seeAlso;range=1-*'],
+            $this->attributeNamesOf($this->ldapClient()->read($person, ['seeAlso;range=1-*'])),
+        );
+    }
+
+    public function testAPostReadOfAnAddNamesALinkedAttributeAsTheSchemaDoes(): void
+    {
+        $this->authenticateAdmin();
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::add(Entry::fromArray(
+                'cn=link-name-post-add,dc=foo,dc=bar',
+                [
+                    'cn' => 'link-name-post-add',
+                    'sn' => 'link-name-post-add',
+                    'objectClass' => 'person',
+                    'SEEALSO' => self::LINKED_ADMIN,
+                ],
+            )),
+            Controls::postRead('seeAlso'),
+        );
+
+        self::assertSame(
+            ['seeAlso'],
+            $this->attributeNamesOf($this->postReadOf($response)),
+        );
+    }
+
+    public function testAPostReadOfAModifyNamesALinkedAttributeAsTheSchemaDoes(): void
+    {
+        $person = $this->seedPerson('link-name-post-modify');
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::modify(
+                $person,
+                Change::replace(
+                    'SEEALSO',
+                    self::LINKED_ADMIN,
+                ),
+            ),
+            Controls::postRead('seeAlso'),
+        );
+
+        self::assertSame(
+            ['seeAlso'],
+            $this->attributeNamesOf($this->postReadOf($response)),
+        );
+    }
+
     public function testASliceOfAMembershipIsReturnedUnderTheRangeItHolds(): void
     {
         // Four members, so the slice asked for stops short of the end and is named for where it stops.
@@ -481,7 +600,7 @@ trait LinkedAttributeTestsTrait
 
     /**
      * @param list<string> $auxiliaries
-     * @param array<string, string> $attributes
+     * @param array<string, string|list<string>> $attributes
      */
     private function seedPerson(
         string $cn,
@@ -515,6 +634,15 @@ trait LinkedAttributeTestsTrait
                 ?->get('member')
                 ?->getValues() ?? [],
         );
+    }
+
+    private function postReadOf(LdapMessageResponse $response): ?Entry
+    {
+        $control = $response->controls()->get(Control::OID_POST_READ);
+
+        return $control instanceof PostReadResponseControl
+            ? $control->getEntry()
+            : null;
     }
 
     private function expectOperationCode(int $code): void

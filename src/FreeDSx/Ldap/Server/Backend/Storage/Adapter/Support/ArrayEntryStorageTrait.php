@@ -138,7 +138,7 @@ trait ArrayEntryStorageTrait
 
             $sliced->set(
                 $window->nameFor(
-                    $name,
+                    $this->linkedAttributes->primaryName($name),
                     count($slice),
                     count($values) > $window->first + count($slice),
                 ),

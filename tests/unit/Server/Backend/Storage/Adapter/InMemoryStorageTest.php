@@ -238,6 +238,71 @@ final class InMemoryStorageTest extends TestCase
         self::assertNull($subject->find(new Dn('cn=admins,dc=ex,dc=com'))?->get('member'));
     }
 
+    public function test_an_entry_written_whole_holds_its_linked_attributes_under_their_schema_names(): void
+    {
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()),
+        );
+
+        $subject->store(EntryFixture::withUuid(Entry::fromArray(
+            'cn=alice,dc=ex,dc=com',
+            ['cn' => ['alice'], 'SEEALSO' => ['cn=bob,dc=ex,dc=com']],
+        )));
+
+        self::assertSame(
+            'seeAlso',
+            $subject->find(new Dn('cn=alice,dc=ex,dc=com'))?->get('seeAlso')?->getName(),
+        );
+    }
+
+    public function test_a_delta_holds_the_attribute_it_changes_under_its_schema_name(): void
+    {
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()),
+        );
+        $subject->store(EntryFixture::withUuid(Entry::fromArray(
+            'cn=alice,dc=ex,dc=com',
+            ['cn' => ['alice'], 'seeAlso' => ['cn=bob,dc=ex,dc=com']],
+        )));
+
+        $subject->store(
+            EntryFixture::withUuid(Entry::fromArray(
+                'cn=alice,dc=ex,dc=com',
+                ['cn' => ['alice']],
+            )),
+            links: new LinkDelta(added: ['seealso' => ['cn=carol,dc=ex,dc=com']]),
+        );
+
+        self::assertSame(
+            'seeAlso',
+            $subject->find(new Dn('cn=alice,dc=ex,dc=com'))?->get('seeAlso')?->getName(),
+        );
+    }
+
+    public function test_an_untouched_write_holds_the_kept_values_under_their_schema_name(): void
+    {
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()),
+        );
+        $subject->store(EntryFixture::withUuid(Entry::fromArray(
+            'cn=alice,dc=ex,dc=com',
+            ['cn' => ['alice'], 'seeAlso' => ['cn=bob,dc=ex,dc=com']],
+        )));
+
+        $subject->store(
+            EntryFixture::withUuid(Entry::fromArray(
+                'cn=alice,dc=ex,dc=com',
+                ['cn' => ['alice'], 'description' => ['Renamed']],
+            )),
+            links: LinkDelta::untouched(),
+        );
+
+        self::assertSame(
+            'seeAlso',
+            $subject->find(new Dn('cn=alice,dc=ex,dc=com'))?->get('seeAlso')?->getName(),
+        );
+    }
+
     public function test_find_returns_null_for_unknown_norm_dn(): void
     {
         self::assertNull($this->subject->find(new Dn('cn=nobody,dc=example,dc=com')));

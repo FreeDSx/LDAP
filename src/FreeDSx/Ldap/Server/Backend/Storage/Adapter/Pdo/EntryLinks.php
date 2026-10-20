@@ -262,7 +262,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
             }
 
             $links[$window->nameFor(
-                $name,
+                $this->declared->primaryName($name),
                 count($values),
                 $more,
             )] = $values;

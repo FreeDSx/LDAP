@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
@@ -26,7 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
-use FreeDSx\Ldap\Server\Backend\Storage\Schema\Backlinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -40,7 +42,13 @@ final class LinkSpanReaderTest extends TestCase
 
     private const MEMBER = 'cn=alice,dc=example,dc=com';
 
-    private LinkSpanReader $subject;
+    private const STAFF = 'cn=staff,dc=example,dc=com';
+
+    private const SECOND_MEMBER = 'cn=bob,dc=example,dc=com';
+
+    private LinkSpanReader $backward;
+
+    private LinkSpanReader $forward;
 
     private EntryWriter $storage;
 
@@ -57,15 +65,24 @@ final class LinkSpanReaderTest extends TestCase
         );
         $this->storage = $container->get(EntryWriter::class);
         $this->connection = $container->get(PdoConnection::class);
-        $reversing = [
-            'memberof' => 'member',
-            'ismemberof' => 'member',
-        ];
-        $this->subject = new LinkSpanReader(
-            $container->get(PdoDialectInterface::class),
+        $dialect = $container->get(PdoDialectInterface::class);
+        $linked = new LinkedAttributes(SchemaResource::Core->load()->addAttributeType(new AttributeType(
+            '1.400',
+            ['isMemberOf'],
+            noUserModification: true,
+            extensions: [AttributeType::EXTENSION_LINKED_BY => ['member']],
+        )));
+        $this->backward = new LinkSpanReader(
+            $dialect,
             $this->connection,
             LinkDirection::Backward,
-            new Backlinks($reversing, $reversing),
+            $linked,
+        );
+        $this->forward = new LinkSpanReader(
+            $dialect,
+            $this->connection,
+            LinkDirection::Forward,
+            $linked,
         );
 
         $this->seed();
@@ -75,10 +92,10 @@ final class LinkSpanReaderTest extends TestCase
     {
         self::assertSame(
             [
-                'memberof' => [self::GROUP],
-                'ismemberof' => [self::GROUP],
+                'memberOf' => [self::GROUP],
+                'isMemberOf' => [self::GROUP],
             ],
-            $this->subject->forSpan(...$this->spanOf(self::MEMBER))[$this->entryIdOf(self::MEMBER)] ?? [],
+            $this->backward->forSpan(...$this->spanOf(self::MEMBER))[$this->entryIdOf(self::MEMBER)] ?? [],
         );
     }
 
@@ -86,8 +103,69 @@ final class LinkSpanReaderTest extends TestCase
     {
         self::assertSame(
             [],
-            $this->subject->forSpan(...$this->spanOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
+            $this->backward->forSpan(...$this->spanOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
         );
+    }
+
+    public function test_reading_forwards_names_each_attribute_as_the_schema_does(): void
+    {
+        self::assertSame(
+            [
+                'member' => [self::MEMBER],
+                'seeAlso' => [self::MEMBER],
+            ],
+            $this->forward->forSpan(...$this->spanOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
+        );
+    }
+
+    public function test_a_linked_attribute_over_the_cap_is_ranged_under_its_schema_name(): void
+    {
+        $this->seedStaff();
+
+        self::assertSame(
+            [
+                'member;range=0-0' => [self::MEMBER],
+                'seeAlso;range=0-0' => [self::MEMBER],
+            ],
+            $this->cappedAtOne(
+                $this->forward,
+                self::STAFF,
+            ),
+        );
+    }
+
+    public function test_a_backlink_over_the_cap_is_ranged_under_its_schema_name(): void
+    {
+        $this->seedStaff();
+
+        self::assertSame(
+            [
+                'isMemberOf;range=0-0' => [self::GROUP],
+                'memberOf;range=0-0' => [self::GROUP],
+            ],
+            $this->cappedAtOne(
+                $this->backward,
+                self::MEMBER,
+            ),
+        );
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function cappedAtOne(
+        LinkSpanReader $reader,
+        string $dn,
+    ): array {
+        $id = $this->entryIdOf($dn);
+        $links = $reader->forSpan(
+            $id,
+            $id,
+            1,
+        )[$id] ?? [];
+        ksort($links);
+
+        return $links;
     }
 
     /**
@@ -131,6 +209,21 @@ final class LinkSpanReaderTest extends TestCase
             new Dn(self::GROUP),
             new Attribute('cn', 'admins'),
             new Attribute('member', self::MEMBER),
+            new Attribute('seealso', self::MEMBER),
+        )));
+    }
+
+    private function seedStaff(): void
+    {
+        $this->storage->store(EntryFixture::withUuid(new Entry(
+            new Dn(self::SECOND_MEMBER),
+            new Attribute('cn', 'bob'),
+        )));
+        $this->storage->store(EntryFixture::withUuid(new Entry(
+            new Dn(self::STAFF),
+            new Attribute('cn', 'staff'),
+            new Attribute('member', self::MEMBER, self::SECOND_MEMBER),
+            new Attribute('seealso', self::MEMBER, self::SECOND_MEMBER),
         )));
     }
 }

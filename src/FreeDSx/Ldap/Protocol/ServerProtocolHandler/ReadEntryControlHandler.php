@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -42,6 +43,7 @@ final readonly class ReadEntryControlHandler
     public function __construct(
         private Schema $schema,
         private AccessControlInterface $accessControl,
+        private LinkedAttributes $linked,
     ) {}
 
     /**
@@ -95,6 +97,8 @@ final readonly class ReadEntryControlHandler
         if (!$control instanceof ReadEntryControl || $entry === null) {
             return null;
         }
+        // RFC 4527: the entry is returned as a search would return it, with linked attributes under their schema names.
+        $entry = $this->linked->withSchemaNames($entry);
 
         $scope = $this->accessControl->readScope($token);
         if (!$scope->isEntryVisible($entry)) {
