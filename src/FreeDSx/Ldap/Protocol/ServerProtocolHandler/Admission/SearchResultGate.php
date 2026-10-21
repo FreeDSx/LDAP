@@ -38,7 +38,7 @@ final class SearchResultGate
     private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
 
     /**
-     * @var array<string, AttributeAdmission>
+     * @var array<string, AttributeAdmission|bool> A bool when the description is returned or dropped on every entry.
      */
     private array $admissions = [];
 
@@ -91,9 +91,20 @@ final class SearchResultGate
         $returned = [];
         $withheld = [];
 
+        // Kept inline for performance reasons.
         foreach ($all as $index => $attribute) {
-            $admission = $this->admissionFor($attribute);
-            // Kept inline for performance reasons.
+            $admission = $this->admissions[$attribute->getDescription()] ?? $this->admissionFor($attribute);
+
+            if ($admission === true) {
+                $returned[] = $attribute;
+
+                continue;
+            }
+
+            if ($admission === false) {
+                continue;
+            }
+
             $readable = match ($admission->read) {
                 ReadVerdict::Allow => true,
                 ReadVerdict::Deny => false,
@@ -135,14 +146,14 @@ final class SearchResultGate
         $this->admissions = [];
     }
 
-    private function admissionFor(Attribute $attribute): AttributeAdmission
+    /**
+     * The decision for a description not yet remembered, settled to a bool when it is the same on every entry.
+     */
+    private function admissionFor(Attribute $attribute): AttributeAdmission|bool
     {
         $description = $attribute->getDescription();
-
-        if (isset($this->admissions[$description])) {
-            return $this->admissions[$description];
-        }
-        $admission = $this->decideAdmission($attribute);
+        $decided = $this->decideAdmission($attribute);
+        $admission = $decided->returnedOnEveryEntry() ?? $decided;
 
         if ($this->remembering && count($this->admissions) < self::MAX_REMEMBERED_DESCRIPTIONS) {
             $this->admissions[$description] = $admission;
