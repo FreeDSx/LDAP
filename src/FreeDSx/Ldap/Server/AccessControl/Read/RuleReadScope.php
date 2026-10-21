@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Server\AccessControl\Target\DnTargetMatcher;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
- * Decides once per request what the rules make of an attribute or an entry anywhere, leaving the rest to each entry's DN.
+ * Decides once per request what the rules make of an attribute or entry anywhere, leaving the rest to each entry's DN.
  *
  * @internal
  *
@@ -44,7 +44,7 @@ final class RuleReadScope implements ReadScopeInterface
     private ?bool $visibility = null;
 
     /**
-     * @var array<string, true> The canonical DNs search rules name, which are always checked against the rules.
+     * @var array<string, true> The canonical DNs search rules name, each always checked against the rules.
      */
     private array $namedDns = [];
 
@@ -67,7 +67,8 @@ final class RuleReadScope implements ReadScopeInterface
             $this->classifyVisibility();
         }
 
-        if ($this->visibility === null || isset($this->namedDns[$entry->getDn()->normalizedString()])) {
+        $isNamed = $this->namedDns !== [] && isset($this->namedDns[$entry->getDn()->normalizedString()]);
+        if ($this->visibility === null || $isNamed) {
             return $this->policy->isEntryVisible(
                 $this->token,
                 $entry,
@@ -107,7 +108,7 @@ final class RuleReadScope implements ReadScopeInterface
     }
 
     /**
-     * Rules naming one DN pass over every other entry, so the first remaining rule that matches anywhere decides them.
+     * Every entry no rule names by DN is decided by the first remaining rule that matches anywhere.
      */
     private function classifyVisibility(): void
     {

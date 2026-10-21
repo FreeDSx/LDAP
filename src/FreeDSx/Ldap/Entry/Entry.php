@@ -54,6 +54,16 @@ class Entry implements IteratorAggregate, Countable, Stringable
         $this->attributes = $attributes;
     }
 
+    /**
+     * A clone tracks its own changes from here on, starting from those pending on the original.
+     */
+    public function __clone()
+    {
+        if ($this->changes !== null) {
+            $this->changes = clone $this->changes;
+        }
+    }
+
     public function __toString(): string
     {
         return $this->dn->toString();
