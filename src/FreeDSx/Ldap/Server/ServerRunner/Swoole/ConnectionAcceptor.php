@@ -86,7 +86,7 @@ class ConnectionAcceptor
         $this->metricsRecorder->serverStarted(time());
         $this->options->getOnServerReady()?->__invoke();
 
-        while (!$this->isShuttingDown) {
+        do {
             $this->backgroundTasks?->tick();
 
             try {
@@ -104,14 +104,27 @@ class ConnectionAcceptor
                 continue;
             }
 
+            // A shutdown that began while accepting may already be draining
+            if ($this->isShuttingDown) {
+                $this->events->record(
+                    ServerEvent::ClientRejected,
+                    [EventContext::REASON => 'shutting_down'],
+                );
+                $socket->close();
+
+                break;
+            }
+
             if (!$this->acquireConnectionSlot()) {
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);
+                $this->server->removeClient($socket);
                 $socket->close();
+
                 continue;
             }
 
             $this->handleInCoroutine($socket);
-        }
+        } while (!$this->isShuttingDown);
 
         $this->events->record(ServerEvent::ShutdownDraining);
     }
