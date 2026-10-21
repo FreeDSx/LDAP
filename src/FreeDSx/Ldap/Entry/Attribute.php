@@ -241,15 +241,12 @@ class Attribute implements IteratorAggregate, Countable, Stringable
      */
     public function getDescription(): string
     {
-        if ($this->options === null && !str_contains($this->attribute, ';')) {
-            return $this->attribute;
-        }
-        $options = $this->options();
-        if ($options->count() === 0) {
+        // Until its options are parsed, the attribute still holds the whole description it was given.
+        if ($this->options === null || $this->options->count() === 0) {
             return $this->attribute;
         }
 
-        return $this->attribute . ';' . $options->toString();
+        return $this->attribute . ';' . $this->options->toString();
     }
 
     /**
