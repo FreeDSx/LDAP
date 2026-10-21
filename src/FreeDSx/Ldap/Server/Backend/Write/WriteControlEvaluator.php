@@ -146,12 +146,12 @@ class WriteControlEvaluator
         }
 
         // Subordinates are counted on the target, as a write only ever moves them along with it.
-        return $this->derived->injectRequested(
+        return $this->derived->inject(
             $kept,
-            array_map(
+            $this->derived->requested(array_map(
                 static fn(string $name): Attribute => new Attribute($name),
                 $control->getAttributes(),
-            ),
+            )),
             $this->target,
         );
     }

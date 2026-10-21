@@ -53,15 +53,12 @@ final readonly class SearchStreamBuilder
         SearchRequest $request,
     ): EntryStream {
         // RFC 4511 §4.5.1 applies the filter at every scope, and derived attributes are injected after it
-        $generator = $this->wrapWithFilterEvaluation(
-            $this->yieldSingle($entry),
-            $request->getFilter(),
-        );
-
         return EntryStream::positioned(
-            $this->wrapWithDerived(
-                $generator,
+            $this->examined(
+                $this->yieldSingle($entry),
                 $request,
+                $request->getFilter(),
+                0,
             ),
             true,
         );
@@ -77,108 +74,60 @@ final readonly class SearchStreamBuilder
     ): EntryStream {
         // In-search alias dereferencing is not implemented, so an alias is returned as the ordinary entry it is
         // rather than failing the search. This is a deliberate RFC difference.
-        $generator = $this->wrapWithTimeLimitHandling($stream->fetched());
-
-        // Every candidate examined is charged.
-        $generator = $this->wrapWithLookthrough(
-            $generator,
-            $effectiveLimits,
-        );
-
-        if (!$stream->isPreFiltered) {
-            $generator = $this->wrapWithFilterEvaluation(
-                $generator,
-                $request->getFilter(),
-            );
-        }
-
-        $generator = $this->wrapWithDerived($generator, $request);
-
         return EntryStream::positioned(
-            $generator,
+            $this->examined(
+                $stream->fetched(),
+                $request,
+                $stream->isPreFiltered
+                    ? null
+                    : $request->getFilter(),
+                ($effectiveLimits ?? $this->limits)->maxSearchLookthrough(),
+            ),
             true,
         );
     }
 
     /**
-     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
+     * Charges each candidate to the lookthrough, applies the filter storage left, and injects derived attributes.
+     *
+     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $candidates
+     * @param ?FilterInterface $filter Null when storage already applied it.
+     * @param int $lookthrough The candidates that may be examined, or 0 for no limit.
      * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
+     * @throws OperationException
      */
-    private function wrapWithDerived(
-        Generator $generator,
+    private function examined(
+        Generator $candidates,
         SearchRequest $request,
+        ?FilterInterface $filter,
+        int $lookthrough,
     ): Generator {
-        foreach ($generator as $fetched) {
-            yield new FetchedEntry(
-                $this->derivedResolver->injectRequested(
-                    $fetched->entry,
-                    $request->getAttributes(),
-                ),
-                $fetched->cursor,
-            );
-        }
-
-        return $generator->getReturn();
-    }
-
-    /**
-     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
-     * @throws OperationException
-     */
-    private function wrapWithFilterEvaluation(
-        Generator $generator,
-        FilterInterface $filter,
-    ): Generator {
-        foreach ($generator as $fetched) {
-            $judged = $this->linkedLeaves->witness(
-                $fetched->entry,
-                $filter,
-            );
-
-            if ($this->filterEvaluator->evaluate($judged, $filter)) {
-                yield $fetched;
-            }
-        }
-
-        return $generator->getReturn();
-    }
-
-    /**
-     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
-     * @throws OperationException
-     */
-    private function wrapWithLookthrough(
-        Generator $generator,
-        ?SearchLimits $effectiveLimits = null,
-    ): Generator {
-        $lookthrough = ($effectiveLimits ?? $this->limits)->maxSearchLookthrough();
+        $derived = $this->derivedResolver->requested($request->getAttributes());
         $examined = 0;
 
-        foreach ($generator as $fetched) {
-            if ($lookthrough > 0 && ++$examined > $lookthrough) {
-                throw new OperationException(
-                    'Administrative limit exceeded.',
-                    ResultCode::ADMIN_LIMIT_EXCEEDED,
-                );
-            }
-
-            yield $fetched;
-        }
-
-        return $generator->getReturn();
-    }
-
-    /**
-     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
-     * @throws OperationException
-     */
-    private function wrapWithTimeLimitHandling(Generator $generator): Generator
-    {
         try {
-            foreach ($generator as $fetched) {
+            foreach ($candidates as $fetched) {
+                if ($lookthrough > 0 && ++$examined > $lookthrough) {
+                    throw new OperationException(
+                        'Administrative limit exceeded.',
+                        ResultCode::ADMIN_LIMIT_EXCEEDED,
+                    );
+                }
+
+                if ($filter !== null && !$this->matches($fetched->entry, $filter)) {
+                    continue;
+                }
+
+                if ($derived !== []) {
+                    $fetched = new FetchedEntry(
+                        $this->derivedResolver->inject(
+                            $fetched->entry,
+                            $derived,
+                        ),
+                        $fetched->cursor,
+                    );
+                }
+
                 yield $fetched;
             }
         } catch (TimeLimitExceededException) {
@@ -188,7 +137,23 @@ final readonly class SearchStreamBuilder
             );
         }
 
-        return $generator->getReturn();
+        return $candidates->getReturn();
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function matches(
+        Entry $entry,
+        FilterInterface $filter,
+    ): bool {
+        return $this->filterEvaluator->evaluate(
+            $this->linkedLeaves->witness(
+                $entry,
+                $filter,
+            ),
+            $filter,
+        );
     }
 
     /**
