@@ -75,7 +75,8 @@ readonly class SocketServerFactory
             ->setSslAllowSelfSigned($this->network->getSslAllowSelfSigned())
             ->setSslCaCert($this->network->getSslCaCert())
             ->setTimeoutHandshake($this->network->getSslHandshakeTimeout())
-            ->setReusePort($this->reusePort);
+            ->setReusePort($this->reusePort)
+            ->setTcpNoDelay(!$isUnixSocket);
 
         return SocketServer::bind(
             $resource,
