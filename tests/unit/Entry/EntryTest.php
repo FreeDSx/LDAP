@@ -409,4 +409,35 @@ class EntryTest extends TestCase
             $change->getType(),
         );
     }
+
+    public function test_a_clone_tracks_its_changes_apart_from_the_original(): void
+    {
+        $clone = clone $this->subject;
+        $clone->set('sn', 'Smith');
+
+        self::assertCount(
+            0,
+            $this->subject->changes()->toArray(),
+        );
+        self::assertCount(
+            1,
+            $clone->changes()->toArray(),
+        );
+    }
+
+    public function test_a_clone_starts_from_the_changes_pending_on_the_original(): void
+    {
+        $this->subject->set('sn', 'Smith');
+        $clone = clone $this->subject;
+        $clone->set('givenName', 'Pat');
+
+        self::assertCount(
+            1,
+            $this->subject->changes()->toArray(),
+        );
+        self::assertCount(
+            2,
+            $clone->changes()->toArray(),
+        );
+    }
 }
