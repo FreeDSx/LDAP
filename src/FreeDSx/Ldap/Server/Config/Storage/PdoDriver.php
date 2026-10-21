@@ -77,6 +77,7 @@ enum PdoDriver
                 'PRAGMA synchronous = NORMAL',
                 'PRAGMA journal_mode = WAL',
                 'PRAGMA foreign_keys = ON',
+                'PRAGMA mmap_size = 268435456',
             ],
             // Strict mode is pinned: without it an overlong value is truncated and the write still reports success.
             self::Mysql => [

@@ -97,6 +97,14 @@ final class PdoConfigTest extends TestCase
         );
     }
 
+    public function test_sqlite_maps_the_database_file_for_every_session(): void
+    {
+        self::assertContains(
+            'PRAGMA mmap_size = 268435456',
+            PdoDriver::Sqlite->defaultSessionStatements(),
+        );
+    }
+
     public function test_it_takes_its_pdo_options_from_the_driver(): void
     {
         self::assertSame(
