@@ -58,6 +58,33 @@ class AttributeTest extends TestCase
         );
     }
 
+    public function test_the_description_is_the_same_before_and_after_its_options_are_parsed(): void
+    {
+        $attribute = new Attribute('userCertificate;binary;;lang-EN');
+        $before = $attribute->getDescription();
+        $attribute->getName();
+
+        self::assertSame(
+            'userCertificate;binary;;lang-EN',
+            $before,
+        );
+        self::assertSame(
+            $before,
+            $attribute->getDescription(),
+        );
+    }
+
+    public function test_the_description_follows_a_change_to_its_options(): void
+    {
+        $attribute = new Attribute('userCertificate;binary');
+        $attribute->getOptions()->add('lang-en');
+
+        self::assertSame(
+            'userCertificate;binary;lang-en',
+            $attribute->getDescription(),
+        );
+    }
+
     public function test_it_should_return_false_for_hasOptions_when_there_are_none(): void
     {
         self::assertFalse($this->subject->hasOptions());
