@@ -33,4 +33,18 @@ final readonly class AttributeAdmission
         public ReadVerdict $read,
         public bool $concernsFilter,
     ) {}
+
+    /**
+     * Whether every entry holding it returns the attribute, or null when that depends on the entry or the filter.
+     */
+    public function returnedOnEveryEntry(): ?bool
+    {
+        return match ($this->read) {
+            ReadVerdict::Allow => $this->returned,
+            ReadVerdict::Deny => $this->concernsFilter
+                ? null
+                : false,
+            ReadVerdict::PerEntry => null,
+        };
+    }
 }
