@@ -503,8 +503,9 @@ outright rather than merging, so carry over any you still want.
 Statements replayed on every new connection, used to put each one into the state the storage expects. This also
 replaces the defaults outright, so include the ones you want to keep.
 
-**Default**: for SQLite, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, `PRAGMA journal_mode = WAL`, and
-`PRAGMA foreign_keys = ON`. For MySQL, `SET NAMES utf8mb4` and `SET time_zone = '+00:00'`.
+**Default**: for SQLite, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, `PRAGMA journal_mode = WAL`,
+`PRAGMA foreign_keys = ON`, and `PRAGMA mmap_size = 268435456`. For MySQL, `SET NAMES utf8mb4` and
+`SET time_zone = '+00:00'`.
 
 ##### setSerializeSwooleWrites
 
