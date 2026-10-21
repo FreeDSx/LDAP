@@ -44,7 +44,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
 
     private Dn $dn;
 
-    private Changes $changes;
+    private ?Changes $changes = null;
 
     public function __construct(
         Dn|string $dn,
@@ -52,7 +52,6 @@ class Entry implements IteratorAggregate, Countable, Stringable
     ) {
         $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
         $this->attributes = $attributes;
-        $this->changes = new Changes();
     }
 
     public function __toString(): string
@@ -140,7 +139,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
         } else {
             $this->attributes[] = $attribute;
         }
-        $this->changes->add(Change::add(clone $attribute));
+        $this->changes()->add(Change::add(clone $attribute));
 
         return $this;
     }
@@ -166,7 +165,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
             if (($exists = $this->get($attribute, true)) !== null) {
                 $exists->remove(...$attribute->getValues());
             }
-            $this->changes->add(Change::delete(clone $attribute));
+            $this->changes()->add(Change::delete(clone $attribute));
         }
 
         return $this;
@@ -219,7 +218,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
         if (!$exists) {
             $this->attributes[] = $attribute;
         }
-        $this->changes->add(Change::replace(clone $attribute));
+        $this->changes()->add(Change::replace(clone $attribute));
 
         return $this;
     }
@@ -304,7 +303,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
      */
     public function changes(): Changes
     {
-        return $this->changes;
+        return $this->changes ??= new Changes();
     }
 
     /**
