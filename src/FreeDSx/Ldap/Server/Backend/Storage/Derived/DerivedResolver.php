@@ -32,17 +32,27 @@ final readonly class DerivedResolver
     public function __construct(private ReadEntryInterface $storage) {}
 
     /**
-     * A copy carrying each derived attribute the request names or selects with "+", or the entry when it asks for none.
+     * The derived types a requested attribute list names or selects with "+", in a stable order.
      *
      * @param array<Attribute> $requested
+     * @return list<string>
+     */
+    public function requested(array $requested): array
+    {
+        return self::derivedTypesRequested($requested);
+    }
+
+    /**
+     * A copy carrying each of the derived types named, or the entry when none are.
+     *
+     * @param list<string> $names Canonical type names, as {@see requested()} gives them.
      * @param ?Entry $subordinatesOf The entry whose children decide hasSubordinates, when it is not the one given.
      */
-    public function injectRequested(
+    public function inject(
         Entry $entry,
-        array $requested,
+        array $names,
         ?Entry $subordinatesOf = null,
     ): Entry {
-        $names = self::derivedTypesRequested($requested);
         if ($names === []) {
             return $entry;
         }
