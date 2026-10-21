@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\AccessControl\Read;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\Read\ReadVerdict;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
@@ -294,6 +295,54 @@ final class RuleReadScopeTest extends TestCase
 
         self::assertTrue($scope->isEntryVisible(new Entry(new Dn('cn=a,ou=shown,dc=foo,dc=bar'))));
         self::assertFalse($scope->isEntryVisible(new Entry(new Dn('cn=a,ou=hidden,dc=foo,dc=bar'))));
+    }
+
+    public function test_an_entry_a_search_rule_names_is_decided_by_that_rule(): void
+    {
+        $scope = (new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [
+                OperationRule::deny(
+                    Subject::anyone(),
+                    Target::dn('cn=hidden,dc=foo,dc=bar'),
+                    OperationType::Search,
+                ),
+                OperationRule::allow(
+                    Subject::authenticated(),
+                    Target::any(),
+                    OperationType::Search,
+                ),
+            ],
+        )))->readScope($this->user);
+
+        self::assertFalse($scope->isEntryVisible(new Entry(new Dn('CN=Hidden,DC=foo,DC=bar'))));
+        self::assertTrue($scope->isEntryVisible(new Entry(new Dn('cn=shown,dc=foo,dc=bar'))));
+    }
+
+    public function test_an_entry_no_search_rule_admits_is_not_visible(): void
+    {
+        $scope = (new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(
+                Subject::dn('cn=other,dc=foo,dc=bar'),
+                Target::any(),
+                OperationType::Search,
+            )],
+        )))->readScope($this->user);
+
+        self::assertFalse($scope->isEntryVisible(new Entry(new Dn('cn=a,dc=foo,dc=bar'))));
+    }
+
+    public function test_a_search_rule_whose_subject_needs_the_entry_leaves_visibility_to_each_entry(): void
+    {
+        $scope = (new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(
+                Subject::self(),
+                Target::any(),
+                OperationType::Search,
+            )],
+        )))->readScope($this->user);
+
+        self::assertTrue($scope->isEntryVisible(new Entry(new Dn('cn=user,dc=foo,dc=bar'))));
+        self::assertFalse($scope->isEntryVisible(new Entry(new Dn('cn=other,dc=foo,dc=bar'))));
     }
 
     private function policy(AttributeRule ...$rules): RuleBasedAccessControl
