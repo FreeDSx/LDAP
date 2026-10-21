@@ -33,4 +33,12 @@ final class DnTargetMatcher implements TargetMatcherInterface
     {
         return $dn->normalizedString() === $this->normalizedDn;
     }
+
+    /**
+     * The canonical form of the one DN it matches.
+     */
+    public function normalizedDn(): string
+    {
+        return $this->normalizedDn;
+    }
 }

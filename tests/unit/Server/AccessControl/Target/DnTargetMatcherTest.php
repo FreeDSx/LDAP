@@ -39,4 +39,14 @@ final class DnTargetMatcherTest extends TestCase
 
         self::assertFalse($subject->matches(new Dn('cn=other,dc=bar')));
     }
+
+    public function test_it_exposes_the_canonical_form_of_the_dn_it_matches(): void
+    {
+        $subject = new DnTargetMatcher('CN=Foo,DC=bar');
+
+        self::assertSame(
+            (new Dn('cn=foo,dc=bar'))->normalizedString(),
+            $subject->normalizedDn(),
+        );
+    }
 }
