@@ -20,6 +20,8 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Exception\PduLengthException;
 use FreeDSx\Asn1\Helper\AttributeEntryEncoder;
 use FreeDSx\Asn1\Type\SequenceOfType;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
@@ -318,33 +320,60 @@ class LdapQueue extends Asn1MessageQueue
             return $this->encoder->encode($message->toAsn1());
         }
 
-        $envelope = Asn1::sequence(
-            Asn1::integer($message->getMessageId()),
-            Asn1::raw($this->encodeSearchResultEntry($response)),
-        );
-
+        $entry = $response->getEntry();
         $controls = $message->controls()->toArray();
-        if ($controls !== []) {
-            /** @var SequenceOfType $context */
-            $context = Asn1::context(
-                tagNumber: 0,
-                type: Asn1::sequenceOf(),
+        if ($controls === []) {
+            return $this->entryEncoder->encodeMessage(
+                $message->getMessageId(),
+                SearchResultEntry::TAG_NUMBER,
+                $entry->getDn()->toString(),
+                $this->attributeList($entry),
             );
-            foreach ($controls as $control) {
-                $context->addChild($control->toAsn1());
-            }
-            $envelope->addChild($context);
         }
 
-        return $this->encoder->encode($envelope);
+        return $this->encodeEntryWithControls(
+            $message->getMessageId(),
+            $entry,
+            $controls,
+        );
     }
 
     /**
+     * @param Control[] $controls
      * @throws EncoderException
      */
-    private function encodeSearchResultEntry(SearchResultEntry $response): string
+    private function encodeEntryWithControls(
+        int $messageId,
+        Entry $entry,
+        array $controls,
+    ): string {
+        /** @var SequenceOfType $context */
+        $context = Asn1::context(
+            tagNumber: 0,
+            type: Asn1::sequenceOf(),
+        );
+        foreach ($controls as $control) {
+            $context->addChild($control->toAsn1());
+        }
+
+        return $this->encoder->encode(Asn1::sequence(
+            Asn1::integer($messageId),
+            Asn1::raw($this->entryEncoder->encodeEntry(
+                SearchResultEntry::TAG_NUMBER,
+                $entry->getDn()->toString(),
+                $this->attributeList($entry),
+            )),
+            $context,
+        ));
+    }
+
+    /**
+     * Each attribute of the entry as its description and values.
+     *
+     * @return list<array{0: string, 1: string[]}>
+     */
+    private function attributeList(Entry $entry): array
     {
-        $entry = $response->getEntry();
         $attributes = [];
         foreach ($entry->getAttributes() as $attribute) {
             $attributes[] = [
@@ -353,10 +382,6 @@ class LdapQueue extends Asn1MessageQueue
             ];
         }
 
-        return $this->entryEncoder->encode(
-            SearchResultEntry::TAG_NUMBER,
-            $entry->getDn()->toString(),
-            $attributes,
-        );
+        return $attributes;
     }
 }
