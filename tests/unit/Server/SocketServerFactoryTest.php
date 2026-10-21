@@ -185,6 +185,25 @@ final class SocketServerFactoryTest extends TestCase
         $this->subject->makeAndBind();
     }
 
+    public function test_it_disables_nagle_on_tcp_connections(): void
+    {
+        self::assertTrue($this->subject->makeAndBind()->getOptions()->isTcpNoDelay());
+    }
+
+    public function test_it_leaves_nagle_alone_on_a_unix_socket(): void
+    {
+        $this->requireUnix('Cannot construct unix based socket on Windows.');
+
+        $subject = new SocketServerFactory(
+            (new NetworkConfig())
+                ->setUnixSocket($this->tmpUnixSocketFilePath)
+                ->setTransport('unix'),
+            RunnerMode::Pcntl,
+        );
+
+        self::assertFalse($subject->makeAndBind()->getOptions()->isTcpNoDelay());
+    }
+
     public function test_an_existing_socket_that_is_not_writeable_is_recorded_and_refused(): void
     {
         $this->requireUnix('Cannot construct unix based socket on Windows.');
