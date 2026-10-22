@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSchemaTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSidecarDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoTransactionDialectTrait;
 use PDO;
-use PDOException;
 
 /**
  * SQLite-specific SQL for the PDO storage.
@@ -47,56 +46,6 @@ final class SqliteDialect implements PdoDialectInterface
     use PdoSchemaTrait;
     use PdoSidecarDialectTrait;
     use PdoTransactionDialectTrait;
-
-    /**
-     * The database file is locked by another writer.
-     */
-    private const ERROR_BUSY = 5;
-
-    /**
-     * A table in the database is locked, which the busy handler is never invoked for.
-     */
-    private const ERROR_LOCKED = 6;
-
-    /**
-     * A constraint was violated, which the message then names.
-     */
-    private const ERROR_CONSTRAINT = 19;
-
-    /**
-     * `busy_timeout` absorbs most contention by waiting, but it still gives up once the timeout is exhausted.
-     */
-    public function isRetryableConflict(PDOException $exception): bool
-    {
-        $driverCode = $exception->errorInfo[1] ?? null;
-
-        return $driverCode === self::ERROR_BUSY
-            || $driverCode === self::ERROR_LOCKED;
-    }
-
-    public function isDuplicateDn(PDOException $exception): bool
-    {
-        return $this->isUniqueFailureOn(
-            $exception,
-            'entries.lc_dn',
-        );
-    }
-
-    public function isDuplicateEntryUuid(PDOException $exception): bool
-    {
-        return $this->isUniqueFailureOn(
-            $exception,
-            'entries.entry_uuid',
-        );
-    }
-
-    /**
-     * SQLite declares no length on its columns.
-     */
-    public function isValueTooLong(PDOException $exception): bool
-    {
-        return false;
-    }
 
     /**
      * `BEGIN IMMEDIATE` acquires the reserved lock up front so concurrent writers wait (honoring `busy_timeout`)
@@ -160,16 +109,5 @@ final class SqliteDialect implements PdoDialectInterface
     protected function schemaName(): string
     {
         return 'sqlite';
-    }
-
-    /**
-     * The constraint code covers every kind of constraint, so the message's table and column say which key refused.
-     */
-    private function isUniqueFailureOn(
-        PDOException $exception,
-        string $column,
-    ): bool {
-        return ($exception->errorInfo[1] ?? null) === self::ERROR_CONSTRAINT
-            && ($exception->errorInfo[2] ?? null) === 'UNIQUE constraint failed: ' . $column;
     }
 }

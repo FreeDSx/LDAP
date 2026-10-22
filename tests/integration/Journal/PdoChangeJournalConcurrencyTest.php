@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Journal;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
+use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
@@ -67,6 +69,7 @@ final class PdoChangeJournalConcurrencyTest extends JournalConcurrencyTestCase
             new PdoTransactor(
                 $provider,
                 $dialect,
+                new PdoErrorFactory(PdoDriver::Sqlite),
             ),
         );
 

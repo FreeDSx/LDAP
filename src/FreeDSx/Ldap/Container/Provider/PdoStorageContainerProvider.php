@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
@@ -76,6 +77,9 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
     {
         return [
             PdoDialectInterface::class => $this->makeDialect(...),
+            PdoErrorFactory::class => fn(Container $container): PdoErrorFactory => new PdoErrorFactory(
+                $this->requirePdoConfig($container)->getDriver(),
+            ),
             SubstringIndexInterface::class => $this->makeSubstringIndex(...),
             FilterTranslatorInterface::class => $this->makeFilterTranslator(...),
             PdoSchema::class => $this->makeSchema(...),
@@ -211,6 +215,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             new PdoTransactor(
                 $provider,
                 $container->get(PdoDialectInterface::class),
+                $container->get(PdoErrorFactory::class),
                 $container->get(SleeperInterface::class),
             ),
         );
@@ -364,6 +369,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(EntryLinkWriter::class),
             $container->get(PendingLinkWriter::class),
             $container->get(EntryRowCodec::class),
+            $container->get(PdoErrorFactory::class),
         );
     }
 

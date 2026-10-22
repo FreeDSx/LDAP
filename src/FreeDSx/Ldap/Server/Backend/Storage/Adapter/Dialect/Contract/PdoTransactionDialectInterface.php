@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
 use PDO;
-use PDOException;
 
 /**
  * Database-specific transaction control.
@@ -37,9 +36,4 @@ interface PdoTransactionDialectInterface
      * Roll back the current transaction.
      */
     public function rollBack(PDO $pdo): void;
-
-    /**
-     * Whether the database guarantees the failed transaction applied nothing, making it safe to reissue.
-     */
-    public function isRetryableConflict(PDOException $exception): bool;
 }

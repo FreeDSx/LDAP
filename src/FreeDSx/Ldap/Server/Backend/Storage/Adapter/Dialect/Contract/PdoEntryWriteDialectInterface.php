@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
-use PDOException;
-
 /**
  * Database-specific SQL for writing the entry table.
  *
@@ -22,21 +20,6 @@ use PDOException;
  */
 interface PdoEntryWriteDialectInterface
 {
-    /**
-     * Whether the failure is the unique key on lc_dn refusing a second entry at one DN.
-     */
-    public function isDuplicateDn(PDOException $exception): bool;
-
-    /**
-     * Whether the failure is the unique key on entry_uuid refusing a second entry with one entryUUID.
-     */
-    public function isDuplicateEntryUuid(PDOException $exception): bool;
-
-    /**
-     * Whether the failure is a value exceeding its column's declared length.
-     */
-    public function isValueTooLong(PDOException $exception): bool;
-
     /**
      * The longest DN in bytes the database can store, or null when there is no practical limit.
      */
