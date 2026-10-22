@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDiale
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -57,6 +58,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         private EntryLinkWriter $links,
         private PendingLinkWriter $pending,
         private EntryRowCodec $codec,
+        private PdoErrorFactory $errors,
     ) {}
 
     /**
@@ -339,19 +341,21 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         try {
             $write();
         } catch (PDOException $e) {
-            if ($landsOn !== null && $this->dialect->isDuplicateDn($e)) {
+            $error = $this->errors->of($e);
+
+            if ($landsOn !== null && $error->isDuplicateDn()) {
                 throw new EntryAlreadyExistsException(
                     sprintf('Entry already exists: %s', $landsOn->toString()),
                     previous: $e,
                 );
             }
-            if ($landsOn !== null && $this->dialect->isDuplicateEntryUuid($e)) {
+            if ($landsOn !== null && $error->isDuplicateEntryUuid()) {
                 throw new EntryUuidTakenException(
                     sprintf('Another entry already holds the entryUUID of: %s', $landsOn->toString()),
                     previous: $e,
                 );
             }
-            if ($this->dialect->isValueTooLong($e)) {
+            if ($error->isValueTooLong()) {
                 throw new DnTooLongException(
                     sprintf(
                         'The resulting DN exceeds the storage backend limit of %d bytes.',

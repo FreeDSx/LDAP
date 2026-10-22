@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
@@ -33,6 +34,7 @@ final readonly class PdoTransactor
     public function __construct(
         private PdoConnectionProviderInterface $provider,
         private PdoTransactionDialectInterface $dialect,
+        private PdoErrorFactory $errors,
         private SleeperInterface $sleeper = new BlockingSleeper(),
         private int $maxRetries = 15,
         private ExponentialBackoff $backoff = new ExponentialBackoff(
@@ -103,7 +105,7 @@ final readonly class PdoTransactor
     private function isReissuable(PDOException $exception): bool
     {
         return $this->provider->txState()->depth === 0
-            && $this->dialect->isRetryableConflict($exception);
+            && $this->errors->of($exception)->isRetryableConflict();
     }
 
     /**

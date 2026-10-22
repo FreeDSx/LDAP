@@ -17,14 +17,17 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
 use PDO;
 use PDOException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\Pdo\DriverFailure;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 
 final class PdoTransactorTest extends TestCase
@@ -35,6 +38,8 @@ final class PdoTransactorTest extends TestCase
 
     private RecordingSleeper $sleeper;
 
+    private PdoErrorFactory $errors;
+
     private PdoTransactor $subject;
 
     protected function setUp(): void
@@ -42,9 +47,11 @@ final class PdoTransactorTest extends TestCase
         $this->dialect = $this->createMock(PdoTransactionDialectInterface::class);
         $this->provider = new SharedPdoConnectionProvider(new PDO('sqlite::memory:'));
         $this->sleeper = new RecordingSleeper();
+        $this->errors = new PdoErrorFactory(PdoDriver::Sqlite);
         $this->subject = new PdoTransactor(
             $this->provider,
             $this->dialect,
+            $this->errors,
             $this->sleeper,
             maxRetries: 3,
             backoff: new ExponentialBackoff(
@@ -57,15 +64,12 @@ final class PdoTransactorTest extends TestCase
 
     public function test_it_reissues_the_transaction_until_the_conflict_clears(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(true);
-
         $attempts = 0;
         $this->subject->atomic(function () use (&$attempts): void {
             $attempts++;
 
             if ($attempts < 3) {
-                throw new PDOException('Deadlock found when trying to get lock');
+                throw self::conflict();
             }
         });
 
@@ -81,11 +85,8 @@ final class PdoTransactorTest extends TestCase
 
     public function test_it_answers_busy_once_the_retry_budget_is_spent(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(true);
-
         $attempts = 0;
-        $conflict = new PDOException('Deadlock found when trying to get lock');
+        $conflict = self::conflict();
 
         try {
             $this->subject->atomic(function () use (&$attempts, $conflict): void {
@@ -112,15 +113,12 @@ final class PdoTransactorTest extends TestCase
 
     public function test_a_nested_transaction_hands_the_raw_conflict_to_the_outermost_one(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(true);
-
         $caught = null;
 
         $this->subject->atomic(function () use (&$caught): void {
             try {
                 $this->subject->atomic(static function (): void {
-                    throw new PDOException('Deadlock found when trying to get lock');
+                    throw self::conflict();
                 });
             } catch (PDOException $e) {
                 $caught = $e;
@@ -133,11 +131,8 @@ final class PdoTransactorTest extends TestCase
         );
     }
 
-    public function test_it_does_not_reissue_a_failure_the_dialect_does_not_own(): void
+    public function test_it_does_not_reissue_a_failure_the_database_does_not_report_as_a_conflict(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(false);
-
         $attempts = 0;
 
         $this->expectException(PDOException::class);
@@ -162,9 +157,6 @@ final class PdoTransactorTest extends TestCase
 
     public function test_it_reissues_only_the_outermost_transaction(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(true);
-
         $outer = 0;
         $inner = 0;
 
@@ -175,7 +167,7 @@ final class PdoTransactorTest extends TestCase
                 $this->subject->atomic(function () use (&$inner): void {
                     $inner++;
 
-                    throw new PDOException('Deadlock found when trying to get lock');
+                    throw self::conflict();
                 });
             });
         } catch (StorageBusyException) {
@@ -194,8 +186,6 @@ final class PdoTransactorTest extends TestCase
 
     public function test_it_keeps_the_original_failure_when_unwinding_also_fails(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(false);
         $this->dialect->method('rollBack')
             ->willThrowException(new PDOException('SAVEPOINT sp_1 does not exist'));
 
@@ -229,9 +219,6 @@ final class PdoTransactorTest extends TestCase
 
     public function test_it_surfaces_a_swallowed_nested_failure_from_the_outermost_transaction(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(false);
-
         $subject = $this->subjectOverUnwindableSavepoint();
 
         $this->expectException(PDOException::class);
@@ -250,9 +237,6 @@ final class PdoTransactorTest extends TestCase
 
     public function test_it_reissues_a_swallowed_nested_conflict(): void
     {
-        $this->dialect->method('isRetryableConflict')
-            ->willReturn(true);
-
         $subject = $this->subjectOverUnwindableSavepoint();
         $attempts = 0;
 
@@ -262,7 +246,7 @@ final class PdoTransactorTest extends TestCase
 
                 try {
                     $subject->atomic(static function (): void {
-                        throw new PDOException('Deadlock found when trying to get lock');
+                        throw self::conflict();
                     });
                 } catch (PDOException) {
                 }
@@ -427,6 +411,7 @@ final class PdoTransactorTest extends TestCase
         return new PdoTransactor(
             new SharedPdoConnectionProvider($pdo),
             new SqliteDialect(),
+            $this->errors,
             $this->sleeper,
         );
     }
@@ -450,6 +435,7 @@ final class PdoTransactorTest extends TestCase
         return new PdoTransactor(
             new SharedPdoConnectionProvider($pdo),
             $this->dialect,
+            $this->errors,
             $this->sleeper,
             maxRetries: 3,
             backoff: new ExponentialBackoff(
@@ -457,6 +443,17 @@ final class PdoTransactorTest extends TestCase
                 max: 0.05,
                 jitter: 0.0,
             ),
+        );
+    }
+
+    /**
+     * SQLite reports a write lock it waited out as busy, which leaves the transaction safe to reissue.
+     */
+    private static function conflict(): PDOException
+    {
+        return DriverFailure::of(
+            5,
+            'database is locked',
         );
     }
 }

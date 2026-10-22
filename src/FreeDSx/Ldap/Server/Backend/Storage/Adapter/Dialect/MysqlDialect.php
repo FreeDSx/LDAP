@@ -27,7 +27,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSidecarDialectTra
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoTransactionDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use PDO;
-use PDOException;
 use PDOStatement;
 
 use function array_chunk;
@@ -61,61 +60,9 @@ final class MysqlDialect implements PdoDialectInterface
     use PdoTransactionDialectTrait;
 
     /**
-     * Deadlock found when trying to get lock. The transaction has already been rolled back.
-     */
-    private const ERROR_DEADLOCK = 1213;
-
-    /**
-     * Lock wait timeout exceeded.
-     */
-    private const ERROR_LOCK_WAIT_TIMEOUT = 1205;
-
-    /**
-     * Duplicate entry for key.
-     */
-    private const ERROR_DUPLICATE_ENTRY = 1062;
-
-    /**
-     * Data too long for a column.
-     */
-    private const ERROR_DATA_TOO_LONG = 1406;
-
-    /**
      * Values per locking read.
      */
     private const LOCK_BATCH_SIZE = 500;
-
-    /**
-     * InnoDB resolves lock conflicts by failing one transaction, which is then safe to reissue unchanged.
-     */
-    public function isRetryableConflict(PDOException $exception): bool
-    {
-        $driverCode = $exception->errorInfo[1] ?? null;
-
-        return $driverCode === self::ERROR_DEADLOCK
-            || $driverCode === self::ERROR_LOCK_WAIT_TIMEOUT;
-    }
-
-    public function isDuplicateDn(PDOException $exception): bool
-    {
-        return $this->isDuplicateOnKey(
-            $exception,
-            'uq_lc_dn',
-        );
-    }
-
-    public function isDuplicateEntryUuid(PDOException $exception): bool
-    {
-        return $this->isDuplicateOnKey(
-            $exception,
-            'uq_entry_uuid',
-        );
-    }
-
-    public function isValueTooLong(PDOException $exception): bool
-    {
-        return ($exception->errorInfo[1] ?? null) === self::ERROR_DATA_TOO_LONG;
-    }
 
     /**
      * Sorted and taken through the key's own index, so overlapping batches always lock in the same order.
@@ -257,19 +204,5 @@ final class MysqlDialect implements PdoDialectInterface
         }
 
         return $keys;
-    }
-
-    /**
-     * The message ends with the key name, which MySQL prefixes with the table and MariaDB does not.
-     */
-    private function isDuplicateOnKey(
-        PDOException $exception,
-        string $key,
-    ): bool {
-        $message = $exception->errorInfo[2] ?? null;
-
-        return ($exception->errorInfo[1] ?? null) === self::ERROR_DUPLICATE_ENTRY
-            && is_string($message)
-            && str_ends_with($message, $key . "'");
     }
 }
