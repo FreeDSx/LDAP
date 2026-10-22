@@ -46,6 +46,11 @@ final class SaslIntegrationTest extends ServerTestCase
 
     private const HASHED_PASSWORD = 'hashedpass';
 
+    /**
+     * The stored value for cn=unsupported in the harness seed, under a scheme the server cannot verify.
+     */
+    private const UNSUPPORTED_SCHEME_VALUE = '{SSHA256}K7gNU3sdo+OL0wNhqoVWhr3g6s1xYv72ol/pe/Unols=';
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-server');
@@ -111,6 +116,17 @@ final class SaslIntegrationTest extends ServerTestCase
 
         $this->buildClient('tcp')->bindSasl(
             (new CramMD5Options())->setUsername('hashed')->setPassword(self::STOLEN_HASH),
+            MechanismName::CRAM_MD5,
+        );
+    }
+
+    public function testSaslCramMD5RefusesAValueUnderAnUnsupportedSchemeAsTheSharedSecret(): void
+    {
+        $this->expectException(BindException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->buildClient('tcp')->bindSasl(
+            (new CramMD5Options())->setUsername('unsupported')->setPassword(self::UNSUPPORTED_SCHEME_VALUE),
             MechanismName::CRAM_MD5,
         );
     }

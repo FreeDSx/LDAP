@@ -122,6 +122,7 @@ change works. Administrative resets then require a [manager](#manager-break-glas
 
 `setManager()` configures an optional super-user that is not a directory entry. It is recognized at bind, bypasses
 access control, and is exempt from password-policy lockout. The password is stored hashed and rotated through config.
+A password under a scheme the server cannot verify is refused at startup, and a reload carrying one fails.
 
 ```php
 $options->setManager(new ManagerIdentity(

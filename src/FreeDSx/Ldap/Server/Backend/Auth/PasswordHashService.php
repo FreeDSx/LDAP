@@ -13,26 +13,21 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Auth;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
+use Closure;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use SensitiveParameter;
 
 /**
- * Hashes, generates, and verifies userPassword values; writes the configured scheme and reads legacy {SHA}/{MD5}/{SMD5}.
+ * Hashes, generates, and verifies userPassword values; writes the configured scheme and reads {SHA}/{MD5}/{SMD5}/{CRYPT}.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 readonly class PasswordHashService
 {
     /**
-     * Read-only legacy prefixes recognized in addition to the writable {@see PasswordHashScheme} set.
-     *
-     * @var list<string>
+     * The {SCHEME} prefix, its name made of RFC 3112 scheme characters in either case.
      */
-    private const LEGACY_READ_PREFIXES = [
-        '{SHA}',
-        '{MD5}',
-        '{SMD5}',
-    ];
+    private const SCHEME_PREFIX = '/^\{([A-Za-z0-9.\/_-]+)\}/';
 
     /**
      * @param int|null $hashCost bcrypt cost forwarded to password_hash(); null uses the PHP default. Does not apply to argon2.
@@ -43,17 +38,11 @@ readonly class PasswordHashService
     ) {}
 
     /**
-     * Whether a value begins with a recognized hash scheme, and so is not cleartext we can inspect.
+     * Whether a value carries a {SCHEME} prefix, recognized or not, which makes it something other than cleartext.
      */
     public function isHashed(string $value): bool
     {
-        foreach ($this->recognizedPrefixes() as $prefix) {
-            if (str_starts_with($value, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->schemeOf($value) !== null;
     }
 
     /**
@@ -96,20 +85,42 @@ readonly class PasswordHashService
             return false;
         }
 
-        foreach ($this->recognizedPrefixes() as $prefix) {
-            if (str_starts_with($stored, $prefix)) {
-                return $this->verifyScheme(
-                    $prefix,
-                    $plain,
-                    substr($stored, strlen($prefix)),
-                );
-            }
+        $scheme = $this->schemeOf($stored);
+
+        if ($scheme === null) {
+            return hash_equals(
+                $stored,
+                $plain,
+            );
+        }
+        $verifier = $this->verifierFor($scheme);
+
+        return $verifier !== null && $verifier(
+            $plain,
+            substr(
+                $stored,
+                strlen($scheme) + 2,
+            ),
+        );
+    }
+
+    /**
+     * Refuses a stored value under a scheme with no verification.
+     *
+     * @throws InvalidArgumentException naming the unsupported scheme
+     */
+    public function assertVerifiable(string $stored): void
+    {
+        $scheme = $this->schemeOf($stored);
+
+        if ($scheme === null || $this->verifierFor($scheme) !== null) {
+            return;
         }
 
-        return hash_equals(
-            $stored,
-            $plain,
-        );
+        throw new InvalidArgumentException(sprintf(
+            'The "{%s}" password scheme is not supported.',
+            $scheme,
+        ));
     }
 
     /**
@@ -123,38 +134,51 @@ readonly class PasswordHashService
     }
 
     /**
-     * Prefixes recognized for verification.
-     *
-     * @return list<string>
+     * The upper-cased scheme a value's {SCHEME} prefix names, or null for a value without one.
      */
-    private function recognizedPrefixes(): array
+    private function schemeOf(string $value): ?string
     {
-        return [
-            ...array_map(
-                static fn(PasswordHashScheme $scheme): string => $scheme->value,
-                PasswordHashScheme::cases(),
-            ),
-            ...self::LEGACY_READ_PREFIXES,
-        ];
+        $matched = preg_match(
+            self::SCHEME_PREFIX,
+            $value,
+            $matches,
+        );
+
+        return $matched === 1
+            ? strtoupper($matches[1])
+            : null;
     }
 
-    private function verifyScheme(
-        string $prefix,
+    /**
+     * The comparison for a scheme, or null for a scheme this service cannot verify.
+     *
+     * @return (Closure(string, string): bool)|null
+     */
+    private function verifierFor(string $scheme): ?Closure
+    {
+        return match ('{' . $scheme . '}') {
+            PasswordHashScheme::Ssha->value => $this->verifySsha(...),
+            PasswordHashScheme::Bcrypt->value, PasswordHashScheme::Argon2->value => password_verify(...),
+            '{SHA}' => $this->verifySha(...),
+            '{MD5}' => $this->verifyMd5(...),
+            '{SMD5}' => $this->verifySmd5(...),
+            '{CRYPT}' => $this->verifyCrypt(...),
+            default => null,
+        };
+    }
+
+    private function verifyCrypt(
         #[SensitiveParameter]
         string $plain,
         string $encoded,
     ): bool {
-        return match ($prefix) {
-            PasswordHashScheme::Ssha->value => $this->verifySsha($plain, $encoded),
-            PasswordHashScheme::Bcrypt->value, PasswordHashScheme::Argon2->value => password_verify($plain, $encoded),
-            '{SHA}' => $this->verifySha($plain, $encoded),
-            '{MD5}' => $this->verifyMd5($plain, $encoded),
-            '{SMD5}' => $this->verifySmd5($plain, $encoded),
-            default => throw new RuntimeException(sprintf(
-                'No verification is implemented for the recognized hash scheme "%s".',
-                $prefix,
-            )),
-        };
+        return hash_equals(
+            $encoded,
+            crypt(
+                $plain,
+                $encoded,
+            ),
+        );
     }
 
     private function hashSsha(

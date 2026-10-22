@@ -62,8 +62,8 @@ forking runner. Seeding refuses an entry that already exists, so running this ag
 `setSkipExisting(true)`, which leaves the entries already there untouched.
 
 The built-in `PasswordAuthenticator` handles bind authentication automatically — it reads the `userPassword` attribute
-from entries and verifies credentials against it. Supported hash schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`, and
-plaintext.
+from entries and verifies credentials against it. Supported hash schemes: `{SSHA}`, `{BCRYPT}`, `{ARGON2}`, `{SHA}`,
+`{MD5}`, `{SMD5}`, `{CRYPT}`, and plaintext. A value with any other `{SCHEME}` prefix never verifies.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -753,8 +753,11 @@ interface PasswordAuthenticatableInterface
 
 When no explicit authenticator is registered, we build a `PasswordAuthenticator` automatically. It
 resolves the bind name to an entry via the backend's `get()` method (or a custom resolver — see below), then verifies
-the supplied password against the `userPassword` attribute. Supported schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`,
-and plaintext.
+the supplied password against the `userPassword` attribute. Supported schemes: `{SSHA}`, `{BCRYPT}`, `{ARGON2}`,
+`{SHA}`, `{MD5}`, `{SMD5}`, `{CRYPT}`, and plaintext. A value with any other `{SCHEME}` prefix never verifies.
+
+`{CRYPT}` uses PHP's `crypt()`: no yescrypt (`$y$`, `$gy$`) or scrypt (`$7$`), and DES checks only 8 characters. A
+plaintext password starting with a `{scheme}` prefix never verifies.
 
 This means simple bind authentication works out of the box with any backend that stores `userPassword` on entries —
 no additional configuration required.
@@ -883,8 +886,8 @@ modification is needed.
 
 The `PLAIN` mechanism extracts the username and password from the SASL credentials and calls
 `PasswordAuthenticatableInterface::getSaslIdentity()`. The built-in `PasswordAuthenticator` then verifies the
-supplied password against the stored `userPassword` using `PasswordHashService`, which supports `{SHA}`, `{SSHA}`,
-`{MD5}`, `{SMD5}`, and plaintext. No additional configuration is needed beyond enabling the mechanism.
+supplied password against the stored `userPassword` using `PasswordHashService`, which supports the schemes listed
+above and plaintext. No additional configuration is needed beyond enabling the mechanism.
 
 **Note**: PLAIN transmits credentials in cleartext. Only enable it when the connection is protected by TLS (StartTLS
 or `setUseSsl`).

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -46,6 +47,66 @@ trait BindTestsTrait
         $this->expectException(BindException::class);
 
         $this->ldapClient()->bind('cn=nobody,dc=foo,dc=bar', '12345');
+    }
+
+    public function testABindVerifiesAPasswordStoredUnderCrypt(): void
+    {
+        $dn = $this->createUserWithPassword(
+            'crypt-user',
+            '{CRYPT}' . crypt(
+                'secret',
+                '$6$saltsaltsalt$',
+            ),
+        );
+
+        try {
+            $this->ldapClient()->bind(
+                $dn,
+                'secret',
+            );
+
+            self::assertTrue($this->ldapClient()->compare(
+                $dn,
+                'cn',
+                'crypt-user',
+            ));
+        } finally {
+            $this->deleteAsAdmin($dn);
+        }
+    }
+
+    public function testAPasswordUnderAnUnsupportedSchemeNeverAuthenticates(): void
+    {
+        $stored = '{SSHA256}' . base64_encode(hash(
+            'sha256',
+            'secret',
+            true,
+        ));
+        $dn = $this->createUserWithPassword(
+            'unsupported-scheme-user',
+            $stored,
+        );
+
+        try {
+            self::assertSame(
+                [
+                    ResultCode::INVALID_CREDENTIALS,
+                    ResultCode::INVALID_CREDENTIALS,
+                ],
+                [
+                    $this->bindResultCode(
+                        $dn,
+                        'secret',
+                    ),
+                    $this->bindResultCode(
+                        $dn,
+                        $stored,
+                    ),
+                ],
+            );
+        } finally {
+            $this->deleteAsAdmin($dn);
+        }
     }
 
     public function testAnUnauthenticatedAbandonDrawsNoResponse(): void
@@ -93,5 +154,49 @@ trait BindTestsTrait
         self::assertTrue(
             $this->ldapClient()->compare('cn=user,dc=foo,dc=bar', 'cn', 'user'),
         );
+    }
+
+    private function createUserWithPassword(
+        string $cn,
+        string $userPassword,
+    ): string {
+        $dn = sprintf(
+            'cn=%s,dc=foo,dc=bar',
+            $cn,
+        );
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => $cn,
+                'sn' => $cn,
+                'objectClass' => 'inetOrgPerson',
+                'userPassword' => $userPassword,
+            ],
+        ));
+
+        return $dn;
+    }
+
+    private function bindResultCode(
+        string $dn,
+        string $password,
+    ): int {
+        try {
+            $this->ldapClient()->bind(
+                $dn,
+                $password,
+            );
+        } catch (BindException $e) {
+            return $e->getCode();
+        }
+
+        return ResultCode::SUCCESS;
+    }
+
+    private function deleteAsAdmin(string $dn): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->delete($dn);
     }
 }

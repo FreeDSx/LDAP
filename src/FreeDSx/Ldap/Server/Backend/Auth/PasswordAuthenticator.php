@@ -25,16 +25,16 @@ use FreeDSx\Sasl\Mechanism\MechanismName;
 use SensitiveParameter;
 
 /**
- * Resolves the bind name to an Entry and verifies its userPassword; supports {SHA}, {SSHA}, {MD5}, {SMD5}, and plaintext.
+ * Resolves the bind name to an Entry and verifies its userPassword through the password hash service.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PasswordAuthenticator implements PasswordAuthenticatableInterface
+final readonly class PasswordAuthenticator implements PasswordAuthenticatableInterface
 {
     public function __construct(
-        private readonly BindNameResolverInterface $resolver,
-        private readonly ReadBackendInterface $backend,
-        private readonly PasswordHashService $hashService = new PasswordHashService(),
+        private BindNameResolverInterface $resolver,
+        private ReadBackendInterface $backend,
+        private PasswordHashService $hashService = new PasswordHashService(),
     ) {}
 
     public function authenticate(

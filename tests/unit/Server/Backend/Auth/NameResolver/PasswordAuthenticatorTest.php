@@ -279,6 +279,26 @@ final class PasswordAuthenticatorTest extends TestCase
         );
     }
 
+    public function test_get_sasl_identity_returns_null_for_a_password_under_an_unsupported_scheme(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute(
+                'userPassword',
+                '{SSHA256}' . base64_encode(hash(
+                    'sha256',
+                    'secret',
+                    true,
+                )),
+            ),
+        );
+
+        self::assertNull($this->subject($entry)->getSaslIdentity(
+            'alice',
+            MechanismName::SCRAM_SHA256,
+        ));
+    }
+
     /**
      * PLAIN verifies the presented password against the stored value, so a hash is still usable there.
      */

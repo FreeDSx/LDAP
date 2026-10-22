@@ -31,6 +31,14 @@ sn: Hashed
 uid: hashed
 userPassword: {SHA}JDjNt4ihTaLvLHpHhEFSdZmM1KM=
 
+# Under a scheme the server cannot verify ({SSHA256} of "secret"): never a password and never a shared secret.
+dn: cn=unsupported,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: unsupported
+sn: Unsupported
+uid: unsupported
+userPassword: {SSHA256}K7gNU3sdo+OL0wNhqoVWhr3g6s1xYv72ol/pe/Unols=
+
 # Empty on purpose: an empty value is the absence of a credential.
 dn: cn=empty,dc=foo,dc=bar
 objectClass: inetOrgPerson
