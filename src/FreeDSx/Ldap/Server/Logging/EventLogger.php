@@ -127,6 +127,7 @@ final readonly class EventLogger
      *
      * @param array<string, mixed> $context Event-scope context merged on top of connection-scope context.
      * @param TokenInterface|array<string, mixed>|null $subject Default `subject` sub-array.
+     * @param ?Throwable $cause When supplied, adds what caused the failure, and its trace when the policy includes traces.
      */
     public function recordFailure(
         ServerEvent $event,
@@ -134,6 +135,7 @@ final readonly class EventLogger
         array $context = [],
         TokenInterface|array|null $subject = null,
         ?LdapMessageRequest $message = null,
+        ?Throwable $cause = null,
     ): void {
         $this->record(
             $event,
@@ -143,6 +145,7 @@ final readonly class EventLogger
             ],
             $subject,
             $message,
+            $cause,
         );
     }
 

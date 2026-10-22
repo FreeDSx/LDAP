@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
@@ -40,13 +41,22 @@ final class PdoConnectionTest extends TestCase
             fn(): RecordingPdo => $this->second,
         );
 
+        $errors = new PdoErrorFactory(PdoDriver::Sqlite);
+        $connectionLoss = new ConnectionLoss(
+            $provider,
+            $errors,
+        );
         $this->subject = new PdoConnection(
             $provider,
-            new PdoStatementPool($provider),
+            new PdoStatementPool(
+                $provider,
+                $connectionLoss,
+            ),
             new PdoTransactor(
                 $provider,
                 new SqliteDialect(),
-                new PdoErrorFactory(PdoDriver::Sqlite),
+                $errors,
+                $connectionLoss,
             ),
         );
     }

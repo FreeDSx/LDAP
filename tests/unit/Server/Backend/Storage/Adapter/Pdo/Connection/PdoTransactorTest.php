@@ -16,9 +16,11 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
@@ -52,6 +54,10 @@ final class PdoTransactorTest extends TestCase
             $this->provider,
             $this->dialect,
             $this->errors,
+            new ConnectionLoss(
+                $this->provider,
+                $this->errors,
+            ),
             $this->sleeper,
             maxRetries: 3,
             backoff: new ExponentialBackoff(
@@ -153,6 +159,102 @@ final class PdoTransactorTest extends TestCase
                 $this->sleeper->durations,
             );
         }
+    }
+
+    public function test_a_lost_connection_is_answered_as_unavailable_and_never_reissued(): void
+    {
+        $attempts = 0;
+
+        $this->expectException(StorageIoException::class);
+        $this->expectExceptionCode(ResultCode::UNAVAILABLE);
+
+        try {
+            $this->subject->atomic(function () use (&$attempts): void {
+                $attempts++;
+
+                throw self::lostConnection();
+            });
+        } finally {
+            self::assertSame(
+                1,
+                $attempts,
+            );
+            self::assertSame(
+                [],
+                $this->sleeper->durations,
+            );
+        }
+    }
+
+    public function test_the_transaction_after_a_lost_connection_runs_on_a_new_one(): void
+    {
+        $fresh = new PDO('sqlite::memory:');
+        $provider = new SharedPdoConnectionProvider(
+            new PDO('sqlite::memory:'),
+            static fn(): PDO => $fresh,
+        );
+        $subject = new PdoTransactor(
+            $provider,
+            $this->dialect,
+            $this->errors,
+            new ConnectionLoss(
+                $provider,
+                $this->errors,
+            ),
+            $this->sleeper,
+        );
+
+        try {
+            $subject->atomic(static function (): void {
+                throw self::lostConnection();
+            });
+        } catch (StorageIoException) {
+        }
+
+        self::assertSame(
+            $fresh,
+            $subject->atomic(static fn(): PDO => $provider->get()),
+        );
+    }
+
+    public function test_a_connection_lost_in_a_nested_transaction_is_replaced_once_the_outermost_one_ends(): void
+    {
+        $lost = new PDO('sqlite::memory:');
+        $fresh = new PDO('sqlite::memory:');
+        $provider = new SharedPdoConnectionProvider(
+            $lost,
+            static fn(): PDO => $fresh,
+        );
+        $subject = new PdoTransactor(
+            $provider,
+            $this->dialect,
+            $this->errors,
+            new ConnectionLoss(
+                $provider,
+                $this->errors,
+            ),
+            $this->sleeper,
+        );
+        $heldInside = null;
+
+        $subject->atomic(static function () use ($subject, $provider, &$heldInside): void {
+            try {
+                $subject->atomic(static function (): void {
+                    throw self::lostConnection();
+                });
+            } catch (StorageIoException) {
+            }
+            $heldInside = $provider->get();
+        });
+
+        self::assertSame(
+            $lost,
+            $heldInside,
+        );
+        self::assertSame(
+            $fresh,
+            $provider->get(),
+        );
     }
 
     public function test_it_reissues_only_the_outermost_transaction(): void
@@ -408,10 +510,16 @@ final class PdoTransactorTest extends TestCase
      */
     private function subjectOver(PDO $pdo): PdoTransactor
     {
+        $provider = new SharedPdoConnectionProvider($pdo);
+
         return new PdoTransactor(
-            new SharedPdoConnectionProvider($pdo),
+            $provider,
             new SqliteDialect(),
             $this->errors,
+            new ConnectionLoss(
+                $provider,
+                $this->errors,
+            ),
             $this->sleeper,
         );
     }
@@ -432,10 +540,16 @@ final class PdoTransactorTest extends TestCase
                 return 0;
             });
 
+        $provider = new SharedPdoConnectionProvider($pdo);
+
         return new PdoTransactor(
-            new SharedPdoConnectionProvider($pdo),
+            $provider,
             $this->dialect,
             $this->errors,
+            new ConnectionLoss(
+                $provider,
+                $this->errors,
+            ),
             $this->sleeper,
             maxRetries: 3,
             backoff: new ExponentialBackoff(
@@ -454,6 +568,14 @@ final class PdoTransactorTest extends TestCase
         return DriverFailure::of(
             5,
             'database is locked',
+        );
+    }
+
+    private static function lostConnection(): PDOException
+    {
+        return DriverFailure::of(
+            10,
+            'disk I/O error',
         );
     }
 }

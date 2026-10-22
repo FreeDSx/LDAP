@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
@@ -86,6 +87,10 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             PdoConnector::class => $this->makeConnector(...),
             WriteScope::class => static fn(): WriteScope => new WriteScope(),
             PdoConnectionProviderInterface::class => $this->makeConnectionProvider(...),
+            ConnectionLoss::class => static fn(Container $container): ConnectionLoss => new ConnectionLoss(
+                $container->get(PdoConnectionProviderInterface::class),
+                $container->get(PdoErrorFactory::class),
+            ),
             PdoConnection::class => $this->makeConnection(...),
             WriterQueueInterface::class => $this->makeWriterQueue(...),
             EntryIndexWriter::class => $this->makeEntryIndexWriter(...),
@@ -208,14 +213,19 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
     private function makeConnection(Container $container): PdoConnection
     {
         $provider = $container->get(PdoConnectionProviderInterface::class);
+        $connectionLoss = $container->get(ConnectionLoss::class);
 
         return new PdoConnection(
             $provider,
-            new PdoStatementPool($provider),
+            new PdoStatementPool(
+                $provider,
+                $connectionLoss,
+            ),
             new PdoTransactor(
                 $provider,
                 $container->get(PdoDialectInterface::class),
                 $container->get(PdoErrorFactory::class),
+                $connectionLoss,
                 $container->get(SleeperInterface::class),
             ),
         );

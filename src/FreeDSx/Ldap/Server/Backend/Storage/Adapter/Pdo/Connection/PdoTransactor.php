@@ -35,6 +35,7 @@ final readonly class PdoTransactor
         private PdoConnectionProviderInterface $provider,
         private PdoTransactionDialectInterface $dialect,
         private PdoErrorFactory $errors,
+        private ConnectionLoss $connectionLoss,
         private SleeperInterface $sleeper = new BlockingSleeper(),
         private int $maxRetries = 15,
         private ExponentialBackoff $backoff = new ExponentialBackoff(
@@ -71,6 +72,7 @@ final readonly class PdoTransactor
      * @return TResult what the operation produced, once it has committed
      *
      * @throws StorageBusyException when the conflict outlasts the retry budget
+     * @throws StorageIoException when the connection to the database is lost
      * @throws PDOException when the failure is not a transient conflict, or the transaction is nested
      */
     public function atomic(callable $operation): mixed
@@ -82,7 +84,7 @@ final readonly class PdoTransactor
                 return $this->runAtomic($operation);
             } catch (PDOException $e) {
                 if (!$this->isReissuable($e)) {
-                    throw $e;
+                    throw $this->connectionLoss->translate($e);
                 }
 
                 $attempt++;

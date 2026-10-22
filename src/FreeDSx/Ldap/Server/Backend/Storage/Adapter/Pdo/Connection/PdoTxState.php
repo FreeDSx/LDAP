@@ -34,6 +34,19 @@ final class PdoTxState
      */
     public ?Throwable $cause = null;
 
+    /**
+     * Set when the database dropped the connection, which is replaced once no transaction is open on it.
+     */
+    public bool $lost = false;
+
+    /**
+     * Whether the connection is lost and nothing still runs inside a transaction on it.
+     */
+    public function isReplaceable(): bool
+    {
+        return $this->lost && $this->depth === 0;
+    }
+
     public function markBroken(Throwable $cause): void
     {
         $this->broken = true;

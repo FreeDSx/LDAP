@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\DriverErrorInfo;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\MysqlError;
 use PDOException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class MysqlErrorTest extends TestCase
@@ -100,6 +101,30 @@ final class MysqlErrorTest extends TestCase
         self::assertFalse($error->isDuplicateEntryUuid());
     }
 
+    #[DataProvider('connectionLostDataProvider')]
+    public function test_a_connection_the_client_lost_or_the_server_ended_is_lost(int $driverCode): void
+    {
+        self::assertTrue($this->errorWithDriverCode($driverCode)->isConnectionLost());
+    }
+
+    public function test_a_connection_exception_sqlstate_is_lost_whatever_the_code(): void
+    {
+        $error = new MysqlError(new DriverErrorInfo(
+            1047,
+            'Unknown command',
+            '08S01',
+        ));
+
+        self::assertTrue($error->isConnectionLost());
+    }
+
+    public function test_a_conflict_or_a_duplicate_is_not_a_lost_connection(): void
+    {
+        self::assertFalse($this->errorWithDriverCode(1213)->isConnectionLost());
+        self::assertFalse($this->errorWithDriverCode(1062)->isConnectionLost());
+        self::assertFalse($this->errorOf(new PDOException('Connection refused'))->isConnectionLost());
+    }
+
     public function test_an_unrelated_database_error_is_not_a_duplicate(): void
     {
         $error = $this->errorWithDriverCode(
@@ -109,6 +134,23 @@ final class MysqlErrorTest extends TestCase
 
         self::assertFalse($error->isDuplicateDn());
         self::assertFalse($error->isDuplicateEntryUuid());
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function connectionLostDataProvider(): array
+    {
+        return [
+            'server shutdown' => [1053],
+            'connection killed (MariaDB)' => [1927],
+            'cannot connect through the socket' => [2002],
+            'cannot connect to the host' => [2003],
+            'server has gone away' => [2006],
+            'lost during a query' => [2013],
+            'lost with a system error' => [2055],
+            'idle timeout' => [4031],
+        ];
     }
 
     private function errorWithDriverCode(

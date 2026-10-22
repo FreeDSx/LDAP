@@ -43,7 +43,7 @@ readonly class PdoConnection implements TransactionalWriteInterface, ResettableI
     /**
      * @param list<string|int|null> $params
      *
-     * @throws StorageIoException when the statement cannot be prepared
+     * @throws StorageIoException when the statement cannot be prepared, or the connection to the database is lost
      */
     public function execute(
         string $query,
@@ -63,6 +63,7 @@ readonly class PdoConnection implements TransactionalWriteInterface, ResettableI
      * @return TResult
      *
      * @throws StorageBusyException when a transient conflict outlasts the retry budget
+     * @throws StorageIoException when the connection to the database is lost
      */
     public function atomic(callable $operation): mixed
     {

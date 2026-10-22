@@ -34,12 +34,33 @@ final class DriverErrorInfoTest extends TestCase
         );
     }
 
-    public function test_a_failure_without_driver_error_info_reports_neither(): void
+    public function test_a_failure_without_driver_error_info_reports_none_of_it(): void
     {
         $info = DriverErrorInfo::of(new PDOException('Connection refused'));
 
         self::assertFalse($info->hasDriverCode(0));
         self::assertNull($info->driverMessage());
+        self::assertFalse($info->isConnectionException());
+    }
+
+    public function test_a_connection_exception_sqlstate_is_recognised_whatever_the_subclass(): void
+    {
+        self::assertTrue(DriverErrorInfo::of(DriverFailure::of(
+            2006,
+            sqlState: '08S01',
+        ))->isConnectionException());
+        self::assertTrue(DriverErrorInfo::of(DriverFailure::of(
+            0,
+            sqlState: '08006',
+        ))->isConnectionException());
+    }
+
+    public function test_another_sqlstate_class_is_not_a_connection_exception(): void
+    {
+        self::assertFalse(DriverErrorInfo::of(DriverFailure::of(
+            2006,
+            sqlState: 'HY000',
+        ))->isConnectionException());
     }
 
     public function test_it_matches_any_of_the_codes_asked_about(): void

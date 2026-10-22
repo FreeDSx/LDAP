@@ -110,6 +110,37 @@ final class RoutingPdoConnectionProviderTest extends TestCase
         );
     }
 
+    public function test_a_caller_outside_the_writer_discards_the_reads_connection(): void
+    {
+        $this->reads
+            ->expects(self::once())
+            ->method('discard');
+        $this->writes
+            ->expects(self::never())
+            ->method('discard');
+
+        $this->subject->discard();
+    }
+
+    public function test_the_writer_discards_the_writes_connection(): void
+    {
+        $this->requireSwoole();
+
+        $this->writes
+            ->expects(self::once())
+            ->method('discard');
+        $this->reads
+            ->expects(self::never())
+            ->method('discard');
+
+        $this->scope->enter();
+        try {
+            $this->subject->discard();
+        } finally {
+            $this->scope->leave();
+        }
+    }
+
     public function test_reset_resets_both_connections(): void
     {
         $this->reads

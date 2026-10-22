@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Auth;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -27,8 +28,10 @@ use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 
 /**
  * Drives the bind guard for the SASL flow, where the identity is only known once the exchange completes.
+ *
+ * @internal
  */
-final readonly class SaslBindPolicyEnforcer
+readonly class SaslBindPolicyEnforcer
 {
     public function __construct(
         private BindNameResolverInterface $nameResolver,
@@ -38,6 +41,9 @@ final readonly class SaslBindPolicyEnforcer
         private PasswordPolicyContext $context,
     ) {}
 
+    /**
+     * @throws AnswerableExceptionInterface
+     */
     public function recordFailure(?string $username): void
     {
         if ($username === null) {

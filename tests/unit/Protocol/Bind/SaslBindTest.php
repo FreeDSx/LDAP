@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
@@ -33,12 +34,15 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
@@ -309,6 +313,70 @@ final class SaslBindTest extends TestCase
             1,
             new SaslBindRequest('CRAM-MD5'),
         ));
+    }
+
+    public function test_a_failure_finishing_a_later_round_is_answered_on_its_message_id(): void
+    {
+        $sent = [];
+        $enforcer = $this->createMock(SaslBindPolicyEnforcer::class);
+        $enforcer
+            ->method('recordFailure')
+            ->willThrowException(new StorageIoException('The connection to the database was lost.'));
+        $subject = new SaslBind(
+            queue: $this->mockQueue,
+            exchange: $this->makeExchange(),
+            mechanisms: [ServerOptions::SASL_CRAM_MD5],
+            policyEnforcer: $enforcer,
+        );
+        $this->mockAuthenticator
+            ->method('getSaslIdentity')
+            ->willReturn(new SaslIdentity(
+                'correctpassword',
+                new Dn('cn=user,dc=foo,dc=bar'),
+            ));
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$sent): ServerQueue {
+                $sent[] = $response;
+
+                return $this->mockQueue;
+            });
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn(new LdapMessageRequest(
+                2,
+                new SaslBindRequest(
+                    'CRAM-MD5',
+                    'cn=user,dc=foo,dc=bar aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                ),
+            ));
+
+        try {
+            $subject->bind(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            self::fail('The failure was not answered.');
+        } catch (ResponseAlreadySentException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE,
+                $e->getCode(),
+            );
+        }
+
+        $answer = $sent[1]->getResponse();
+        self::assertSame(
+            2,
+            $sent[1]->getMessageId(),
+        );
+        self::assertInstanceOf(
+            LdapResult::class,
+            $answer,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE,
+            $answer->getResultCode(),
+        );
     }
 
     public function test_it_throws_runtime_exception_when_bind_is_called_with_a_non_sasl_request(): void

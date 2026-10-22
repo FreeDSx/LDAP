@@ -49,6 +49,10 @@ final class CoroutinePdoConnectionProvider implements PdoConnectionProviderInter
     {
         $cid = $this->requireCoroutineId();
 
+        if (isset($this->txStates[$cid]) && $this->txStates[$cid]->isReplaceable()) {
+            $this->release($cid);
+        }
+
         if (!isset($this->connections[$cid])) {
             $this->connections[$cid] = ($this->factory)();
             $this->txStates[$cid] = new PdoTxState();
@@ -81,6 +85,15 @@ final class CoroutinePdoConnectionProvider implements PdoConnectionProviderInter
      * No-op: connections are already isolated per coroutine, and coroutines do not cross fork boundaries.
      */
     public function reset(): void {}
+
+    public function discard(): void
+    {
+        $cid = $this->requireCoroutineId();
+
+        if (isset($this->txStates[$cid])) {
+            $this->txStates[$cid]->lost = true;
+        }
+    }
 
     private function release(int $cid): void
     {

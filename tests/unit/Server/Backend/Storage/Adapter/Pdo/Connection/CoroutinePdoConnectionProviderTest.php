@@ -59,6 +59,45 @@ final class CoroutinePdoConnectionProviderTest extends TestCase
         );
     }
 
+    public function test_a_discarded_connection_is_replaced_on_its_next_use_in_the_coroutine(): void
+    {
+        $released = [];
+        $this->subject->onConnectionReleased(static function (PDO $pdo) use (&$released): void {
+            $released[] = $pdo;
+        });
+
+        $first = null;
+        $next = null;
+        run(function () use (&$first, &$next): void {
+            $first = $this->subject->get();
+            $this->subject->discard();
+            $next = $this->subject->get();
+        });
+
+        self::assertNotSame(
+            $first,
+            $next,
+        );
+        self::assertSame(
+            [$first, $next],
+            $released,
+        );
+    }
+
+    public function test_a_discarded_connection_is_kept_until_the_transaction_open_on_it_ends(): void
+    {
+        $kept = false;
+        run(function () use (&$kept): void {
+            $first = $this->subject->get();
+            $this->subject->txState()->depth = 1;
+            $this->subject->discard();
+            $kept = $this->subject->get() === $first;
+            $this->subject->txState()->depth = 0;
+        });
+
+        self::assertTrue($kept);
+    }
+
     public function test_it_notifies_nothing_when_no_connection_was_opened(): void
     {
         $released = [];

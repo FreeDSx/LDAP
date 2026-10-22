@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use PDO;
 use PDOException;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\ConnectionLossTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedReferenceTestsTrait;
 
 /**
@@ -22,6 +23,7 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedReferenceTestsTrait;
  */
 final class MysqlLdapBackendStorageTest extends LdapBackendStorageTestCase
 {
+    use ConnectionLossTestsTrait;
     use LinkedReferenceTestsTrait;
 
     public static function setUpBeforeClass(): void

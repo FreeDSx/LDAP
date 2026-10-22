@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use PDO;
+use PDOException;
 use PDOStatement;
 use Throwable;
 
@@ -35,6 +37,7 @@ final class PdoStatementPool
 
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
+        private readonly ConnectionLoss $connectionLoss,
         private readonly int $maxQueries = self::DEFAULT_MAX_QUERIES,
     ) {
         // Make sure we clean-up cached statements when the provider closes the connection.
@@ -46,7 +49,7 @@ final class PdoStatementPool
      *
      * @param list<string|int|null> $params
      *
-     * @throws StorageIoException when the statement cannot be prepared
+     * @throws StorageIoException when the statement cannot be prepared, or the connection to the database is lost
      */
     public function execute(
         string $query,
@@ -54,14 +57,21 @@ final class PdoStatementPool
     ): PooledStatement {
         $pdo = $this->provider->get();
         $key = spl_object_id($pdo);
-        $statement = $this->lease(
-            $pdo,
-            $key,
-            $query,
-        );
 
-        $this->bind($statement, $params);
-        $statement->execute();
+        try {
+            $statement = $this->lease(
+                $pdo,
+                $key,
+                $query,
+            );
+            $this->bind(
+                $statement,
+                $params,
+            );
+            $statement->execute();
+        } catch (PDOException $e) {
+            throw $this->connectionLoss->translate($e);
+        }
 
         return new PooledStatement(
             $statement,

@@ -54,6 +54,11 @@ class RoutingPdoConnectionProvider implements PdoConnectionProviderInterface
         $this->writes->reset();
     }
 
+    public function discard(): void
+    {
+        $this->route()->discard();
+    }
+
     /**
      * The writer's connection holds its open transaction, which a reads connection cannot see.
      */

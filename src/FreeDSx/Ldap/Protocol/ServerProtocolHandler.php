@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
-use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
+use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
 use Throwable;
 
 /**
@@ -34,6 +35,8 @@ use Throwable;
  */
 readonly class ServerProtocolHandler
 {
+    use FailureAnswerTrait;
+
     public function __construct(
         private ServerQueue $queue,
         private MiddlewareHandlerInterface $requestPipeline,
@@ -130,23 +133,23 @@ readonly class ServerProtocolHandler
         } catch (ResponseAlreadySentException) {
             # A handler already sent the response (e.g. SASL, which needs the correct multi-round message ID), so
             # there is nothing further to do for this message.
-        } catch (OperationException $e) {
-            # A pre-pipeline bind/authorization failure. Answer it and keep the session open — a failed bind does not
-            # terminate the connection (RFC 4511 §4.2.1). Operation failures are handled by OperationErrorMiddleware.
-            #
-            # Audited here because these are thrown above the writer, so no middleware sees them.
+        } catch (AnswerableExceptionInterface $e) {
+            # No middleware sees a failure thrown above the writer; a failed bind keeps the session (RFC 4511 4.2.1).
+            $failure = $this->answerFor($e) ?? throw $e;
+
             $this->eventLogger->recordFailure(
                 ServerEvent::OperationRefused,
-                $e,
+                $failure,
                 message: $message,
+                cause: $failure->getPrevious(),
             );
             $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                 $message,
-                $e->getCode(),
-                $e->getMessage(),
+                $failure->getCode(),
+                $failure->getMessage(),
                 null,
                 [],
-                ...$e->controls()->toArray(),
+                ...$failure->controls()->toArray(),
             ));
         }
     }

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -32,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
@@ -48,6 +50,7 @@ use FreeDSx\Sasl\SaslInterface;
  */
 class SaslBind implements BindInterface
 {
+    use FailureAnswerTrait;
     use VersionValidatorTrait;
 
     /**
@@ -182,7 +185,14 @@ class SaslBind implements BindInterface
         $message = $result->getLastMessage();
 
         if (!$context->isAuthenticated()) {
-            $this->policyEnforcer?->recordFailure($result->getUsername());
+            try {
+                $this->policyEnforcer?->recordFailure($result->getUsername());
+            } catch (AnswerableExceptionInterface $e) {
+                throw $this->answerOn(
+                    $message,
+                    $this->answerFor($e) ?? throw $e,
+                );
+            }
 
             // Send the failure response directly using the current $message, which reflects
             // the latest message consumed from the queue (correct ID for multi-round exchanges).
@@ -224,17 +234,10 @@ class SaslBind implements BindInterface
                 $username,
                 $resolvedDn,
             );
-        } catch (OperationException $e) {
-            $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+        } catch (AnswerableExceptionInterface $e) {
+            throw $this->answerOn(
                 $message,
-                $e->getCode(),
-                $e->getMessage(),
-            ));
-
-            throw new ResponseAlreadySentException(
-                $e->getMessage(),
-                $e->getCode(),
-                $e,
+                $this->answerFor($e) ?? throw $e,
             );
         }
 
@@ -265,5 +268,27 @@ class SaslBind implements BindInterface
         }
 
         return $token;
+    }
+
+    /**
+     * Answers a failure on the message the exchange read last, which the dispatcher above cannot address.
+     *
+     * @throws EncoderException
+     */
+    private function answerOn(
+        LdapMessageRequest $message,
+        OperationException $failure,
+    ): ResponseAlreadySentException {
+        $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+            $message,
+            $failure->getCode(),
+            $failure->getMessage(),
+        ));
+
+        return new ResponseAlreadySentException(
+            $failure->getMessage(),
+            $failure->getCode(),
+            $failure,
+        );
     }
 }

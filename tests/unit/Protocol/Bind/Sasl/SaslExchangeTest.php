@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
@@ -49,6 +51,8 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
@@ -57,6 +61,7 @@ use FreeDSx\Sasl\SaslContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Throwable;
 
 final class SaslExchangeTest extends TestCase
 {
@@ -390,6 +395,82 @@ final class SaslExchangeTest extends TestCase
         );
     }
 
+    #[DataProvider('answeredFailures')]
+    public function test_a_failure_in_a_later_round_is_answered_on_that_rounds_message_id(
+        Throwable $failure,
+        int $resultCode,
+    ): void {
+        $sent = [];
+        $this->givenTheSecondRoundFailsWith($failure);
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$sent): ServerQueue {
+                $sent[] = $response;
+
+                return $this->mockQueue;
+            });
+
+        try {
+            $this->subject->run($this->makeInput());
+            self::fail('The failure was not answered.');
+        } catch (ResponseAlreadySentException $e) {
+            self::assertSame(
+                $resultCode,
+                $e->getCode(),
+            );
+        }
+
+        $answer = $sent[1]->getResponse();
+        self::assertSame(
+            2,
+            $sent[1]->getMessageId(),
+        );
+        self::assertInstanceOf(
+            LdapResult::class,
+            $answer,
+        );
+        self::assertSame(
+            $resultCode,
+            $answer->getResultCode(),
+        );
+    }
+
+    /**
+     * @return array<string, array{Throwable, int}>
+     */
+    public static function answeredFailures(): array
+    {
+        return [
+            'refused' => [
+                new OperationException(
+                    'Invalid credentials.',
+                    ResultCode::INVALID_CREDENTIALS,
+                ),
+                ResultCode::INVALID_CREDENTIALS,
+            ],
+            'storage unavailable' => [
+                new StorageIoException('The connection to the database was lost.'),
+                ResultCode::UNAVAILABLE,
+            ],
+            'storage busy' => [
+                new StorageBusyException('The transaction kept conflicting with concurrent writes.'),
+                ResultCode::BUSY,
+            ],
+        ];
+    }
+
+    public function test_an_unrecoverable_failure_in_a_later_round_ends_the_session_unanswered(): void
+    {
+        $this->givenTheSecondRoundFailsWith(new ProtocolException('The message could not be processed.'));
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $this->expectException(ProtocolException::class);
+
+        $this->subject->run($this->makeInput());
+    }
+
     /**
      * @return array<string, array{RequestInterface, string}>
      */
@@ -560,6 +641,33 @@ final class SaslExchangeTest extends TestCase
             criticalControls: new CriticalControlValidator(),
             policyContext: $this->policyContext,
         );
+    }
+
+    private function givenTheSecondRoundFailsWith(Throwable $failure): void
+    {
+        $rounds = 0;
+
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturnCallback(function () use (&$rounds, $failure): SaslContext {
+                if (++$rounds === 1) {
+                    return $this->makeContext(
+                        isComplete: false,
+                        response: 'server-challenge',
+                    );
+                }
+
+                throw $failure;
+            });
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn(new LdapMessageRequest(
+                2,
+                new SaslBindRequest(
+                    self::MECH,
+                    'creds',
+                ),
+            ));
     }
 
     private function makeInput(?string $initialCredentials = null): SaslExchangeInput

@@ -15,8 +15,10 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use PDO;
+use PDOException;
 
 /**
  * Opens connections to the configured database, ready for the storage to use.
@@ -50,6 +52,7 @@ readonly class PdoConnector
 
     /**
      * @throws RuntimeException when the driver's extension is not loaded
+     * @throws StorageIoException when the database cannot be reached or refuses the connection
      */
     public function open(): PDO
     {
@@ -62,6 +65,24 @@ readonly class PdoConnector
             ));
         }
 
+        try {
+            return $this->connect();
+        } catch (PDOException $e) {
+            throw new StorageIoException(
+                sprintf(
+                    'Could not connect to the database: %s',
+                    $e->getMessage(),
+                ),
+                $e,
+            );
+        }
+    }
+
+    /**
+     * @throws PDOException
+     */
+    private function connect(): PDO
+    {
         $pdo = new PDO(
             $this->config->getDsn(),
             $this->config->getUsername(),
