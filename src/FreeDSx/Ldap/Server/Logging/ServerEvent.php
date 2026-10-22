@@ -85,7 +85,7 @@ enum ServerEvent: string
     case MetricsChannelUnavailable      = 'server.metrics.channel_unavailable';
     case TaskFailed                     = 'server.task.failed';
     case SocketUnusable                 = 'server.socket.unusable';
-    case WorkersClamped                 = 'server.workers_clamped';
+    case ConcurrencyLimited             = 'server.concurrency_limited';
 
     public function level(): string
     {
@@ -106,7 +106,7 @@ enum ServerEvent: string
             self::ClientTlsFailed,
             self::ClientNotifyFailed,
             self::MetricsSnapshotFailed,
-            self::WorkersClamped => LogLevel::WARNING,
+            self::ConcurrencyLimited => LogLevel::WARNING,
             self::BindFailure,
             self::StartTlsFailed,
             self::PasswordModifyFailed,
@@ -193,7 +193,7 @@ enum ServerEvent: string
             self::MetricsChannelUnavailable => 'Unable to create a child metrics channel; continuing without operation rollup.',
             self::TaskFailed => 'A background task failed.',
             self::SocketUnusable => 'The existing socket cannot be used. To run the LDAP server, you must remove the existing socket.',
-            self::WorkersClamped => 'The configured storage cannot be shared between processes; accepting on a single worker.',
+            self::ConcurrencyLimited => 'The configuration limits how many clients the server can serve at once.',
         };
     }
 

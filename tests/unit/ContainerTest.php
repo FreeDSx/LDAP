@@ -44,6 +44,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInt
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -85,6 +86,7 @@ use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
+use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\SocketServerFactory;
@@ -95,6 +97,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
+use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 class ContainerTest extends TestCase
@@ -676,7 +679,8 @@ class ContainerTest extends TestCase
             ->with(
                 LogLevel::WARNING,
                 self::anything(),
-                self::callback(static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::WorkersClamped->value
+                self::callback(static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::ConcurrencyLimited->value
+                    && $context[EventContext::REASON] === ConcurrencyLimitReason::StorageNotShareable->value
                     && $context['requested_workers'] === 4),
             );
 
@@ -692,6 +696,45 @@ class ContainerTest extends TestCase
         self::assertInstanceOf(
             SwooleServerRunner::class,
             $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_swoole_on_sqlite_warns_when_swoole_was_built_without_the_sqlite_hook(): void
+    {
+        $this->requireSwoole();
+        if (defined('SWOOLE_HOOK_PDO_SQLITE')) {
+            self::markTestSkipped('This Swoole build runs SQLite without blocking the worker.');
+        }
+        $logger = new RecordingLogger();
+
+        $this->resolveSqliteConnection(
+            RunnerConfig::forSwoole(1),
+            $logger,
+        );
+
+        self::assertSame(
+            [
+                [
+                    LogLevel::WARNING,
+                    ConcurrencyLimitReason::StorageBlocksWorker->value,
+                ],
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_pcntl_on_sqlite_does_not_warn_about_blocking_the_worker(): void
+    {
+        $logger = new RecordingLogger();
+
+        $this->resolveSqliteConnection(
+            RunnerConfig::forPcntl(),
+            $logger,
+        );
+
+        self::assertSame(
+            [],
+            $this->concurrencyLimitsRecorded($logger),
         );
     }
 
@@ -725,5 +768,46 @@ class ContainerTest extends TestCase
     private function containerFor(ServerOptions $options): Container
     {
         return Container::forServer($options);
+    }
+
+    private function resolveSqliteConnection(
+        RunnerConfig $runnerConfig,
+        RecordingLogger $logger,
+    ): void {
+        $path = tempnam(
+            sys_get_temp_dir(),
+            'container-',
+        );
+        self::assertIsString($path);
+
+        try {
+            $this->containerFor(
+                (new ServerOptions(PdoConfig::forSqlite($path)))
+                    ->setRunnerConfig($runnerConfig)
+                    ->setLogger($logger),
+            )->get(PdoConnectionProviderInterface::class);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /**
+     * @return list<array{string, mixed}>
+     */
+    private function concurrencyLimitsRecorded(RecordingLogger $logger): array
+    {
+        $recorded = [];
+
+        foreach ($logger->records as $record) {
+            if (($record['context'][EventContext::EVENT] ?? null) !== ServerEvent::ConcurrencyLimited->value) {
+                continue;
+            }
+            $recorded[] = [
+                $record['level'],
+                $record['context'][EventContext::REASON] ?? null,
+            ];
+        }
+
+        return $recorded;
     }
 }

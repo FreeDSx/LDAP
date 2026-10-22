@@ -99,7 +99,7 @@ final readonly class EventLogPolicy
             ServerEvent::MetricsChannelUnavailable,
             ServerEvent::TaskFailed,
             ServerEvent::SocketUnusable,
-            ServerEvent::WorkersClamped,
+            ServerEvent::ConcurrencyLimited,
         );
     }
 

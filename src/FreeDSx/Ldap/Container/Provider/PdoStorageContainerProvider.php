@@ -63,6 +63,10 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
+use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ServerOptions;
@@ -189,6 +193,9 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
                 'The Swoole runner opens a connection per coroutine, so an in-memory SQLite database is not supported.',
             );
         }
+        if ($isSwoole) {
+            $this->recordBlockingSqlite($container);
+        }
 
         $connector = $container->get(PdoConnector::class);
         $initial = $connector->bootstrap();
@@ -207,6 +214,24 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
                 $open,
             ),
             $container->get(WriteScope::class),
+        );
+    }
+
+    private function recordBlockingSqlite(Container $container): void
+    {
+        $isSqlite = $this->requirePdoConfig($container)->getDriver() === PdoDriver::Sqlite;
+
+        if (!$isSqlite || defined('SWOOLE_HOOK_PDO_SQLITE')) {
+            return;
+        }
+        $options = $container->get(ServerOptions::class);
+
+        (new EventLogger(
+            $options->getLogger(),
+            $options->getEventLogPolicy(),
+        ))->record(
+            ServerEvent::ConcurrencyLimited,
+            [EventContext::REASON => ConcurrencyLimitReason::StorageBlocksWorker->value],
         );
     }
 

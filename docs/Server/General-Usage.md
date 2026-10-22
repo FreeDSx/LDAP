@@ -401,7 +401,7 @@ A SQLite-backed `PdoStorage` that persists the directory in a SQLite database fi
 use cases that need durable persistence across restarts with support for concurrent access:
 
 - **PCNTL**: a single shared PDO connection is inherited by all forked child processes. SQLite WAL mode handles concurrent access at the OS level.
-- **Swoole**: each coroutine gets its own PDO connection to avoid blocking.
+- **Swoole**: each coroutine gets its own PDO connection to avoid blocking (swoole must be compiled with `--enable-swoole-sqlite` for this to fully work).
 
 Pass a `PdoConfig::forSqlite()` to the `ServerOptions` constructor. The container builds the shared-connection
 (PCNTL) or per-coroutine (Swoole) storage to match the configured runner, both using WAL journal mode:
