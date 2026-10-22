@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Auth;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -265,5 +266,166 @@ final class PasswordHashServiceTest extends TestCase
     public function test_is_hashed_treats_plaintext_as_not_hashed(): void
     {
         self::assertFalse($this->subject->isHashed('plaintext'));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function cryptSaltProvider(): array
+    {
+        return [
+            'sha-512' => ['$6$rounds=5000$saltsaltsalt$'],
+            'sha-256' => ['$5$saltsaltsalt$'],
+            'md5' => ['$1$saltsalt$'],
+            'bcrypt' => ['$2y$04$abcdefghijklmnopqrstuu'],
+            'des' => ['ab'],
+        ];
+    }
+
+    #[DataProvider('cryptSaltProvider')]
+    public function test_crypt_format_verifies_with_the_algorithm_its_hash_names(string $salt): void
+    {
+        $hashed = '{CRYPT}' . crypt(
+            'mypassword',
+            $salt,
+        );
+
+        self::assertTrue($this->subject->verify(
+            'mypassword',
+            $hashed,
+        ));
+        self::assertFalse($this->subject->verify(
+            'wrong',
+            $hashed,
+        ));
+    }
+
+    public function test_a_crypt_value_without_a_usable_hash_does_not_verify(): void
+    {
+        self::assertFalse($this->subject->verify(
+            'mypassword',
+            '{CRYPT}',
+        ));
+        self::assertFalse($this->subject->verify(
+            '*0',
+            '{CRYPT}*0',
+        ));
+    }
+
+    public function test_a_scheme_name_is_recognized_in_any_case(): void
+    {
+        self::assertTrue($this->subject->verify(
+            'mypassword',
+            '{crypt}' . crypt(
+                'mypassword',
+                '$6$saltsaltsalt$',
+            ),
+        ));
+        self::assertTrue($this->subject->verify(
+            'mypassword',
+            '{sha}' . base64_encode(sha1(
+                'mypassword',
+                true,
+            )),
+        ));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function unsupportedSchemeProvider(): array
+    {
+        return [
+            'salted sha-256' => [
+                '{SSHA256}' . base64_encode(hash(
+                    'sha256',
+                    'mypassword',
+                    true,
+                )),
+            ],
+            'pbkdf2 with a hyphen' => ['{PBKDF2-SHA512}10000$c2FsdA$aGFzaA'],
+            'pbkdf2 with an underscore' => ['{PBKDF2_SHA256}AAAIAA'],
+            'dotted scheme' => ['{SHA256.HEX}89e01536ac207279409d4de1e5253e01f4a1769e696db0d6062ca9b8f56767c8'],
+            'leading digit' => ['{1st}word'],
+            'rfc 2307 alternative scheme' => ['{x-custom}mypassword'],
+        ];
+    }
+
+    #[DataProvider('unsupportedSchemeProvider')]
+    public function test_an_unsupported_scheme_never_verifies_not_even_against_the_stored_value(string $stored): void
+    {
+        self::assertTrue($this->subject->isHashed($stored));
+        self::assertFalse($this->subject->verify(
+            'mypassword',
+            $stored,
+        ));
+        self::assertFalse($this->subject->verify(
+            $stored,
+            $stored,
+        ));
+    }
+
+    #[DataProvider('unsupportedSchemeProvider')]
+    public function test_an_unsupported_scheme_is_refused_as_unverifiable(string $stored): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->subject->assertVerifiable($stored);
+    }
+
+    public function test_an_unverifiable_value_is_refused_by_its_scheme_name(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The "{PBKDF2-SHA512}" password scheme is not supported.');
+
+        $this->subject->assertVerifiable('{pbkdf2-sha512}10000$c2FsdA$aGFzaA');
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function verifiableValueProvider(): array
+    {
+        return [
+            'cleartext' => ['mypassword'],
+            'brace-led cleartext' => ['{my pass}word'],
+            'ssha' => ['{SSHA}c2FsdGVkaGFzaA=='],
+            'bcrypt in lower case' => ['{bcrypt}$2y$04$abcdefghijklmnopqrstuu'],
+            'argon2' => ['{ARGON2}$argon2id$v=19$m=65536,t=4,p=1$c2FsdA$aGFzaA'],
+            'sha' => ['{SHA}aGFzaA=='],
+            'md5' => ['{MD5}aGFzaA=='],
+            'smd5' => ['{SMD5}aGFzaA=='],
+            'crypt' => ['{CRYPT}$6$saltsaltsalt$hash'],
+        ];
+    }
+
+    #[DataProvider('verifiableValueProvider')]
+    public function test_cleartext_and_every_supported_scheme_are_verifiable(string $stored): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertVerifiable($stored);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function braceLedCleartextProvider(): array
+    {
+        return [
+            'space in the braces' => ['{my pass}word'],
+            'empty braces' => ['{}word'],
+            'no closing brace' => ['{word'],
+        ];
+    }
+
+    #[DataProvider('braceLedCleartextProvider')]
+    public function test_a_value_whose_braces_are_not_a_scheme_prefix_is_cleartext(string $stored): void
+    {
+        self::assertFalse($this->subject->isHashed($stored));
+        self::assertTrue($this->subject->verify(
+            $stored,
+            $stored,
+        ));
     }
 }

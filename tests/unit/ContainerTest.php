@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -59,6 +60,7 @@ use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
@@ -304,6 +306,36 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
 
         $this->subject->get(ReplicaPasswordStateStoreInterface::class);
+    }
+
+    public function test_a_manager_password_under_an_unsupported_scheme_is_refused_naming_the_scheme(): void
+    {
+        $container = $this->containerFor(
+            TestServerOptions::defaults()->setManager(new ManagerIdentity(
+                new Dn('cn=manager'),
+                '{PBKDF2-SHA512}10000$c2FsdA$aGFzaA',
+            )),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The manager password can never be verified. The "{PBKDF2-SHA512}" password scheme is not supported.');
+
+        $container->get(ServerProtocolFactoryInterface::class);
+    }
+
+    public function test_a_manager_password_under_a_supported_scheme_is_accepted(): void
+    {
+        $container = $this->containerFor(
+            TestServerOptions::defaults()->setManager(new ManagerIdentity(
+                new Dn('cn=manager'),
+                '{SHA}aGFzaA==',
+            )),
+        );
+
+        self::assertInstanceOf(
+            ServerProtocolFactory::class,
+            $container->get(ServerProtocolFactoryInterface::class),
+        );
     }
 
     public function test_a_proxy_container_uses_the_proxy_protocol_factory(): void

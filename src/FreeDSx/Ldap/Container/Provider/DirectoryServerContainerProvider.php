@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\Contributor\DirectoryListenerContributor;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
@@ -120,6 +121,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\ReplayWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
@@ -614,7 +616,33 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeServerProtocolFactory(Container $container): ServerProtocolFactory
     {
+        $this->refuseUnverifiableManagerPassword($container);
+
         return new ServerProtocolFactory($container->get(ConnectionHandlerBuilderInterface::class));
+    }
+
+    /**
+     * Refuses a manager password under a scheme with no verification, which would leave the account unusable.
+     */
+    private function refuseUnverifiableManagerPassword(Container $container): void
+    {
+        $manager = $container->get(ServerOptions::class)->getManager();
+
+        if ($manager === null) {
+            return;
+        }
+
+        try {
+            $container->get(PasswordHashService::class)->assertVerifiable($manager->hashedPassword());
+        } catch (InvalidArgumentException $e) {
+            throw new RuntimeException(
+                sprintf(
+                    'The manager password can never be verified. %s',
+                    $e->getMessage(),
+                ),
+                previous: $e,
+            );
+        }
     }
 
     private function makeServerProtocolHandlerFactory(Container $container): ServerProtocolHandlerFactory
