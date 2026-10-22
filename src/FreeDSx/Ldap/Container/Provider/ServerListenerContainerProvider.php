@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
+use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
@@ -210,8 +212,11 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         }
 
         $this->makeEventLogger($options)->record(
-            ServerEvent::WorkersClamped,
-            ['requested_workers' => $requestedWorkers],
+            ServerEvent::ConcurrencyLimited,
+            [
+                EventContext::REASON => ConcurrencyLimitReason::StorageNotShareable->value,
+                'requested_workers' => $requestedWorkers,
+            ],
         );
     }
 
