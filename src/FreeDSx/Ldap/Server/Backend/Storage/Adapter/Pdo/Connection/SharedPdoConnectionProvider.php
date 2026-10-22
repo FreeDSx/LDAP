@@ -46,6 +46,10 @@ final class SharedPdoConnectionProvider implements PdoConnectionProviderInterfac
 
     public function get(): PDO
     {
+        if ($this->txState->isReplaceable()) {
+            $this->reset();
+        }
+
         if ($this->pdo !== null) {
             return $this->pdo;
         }
@@ -84,5 +88,10 @@ final class SharedPdoConnectionProvider implements PdoConnectionProviderInterfac
         foreach ($this->releaseListeners as $listener) {
             $listener($pdo);
         }
+    }
+
+    public function discard(): void
+    {
+        $this->txState->lost = true;
     }
 }

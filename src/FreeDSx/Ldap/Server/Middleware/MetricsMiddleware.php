@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Middleware;
 
-use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -61,8 +61,8 @@ final readonly class MetricsMiddleware implements MiddlewareInterface
 
         try {
             $stream = $next->handle($context);
-        } catch (OperationException $e) {
-            // Only front-of-chain failures (bind/authorization) reach here; operation failures resolve as outcomes.
+        } catch (AnswerableExceptionInterface $e) {
+            // Only failures thrown above the writer reach here; operation failures resolve as outcomes.
             $this->record(
                 $request,
                 $operation,

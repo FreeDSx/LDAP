@@ -39,4 +39,9 @@ interface PdoErrorInterface
      * Whether a value exceeded its column's declared length.
      */
     public function isValueTooLong(): bool;
+
+    /**
+     * Whether the connection itself is gone and has to be replaced before it is used again.
+     */
+    public function isConnectionLost(): bool;
 }

@@ -48,6 +48,18 @@ final class SqliteErrorTest extends TestCase
         self::assertFalse($this->errorWithDriverCode(19)->isValueTooLong());
     }
 
+    public function test_a_database_file_that_can_no_longer_be_read_or_opened_is_a_lost_connection(): void
+    {
+        self::assertTrue($this->errorWithDriverCode(10)->isConnectionLost());
+        self::assertTrue($this->errorWithDriverCode(14)->isConnectionLost());
+    }
+
+    public function test_a_busy_database_is_not_a_lost_connection(): void
+    {
+        self::assertFalse($this->errorWithDriverCode(5)->isConnectionLost());
+        self::assertFalse($this->errorWithDriverCode(19)->isConnectionLost());
+    }
+
     public function test_a_unique_failure_on_the_dn_is_a_duplicate_dn_only(): void
     {
         $error = $this->errorWithDriverCode(

@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Protocol\Bind\Sasl;
 use Closure;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
@@ -37,6 +38,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
+use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -53,6 +55,8 @@ use Throwable;
  */
 final class SaslExchange
 {
+    use FailureAnswerTrait;
+
     private const BIND_IN_PROGRESS = 'A SASL bind is in progress.';
 
     public function __construct(
@@ -123,21 +127,22 @@ final class SaslExchange
             }
         } catch (ResponseAlreadySentException $e) {
             throw $e;
-        } catch (OperationException $e) {
+        } catch (AnswerableExceptionInterface $e) {
             // Once $message is a continuation, the outer ServerProtocolHandler holds a stale
             // initial-bind ID. Send the error here with the correct ID before re-throwing.
             if ($message !== $input->getInitialMessage()) {
+                $failure = $this->answerFor($e) ?? throw $e;
                 $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                     $message,
-                    $e->getCode(),
-                    $e->getMessage(),
+                    $failure->getCode(),
+                    $failure->getMessage(),
                 ));
 
                 // Signals the dispatcher that this message is answered, so it does not add one for the initial ID.
                 throw new ResponseAlreadySentException(
-                    $e->getMessage(),
-                    $e->getCode(),
-                    $e,
+                    $failure->getMessage(),
+                    $failure->getCode(),
+                    $failure,
                 );
             }
 

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
@@ -487,14 +488,23 @@ final class PdoChangeJournalTest extends TestCase
         SqliteDialect $dialect,
     ): PdoConnection {
         $provider = new SharedPdoConnectionProvider($pdo);
+        $errors = new PdoErrorFactory(PdoDriver::Sqlite);
+        $connectionLoss = new ConnectionLoss(
+            $provider,
+            $errors,
+        );
 
         return new PdoConnection(
             $provider,
-            new PdoStatementPool($provider),
+            new PdoStatementPool(
+                $provider,
+                $connectionLoss,
+            ),
             new PdoTransactor(
                 $provider,
                 $dialect,
-                new PdoErrorFactory(PdoDriver::Sqlite),
+                $errors,
+                $connectionLoss,
             ),
         );
     }

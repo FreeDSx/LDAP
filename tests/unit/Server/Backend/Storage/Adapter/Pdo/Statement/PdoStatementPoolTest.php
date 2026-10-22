@@ -13,10 +13,18 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement;
 
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
+use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use PDO;
+use PDOException;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Pdo\DriverFailure;
+use Tests\Support\FreeDSx\Ldap\Pdo\DroppablePdo;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 
 final class PdoStatementPoolTest extends TestCase
@@ -39,7 +47,7 @@ final class PdoStatementPoolTest extends TestCase
         $this->pdo->exec('CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)');
         $this->pdo->exec("INSERT INTO t (id, name) VALUES (1, 'a'), (2, 'b'), (3, 'c')");
 
-        $this->subject = new PdoStatementPool(new SharedPdoConnectionProvider($this->pdo));
+        $this->subject = $this->poolOver(new SharedPdoConnectionProvider($this->pdo));
     }
 
     public function test_it_prepares_a_repeated_query_only_once(): void
@@ -75,8 +83,10 @@ final class PdoStatementPoolTest extends TestCase
 
     public function test_it_evicts_the_least_recently_used_query_beyond_the_cap(): void
     {
+        $provider = new SharedPdoConnectionProvider($this->pdo);
         $pool = new PdoStatementPool(
-            new SharedPdoConnectionProvider($this->pdo),
+            $provider,
+            $this->connectionLossOver($provider),
             maxQueries: 2,
         );
 
@@ -119,7 +129,7 @@ final class PdoStatementPoolTest extends TestCase
             $this->pdo,
             fn(): PDO => $this->pdo,
         );
-        $pool = new PdoStatementPool($provider);
+        $pool = $this->poolOver($provider);
 
         $pool->execute($query, [1]);
         $provider->reset();
@@ -180,6 +190,63 @@ final class PdoStatementPoolTest extends TestCase
             $this->subject
                 ->execute('SELECT COUNT(*) FROM t WHERE name IS NULL')
                 ->fetchIntColumn(),
+        );
+    }
+
+    public function test_a_lost_connection_is_answered_as_unavailable_and_the_next_query_reconnects(): void
+    {
+        $dropped = new DroppablePdo('sqlite::memory:');
+        $dropped->drop(DriverFailure::of(
+            10,
+            'disk I/O error',
+        ));
+        $pool = $this->poolOver(new SharedPdoConnectionProvider(
+            $dropped,
+            fn(): PDO => $this->pdo,
+        ));
+
+        try {
+            $pool->execute(
+                'SELECT name FROM t WHERE id = ?',
+                [1],
+            );
+            self::fail('Expected the lost connection to surface.');
+        } catch (StorageIoException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            ['name' => 'a'],
+            $pool->execute(
+                'SELECT name FROM t WHERE id = ?',
+                [1],
+            )->fetch(),
+        );
+    }
+
+    public function test_a_failure_that_keeps_the_connection_is_rethrown_as_it_is(): void
+    {
+        $this->expectException(PDOException::class);
+
+        $this->subject->execute('SELECT missing FROM t');
+    }
+
+    private function poolOver(SharedPdoConnectionProvider $provider): PdoStatementPool
+    {
+        return new PdoStatementPool(
+            $provider,
+            $this->connectionLossOver($provider),
+        );
+    }
+
+    private function connectionLossOver(SharedPdoConnectionProvider $provider): ConnectionLoss
+    {
+        return new ConnectionLoss(
+            $provider,
+            new PdoErrorFactory(PdoDriver::Sqlite),
         );
     }
 }

@@ -33,6 +33,16 @@ readonly class SqliteError implements PdoErrorInterface
     private const ERROR_LOCKED = 6;
 
     /**
+     * A disk I/O error while reading or writing the database file.
+     */
+    private const ERROR_IO = 10;
+
+    /**
+     * The database file could not be opened.
+     */
+    private const ERROR_CANT_OPEN = 14;
+
+    /**
      * A constraint was violated, which the message then names.
      */
     private const ERROR_CONSTRAINT = 19;
@@ -66,6 +76,17 @@ readonly class SqliteError implements PdoErrorInterface
     public function isValueTooLong(): bool
     {
         return false;
+    }
+
+    /**
+     * With no server to lose, a database file that can no longer be read or opened stands in for one.
+     */
+    public function isConnectionLost(): bool
+    {
+        return $this->info->hasDriverCode(
+            self::ERROR_IO,
+            self::ERROR_CANT_OPEN,
+        );
     }
 
     /**

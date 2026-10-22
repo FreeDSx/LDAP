@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
+use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -33,6 +35,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
@@ -139,6 +142,135 @@ final class ServerProtocolHandlerTest extends TestCase
                     'Authentication required.',
                 )),
             ],
+            $captured,
+        );
+    }
+
+    public function test_a_bind_that_finds_the_storage_unavailable_is_answered_and_the_session_stays_open(): void
+    {
+        $captured = [];
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$captured): ServerQueue {
+                $captured[] = $response;
+
+                return $this->mockQueue;
+            });
+        $this->queueReturns([
+            new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    'cn=a,dc=bar',
+                    'secret',
+                ),
+            ),
+            new LdapMessageRequest(
+                2,
+                new SimpleBindRequest(
+                    'cn=a,dc=bar',
+                    'secret',
+                ),
+            ),
+        ]);
+
+        $this->handlerWith(new ThrowingMiddlewareHandler(
+            new StorageIoException('The connection to the database was lost.'),
+        ))->handle();
+
+        self::assertEquals(
+            [
+                new LdapMessageResponse(
+                    1,
+                    new BindResponse(new LdapResult(
+                        ResultCode::UNAVAILABLE,
+                        '',
+                        'The backend storage is currently unavailable.',
+                    )),
+                ),
+                new LdapMessageResponse(
+                    2,
+                    new BindResponse(new LdapResult(
+                        ResultCode::UNAVAILABLE,
+                        '',
+                        'The backend storage is currently unavailable.',
+                    )),
+                ),
+            ],
+            $captured,
+        );
+    }
+
+    public function test_a_refusal_caused_by_a_storage_outage_logs_the_outage(): void
+    {
+        $recordingLogger = new RecordingLogger();
+        $this->queueReturns([
+            new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    'cn=a,dc=bar',
+                    'secret',
+                ),
+            ),
+        ]);
+
+        $this->handlerWith(
+            new ThrowingMiddlewareHandler(new StorageIoException('The connection to the database was lost: gone away')),
+            new EventLogger(
+                $recordingLogger,
+                EventLogPolicy::all(),
+            ),
+        )->handle();
+
+        $record = $this->findRecord(
+            $recordingLogger,
+            ServerEvent::OperationRefused,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE,
+            $record['context'][EventContext::RESULT_CODE],
+        );
+        self::assertSame(
+            StorageIoException::class,
+            $record['context']['exception_class'],
+        );
+        self::assertSame(
+            'The connection to the database was lost: gone away',
+            $record['context']['exception_message'],
+        );
+    }
+
+    public function test_an_unrecoverable_failure_above_the_writer_still_ends_the_session(): void
+    {
+        $captured = [];
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$captured): ServerQueue {
+                $captured[] = $response->getMessageId();
+
+                return $this->mockQueue;
+            });
+        $this->queueReturns([
+            new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    'cn=a,dc=bar',
+                    'secret',
+                ),
+            ),
+            new LdapMessageRequest(
+                2,
+                new SimpleBindRequest(
+                    'cn=a,dc=bar',
+                    'secret',
+                ),
+            ),
+        ]);
+
+        $this->handlerWith(new ThrowingMiddlewareHandler(new ProtocolException('The PDU is malformed.')))
+            ->handle();
+
+        self::assertSame(
+            [0],
             $captured,
         );
     }

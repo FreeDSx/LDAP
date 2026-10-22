@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
@@ -153,6 +154,26 @@ final class MetricsMiddlewareTest extends TestCase
         self::assertSame(
             [ResultCode::INSUFFICIENT_ACCESS_RIGHTS => 1],
             $operations->resultCodeCounts,
+        );
+    }
+
+    public function test_a_storage_outage_above_the_writer_is_counted_with_the_code_the_client_is_answered_with(): void
+    {
+        try {
+            $this->subject->process(
+                $this->contextFor(new SimpleBindRequest(
+                    'cn=user,dc=foo,dc=bar',
+                    'secret',
+                )),
+                new ThrowingMiddlewareHandler(new StorageIoException('The connection to the database was lost.')),
+            );
+            self::fail('The outage was not rethrown.');
+        } catch (StorageIoException) {
+        }
+
+        self::assertSame(
+            [ResultCode::UNAVAILABLE => 1],
+            $this->recorder->snapshot()->operations->resultCodeCounts,
         );
     }
 

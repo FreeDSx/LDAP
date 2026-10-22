@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
@@ -25,9 +26,11 @@ use FreeDSx\Ldap\Protocol\Bind\BindInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Throwable;
 
 final class AuthenticatorTest extends TestCase
 {
@@ -127,6 +130,33 @@ final class AuthenticatorTest extends TestCase
         $this->subject->bind($this->initialSaslBind());
     }
 
+    public function test_a_replacement_bind_that_finds_the_storage_unavailable_is_answered_on_its_own_message_id(): void
+    {
+        $replacement = new LdapMessageRequest(
+            2,
+            new SimpleBindRequest(
+                'foo',
+                'bar',
+            ),
+        );
+        $this->givenTheBindIsReplacedBy(
+            $replacement,
+            new StorageIoException('The connection to the database was lost.'),
+        );
+
+        $this->queue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(self::callback(
+                fn(LdapMessageResponse $response): bool => $response->getMessageId() === 2
+                    && $response->getResponse() instanceof LdapResult
+                    && $response->getResponse()->getResultCode() === ResultCode::UNAVAILABLE,
+            ));
+        self::expectException(ResponseAlreadySentException::class);
+
+        $this->subject->bind($this->initialSaslBind());
+    }
+
     public function test_a_replacement_bind_that_answered_itself_is_not_answered_again(): void
     {
         $replacement = new LdapMessageRequest(
@@ -159,7 +189,7 @@ final class AuthenticatorTest extends TestCase
 
     private function givenTheBindIsReplacedBy(
         LdapMessageRequest $replacement,
-        OperationException $replacementFailure,
+        Throwable $replacementFailure,
     ): void {
         $this->authOne
             ->method('supports')

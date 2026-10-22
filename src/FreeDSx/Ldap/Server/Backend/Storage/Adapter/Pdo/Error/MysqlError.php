@@ -44,6 +44,28 @@ readonly class MysqlError implements PdoErrorInterface
      */
     private const ERROR_DATA_TOO_LONG = 1406;
 
+    /**
+     * Errors after which the connection is gone, whether the client lost it or the server ended it.
+     */
+    private const CONNECTION_LOST_ERRORS = [
+        // Server shutdown in progress.
+        1053,
+        // MariaDB: the connection was killed.
+        1927,
+        // Cannot connect through the local socket.
+        2002,
+        // Cannot connect to the host.
+        2003,
+        // The server has gone away.
+        2006,
+        // Lost connection during a query.
+        2013,
+        // Lost connection, with the system error.
+        2055,
+        // Disconnected by the server after an idle timeout.
+        4031,
+    ];
+
     public function __construct(private DriverErrorInfo $info) {}
 
     /**
@@ -70,6 +92,12 @@ readonly class MysqlError implements PdoErrorInterface
     public function isValueTooLong(): bool
     {
         return $this->info->hasDriverCode(self::ERROR_DATA_TOO_LONG);
+    }
+
+    public function isConnectionLost(): bool
+    {
+        return $this->info->isConnectionException()
+            || $this->info->hasDriverCode(...self::CONNECTION_LOST_ERRORS);
     }
 
     /**

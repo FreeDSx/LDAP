@@ -18,9 +18,10 @@ use PDOException;
 use function in_array;
 use function is_int;
 use function is_string;
+use function str_starts_with;
 
 /**
- * The code and message a PDO driver reported with a failure.
+ * The code, message and SQLSTATE a PDO driver reported with a failure.
  *
  * @internal
  *
@@ -28,13 +29,19 @@ use function is_string;
  */
 readonly class DriverErrorInfo
 {
+    /**
+     * The SQLSTATE class for a connection exception.
+     */
+    private const SQLSTATE_CONNECTION_CLASS = '08';
+
     public function __construct(
         private ?int $driverCode = null,
         private ?string $driverMessage = null,
+        private ?string $sqlState = null,
     ) {}
 
     /**
-     * A failure raised without the driver's error info reports neither.
+     * A failure raised without the driver's error info reports none of it.
      */
     public static function of(PDOException $exception): self
     {
@@ -43,7 +50,17 @@ readonly class DriverErrorInfo
         return new self(
             is_int($info[1] ?? null) ? $info[1] : null,
             is_string($info[2] ?? null) ? $info[2] : null,
+            is_string($info[0] ?? null) ? $info[0] : null,
         );
+    }
+
+    /**
+     * Whether the SQLSTATE is a standard SQL connection exception, whatever the driver.
+     */
+    public function isConnectionException(): bool
+    {
+        return $this->sqlState !== null
+            && str_starts_with($this->sqlState, self::SQLSTATE_CONNECTION_CLASS);
     }
 
     public function hasDriverCode(int ...$codes): bool

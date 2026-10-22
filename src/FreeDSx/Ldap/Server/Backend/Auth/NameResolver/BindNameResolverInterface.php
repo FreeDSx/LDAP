@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Auth\NameResolver;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 /**
@@ -25,6 +26,8 @@ interface BindNameResolverInterface
 {
     /**
      * Resolve the bind name to an {@see Entry}, or return null if no match is found.
+     *
+     * @throws AnswerableExceptionInterface
      */
     public function resolve(
         string $name,

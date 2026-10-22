@@ -38,4 +38,9 @@ interface PdoConnectionProviderInterface
      * Discard any cached connection and transaction state.
      */
     public function reset(): void;
+
+    /**
+     * Marks the current connection as dropped by the database; its next use outside a transaction opens a new one.
+     */
+    public function discard(): void;
 }

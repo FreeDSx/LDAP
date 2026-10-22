@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -20,10 +21,13 @@ use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Protocol\Bind\BindInterface;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 class Authenticator
 {
+    use FailureAnswerTrait;
+
     /**
      * @param BindInterface[] $authenticators
      */
@@ -49,14 +53,14 @@ class Authenticator
                 $dispatched = $e->request;
             } catch (ResponseAlreadySentException $e) {
                 throw $e;
-            } catch (OperationException $e) {
+            } catch (AnswerableExceptionInterface $e) {
                 if ($dispatched === $request) {
                     throw $e;
                 }
 
                 throw $this->answer(
                     $dispatched,
-                    $e,
+                    $this->answerFor($e) ?? throw $e,
                 );
             }
         }
