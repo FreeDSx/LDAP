@@ -43,6 +43,9 @@ services:
       MYSQL_DSN: "mysql:host=mysql;port=3306;dbname=freedsx"
       MYSQL_USER: "root"
       MYSQL_PASSWORD: "root"
+    # Every compared server keeps its data in memory, so disk speed and fsync policy stay out of the comparison.
+    tmpfs:
+      - /tmp
     command:
       - bash
       - -lc
@@ -95,6 +98,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    # Every compared server keeps its data in memory, so disk speed and fsync policy stay out of the comparison.
     tmpfs:
       - /var/lib/ldap
 
@@ -112,6 +116,9 @@ services:
     environment:
       DS_DM_PASSWORD: "P@ssword12345"
       DS_SUFFIX_NAME: "dc=example,dc=com"
+    # Every compared server keeps its data in memory, so disk speed and fsync policy stay out of the comparison.
+    tmpfs:
+      - /data/db
     # The instance answers before the entrypoint applies DS_DM_PASSWORD, so readiness is a successful manager bind.
     healthcheck:
       test: ["CMD-SHELL", "dsconf -D 'cn=Directory Manager' -w \"$$DS_DM_PASSWORD\" ldap://localhost:3389 backend suffix list >/dev/null 2>&1"]
@@ -151,6 +158,9 @@ services:
       BASE_DN: "dc=example,dc=com"
       ROOT_USER_DN: "cn=Directory Manager"
       ROOT_PASSWORD: "P@ssword12345"
+    # Every compared server keeps its data in memory; OpenDJ runs as uid 1001 and executes a script from here.
+    tmpfs:
+      - /opt/opendj/data:uid=1001,gid=1001,mode=0755,exec
     healthcheck:
       test: ["CMD-SHELL", "/opt/opendj/bin/ldapsearch -h localhost -p 1389 -D 'cn=Directory Manager' -w 'P@ssword12345' -b '' -s base '(objectClass=*)' 1.1 >/dev/null 2>&1"]
       interval: 5s
