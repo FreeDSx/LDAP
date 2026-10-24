@@ -186,7 +186,7 @@ $options = new ServerOptions(
 
 #### setMode
 
-`RunnerMode::Pcntl` forks a process per connection and is Linux only. `RunnerMode::Swoole` handles each connection in
+`RunnerMode::Pcntl` forks a process per connection and is not available on Windows. `RunnerMode::Swoole` handles each connection in
 its own coroutine and requires the Swoole extension.
 
 **Default**: `RunnerMode::Pcntl`

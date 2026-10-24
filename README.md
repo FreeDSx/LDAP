@@ -1,17 +1,27 @@
 # FreeDSx LDAP ![](https://github.com/FreeDSx/LDAP/workflows/Analysis/badge.svg) ![](https://github.com/FreeDSx/LDAP/workflows/Build/badge.svg) [![codecov](https://codecov.io/gh/FreeDSx/LDAP/branch/main/graph/badge.svg)](https://codecov.io/gh/FreeDSx/LDAP)
-FreeDSx LDAP is a pure PHP LDAP library. It has no requirement on the core PHP LDAP extension. This library currently implements
-most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511) and some very limited LDAP server
-functionality. It also implements some other client features from various RFCs:
+FreeDSx LDAP is a pure PHP LDAP client and server library. It has no requirement on the core PHP LDAP extension. This library
+implements the client and server sides of the LDAPv3 technical specification ([RFC 4510](https://datatracker.ietf.org/doc/rfc4510/))
+(deviations are noted in [Conformance](/docs/Server/Conformance.md)). It also implements other features from
+various RFCs and drafts:
 
-* Paging Control Support ([RFC 2696](https://datatracker.ietf.org/doc/rfc2696/))
-* VLV Control Support ([draft-ietf-ldapext-ldapv3-vlv-09](https://www.ietf.org/archive/id/draft-ietf-ldapext-ldapv3-vlv-09.txt))
-* Server Side Sort Control ([RFC 2891](https://datatracker.ietf.org/doc/rfc2891/))
-* Password Modify Request ([RFC 3062](https://datatracker.ietf.org/doc/rfc3062/))
-* String Representation of Search Filters ([RFC 4515](https://datatracker.ietf.org/doc/rfc4515/))
-* SASL authentication / integrity layer support for certain mechanisms ([RFC 4513](https://datatracker.ietf.org/doc/rfc4513/))
-* Directory Synchronization via SyncRepl or DirSync ([RFC 4533](https://datatracker.ietf.org/doc/rfc4533/) and [draft-armijo-ldap-dirsync-01](https://www.ietf.org/archive/id/draft-armijo-ldap-dirsync-01.txt))
-
-It supports encryption of the LDAP connection through TLS via the OpenSSL extension if available.
+| Feature               | RFC / Specification                                                                                           |  Client  |            Server            |
+|-----------------------|---------------------------------------------------------------------------------------------------------------|:--------:|:----------------------------:|
+| Paging                | [RFC 2696](https://datatracker.ietf.org/doc/rfc2696/)                                                         |    ✓     |              ✓               |
+| Server Side Sort      | [RFC 2891](https://datatracker.ietf.org/doc/rfc2891/)                                                         |    ✓     |              ✓               |
+| Virtual List View     | [draft-ietf-ldapext-ldapv3-vlv-09](https://www.ietf.org/archive/id/draft-ietf-ldapext-ldapv3-vlv-09.txt)      |    ✓     |                              |
+| Password Modify       | [RFC 3062](https://datatracker.ietf.org/doc/rfc3062/)                                                         |    ✓     |              ✓               |
+| Cancel                | [RFC 3909](https://datatracker.ietf.org/doc/rfc3909/)                                                         |    ✓     |              ✓               |
+| Who Am I?             | [RFC 4532](https://datatracker.ietf.org/doc/rfc4532/)                                                         |    ✓     |              ✓               |
+| Assertion Control     | [RFC 4528](https://datatracker.ietf.org/doc/rfc4528/)                                                         |    ✓     |              ✓               |
+| Pre / Post Read       | [RFC 4527](https://datatracker.ietf.org/doc/rfc4527/)                                                         |    ✓     |              ✓               |
+| Proxied Authorization | [RFC 4370](https://datatracker.ietf.org/doc/rfc4370/)                                                         |    ✓     |              ✓               |
+| Subentries            | [RFC 3672](https://datatracker.ietf.org/doc/rfc3672/)                                                         |    ✓     |              ✓               |
+| Relax Rules           | [draft-zeilenga-ldap-relax](https://datatracker.ietf.org/doc/draft-zeilenga-ldap-relax/)                      |    ✓     |              ✓               |
+| Subtree Delete        | [draft-armijo-ldap-treedelete](https://datatracker.ietf.org/doc/draft-armijo-ldap-treedelete/)                |    ✓     |              ✓               |
+| Password Policy       | [draft-behera-ldap-password-policy-10](https://datatracker.ietf.org/doc/draft-behera-ldap-password-policy/)   |    ✓     |              ✓               |
+| SASL Authentication   | [RFC 4422](https://datatracker.ietf.org/doc/rfc4422/) / [RFC 4513](https://datatracker.ietf.org/doc/rfc4513/) |    ✓     |    ✓ (no integrity layer)    |
+| SyncRepl              | [RFC 4533](https://datatracker.ietf.org/doc/rfc4533/)                                                         | Consumer | Provider + read-only replica |
+| DirSync               | [draft-armijo-ldap-dirsync-01](https://www.ietf.org/archive/id/draft-armijo-ldap-dirsync-01.txt)              |    ✓     |                              |
 
 # Documentation
 
@@ -31,6 +41,8 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 * [LDAP Server](/docs/Server)
   * [Configuration](/docs/Server/Configuration.md)
   * [General Usage](/docs/Server/General-Usage.md)
+  * [Proxy Server](/docs/Server/General-Usage.md#creating-a-proxy-server)
+  * [LDIF Data](/docs/Server/General-Usage.md#ldif-data)
   * [Schema](/docs/Server/Schema.md)
   * [Logging](/docs/Server/Logging.md)
   * [Monitoring](/docs/Server/Monitoring.md)
@@ -40,6 +52,23 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
   * [Database Schema](/docs/Server/Database-Schema.md)
   * [Conformance](/docs/Server/Conformance.md)
 
+# Requirements
+
+PHP 8.2 or newer is required. The `openssl` extension is optional and enables TLS and some SASL mechanisms.
+
+The server also needs one runner and one storage backend, each with its own requirements:
+
+| Component              | Requires                                                           |
+|------------------------|--------------------------------------------------------------------|
+| PCNTL runner (default) | `pcntl` and `posix` extensions (not available on Windows)          |
+| Swoole runner          | `swoole` extension                                                 |
+| SQLite storage         | `pdo_sqlite` and `mbstring` extensions                             |
+| MySQL storage          | `pdo_mysql` and `mbstring` extensions, MySQL 8.0+ or MariaDB 10.6+ |
+| In-memory storage      | The Swoole runner                                                  |
+
+For Unicode case folding and normalization in string matching (RFC 4518), load the `mbstring` and `intl` extensions, or
+install `symfony/polyfill-mbstring` and `symfony/polyfill-intl-normalizer`.
+
 # Getting Started
 
 Install via [composer](https://getcomposer.org/download/):
@@ -47,6 +76,8 @@ Install via [composer](https://getcomposer.org/download/):
 ```bash
 composer require freedsx/ldap
 ```
+
+## Client
 
 Use the LdapClient class and the helper classes:
 
@@ -58,7 +89,7 @@ use FreeDSx\Ldap\Search\Filters;
 $ldap = new LdapClient(
     (new ClientOptions)
         # Servers are tried in order until one connects
-        ->setServers( ['dc1', 'dc2'])
+        ->setServers(['dc1', 'dc2'])
         # The base_dn is used as the default for searches
         ->setBaseDn('dc=example,dc=local')
 );
@@ -91,112 +122,48 @@ while ($paging->hasEntries()) {
 }
 ```
 
-# CRUD Operations:
+See [Operations](/docs/Client/Operations.md) for creating, reading, updating and deleting entries.
 
-* [Create](#create)
-* [Read](#read)
-* [Update](#update)
-* [Delete](#delete)
+## Server
 
-## Create
+Use the LdapServer class with a storage backend. This seeds a SQLite database with a base entry and an admin user:
 
 ```php
-use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\ServerOptions;
 
-# Create a new LDAP entry object
-$entry = (new Entry('cn=foo,dc=domain,dc=local'))
-   ->set('objectClass','top', 'group')
-   ->set('sAMAccountName', 'foo');
-
-# Create the entry with the LDAP client
-try {
-    $ldap->create($entry);
-} catch (OperationException $e) {
-    echo sprintf(
-        'Error adding entry (%s): %s',
-        $e->getCode(),
-        $e->getMessage(),
-    ) . PHP_EOL;
-}
-```
-
-## Read
-
-```php
-# Use the read() method of the LDAP client to search for a specific entry.
-# Optionally pass an array of attributes to select as the second argument.
-$entry = $ldap->read('cn=foo,dc=domain,dc=local');
-
-# Entry will be null if it doesn't exist
-echo $entry . PHP_EOL;
-
-var_dump($entry?->toArray());
-```
-
-## Update
-
-```php
-use FreeDSx\Ldap\Exception\OperationException;
-
-# Search for an entry object to get its current attributes / values
-$entry = $ldap->read('cn=foo,dc=domain,dc=local');
-
-# Add a value to an attribute
-if (!$entry->get('telephoneNumber')) {
-    $entry->add(
-        'telephoneNumber',
-        '555-5555',
-    );
-}
-# Remove any values an attribute may have
-if ($entry->has('title')) {
-    $entry->reset('title');
-}
-# Delete a specific value for an attribute if it actually exists.
-if ($entry->get('ipPhone')?->has('12345')) {
-    $entry->delete(
-        'ipPhone',
-        '12345',
-    );
-}
-# Set a value for an attribute. This replaces any value it may, or may not, have.
-$entry->set(
-    'description',
-    'Employee',
+$passwordHash = '{BCRYPT}' . password_hash(
+    'secret',
+    PASSWORD_BCRYPT,
 );
 
-# Send the built up changes back to LDAP to update the entry via the LDAP client update method.
-try {
-    $ldap->update($entry);
-} catch (OperationException $e) {
-    echo sprintf(
-        'Error modifying entry (%s): %s',
-        $e->getCode(),
-        $e->getMessage(),
-    ) . PHP_EOL;
-}
-```
+$server = new LdapServer(new ServerOptions(
+    # Entries are persisted to a SQLite file
+    PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'),
+    # Listen on a custom port (defaults to 389)
+    NetworkConfig::withPort(3389),
+));
 
-## Delete
+# Entries that already exist are left untouched
+$server->seed(
+    new StringLdifLoader(<<<LDIF
+        dn: dc=example,dc=com
+        objectClass: domain
+        dc: example
 
-```php
-use FreeDSx\Ldap\Exception\OperationException;
+        dn: cn=admin,dc=example,dc=com
+        objectClass: person
+        cn: admin
+        sn: admin
+        userPassword: {$passwordHash}
+        LDIF),
+    new SeedOptions(skipExisting: true),
+);
 
-# Search for the entry object to delete
-$entry = $ldap->read('cn=foo,dc=domain,dc=local');
-
-# Pass the entry object to the delete method of the LDAP client if it was found.
-# You could also pass a DN object or a simple DN as a string.
-if ($entry) {
-    try {
-        $ldap->delete($entry);
-    } catch (OperationException $e) {
-        echo sprintf(
-            'Error deleting entry (%s): %s',
-            $e->getCode(),
-            $e->getMessage()
-        ) . PHP_EOL;;
-    }
-}
+# Clients can now bind as cn=admin,dc=example,dc=com with the password "secret"
+$server->run();
 ```
