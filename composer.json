@@ -40,10 +40,12 @@
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
     "ext-pcntl": "For the LDAP server PcntlServerRunner functionality. Process forking based connection handling.",
-    "ext-swoole": "For the LDAP server SwooleServerRunner fucntionality. Coroutine-based connection handling.",
+    "ext-posix": "For the LDAP server PcntlServerRunner functionality. Required alongside ext-pcntl.",
+    "ext-swoole": "For the LDAP server SwooleServerRunner functionality. Coroutine-based connection handling.",
     "ext-mbstring": "For the PDO based storage backends.",
     "ext-pdo_sqlite": "For the SQLite storage backend.",
     "ext-pdo_mysql": "For the MySQL storage backend.",
+    "ext-intl": "Unicode NFKC normalization (RFC 4518) for string matching.",
     "symfony/polyfill-intl-normalizer": "Deterministic Unicode NFKC normalization (RFC 4518) for string matching when ext-intl is absent.",
     "symfony/polyfill-mbstring": "Unicode-aware case folding (RFC 4518) for string matching when ext-mbstring is absent."
   },
