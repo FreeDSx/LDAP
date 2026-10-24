@@ -659,7 +659,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertNull($result);
     }
 
-    public function test_substring_starts_with_only_emits_prefix_like(): void
+    public function test_substring_starts_with_only_emits_a_seekable_prefix_range(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
@@ -668,11 +668,18 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            "s.value_lower LIKE ? ESCAPE '!'",
+            's.value_lower >= ? AND s.value_lower < ?',
+            $result->sql,
+        );
+        self::assertStringNotContainsString(
+            'LIKE',
             $result->sql,
         );
         self::assertSame(
-            ['al%'],
+            [
+                'al',
+                'am',
+            ],
             $result->params,
         );
         self::assertTrue($result->isExact);
@@ -811,17 +818,20 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            "s.value_lower LIKE ? ESCAPE '!'",
+            's.value_lower >= ? AND s.value_lower < ?',
             $result->sql,
         );
         self::assertSame(
-            ['a%'],
+            [
+                'a',
+                'b',
+            ],
             $result->params,
         );
         self::assertFalse($result->isExact);
     }
 
-    public function test_substring_escapes_special_like_characters(): void
+    public function test_substring_prefix_binds_like_wildcards_literally(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
@@ -830,9 +840,30 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertSame(
-            ['al!%ice%'],
+            [
+                'al%ice',
+                'al%icf',
+            ],
             $result->params,
         );
+    }
+
+    public function test_substring_prefix_range_ends_within_a_multibyte_character(): void
+    {
+        $result = $this->subject->translate(new SubstringFilter(
+            'cn',
+            'Zoë',
+        ));
+
+        self::assertNotNull($result);
+        self::assertSame(
+            [
+                'zoë',
+                'zoì',
+            ],
+            $result->params,
+        );
+        self::assertFalse($result->isExact);
     }
 
     public function test_and_of_translatable_is_exact(): void
@@ -1131,7 +1162,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertSame(
-            "s.attr_name_lower = 'cn' AND s.value_lower LIKE ? ESCAPE '!'",
+            "s.attr_name_lower = 'cn' AND s.value_lower >= ? AND s.value_lower < ?",
             $result->sidecarCondition,
         );
     }

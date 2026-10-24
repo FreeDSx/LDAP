@@ -67,4 +67,17 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
     {
         return "CAST($expression AS SIGNED)";
     }
+
+    private function prefixCondition(string $alias): string
+    {
+        return "$alias LIKE ? ESCAPE '!'";
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function prefixParams(string $prefix): array
+    {
+        return [SqlFilterUtility::escape($prefix) . '%'];
+    }
 }

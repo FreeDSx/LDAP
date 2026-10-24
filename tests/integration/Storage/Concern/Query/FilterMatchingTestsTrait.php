@@ -117,6 +117,50 @@ trait FilterMatchingTestsTrait
         );
     }
 
+    public function testSubstringStartsWithIgnoresCaseUnderACaseIgnoreRule(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::startsWith('cn', 'AL'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
+    public function testSubstringStartsWithTreatsLikeWildcardsLiterally(): void
+    {
+        $this->authenticateUser();
+
+        $underscore = $this->ldapClient()->search(
+            Operations::search(Filters::startsWith('cn', 'a_'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+        $percent = $this->ldapClient()->search(
+            Operations::search(Filters::startsWith('cn', 'a%'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $underscore,
+        );
+        self::assertCount(
+            0,
+            $percent,
+        );
+    }
+
     public function testSubstringContainsMatches(): void
     {
         $this->authenticateUser();

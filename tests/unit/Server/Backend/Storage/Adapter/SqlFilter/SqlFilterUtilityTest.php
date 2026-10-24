@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use PHPUnit\Framework\TestCase;
 
@@ -56,5 +57,55 @@ final class SqlFilterUtilityTest extends TestCase
             'hello world',
             SqlFilterUtility::escape('hello world'),
         );
+    }
+
+    public function test_prefix_upper_bound_increments_the_last_byte(): void
+    {
+        self::assertSame(
+            'seed-13',
+            SqlFilterUtility::prefixUpperBound('seed-12'),
+        );
+    }
+
+    public function test_prefix_upper_bound_increments_within_a_multibyte_character(): void
+    {
+        self::assertSame(
+            'zoì',
+            SqlFilterUtility::prefixUpperBound('zoë'),
+        );
+    }
+
+    public function test_prefix_upper_bound_sorts_above_every_string_with_the_prefix(): void
+    {
+        $bound = SqlFilterUtility::prefixUpperBound('al');
+
+        self::assertLessThan(
+            0,
+            strcmp(
+                'al' . "\u{10FFFF}",
+                $bound,
+            ),
+        );
+        self::assertGreaterThan(
+            0,
+            strcmp(
+                $bound,
+                'alzzzz',
+            ),
+        );
+    }
+
+    public function test_prefix_upper_bound_refuses_an_empty_prefix(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        SqlFilterUtility::prefixUpperBound('');
+    }
+
+    public function test_prefix_upper_bound_refuses_a_non_utf8_prefix(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        SqlFilterUtility::prefixUpperBound("a\xFF");
     }
 }

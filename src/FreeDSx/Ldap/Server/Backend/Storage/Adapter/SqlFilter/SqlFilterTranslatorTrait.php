@@ -142,6 +142,18 @@ trait SqlFilterTranslatorTrait
     abstract private function castToNumeric(string $expression): string;
 
     /**
+     * A condition on the value alias matching every value that starts with the prefix prefixParams() binds.
+     */
+    abstract private function prefixCondition(string $alias): string;
+
+    /**
+     * The parameters prefixCondition() binds for a non-empty prepared prefix.
+     *
+     * @return list<string>
+     */
+    abstract private function prefixParams(string $prefix): array;
+
+    /**
      * A single leaf's sidecar sub-select WHERE body, mirroring what buildValueExists wraps, for the streaming fast path.
      */
     private function sidecarCondition(
@@ -563,19 +575,24 @@ trait SqlFilterTranslatorTrait
             return $indexed;
         }
 
-        // Prefix-anchored LIKE is the only valid superset under truncation; other fragments fall back to presence + PHP re-eval.
-        $alias = $this->valueAlias();
-        $prefix = $startsWith === null
+        // A prefix-anchored match is the only valid superset under truncation; other fragments fall back to presence + PHP re-eval.
+        $fragment = $startsWith === null
             ? null
-            : $this->indexForms->fragment($filter->getAttribute(), $startsWith);
+            : $this->indexForms->fragment(
+                $filter->getAttribute(),
+                $startsWith,
+            );
+        $prefix = $fragment === null
+            ? ''
+            : SqlFilterUtility::truncate($fragment);
 
-        if ($prefix !== null) {
-            $inner = "$alias LIKE ? ESCAPE '!'";
+        if ($prefix !== '') {
+            $inner = $this->prefixCondition($this->valueAlias());
             $sql = $this->buildValueExists(
                 $attribute,
                 $inner,
             );
-            $params = [SqlFilterUtility::escape(SqlFilterUtility::truncate($prefix)) . '%'];
+            $params = $this->prefixParams($prefix);
             $sidecar = $this->sidecarCondition(
                 $attribute,
                 $inner,
@@ -589,7 +606,7 @@ trait SqlFilterTranslatorTrait
             );
         }
 
-        $fragmentsAreExact = $prefix !== null
+        $fragmentsAreExact = $prefix !== ''
             && $this->isExactSubstring(
                 $startsWith,
                 $contains,
