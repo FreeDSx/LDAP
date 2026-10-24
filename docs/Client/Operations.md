@@ -90,7 +90,7 @@ if ($entry->has('title')) {
     $entry->reset('title');
 }
 # Delete a specific value for an attribute
-if ($entry->get('ipPhone')->has('12345')) {
+if ($entry->get('ipPhone')?->has('12345')) {
     $entry->remove('ipPhone', '12345');
 }
 # Set a value for an attribute. This replaces any value it may, or may not, have.
