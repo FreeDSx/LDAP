@@ -178,7 +178,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
 
         if (!$isSwoole && (!extension_loaded('pcntl') || !extension_loaded('posix'))) {
             throw new RuntimeException(
-                'The pcntl and posix extensions are required to fork and manage child processes (Linux only).',
+                'The pcntl and posix extensions are required to fork and manage child processes (not available on Windows).',
             );
         }
     }
