@@ -52,7 +52,7 @@ final class RunnerConfig
     }
 
     /**
-     * A forked process per connection, which is Linux only.
+     * A forked process per connection, which is not available on Windows.
      */
     public static function forPcntl(): self
     {

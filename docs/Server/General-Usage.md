@@ -40,7 +40,7 @@ General LDAP Server Usage
 * [Password Modify Extended Operation](#password-modify-extended-operation)
 
 The LdapServer class runs an LDAP server process that accepts client requests and sends back responses. It defaults to
-using a forking method (PCNTL) for handling client connections, which is only available on Linux.
+using a forking method (PCNTL) for handling client connections, which is not available on Windows.
 
 > **⚠️ PCNTL runner and the JIT**
 >
