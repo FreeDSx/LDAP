@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Text;
 
@@ -70,6 +71,29 @@ final class SqlFilterUtility
             ['!!', '!%', '!_'],
             $value,
         );
+    }
+
+    /**
+     * The least string above every string that starts with the prefix, under byte-wise ordering.
+     *
+     * @throws InvalidArgumentException when the prefix is empty or not UTF-8
+     */
+    public static function prefixUpperBound(string $prefix): string
+    {
+        $last = $prefix === ''
+            ? null
+            : ord($prefix[-1]);
+
+        // UTF-8 never holds the byte 0xFF, so a valid prefix always leaves its last byte room to increment.
+        if ($last === null || $last === 0xFF || !Text::isUtf8($prefix)) {
+            throw new InvalidArgumentException('A prefix upper bound needs a non-empty UTF-8 prefix.');
+        }
+
+        return substr(
+            $prefix,
+            0,
+            -1,
+        ) . chr($last + 1);
     }
 
     /**

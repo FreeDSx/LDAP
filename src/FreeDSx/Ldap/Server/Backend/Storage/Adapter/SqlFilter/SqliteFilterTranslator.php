@@ -67,4 +67,23 @@ final class SqliteFilterTranslator implements FilterTranslatorInterface
     {
         return "CAST($expression AS INTEGER)";
     }
+
+    /**
+     * A byte range seeks the BINARY index on the already folded value, where SQLite's case-insensitive LIKE cannot.
+     */
+    private function prefixCondition(string $alias): string
+    {
+        return "$alias >= ? AND $alias < ?";
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function prefixParams(string $prefix): array
+    {
+        return [
+            $prefix,
+            SqlFilterUtility::prefixUpperBound($prefix),
+        ];
+    }
 }
