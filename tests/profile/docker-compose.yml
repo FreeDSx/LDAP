@@ -99,7 +99,10 @@ services:
       - /var/lib/ldap
 
   389ds:
-    image: quay.io/389ds/dirsrv:latest
+    build:
+      context: .
+      dockerfile: 389ds.Dockerfile
+    image: freedsx-profile-389ds:latest
     container_name: freedsx-profile-389ds
     cpus: ${PROFILE_CPUS:-4}
     # Pinned to the same cores as freedsx-server so a comparison measures the server, not core contention.
@@ -119,7 +122,10 @@ services:
 
   # The image creates the instance but not the suffix, so the backend is added once the instance answers.
   389ds-init:
-    image: quay.io/389ds/dirsrv:latest
+    build:
+      context: .
+      dockerfile: 389ds.Dockerfile
+    image: freedsx-profile-389ds:latest
     container_name: freedsx-profile-389ds-init
     depends_on:
       389ds:

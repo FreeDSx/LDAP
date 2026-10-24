@@ -322,6 +322,11 @@ if [[ "$SOURCE" == "openldap" || "$TARGET" == "openldap" ]]; then
     docker compose -f "$COMPOSE" build openldap
 fi
 
+# The 389DS image is built locally from Fedora packages, so a first run has to build it.
+if [[ "$SOURCE" == "389ds" || "$TARGET" == "389ds" ]]; then
+    docker compose -f "$COMPOSE" build 389ds
+fi
+
 echo "==> up $SRC_LABEL ($SRC_SVC) + $TGT_LABEL ($TGT_SVC) (cpuset=$SERVER_CPUSET each, driver on $DRIVER_CPUSET, seed=$SEED)"
 # Sharing cores with the driver can reverse which server looks faster, so each side is pinned to its own.
 PROFILE_CPUS="$CPUS" FREEDSX_STORAGE="$STORAGE" FREEDSX_RUNNER="$RUNNER" SEED_ENTRIES=0 \
