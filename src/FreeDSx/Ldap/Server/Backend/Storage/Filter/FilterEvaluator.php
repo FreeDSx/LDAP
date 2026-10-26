@@ -162,11 +162,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter instanceof OrFilter => $this->evaluateOr($entry, $filter),
             $filter instanceof NotFilter => $this->evaluateNot($entry, $filter),
             $filter instanceof PresentFilter => $this->evaluatePresent($entry, $filter),
-            $filter instanceof EqualityFilter => $this->evaluateEquality($entry, $filter),
+            // RFC 4511 4.5.1.7.6: with no approximate rule implemented, an approximate item is treated as equality.
+            $filter instanceof EqualityFilter,
+            $filter instanceof ApproximateFilter => $this->evaluateEquality($entry, $filter),
             $filter instanceof SubstringFilter => $this->evaluateSubstring($entry, $filter),
             $filter instanceof GreaterThanOrEqualFilter,
             $filter instanceof LessThanOrEqualFilter => $this->evaluateOrdered($entry, $filter),
-            $filter instanceof ApproximateFilter => $this->evaluateApproximate($entry, $filter),
             $filter instanceof MatchingRuleFilter => $this->evaluateMatchingRule($entry, $filter),
             default => throw new OperationException(
                 'Unrecognized filter type.',
@@ -252,7 +253,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private function evaluateEquality(
         Entry $entry,
-        EqualityFilter $filter,
+        EqualityFilter|ApproximateFilter $filter,
     ): FilterResult {
         if (!$this->assertionSyntaxIsValid($filter)) {
             return FilterResult::Undefined;
@@ -349,39 +350,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $cmp = $comparator->compare($value, $filterValue);
 
             if ($atLeast ? $cmp >= 0 : $cmp <= 0) {
-                return FilterResult::True;
-            }
-        }
-
-        return FilterResult::False;
-    }
-
-    private function evaluateApproximate(
-        Entry $entry,
-        ApproximateFilter $filter,
-    ): FilterResult {
-        if (!$this->assertionSyntaxIsValid($filter)) {
-            return FilterResult::Undefined;
-        }
-
-        $values = $this->valuesForAssertion(
-            $entry,
-            $filter,
-            $filter->getAttribute(),
-        );
-
-        // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
-        if ($values === []) {
-            return FilterResult::False;
-        }
-
-        // No approximate rule is implemented, so this falls back to the type's own equality rather than a case
-        // insensitive default, which would answer differently than the equality filter for the same assertion.
-        $comparator = $this->equalityResolver->for($filter->getAttribute());
-        $filterValue = $filter->getValue();
-
-        foreach ($values as $value) {
-            if ($comparator->equals($value, $filterValue)) {
                 return FilterResult::True;
             }
         }

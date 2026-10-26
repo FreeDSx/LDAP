@@ -918,6 +918,13 @@ trait FilterEvaluationTestsTrait
             )),
             0,
         ];
+        yield 'a negated approximate unknown objectClass descriptor stays undefined' => [
+            Filters::not(Filters::approximate(
+                'objectClass',
+                'bogusClass',
+            )),
+            0,
+        ];
     }
 
     #[DataProvider('filterChoiceProvider')]
