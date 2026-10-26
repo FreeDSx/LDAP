@@ -112,8 +112,9 @@ trait SqlFilterTranslatorTrait
             $filter instanceof OrFilter => $this->translateOr($filter),
             $filter instanceof NotFilter => $this->translateNot($filter),
             $filter instanceof PresentFilter => $this->translatePresent($filter),
-            $filter instanceof EqualityFilter => $this->translateEquality($filter),
-            $filter instanceof ApproximateFilter => $this->translateApproximate($filter),
+            // RFC 4511 4.5.1.7.6: with no approximate rule implemented, an approximate item is treated as equality.
+            $filter instanceof EqualityFilter,
+            $filter instanceof ApproximateFilter => $this->translateEquality($filter),
             $filter instanceof SubstringFilter => $this->translateSubstring($filter),
             $filter instanceof GreaterThanOrEqualFilter => $this->translateGte($filter),
             $filter instanceof LessThanOrEqualFilter => $this->translateLte($filter),
@@ -349,7 +350,7 @@ trait SqlFilterTranslatorTrait
         );
     }
 
-    private function translateEquality(EqualityFilter $filter): ?SqlFilterResult
+    private function translateEquality(EqualityFilter|ApproximateFilter $filter): ?SqlFilterResult
     {
         if ($this->isSubordinateCheck($filter->getAttribute())) {
             return $this->translateHasSubordinates($filter->getValue());
@@ -428,18 +429,6 @@ trait SqlFilterTranslatorTrait
             $filter->getAttribute(),
             $attribute,
             $value,
-        );
-    }
-
-    private function translateApproximate(ApproximateFilter $filter): ?SqlFilterResult
-    {
-        $attribute = $this->validateAttribute($filter->getAttribute());
-
-        // Implementation-defined (RFC 4511 §4.5.1.7.6); mirror FilterEvaluator's fallback to the equality rule.
-        return $this->translateRuleEquality(
-            $filter->getAttribute(),
-            $attribute,
-            $filter->getValue(),
         );
     }
 

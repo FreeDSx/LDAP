@@ -438,6 +438,27 @@ trait FilterEvaluationTestsTrait
             Filters::approximate('labeledURI', 'A1b2C3'),
             1,
         ];
+        yield 'approximate on a linked attribute matches as equality does' => [
+            Filters::approximate(
+                'member',
+                'CN=User, DC=Foo, DC=Bar',
+            ),
+            2,
+        ];
+        yield 'approximate on a computed attribute matches as equality does' => [
+            Filters::approximate(
+                'hasSubordinates',
+                'TRUE',
+            ),
+            2,
+        ];
+        yield 'a negated approximate on a linked attribute excludes its holders' => [
+            Filters::not(Filters::approximate(
+                'member',
+                'cn=user,dc=foo,dc=bar',
+            )),
+            6,
+        ];
 
         // The seed spells each of these two ways, so a store keying values by anything but the attribute's own
         // rule answers with only the spelling it was handed.

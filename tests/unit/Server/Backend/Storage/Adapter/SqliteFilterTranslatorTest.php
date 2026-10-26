@@ -210,6 +210,66 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    #[DataProvider('equalityRoutedAssertionProvider')]
+    public function test_approximate_translates_as_equality_does(
+        string $attribute,
+        string $value,
+        ?bool $integerOrdered,
+    ): void {
+        $context = $this->attributeContext(integerOrdered: $integerOrdered);
+
+        self::assertEquals(
+            $this->translateWith(
+                new EqualityFilter(
+                    $attribute,
+                    $value,
+                ),
+                $context,
+            ),
+            $this->translateWith(
+                new ApproximateFilter(
+                    $attribute,
+                    $value,
+                ),
+                $context,
+            ),
+        );
+    }
+
+    /**
+     * @return array<string, array{string, string, ?bool}>
+     */
+    public static function equalityRoutedAssertionProvider(): array
+    {
+        return [
+            'a linked attribute' => [
+                'member',
+                'CN=Alice,DC=foo,DC=bar',
+                null,
+            ],
+            'a back-link' => [
+                'memberOf',
+                'cn=admins,dc=foo,dc=bar',
+                null,
+            ],
+            'a computed attribute' => [
+                'hasSubordinates',
+                'TRUE',
+                null,
+            ],
+            'an object identifier' => [
+                'objectClass',
+                'person',
+                null,
+            ],
+            'an integer' => [
+                'uidNumber',
+                '042',
+                true,
+            ],
+        ];
+    }
+
     public function test_approximate_with_ascii_value_is_exact(): void
     {
         $result = $this->subject->translate(new ApproximateFilter(
