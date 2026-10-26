@@ -693,7 +693,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testAnEqualityFilterOnMemberMatchesEverySpellingTheMemberWasWrittenIn(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $groups = $this->ldapClient()->search(
             Operations::search(Filters::and(

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -64,9 +65,7 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_a_relaxed_add_keeps_the_operational_attributes_it_supplies(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(
             Entry::fromArray(
                 'cn=relax-add,dc=foo,dc=bar',
                 [
@@ -81,7 +80,7 @@ final class LdapRelaxControlTest extends ServerTestCase
                 ],
             ),
             Controls::relaxRules(),
-        );
+        ));
 
         self::assertSame(
             [
@@ -97,34 +96,35 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_a_relaxed_modify_keeps_the_modify_bookkeeping_it_supplies(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=relax-modify-stamp,dc=foo,dc=bar',
-            [
-                'cn' => 'relax-modify-stamp',
-                'sn' => 'Drift',
-                'objectClass' => 'person',
-            ],
-        ));
-
-        $this->ldapClient()->send(
-            Operations::modify(
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
                 'cn=relax-modify-stamp,dc=foo,dc=bar',
-                Change::replace(
-                    'createTimestamp',
-                    '20200101000000Z',
+                [
+                    'cn' => 'relax-modify-stamp',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                ],
+            ));
+
+            $admin->send(
+                Operations::modify(
+                    'cn=relax-modify-stamp,dc=foo,dc=bar',
+                    Change::replace(
+                        'createTimestamp',
+                        '20200101000000Z',
+                    ),
+                    Change::replace(
+                        'modifyTimestamp',
+                        '20200102000000Z',
+                    ),
+                    Change::replace(
+                        'modifiersName',
+                        'cn=joe,dc=foo,dc=bar',
+                    ),
                 ),
-                Change::replace(
-                    'modifyTimestamp',
-                    '20200102000000Z',
-                ),
-                Change::replace(
-                    'modifiersName',
-                    'cn=joe,dc=foo,dc=bar',
-                ),
-            ),
-            Controls::relaxRules(),
-        );
+                Controls::relaxRules(),
+            );
+        });
 
         $values = $this->operationalValuesOf('cn=relax-modify-stamp,dc=foo,dc=bar');
 
@@ -136,24 +136,25 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_a_relaxed_modify_removing_the_modify_bookkeeping_restamps_it(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=relax-modify-removal,dc=foo,dc=bar',
-            [
-                'cn' => 'relax-modify-removal',
-                'sn' => 'Drift',
-                'objectClass' => 'person',
-            ],
-        ));
-
-        $this->ldapClient()->send(
-            Operations::modify(
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
                 'cn=relax-modify-removal,dc=foo,dc=bar',
-                Change::delete('modifyTimestamp'),
-                Change::delete('modifiersName'),
-            ),
-            Controls::relaxRules(),
-        );
+                [
+                    'cn' => 'relax-modify-removal',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                ],
+            ));
+
+            $admin->send(
+                Operations::modify(
+                    'cn=relax-modify-removal,dc=foo,dc=bar',
+                    Change::delete('modifyTimestamp'),
+                    Change::delete('modifiersName'),
+                ),
+                Controls::relaxRules(),
+            );
+        });
 
         $values = $this->operationalValuesOf('cn=relax-modify-removal,dc=foo,dc=bar');
 
@@ -163,32 +164,33 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_a_relaxed_modify_replacing_then_removing_the_modify_bookkeeping_restamps_it(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=relax-modify-late-removal,dc=foo,dc=bar',
-            [
-                'cn' => 'relax-modify-late-removal',
-                'sn' => 'Drift',
-                'objectClass' => 'person',
-            ],
-        ));
-
-        $this->ldapClient()->send(
-            Operations::modify(
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
                 'cn=relax-modify-late-removal,dc=foo,dc=bar',
-                Change::replace(
-                    'modifyTimestamp',
-                    '20200102000000Z',
+                [
+                    'cn' => 'relax-modify-late-removal',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                ],
+            ));
+
+            $admin->send(
+                Operations::modify(
+                    'cn=relax-modify-late-removal,dc=foo,dc=bar',
+                    Change::replace(
+                        'modifyTimestamp',
+                        '20200102000000Z',
+                    ),
+                    Change::delete('modifyTimestamp'),
+                    Change::replace(
+                        'modifiersName',
+                        'cn=joe,dc=foo,dc=bar',
+                    ),
+                    Change::delete('modifiersName'),
                 ),
-                Change::delete('modifyTimestamp'),
-                Change::replace(
-                    'modifiersName',
-                    'cn=joe,dc=foo,dc=bar',
-                ),
-                Change::delete('modifiersName'),
-            ),
-            Controls::relaxRules(),
-        );
+                Controls::relaxRules(),
+            );
+        });
 
         $values = $this->operationalValuesOf('cn=relax-modify-late-removal,dc=foo,dc=bar');
 
@@ -454,26 +456,27 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_a_relaxed_structural_class_replace_restamps_the_structural_object_class(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=relax-replace-class,dc=foo,dc=bar',
-            [
-                'cn' => 'relax-replace-class',
-                'sn' => 'Drift',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-
-        $this->ldapClient()->send(
-            Operations::modify(
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
                 'cn=relax-replace-class,dc=foo,dc=bar',
-                Change::replace(
-                    'objectClass',
-                    'organizationalPerson',
+                [
+                    'cn' => 'relax-replace-class',
+                    'sn' => 'Drift',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+
+            $admin->send(
+                Operations::modify(
+                    'cn=relax-replace-class,dc=foo,dc=bar',
+                    Change::replace(
+                        'objectClass',
+                        'organizationalPerson',
+                    ),
                 ),
-            ),
-            Controls::relaxRules(),
-        );
+                Controls::relaxRules(),
+            );
+        });
 
         self::assertSame(
             'organizationalPerson',
@@ -483,26 +486,27 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_a_relaxed_addition_of_a_more_specific_structural_class_restamps_it(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=relax-add-class,dc=foo,dc=bar',
-            [
-                'cn' => 'relax-add-class',
-                'sn' => 'Drift',
-                'objectClass' => 'person',
-            ],
-        ));
-
-        $this->ldapClient()->send(
-            Operations::modify(
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
                 'cn=relax-add-class,dc=foo,dc=bar',
-                Change::add(
-                    'objectClass',
-                    'inetOrgPerson',
+                [
+                    'cn' => 'relax-add-class',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                ],
+            ));
+
+            $admin->send(
+                Operations::modify(
+                    'cn=relax-add-class,dc=foo,dc=bar',
+                    Change::add(
+                        'objectClass',
+                        'inetOrgPerson',
+                    ),
                 ),
-            ),
-            Controls::relaxRules(),
-        );
+                Controls::relaxRules(),
+            );
+        });
 
         self::assertSame(
             'inetOrgPerson',

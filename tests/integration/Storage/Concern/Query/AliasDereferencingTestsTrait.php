@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -33,13 +34,12 @@ trait AliasDereferencingTestsTrait
     {
         $this->stopServer();
         $this->createServerProcess('tcp', static::storageExtraArgs());
-        $this->authenticateAdmin();
 
-        $this->ldapClient()->create(Entry::fromArray('cn=ref,dc=foo,dc=bar', [
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray('cn=ref,dc=foo,dc=bar', [
             'objectClass' => ['top', 'alias', 'extensibleObject'],
             'cn' => 'ref',
             'aliasedObjectName' => 'cn=user,dc=foo,dc=bar',
-        ]));
+        ])));
 
         try {
             self::assertCount(
@@ -86,7 +86,7 @@ trait AliasDereferencingTestsTrait
                 'The same base names the alias itself when nothing is dereferenced.',
             );
         } finally {
-            $this->ldapClient()->delete('cn=ref,dc=foo,dc=bar');
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=ref,dc=foo,dc=bar'));
         }
     }
 
@@ -94,13 +94,12 @@ trait AliasDereferencingTestsTrait
     {
         $this->stopServer();
         $this->createServerProcess('tcp', static::storageExtraArgs());
-        $this->authenticateAdmin();
 
-        $this->ldapClient()->create(Entry::fromArray('cn=oid-ref,dc=foo,dc=bar', [
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray('cn=oid-ref,dc=foo,dc=bar', [
             'objectClass' => ['top', '2.5.6.1', 'extensibleObject'],
             'cn' => 'oid-ref',
             'aliasedObjectName' => 'commonName=user,dc=foo,dc=bar',
-        ]));
+        ])));
 
         try {
             $viaAlias = $this->ldapClient()->search(
@@ -115,7 +114,7 @@ trait AliasDereferencingTestsTrait
                 strtolower((string) $viaAlias->first()?->getDn()),
             );
         } finally {
-            $this->ldapClient()->delete('cn=oid-ref,dc=foo,dc=bar');
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=oid-ref,dc=foo,dc=bar'));
         }
     }
 
@@ -123,13 +122,12 @@ trait AliasDereferencingTestsTrait
     {
         $this->stopServer();
         $this->createServerProcess('tcp', static::storageExtraArgs());
-        $this->authenticateAdmin();
 
-        $this->ldapClient()->create(Entry::fromArray('cn=dangle,dc=foo,dc=bar', [
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray('cn=dangle,dc=foo,dc=bar', [
             'objectClass' => ['top', 'alias', 'extensibleObject'],
             'cn' => 'dangle',
             'aliasedObjectName' => 'cn=nothere,dc=foo,dc=bar',
-        ]));
+        ])));
 
         try {
             $this->ldapClient()->search(
@@ -149,7 +147,7 @@ trait AliasDereferencingTestsTrait
                 $e->getMatchedDn()?->toString(),
             );
         } finally {
-            $this->ldapClient()->delete('cn=dangle,dc=foo,dc=bar');
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=dangle,dc=foo,dc=bar'));
         }
     }
 
@@ -157,15 +155,16 @@ trait AliasDereferencingTestsTrait
     {
         $this->stopServer();
         $this->createServerProcess('tcp', static::storageExtraArgs());
-        $this->authenticateAdmin();
 
-        foreach ([['loopa', 'loopb'], ['loopb', 'loopa']] as [$name, $target]) {
-            $this->ldapClient()->create(Entry::fromArray("cn=$name,dc=foo,dc=bar", [
-                'objectClass' => ['top', 'alias', 'extensibleObject'],
-                'cn' => $name,
-                'aliasedObjectName' => "cn=$target,dc=foo,dc=bar",
-            ]));
-        }
+        $this->asAdmin(function (LdapClient $admin): void {
+            foreach ([['loopa', 'loopb'], ['loopb', 'loopa']] as [$name, $target]) {
+                $admin->create(Entry::fromArray("cn=$name,dc=foo,dc=bar", [
+                    'objectClass' => ['top', 'alias', 'extensibleObject'],
+                    'cn' => $name,
+                    'aliasedObjectName' => "cn=$target,dc=foo,dc=bar",
+                ]));
+            }
+        });
 
         try {
             $this->ldapClient()->search(
@@ -188,8 +187,10 @@ trait AliasDereferencingTestsTrait
                 ],
             );
         } finally {
-            $this->ldapClient()->delete('cn=loopa,dc=foo,dc=bar');
-            $this->ldapClient()->delete('cn=loopb,dc=foo,dc=bar');
+            $this->asAdmin(function (LdapClient $admin): void {
+                $admin->delete('cn=loopa,dc=foo,dc=bar');
+                $admin->delete('cn=loopb,dc=foo,dc=bar');
+            });
         }
     }
 }

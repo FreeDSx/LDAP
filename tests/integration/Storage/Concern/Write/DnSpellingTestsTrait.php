@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -31,16 +32,16 @@ trait DnSpellingTestsTrait
 {
     public function testDnsDifferingOnlyByAccentAreDistinctEntries(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=josé,dc=foo,dc=bar',
-            ['cn' => 'josé', 'sn' => 'Accented', 'objectClass' => 'inetOrgPerson'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=jose,dc=foo,dc=bar',
-            ['cn' => 'jose', 'sn' => 'Plain', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=josé,dc=foo,dc=bar',
+                ['cn' => 'josé', 'sn' => 'Accented', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=jose,dc=foo,dc=bar',
+                ['cn' => 'jose', 'sn' => 'Plain', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
 
         $accented = $this->ldapClient()->read('cn=josé,dc=foo,dc=bar');
         $plain = $this->ldapClient()->read('cn=jose,dc=foo,dc=bar');
@@ -114,9 +115,10 @@ trait DnSpellingTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertNotNull($this->ldapClient()->read('cn=repoison,dc=foo,dc=bar'));
-        $this->ldapClient()->delete('cn=repoison,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=repoison,dc=foo,dc=bar'));
     }
 
     public function testDeletingTheRdnValueUnderAnEquivalentSpellingIsRefused(): void
@@ -145,6 +147,7 @@ trait DnSpellingTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $entry = $this->ldapClient()->read('cn=Foo Bar,dc=foo,dc=bar');
         self::assertContains(
@@ -198,6 +201,7 @@ trait DnSpellingTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertCount(
             1,
@@ -233,15 +237,14 @@ trait DnSpellingTestsTrait
 
     public function testAddWithAnEscapedLeadingSharpIsStoredAsALiteralValue(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=\23hashtag,dc=foo,dc=bar',
             [
                 'cn' => '#hashtag',
                 'sn' => 'Hash',
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
 
         try {
             $entries = $this->ldapClient()->search(
@@ -252,7 +255,7 @@ trait DnSpellingTestsTrait
 
             self::assertCount(1, $entries);
         } finally {
-            $this->ldapClient()->delete('cn=\23hashtag,dc=foo,dc=bar');
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=\23hashtag,dc=foo,dc=bar'));
         }
     }
 
@@ -359,11 +362,10 @@ trait DnSpellingTestsTrait
 
     public function testAddAcceptsANamingValueTheEntryHoldsUnderAnEquivalentSpelling(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=Über,dc=foo,dc=bar',
             ['cn' => 'über', 'sn' => 'Uber', 'objectClass' => 'inetOrgPerson'],
-        ));
+        )));
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn')
@@ -375,18 +377,22 @@ trait DnSpellingTestsTrait
             $found->first()?->get('cn')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=Über,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=Über,dc=foo,dc=bar'));
     }
 
     public function testRenameThroughARespelledDnRemovesTheStoredNamingValue(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=École,dc=foo,dc=bar',
-            ['cn' => 'École', 'sn' => 'Ecole', 'objectClass' => 'inetOrgPerson'],
-        ));
-
-        $this->ldapClient()->rename('cn=école,dc=foo,dc=bar', 'cn=ecole2', true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=École,dc=foo,dc=bar',
+                ['cn' => 'École', 'sn' => 'Ecole', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->rename(
+                'cn=école,dc=foo,dc=bar',
+                'cn=ecole2',
+                true,
+            );
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn')
@@ -398,23 +404,27 @@ trait DnSpellingTestsTrait
             $found->first()?->get('cn')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=ecole2,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=ecole2,dc=foo,dc=bar'));
     }
 
     public function testRenameKeepsCaseVariantsOfACaseExactNamingValue(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'labeledURI=Xyz,dc=foo,dc=bar',
-            [
-                'cn' => 'variants',
-                'sn' => 'Variants',
-                'labeledURI' => ['Xyz', 'xyz', 'XYZ'],
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-
-        $this->ldapClient()->rename('labeledURI=Xyz,dc=foo,dc=bar', 'cn=variants', true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'labeledURI=Xyz,dc=foo,dc=bar',
+                [
+                    'cn' => 'variants',
+                    'sn' => 'Variants',
+                    'labeledURI' => ['Xyz', 'xyz', 'XYZ'],
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->rename(
+                'labeledURI=Xyz,dc=foo,dc=bar',
+                'cn=variants',
+                true,
+            );
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'labeledURI')
@@ -426,18 +436,22 @@ trait DnSpellingTestsTrait
             $found->first()?->get('labeledURI')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=variants,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=variants,dc=foo,dc=bar'));
     }
 
     public function testRenameCanRespellTheRdnInADifferentCase(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=Recase,dc=foo,dc=bar',
-            ['cn' => 'Recase', 'sn' => 'Recase', 'objectClass' => 'inetOrgPerson'],
-        ));
-
-        $this->ldapClient()->rename('cn=Recase,dc=foo,dc=bar', 'cn=recase', true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=Recase,dc=foo,dc=bar',
+                ['cn' => 'Recase', 'sn' => 'Recase', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->rename(
+                'cn=Recase,dc=foo,dc=bar',
+                'cn=recase',
+                true,
+            );
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn')
@@ -449,7 +463,7 @@ trait DnSpellingTestsTrait
             $found->first()?->get('cn')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=recase,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=recase,dc=foo,dc=bar'));
     }
 
     public function testAHexEscapeNamesTheSameEntryAsTheCharacterItEncodes(): void

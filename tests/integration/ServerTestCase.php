@@ -246,6 +246,26 @@ class ServerTestCase extends LdapTestCase
         );
     }
 
+    /**
+     * Runs the callable bound as an administrator, then binds back as the standard user the test queries as.
+     *
+     * @template T
+     *
+     * @param callable(LdapClient): T $write
+     *
+     * @return T
+     */
+    protected function asAdmin(callable $write): mixed
+    {
+        $this->authenticateAdmin();
+
+        try {
+            return $write($this->ldapClient());
+        } finally {
+            $this->authenticateUser();
+        }
+    }
+
     protected function setServerMode(string $mode): void
     {
         $this->serverMode = $mode;

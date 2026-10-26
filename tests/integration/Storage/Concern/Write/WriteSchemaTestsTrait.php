@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -141,6 +142,7 @@ trait WriteSchemaTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertNotNull($this->ldapClient()->read('cn=user,dc=foo,dc=bar'));
     }
@@ -163,6 +165,7 @@ trait WriteSchemaTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertNull($this->ldapClient()->read('cn=undefinedclass,dc=foo,dc=bar'));
     }
@@ -183,6 +186,7 @@ trait WriteSchemaTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertNotContains(
             '1.2.3.4.5.6.7.8',
@@ -210,14 +214,12 @@ trait WriteSchemaTestsTrait
 
     public function testAddAcceptsDeviceCarryingAnAuxiliaryPolicyClass(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(new Entry(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(new Entry(
             'cn=policy-carrier,dc=foo,dc=bar',
             new Attribute('objectClass', 'top', 'device', 'pwdPolicy'),
             new Attribute('cn', 'policy-carrier'),
             new Attribute('pwdAttribute', 'userPassword'),
-        ));
+        )));
 
         self::assertCount(
             1,
@@ -228,13 +230,12 @@ trait WriteSchemaTestsTrait
             ),
         );
 
-        $this->ldapClient()->delete('cn=policy-carrier,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=policy-carrier,dc=foo,dc=bar'));
     }
 
     public function testAddAcceptsEveryAttributeGroupOfNamesPermits(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=allmay,dc=foo,dc=bar',
             [
                 'objectClass' => 'groupOfNames',
@@ -247,7 +248,7 @@ trait WriteSchemaTestsTrait
                 'o' => 'Example',
                 'description' => 'every attribute the class allows',
             ],
-        ));
+        )));
 
         self::assertCount(
             1,
@@ -258,13 +259,12 @@ trait WriteSchemaTestsTrait
             ),
         );
 
-        $this->ldapClient()->delete('cn=allmay,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=allmay,dc=foo,dc=bar'));
     }
 
     public function testAddAcceptsEveryAttributeOrganizationalPersonPermits(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=allmayperson,dc=foo,dc=bar',
             [
                 'objectClass' => 'organizationalPerson',
@@ -294,7 +294,7 @@ trait WriteSchemaTestsTrait
                 'l' => 'Anytown',
                 'c' => 'US',
             ],
-        ));
+        )));
 
         self::assertCount(
             1,
@@ -305,7 +305,7 @@ trait WriteSchemaTestsTrait
             ),
         );
 
-        $this->ldapClient()->delete('cn=allmayperson,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=allmayperson,dc=foo,dc=bar'));
     }
 
     /**
@@ -330,16 +330,14 @@ trait WriteSchemaTestsTrait
 
     public function testAddAcceptsATwoCharacterCountryCode(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'o=goodcountry,dc=foo,dc=bar',
             [
                 'o' => 'goodcountry',
                 'c' => 'US',
                 'objectClass' => 'organization',
             ],
-        ));
+        )));
 
         $found = $this->ldapClient()->read('o=goodcountry,dc=foo,dc=bar', ['c']);
 
@@ -348,7 +346,7 @@ trait WriteSchemaTestsTrait
             $found?->get('c')?->getValues(),
         );
 
-        $this->ldapClient()->delete('o=goodcountry,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('o=goodcountry,dc=foo,dc=bar'));
     }
 
     public function testModifyDeletingTheLastValueOfARequiredAttributeIsRefused(): void
@@ -368,6 +366,7 @@ trait WriteSchemaTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'sn')
@@ -394,6 +393,7 @@ trait WriteSchemaTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn')

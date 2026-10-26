@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -31,19 +32,17 @@ trait WriteOperationTestsTrait
 {
     public function testAddStoresEntry(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=charlie,dc=foo,dc=bar',
             ['cn' => 'charlie', 'sn' => 'Charlie', 'objectClass' => 'inetOrgPerson'],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'charlie'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        $this->ldapClient()->delete('cn=charlie,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=charlie,dc=foo,dc=bar'));
 
         self::assertCount(
             1,
@@ -53,9 +52,7 @@ trait WriteOperationTestsTrait
 
     public function testAddPreservesAttributeOptionsOnRoundTrip(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=tagged,dc=foo,dc=bar',
             [
                 'cn' => 'tagged',
@@ -63,7 +60,7 @@ trait WriteOperationTestsTrait
                 'sn' => 'Tag',
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn;lang-en', 'Tagged EN'))
@@ -85,22 +82,22 @@ trait WriteOperationTestsTrait
 
     public function testModifyingABaseFormReindexesItWhenAnOptionBearingFormExists(): void
     {
-        $this->authenticateAdmin();
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=subtyped,dc=foo,dc=bar',
+                [
+                    'cn' => 'subtyped',
+                    'sn' => 'Sub',
+                    'mail' => 'base@foo.bar',
+                    'mail;lang-en' => 'tagged@foo.bar',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
 
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=subtyped,dc=foo,dc=bar',
-            [
-                'cn' => 'subtyped',
-                'sn' => 'Sub',
-                'mail' => 'base@foo.bar',
-                'mail;lang-en' => 'tagged@foo.bar',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-
-        $entry = Entry::fromArray('cn=subtyped,dc=foo,dc=bar');
-        $entry->changes()->add(Change::replace(new Attribute('mail', 'replaced@foo.bar')));
-        $this->ldapClient()->update($entry);
+            $entry = Entry::fromArray('cn=subtyped,dc=foo,dc=bar');
+            $entry->changes()->add(Change::replace(new Attribute('mail', 'replaced@foo.bar')));
+            $admin->update($entry);
+        });
 
         self::assertCount(
             1,
@@ -171,9 +168,11 @@ trait WriteOperationTestsTrait
                 }
             }
 
+            $this->authenticateUser();
+
             self::assertNotNull($this->ldapClient()->read('cn=user,dc=foo,dc=bar'));
         } finally {
-            $this->ldapClient()->delete('cn=ptr,dc=foo,dc=bar');
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=ptr,dc=foo,dc=bar'));
         }
     }
 
@@ -192,13 +191,14 @@ trait WriteOperationTestsTrait
 
     public function testDeleteRemovesEntry(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=delete-target,ou=people,dc=foo,dc=bar',
-            ['cn' => 'delete-target', 'sn' => 'Target', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=delete-target,ou=people,dc=foo,dc=bar',
+                ['cn' => 'delete-target', 'sn' => 'Target', 'objectClass' => 'inetOrgPerson'],
+            ));
 
-        $this->ldapClient()->delete('cn=delete-target,ou=people,dc=foo,dc=bar');
+            $admin->delete('cn=delete-target,ou=people,dc=foo,dc=bar');
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'delete-target'))
@@ -224,22 +224,23 @@ trait WriteOperationTestsTrait
 
     public function testModifyReplacesAttributeValue(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=modify-target,ou=people,dc=foo,dc=bar',
-            ['cn' => 'modify-target', 'sn' => 'Smith', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=modify-target,ou=people,dc=foo,dc=bar',
+                ['cn' => 'modify-target', 'sn' => 'Smith', 'objectClass' => 'inetOrgPerson'],
+            ));
 
-        $entry = Entry::fromArray('cn=modify-target,ou=people,dc=foo,dc=bar');
-        $entry->set('sn', 'Jones');
-        $this->ldapClient()->update($entry);
+            $entry = Entry::fromArray('cn=modify-target,ou=people,dc=foo,dc=bar');
+            $entry->set('sn', 'Jones');
+            $admin->update($entry);
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('sn', 'Jones'))
                 ->base('cn=modify-target,ou=people,dc=foo,dc=bar')
                 ->useBaseScope(),
         );
-        $this->ldapClient()->delete('cn=modify-target,ou=people,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=modify-target,ou=people,dc=foo,dc=bar'));
 
         self::assertCount(
             1,
@@ -268,6 +269,7 @@ trait WriteOperationTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'sn')
@@ -282,21 +284,22 @@ trait WriteOperationTestsTrait
 
     public function testModifyDeletingEveryValueRemovesTheAttribute(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=dropmail,dc=foo,dc=bar',
-            [
-                'cn' => 'dropmail',
-                'sn' => 'Drop',
-                'mail' => ['one@foo.bar', 'two@foo.bar'],
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=dropmail,dc=foo,dc=bar',
+                [
+                    'cn' => 'dropmail',
+                    'sn' => 'Drop',
+                    'mail' => ['one@foo.bar', 'two@foo.bar'],
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
 
-        $this->ldapClient()->send(Operations::modify(
-            'cn=dropmail,dc=foo,dc=bar',
-            Change::delete(new Attribute('mail', 'one@foo.bar', 'two@foo.bar')),
-        ));
+            $admin->send(Operations::modify(
+                'cn=dropmail,dc=foo,dc=bar',
+                Change::delete(new Attribute('mail', 'one@foo.bar', 'two@foo.bar')),
+            ));
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'mail')
@@ -305,23 +308,24 @@ trait WriteOperationTestsTrait
         );
         self::assertNull($found->first()?->get('mail'));
 
-        $this->ldapClient()->delete('cn=dropmail,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=dropmail,dc=foo,dc=bar'));
     }
 
     public function testRenameDropsAnRdnAttributeLeftWithNoValues(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'employeeNumber=E1,dc=foo,dc=bar',
-            [
-                'cn' => 'pruneme',
-                'sn' => 'Prune',
-                'employeeNumber' => 'E1',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'employeeNumber=E1,dc=foo,dc=bar',
+                [
+                    'cn' => 'pruneme',
+                    'sn' => 'Prune',
+                    'employeeNumber' => 'E1',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
 
-        $this->ldapClient()->rename('employeeNumber=E1,dc=foo,dc=bar', 'cn=pruneme', true);
+            $admin->rename('employeeNumber=E1,dc=foo,dc=bar', 'cn=pruneme', true);
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'employeeNumber')
@@ -330,18 +334,19 @@ trait WriteOperationTestsTrait
         );
         self::assertNull($found->first()?->get('employeeNumber'));
 
-        $this->ldapClient()->delete('cn=pruneme,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=pruneme,dc=foo,dc=bar'));
     }
 
     public function testRenameKeepsAnRdnAttributeHoldingOtherValues(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=keepme,dc=foo,dc=bar',
-            ['cn' => ['keepme', 'kept'], 'sn' => 'Keep', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=keepme,dc=foo,dc=bar',
+                ['cn' => ['keepme', 'kept'], 'sn' => 'Keep', 'objectClass' => 'inetOrgPerson'],
+            ));
 
-        $this->ldapClient()->rename('cn=keepme,dc=foo,dc=bar', 'cn=kept', true);
+            $admin->rename('cn=keepme,dc=foo,dc=bar', 'cn=kept', true);
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn')
@@ -353,21 +358,22 @@ trait WriteOperationTestsTrait
             $found->first()?->get('cn')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=kept,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=kept,dc=foo,dc=bar'));
     }
 
     public function testRenameChangesRdn(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=rename-target,ou=people,dc=foo,dc=bar',
-            ['cn' => 'rename-target', 'sn' => 'Target', 'objectClass' => 'inetOrgPerson'],
-        ));
-        $this->ldapClient()->rename(
-            'cn=rename-target,ou=people,dc=foo,dc=bar',
-            'cn=renamed',
-            true,
-        );
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=rename-target,ou=people,dc=foo,dc=bar',
+                ['cn' => 'rename-target', 'sn' => 'Target', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->rename(
+                'cn=rename-target,ou=people,dc=foo,dc=bar',
+                'cn=renamed',
+                true,
+            );
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'renamed'))
@@ -379,7 +385,7 @@ trait WriteOperationTestsTrait
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        $this->ldapClient()->delete('cn=renamed,ou=people,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=renamed,ou=people,dc=foo,dc=bar'));
 
         self::assertCount(
             1,
@@ -438,6 +444,7 @@ trait WriteOperationTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $first = $this->ldapClient()->read(
             'cn=uuid-first,dc=foo,dc=bar',

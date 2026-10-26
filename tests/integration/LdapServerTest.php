@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -95,11 +96,10 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsAnAdd(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=added,dc=foo,dc=bar',
             ['cn' => 'added', 'sn' => 'Test', 'objectClass' => 'inetOrgPerson'],
-        ));
+        )));
 
         $result = $this->ldapClient()->read('cn=added,dc=foo,dc=bar');
         $this->assertNotNull($result);
@@ -111,12 +111,13 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsDelete(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=todelete,dc=foo,dc=bar',
-            ['cn' => 'todelete', 'sn' => 'Delete', 'objectClass' => 'inetOrgPerson'],
-        ));
-        $this->ldapClient()->delete('cn=todelete,dc=foo,dc=bar');
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=todelete,dc=foo,dc=bar',
+                ['cn' => 'todelete', 'sn' => 'Delete', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->delete('cn=todelete,dc=foo,dc=bar');
+        });
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
@@ -125,16 +126,22 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsModify(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=tomodify,dc=foo,dc=bar',
-            ['cn' => 'tomodify', 'sn' => 'Before', 'mail' => 'before@example.com', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=tomodify,dc=foo,dc=bar',
+                [
+                    'cn' => 'tomodify',
+                    'sn' => 'Before',
+                    'mail' => 'before@example.com',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
 
-        $changes = Entry::fromArray('cn=tomodify,dc=foo,dc=bar', []);
-        $changes->set('sn', 'After');
-        $changes->add('mail', 'added@example.com');
-        $this->ldapClient()->update($changes);
+            $changes = Entry::fromArray('cn=tomodify,dc=foo,dc=bar', []);
+            $changes->set('sn', 'After');
+            $changes->add('mail', 'added@example.com');
+            $admin->update($changes);
+        });
 
         $result = $this->ldapClient()->read('cn=tomodify,dc=foo,dc=bar');
         $this->assertNotNull($result);
@@ -175,16 +182,17 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItCanModifyDn(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=tomove,dc=foo,dc=bar',
-            ['cn' => 'tomove', 'sn' => 'Move', 'objectClass' => 'inetOrgPerson'],
-        ));
-        $this->ldapClient()->rename(
-            'cn=tomove,dc=foo,dc=bar',
-            'cn=moved',
-            true,
-        );
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=tomove,dc=foo,dc=bar',
+                ['cn' => 'tomove', 'sn' => 'Move', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->rename(
+                'cn=tomove,dc=foo,dc=bar',
+                'cn=moved',
+                true,
+            );
+        });
 
         $result = $this->ldapClient()->read('cn=moved,dc=foo,dc=bar');
         $this->assertNotNull($result);
@@ -335,7 +343,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testTheSubschemaPublishesTheSameTimestampsOnEveryConnection(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         $first = $this->ldapClient()->read(
             'cn=Subschema',
             ['createTimestamp', 'modifyTimestamp'],
@@ -343,7 +351,7 @@ final class LdapServerTest extends ServerTestCase
 
         $otherClient = $this->buildClient('tcp');
         $otherClient->bind(
-            'cn=admin,dc=foo,dc=bar',
+            'cn=user,dc=foo,dc=bar',
             '12345',
         );
         $second = $otherClient->read(
@@ -371,7 +379,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testTheSubschemaPublishesNoMatchingRuleUse(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $entry = $this->ldapClient()->read(
             'cn=Subschema',
@@ -385,7 +393,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testGoverningStructureRuleIsARecognizedReadOnlyType(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $subschema = $this->ldapClient()->read(
             'cn=Subschema',
@@ -401,6 +409,7 @@ final class LdapServerTest extends ServerTestCase
             'governingStructureRule',
             '1',
         ));
+        $this->authenticateAdmin();
 
         try {
             $this->ldapClient()->send(Operations::modify(
@@ -818,6 +827,7 @@ final class LdapServerTest extends ServerTestCase
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $this->assertNotNull($this->ldapClient()->read('cn=comma-src,dc=foo,dc=bar'));
     }
@@ -845,7 +855,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testASearchWithAMalformedBaseDnReportsInvalidDnSyntax(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         try {
             $this->ldapClient()->search(
@@ -1050,6 +1060,7 @@ final class LdapServerTest extends ServerTestCase
             $this->fail('A shadow entry should not have been created.');
         } catch (OperationException) {
         }
+        $this->authenticateUser();
 
         $this->assertCount(
             0,
@@ -1096,20 +1107,21 @@ final class LdapServerTest extends ServerTestCase
 
     public function testRenameWithoutDeleteKeepsOldRdn(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=torenameold,dc=foo,dc=bar',
-            [
-                'cn' => 'torenameold',
-                'sn' => 'RenameOld',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-        $this->ldapClient()->rename(
-            'cn=torenameold,dc=foo,dc=bar',
-            'cn=torenamednew',
-            false,
-        );
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=torenameold,dc=foo,dc=bar',
+                [
+                    'cn' => 'torenameold',
+                    'sn' => 'RenameOld',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->rename(
+                'cn=torenameold,dc=foo,dc=bar',
+                'cn=torenamednew',
+                false,
+            );
+        });
 
         $result = $this->ldapClient()->read('cn=torenamednew,dc=foo,dc=bar', ['cn']);
         $this->assertNotNull($result);

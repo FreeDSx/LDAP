@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -78,31 +79,30 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testItForwardsWritesToUpstream(): void
     {
-        $this->authenticateAdmin();
         $client = $this->ldapClient();
         $dn = 'cn=written,dc=foo,dc=bar';
 
-        $client->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             $dn,
             [
                 'cn' => ['written'],
                 'sn' => ['Written'],
                 'objectClass' => ['inetOrgPerson'],
             ],
-        ));
+        )));
         self::assertTrue(
             $client->compare($dn, 'sn', 'Written'),
         );
 
-        $client->send(Operations::modify(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->send(Operations::modify(
             $dn,
             Change::replace('sn', 'Changed'),
-        ));
+        )));
         self::assertTrue(
             $client->compare($dn, 'sn', 'Changed'),
         );
 
-        $client->delete($dn);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
         self::assertNull($client->read($dn));
     }
 
@@ -210,9 +210,9 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testARefusedBindLeavesTheUpstreamSessionAnonymous(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertSame(
-            'dn:cn=admin,dc=foo,dc=bar',
+            'dn:cn=user,dc=foo,dc=bar',
             $this->ldapClient()->whoami(),
         );
 
@@ -230,7 +230,7 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testLosingTheUpstreamEndsTheProxiedSession(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNotEmpty($this->ldapClient()->search(
             Operations::search(Filters::equal('objectClass', 'inetOrgPerson'))
                 ->base('dc=foo,dc=bar'),
@@ -251,7 +251,7 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testTheClientCanRebuildASessionTheUpstreamEnded(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::killUpstreamConnections();
 
         try {
@@ -259,10 +259,10 @@ final class LdapProxyTest extends ServerTestCase
         } catch (ConnectionException) {
         }
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         self::assertSame(
-            'dn:cn=admin,dc=foo,dc=bar',
+            'dn:cn=user,dc=foo,dc=bar',
             $this->ldapClient()->whoami(),
         );
     }
@@ -294,10 +294,10 @@ final class LdapProxyTest extends ServerTestCase
             ],
         );
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         self::assertSame(
-            'dn:cn=admin,dc=foo,dc=bar',
+            'dn:cn=user,dc=foo,dc=bar',
             $this->ldapClient()->whoami(),
         );
     }

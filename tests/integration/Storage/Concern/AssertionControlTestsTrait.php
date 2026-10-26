@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -119,8 +120,9 @@ trait AssertionControlTestsTrait
             Operations::add($entry),
             Controls::assertion(Filters::equal('sn', 'Smith')),
         );
+        $this->authenticateUser();
         $added = $this->ldapClient()->read($entry->getDn()->toString());
-        $this->ldapClient()->delete($entry->getDn()->toString());
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($entry->getDn()->toString()));
 
         self::assertSame(
             ['Smith'],
@@ -145,6 +147,7 @@ trait AssertionControlTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertNull($this->ldapClient()->read($entry->getDn()->toString()));
     }
@@ -161,8 +164,9 @@ trait AssertionControlTestsTrait
             ),
             Controls::assertion(Filters::equal('sn', 'Smith')),
         );
+        $this->authenticateUser();
         $modified = $this->ldapClient()->read($dn);
-        $this->ldapClient()->delete($dn);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
 
         self::assertSame(
             ['Jones'],
@@ -190,8 +194,9 @@ trait AssertionControlTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
         $unchanged = $this->ldapClient()->read($dn);
-        $this->ldapClient()->delete($dn);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
 
         self::assertSame(
             ['Smith'],
@@ -216,8 +221,9 @@ trait AssertionControlTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
         $kept = $this->ldapClient()->read($dn);
-        $this->ldapClient()->delete($dn);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
 
         self::assertNotNull($kept);
     }
@@ -240,11 +246,12 @@ trait AssertionControlTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
         $kept = $this->ldapClient()->read('cn=child,ou=assert-tree-no,dc=foo,dc=bar');
-        $this->ldapClient()->send(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->send(
             Operations::delete('ou=assert-tree-no,dc=foo,dc=bar'),
             Controls::subtreeDelete(),
-        );
+        ));
 
         self::assertNotNull($kept);
     }
@@ -259,6 +266,7 @@ trait AssertionControlTestsTrait
             Controls::subtreeDelete(),
             Controls::assertion(Filters::equal('ou', 'assert-tree-yes')),
         );
+        $this->authenticateUser();
 
         self::assertNull($this->ldapClient()->read('ou=assert-tree-yes,dc=foo,dc=bar'));
         self::assertNull($this->ldapClient()->read('cn=child,ou=assert-tree-yes,dc=foo,dc=bar'));
@@ -284,8 +292,9 @@ trait AssertionControlTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
         $kept = $this->ldapClient()->read($dn);
-        $this->ldapClient()->delete($dn);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
 
         self::assertNotNull($kept);
         self::assertNull($this->ldapClient()->read('cn=assert-renamed,ou=people,dc=foo,dc=bar'));

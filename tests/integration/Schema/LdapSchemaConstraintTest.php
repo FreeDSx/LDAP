@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -74,7 +75,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_the_published_subschema_declares_entry_uuid_with_the_uuid_syntax(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $subschema = $this->ldapClient()->read(
             'cn=Subschema',
@@ -99,7 +100,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
      */
     public function test_the_subschema_is_reachable_by_an_equivalent_spelling_of_its_dn(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $subschema = $this->ldapClient()->read(
             'cn = Subschema',
@@ -114,7 +115,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_the_subschema_entry_names_itself_as_its_own_subschema(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $subschema = $this->ldapClient()->read(
             'cn=Subschema',
@@ -129,7 +130,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_the_subschema_entry_carries_a_structural_class_and_satisfies_its_must(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $subschema = $this->ldapClient()->read(
             'cn=Subschema',
@@ -162,7 +163,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_the_subschema_entry_answers_a_filter_on_its_structural_class(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('objectClass', 'subentry'))
@@ -264,16 +265,14 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_supplies_the_superclasses_of_the_named_object_classes(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=superclasses,dc=foo,dc=bar',
             [
                 'cn' => 'superclasses',
                 'sn' => 'Smith',
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
 
         self::assertSame(
             [
@@ -295,19 +294,17 @@ final class LdapSchemaConstraintTest extends ServerTestCase
     #[DataProvider('superclassFilterProvider')]
     public function test_a_filter_naming_a_superclass_finds_the_entry(string $objectClass): void
     {
-        $this->authenticateAdmin();
-
         $cn = 'bysuperclass-' . strtolower($objectClass);
         $dn = "cn=$cn,dc=foo,dc=bar";
 
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             $dn,
             [
                 'cn' => $cn,
                 'sn' => 'Smith',
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('objectClass', $objectClass))
@@ -331,16 +328,14 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_omitting_the_naming_attribute_still_stores_it(): void
     {
-        $this->authenticateAdmin();
-
         // RFC 4511 section 4.7 lets a client leave the RDN attribute out of the attribute list.
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=implied-cn,dc=foo,dc=bar',
             [
                 'sn' => 'Smith',
                 'objectClass' => 'person',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'implied-cn'))
@@ -572,9 +567,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_the_nis_schema_is_usable_end_to_end(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=posix-users,dc=foo,dc=bar',
             [
                 'cn' => 'posix-users',
@@ -582,7 +575,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
                 'gidNumber' => '5000',
                 'memberUid' => ['alice', 'bob'],
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('gidNumber', '5000'))
@@ -619,9 +612,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
      */
     public function test_an_organizational_role_is_accepted_with_its_optional_attributes(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=helpdesk,dc=foo,dc=bar',
             [
                 'cn' => 'helpdesk',
@@ -633,7 +624,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
                 'postalAddress' => '1234 Main St.$Anytown, CA 12345$USA',
                 'teletexTerminalIdentifier' => 'term1$graphic:on',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'helpdesk'))
@@ -705,9 +696,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
      */
     public function test_a_keyword_in_another_case_is_accepted(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=mixed-case-keyword,dc=foo,dc=bar',
             [
                 'cn' => 'mixed-case-keyword',
@@ -715,7 +704,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
                 'preferredDeliveryMethod' => 'Telephone',
                 'facsimileTelephoneNumber' => '+1 555 555 1234$FineResolution',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'mixed-case-keyword'))

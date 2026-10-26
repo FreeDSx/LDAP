@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -41,12 +42,10 @@ trait AttributeValueLimitTestsTrait
 
     public function testAnAddAtTheValueLimitIsStoredWhole(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create($this->boundedEntry(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create($this->boundedEntry(
             'limit-add-at',
             self::SHARED_MAX_ATTRIBUTE_VALUES,
-        ));
+        )));
 
         self::assertCount(
             self::SHARED_MAX_ATTRIBUTE_VALUES,
@@ -87,6 +86,7 @@ trait AttributeValueLimitTestsTrait
             self::fail('The modify should have been refused.');
         } catch (OperationException) {
         }
+        $this->authenticateUser();
 
         $stored = $this->boundedValuesOf('limit-modify-intact');
 
@@ -102,16 +102,16 @@ trait AttributeValueLimitTestsTrait
 
     public function testAModifyStayingWithinTheValueLimitIsApplied(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create($this->boundedEntry(
-            'limit-modify-under',
-            self::SHARED_MAX_ATTRIBUTE_VALUES - 1,
-        ));
-
-        $this->ldapClient()->send(Operations::modify(
-            'cn=limit-modify-under,dc=foo,dc=bar',
-            Change::add('description', 'one more'),
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create($this->boundedEntry(
+                'limit-modify-under',
+                self::SHARED_MAX_ATTRIBUTE_VALUES - 1,
+            ));
+            $admin->send(Operations::modify(
+                'cn=limit-modify-under,dc=foo,dc=bar',
+                Change::add('description', 'one more'),
+            ));
+        });
 
         self::assertCount(
             self::SHARED_MAX_ATTRIBUTE_VALUES,
@@ -131,6 +131,7 @@ trait AttributeValueLimitTestsTrait
             self::fail('The add should have been refused.');
         } catch (OperationException) {
         }
+        $this->authenticateUser();
 
         self::assertCount(
             0,

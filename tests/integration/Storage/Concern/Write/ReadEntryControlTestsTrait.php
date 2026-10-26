@@ -234,6 +234,8 @@ trait ReadEntryControlTestsTrait
             ['TRUE'],
             $preRead->getEntry()->get('hasSubordinates')?->getValues(),
         );
+
+        $this->authenticateUser();
         self::assertNull($this->ldapClient()->read('cn=child,ou=pre-read-tree,dc=foo,dc=bar'));
     }
 }

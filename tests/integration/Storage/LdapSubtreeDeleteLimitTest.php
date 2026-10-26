@@ -61,12 +61,15 @@ final class LdapSubtreeDeleteLimitTest extends ServerTestCase
                 $this->deletedIn($e->controls()),
             );
         }
+        $this->authenticateUser();
         $remaining = $this->entriesLeft();
         self::assertNotNull($this->ldapClient()->read(self::BASE_DN));
 
+        $response = $this->asAdmin(fn(): ?LdapMessageResponse => $this->deleteSubtree());
+
         self::assertSame(
             $remaining,
-            $this->deletedIn($this->deleteSubtree()?->controls() ?? new ControlBag()),
+            $this->deletedIn($response?->controls() ?? new ControlBag()),
         );
         self::assertNull($this->ldapClient()->read(self::BASE_DN));
     }

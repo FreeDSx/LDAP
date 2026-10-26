@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Schema;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
@@ -67,13 +68,14 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_a_subentry_can_be_added_and_read_back(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('read-back', isAdministrative: true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('read-back', isAdministrative: true);
 
-        $this->ldapClient()->create($this->subentry(
-            'cn=policy,ou=read-back,dc=foo,dc=bar',
-            self::EVERY_COMPONENT,
-        ));
+            $admin->create($this->subentry(
+                'cn=policy,ou=read-back,dc=foo,dc=bar',
+                self::EVERY_COMPONENT,
+            ));
+        });
 
         self::assertSame(
             self::EVERY_COMPONENT,
@@ -83,8 +85,10 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_an_entry_may_carry_the_administrative_role_attribute(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('role-holder', isAdministrative: true);
+        $this->asAdmin(fn(LdapClient $admin) => $this->makeParent(
+            'role-holder',
+            isAdministrative: true,
+        ));
 
         $entries = $this->ldapClient()->search(
             Operations::search(
@@ -142,13 +146,14 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_an_empty_specification_is_accepted(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('empty-spec', isAdministrative: true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('empty-spec', isAdministrative: true);
 
-        $this->ldapClient()->create($this->subentry(
-            'cn=empty,ou=empty-spec,dc=foo,dc=bar',
-            '{ }',
-        ));
+            $admin->create($this->subentry(
+                'cn=empty,ou=empty-spec,dc=foo,dc=bar',
+                '{ }',
+            ));
+        });
 
         self::assertSame(
             '{ }',
@@ -223,13 +228,14 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_a_subentry_whose_class_is_spelled_by_oid_is_stored_by_its_primary_name(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('oid-stored', isAdministrative: true);
-        $this->ldapClient()->create($this->subentry(
-            'cn=policy,ou=oid-stored,dc=foo,dc=bar',
-            '{ }',
-            self::SUBENTRY_OID,
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('oid-stored', isAdministrative: true);
+            $admin->create($this->subentry(
+                'cn=policy,ou=oid-stored,dc=foo,dc=bar',
+                '{ }',
+                self::SUBENTRY_OID,
+            ));
+        });
 
         $entry = $this->ldapClient()->search(
             Operations::search(
@@ -248,13 +254,14 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_a_subentry_whose_class_is_spelled_by_oid_is_hidden_from_a_subtree_search(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('oid-hidden', isAdministrative: true);
-        $this->ldapClient()->create($this->subentry(
-            'cn=policy,ou=oid-hidden,dc=foo,dc=bar',
-            '{ }',
-            self::SUBENTRY_OID,
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('oid-hidden', isAdministrative: true);
+            $admin->create($this->subentry(
+                'cn=policy,ou=oid-hidden,dc=foo,dc=bar',
+                '{ }',
+                self::SUBENTRY_OID,
+            ));
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'))
@@ -273,13 +280,14 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_a_subentry_whose_class_is_spelled_by_oid_is_returned_under_the_subentries_control(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('oid-visible', isAdministrative: true);
-        $this->ldapClient()->create($this->subentry(
-            'cn=policy,ou=oid-visible,dc=foo,dc=bar',
-            '{ }',
-            self::SUBENTRY_OID,
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('oid-visible', isAdministrative: true);
+            $admin->create($this->subentry(
+                'cn=policy,ou=oid-visible,dc=foo,dc=bar',
+                '{ }',
+                self::SUBENTRY_OID,
+            ));
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'))
@@ -302,17 +310,18 @@ final class LdapSubentryTest extends ServerTestCase
      */
     public function test_a_plain_entry_under_a_plain_parent_is_accepted(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('plain-ok', isAdministrative: false);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('plain-ok', isAdministrative: false);
 
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=plain-child,ou=plain-ok,dc=foo,dc=bar',
-            [
-                'cn' => 'plain-child',
-                'sn' => 'Child',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
+            $admin->create(Entry::fromArray(
+                'cn=plain-child,ou=plain-ok,dc=foo,dc=bar',
+                [
+                    'cn' => 'plain-child',
+                    'sn' => 'Child',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+        });
 
         self::assertNotNull($this->ldapClient()->read('cn=plain-child,ou=plain-ok,dc=foo,dc=bar'));
     }
@@ -338,18 +347,19 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_moving_a_subentry_under_an_administrative_point_is_accepted(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('move-src', isAdministrative: true);
-        $this->makeParent('move-dst', isAdministrative: true);
-        $this->ldapClient()->create($this->subentry(
-            'cn=good-mover,ou=move-src,dc=foo,dc=bar',
-            '{ }',
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('move-src', isAdministrative: true);
+            $this->makeParent('move-dst', isAdministrative: true);
+            $admin->create($this->subentry(
+                'cn=good-mover,ou=move-src,dc=foo,dc=bar',
+                '{ }',
+            ));
 
-        $this->ldapClient()->move(
-            'cn=good-mover,ou=move-src,dc=foo,dc=bar',
-            'ou=move-dst,dc=foo,dc=bar',
-        );
+            $admin->move(
+                'cn=good-mover,ou=move-src,dc=foo,dc=bar',
+                'ou=move-dst,dc=foo,dc=bar',
+            );
+        });
 
         self::assertNotNull($this->ldapClient()->read('cn=good-mover,ou=move-dst,dc=foo,dc=bar'));
     }
@@ -377,13 +387,14 @@ final class LdapSubentryTest extends ServerTestCase
 
     public function test_removing_the_administrative_role_with_no_subentries_is_accepted(): void
     {
-        $this->authenticateAdmin();
-        $this->makeParent('empty-area', isAdministrative: true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $this->makeParent('empty-area', isAdministrative: true);
 
-        $this->ldapClient()->update(
-            Entry::fromArray('ou=empty-area,dc=foo,dc=bar')
-                ->reset(AttributeTypeOid::NAME_ADMINISTRATIVE_ROLE),
-        );
+            $admin->update(
+                Entry::fromArray('ou=empty-area,dc=foo,dc=bar')
+                    ->reset(AttributeTypeOid::NAME_ADMINISTRATIVE_ROLE),
+            );
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(
