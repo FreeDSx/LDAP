@@ -328,6 +328,34 @@ final class FilterEvaluatorTest extends TestCase
         );
     }
 
+    #[DataProvider('unknownDescriptorFilterProvider')]
+    public function test_a_negated_item_naming_an_unknown_descriptor_stays_undefined(FilterInterface $filter): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            Filters::not($filter),
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{FilterInterface}>
+     */
+    public static function unknownDescriptorFilterProvider(): iterable
+    {
+        yield 'equality' => [
+            Filters::equal(
+                'objectClass',
+                'bogusClass',
+            ),
+        ];
+        yield 'approximate' => [
+            Filters::approximate(
+                'objectClass',
+                'bogusClass',
+            ),
+        ];
+    }
+
     public function test_and_returns_true_when_all_match(): void
     {
         $filter = Filters::and(
