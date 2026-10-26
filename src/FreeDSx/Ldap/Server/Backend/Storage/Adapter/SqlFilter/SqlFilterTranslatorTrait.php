@@ -243,6 +243,7 @@ trait SqlFilterTranslatorTrait
             ? ''
             : " AND $target";
 
+        // Note: The correlated form names the outer table
         return new SqlFilterResult(
             <<<SQL
                 entry_id IN (
@@ -257,7 +258,7 @@ trait SqlFilterTranslatorTrait
                     SELECT 1
                     FROM entry_attribute_links l
                     $join
-                    WHERE $selected = entry_id
+                    WHERE $selected = entries.entry_id
                       AND l.attr_name_lower = '$attribute'$match)
                 SQL,
         );

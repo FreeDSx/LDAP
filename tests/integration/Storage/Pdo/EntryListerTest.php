@@ -361,6 +361,44 @@ final class EntryListerTest extends TestCase
         );
     }
 
+    public function test_a_one_level_list_matches_a_linked_attribute(): void
+    {
+        $this->groupOf(
+            'Admins',
+            1,
+        );
+
+        self::assertSame(
+            ['cn=Admins,dc=example,dc=com'],
+            $this->dns($this->matching(
+                Filters::equal(
+                    'member',
+                    'cn=Admins0,dc=example,dc=com',
+                ),
+                subtree: false,
+            )),
+        );
+    }
+
+    public function test_a_one_level_list_matches_a_backlink(): void
+    {
+        $this->groupOf(
+            'Admins',
+            1,
+        );
+
+        self::assertSame(
+            ['cn=Admins0,dc=example,dc=com'],
+            $this->dns($this->matching(
+                Filters::equal(
+                    'memberOf',
+                    'cn=Admins,dc=example,dc=com',
+                ),
+                subtree: false,
+            )),
+        );
+    }
+
     public function test_a_linked_attribute_matches_nothing_for_an_assertion_that_is_not_a_dn(): void
     {
         $this->groupOf('Admins', 1);
@@ -405,12 +443,14 @@ final class EntryListerTest extends TestCase
         )));
     }
 
-    private function matching(FilterInterface $filter): StorageListOptions
-    {
+    private function matching(
+        FilterInterface $filter,
+        bool $subtree = true,
+    ): StorageListOptions {
         return new StorageListOptions(
             scope: new ListScope(
                 baseDn: new Dn(self::BASE),
-                subtree: true,
+                subtree: $subtree,
             ),
             filter: $filter,
         );

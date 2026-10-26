@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -162,6 +163,38 @@ trait BacklinkAttributeTestsTrait
         self::assertSame(
             [$member],
             $this->searchDns(Filters::equal('memberOf', strtoupper($group))),
+        );
+    }
+
+    public function testAOneLevelSearchFindsTheMembersOfAGroup(): void
+    {
+        [$member, $group] = $this->seedBacklinkPair('backlink-one-level');
+
+        self::assertSame(
+            [$member],
+            $this->searchDns(
+                Filters::equal(
+                    'memberOf',
+                    $group,
+                ),
+                SearchRequest::SCOPE_SINGLE_LEVEL,
+            ),
+        );
+    }
+
+    public function testAOneLevelSearchFindsTheGroupsHoldingAMember(): void
+    {
+        [$member, $group] = $this->seedBacklinkPair('backlink-one-level-member');
+
+        self::assertSame(
+            [$group],
+            $this->searchDns(
+                Filters::equal(
+                    'member',
+                    $member,
+                ),
+                SearchRequest::SCOPE_SINGLE_LEVEL,
+            ),
         );
     }
 
@@ -353,13 +386,15 @@ trait BacklinkAttributeTestsTrait
     /**
      * @return list<string>
      */
-    private function searchDns(FilterInterface $filter): array
-    {
+    private function searchDns(
+        FilterInterface $filter,
+        int $scope = SearchRequest::SCOPE_WHOLE_SUBTREE,
+    ): array {
         $found = [];
         $entries = $this->ldapClient()->search(
             Operations::search($filter, 'cn')
                 ->base('dc=foo,dc=bar')
-                ->useSubtreeScope(),
+                ->setScope($scope),
         );
 
         foreach ($entries as $entry) {

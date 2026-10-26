@@ -1320,6 +1320,20 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
+    public function test_a_linked_leaf_correlates_its_owner_with_the_outer_entry(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'member',
+            'cn=alice,dc=foo,dc=bar',
+        ));
+
+        self::assertNotNull($result?->correlatedSql);
+        self::assertStringContainsString(
+            'l.owner_entry_id = entries.entry_id',
+            $result->correlatedSql,
+        );
+    }
+
     public function test_a_backlink_leaf_correlates_on_the_end_it_selects(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
@@ -1329,7 +1343,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result?->correlatedSql);
         self::assertStringContainsString(
-            'l.target_entry_id = entry_id',
+            'l.target_entry_id = entries.entry_id',
             $result->correlatedSql,
         );
     }
