@@ -166,6 +166,19 @@ trait BacklinkAttributeTestsTrait
         );
     }
 
+    public function testAnApproximateSearchFindsTheMembersOfAGroup(): void
+    {
+        [$member, $group] = $this->seedBacklinkPair('backlink-approximate');
+
+        self::assertSame(
+            [$member],
+            $this->searchDns(Filters::approximate(
+                'memberOf',
+                $group,
+            )),
+        );
+    }
+
     public function testAOneLevelSearchFindsTheMembersOfAGroup(): void
     {
         [$member, $group] = $this->seedBacklinkPair('backlink-one-level');
