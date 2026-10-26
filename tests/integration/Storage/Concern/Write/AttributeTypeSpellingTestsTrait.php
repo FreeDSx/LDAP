@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -28,11 +29,10 @@ trait AttributeTypeSpellingTestsTrait
 {
     public function testAnAddSpelledWithAliasesIsStoredUnderThePrimaryNames(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'commonName=Alias Spelled,dc=foo,dc=bar',
             ['commonName' => 'Alias Spelled', 'surname' => 'Alias', 'objectClass' => 'inetOrgPerson'],
-        ));
+        )));
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn', 'sn')
@@ -55,7 +55,7 @@ trait AttributeTypeSpellingTestsTrait
             $descriptions,
         );
 
-        $this->ldapClient()->delete('2.5.4.3=Alias Spelled,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('2.5.4.3=Alias Spelled,dc=foo,dc=bar'));
         self::assertNull($this->ldapClient()->read('cn=Alias Spelled,dc=foo,dc=bar'));
     }
 
@@ -85,17 +85,21 @@ trait AttributeTypeSpellingTestsTrait
 
     public function testModifyAndRenameReachAnEntryThroughAnAliasSpelledDn(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=Reach Me,dc=foo,dc=bar',
-            ['cn' => 'Reach Me', 'sn' => 'Reach', 'objectClass' => 'inetOrgPerson'],
-        ));
-
-        $this->ldapClient()->send(Operations::modify(
-            'commonName=Reach Me,dc=foo,dc=bar',
-            Change::replace(new Attribute('surname', 'Reached')),
-        ));
-        $this->ldapClient()->rename('commonName=Reach Me,dc=foo,dc=bar', 'commonName=Reached', true);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=Reach Me,dc=foo,dc=bar',
+                ['cn' => 'Reach Me', 'sn' => 'Reach', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->send(Operations::modify(
+                'commonName=Reach Me,dc=foo,dc=bar',
+                Change::replace(new Attribute('surname', 'Reached')),
+            ));
+            $admin->rename(
+                'commonName=Reach Me,dc=foo,dc=bar',
+                'commonName=Reached',
+                true,
+            );
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'cn', 'sn')
@@ -113,7 +117,7 @@ trait AttributeTypeSpellingTestsTrait
             $found->get('sn')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=Reached,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=Reached,dc=foo,dc=bar'));
     }
 
     public function testAFilterNamingAnAttributeByAnAliasMatchesItsValues(): void

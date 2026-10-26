@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 
@@ -31,10 +32,10 @@ trait LinkedReferenceTestsTrait
     {
         $group = $this->seedGroup('link-spelling');
 
-        $this->ldapClient()->send(Operations::modify(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->send(Operations::modify(
             $group,
             Change::add('member', 'CN=Admin,  DC=Foo,DC=Bar'),
-        ));
+        )));
 
         self::assertEqualsCanonicalizing(
             [self::LINKED_USER, self::LINKED_ADMIN],
@@ -45,6 +46,7 @@ trait LinkedReferenceTestsTrait
     public function testAMemberNamingAnEntryThatIsNotStoredIsRefused(): void
     {
         $group = $this->seedGroup('link-missing');
+        $this->authenticateAdmin();
 
         $this->expectOperationCode(ResultCode::CONSTRAINT_VIOLATION);
 
@@ -59,7 +61,7 @@ trait LinkedReferenceTestsTrait
         $member = $this->seedReferencedMember('link-deleted-member');
         $group = $this->seedGroup('link-member-deleted', $member);
 
-        $this->ldapClient()->delete($member);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($member));
 
         self::assertSame(
             [self::LINKED_USER],
@@ -73,7 +75,10 @@ trait LinkedReferenceTestsTrait
         $group = $this->seedGroup('link-member-renamed', $member);
         $before = $this->modifyTimestampOf($group);
 
-        $this->ldapClient()->rename($member, 'cn=link-renamed-after');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->rename(
+            $member,
+            'cn=link-renamed-after',
+        ));
 
         self::assertEqualsCanonicalizing(
             [self::LINKED_USER, 'cn=link-renamed-after,dc=foo,dc=bar'],
@@ -96,17 +101,16 @@ trait LinkedReferenceTestsTrait
 
     private function seedReferencedMember(string $cn): string
     {
-        $this->authenticateAdmin();
         $dn = "cn={$cn},dc=foo,dc=bar";
 
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             $dn,
             [
                 'cn' => $cn,
                 'objectClass' => 'inetOrgPerson',
                 'sn' => $cn,
             ],
-        ));
+        )));
 
         return $dn;
     }

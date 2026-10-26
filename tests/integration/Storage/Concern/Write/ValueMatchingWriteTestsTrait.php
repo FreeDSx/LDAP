@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -28,15 +29,14 @@ trait ValueMatchingWriteTestsTrait
 {
     public function testAddAcceptsAUniqueMemberCarryingAnIdentifier(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=uidgroup,dc=foo,dc=bar',
             [
                 'cn' => 'uidgroup',
                 'uniqueMember' => "cn=user,dc=foo,dc=bar#'0101'B",
                 'objectClass' => 'groupOfUniqueNames',
             ],
-        ));
+        )));
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'uniqueMember')
@@ -48,7 +48,7 @@ trait ValueMatchingWriteTestsTrait
             $found->first()?->get('uniqueMember')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=uidgroup,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=uidgroup,dc=foo,dc=bar'));
     }
 
     public function testAddRejectsAUniqueMemberWhoseNameIsNotADn(): void
@@ -73,15 +73,14 @@ trait ValueMatchingWriteTestsTrait
      */
     public function testAddAcceptsAUniqueMemberWhoseTailIsNotABitString(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=notabitstring,dc=foo,dc=bar',
             [
                 'cn' => 'notabitstring',
                 'uniqueMember' => "cn=user,dc=foo,dc=bar#'0102'B",
                 'objectClass' => 'groupOfUniqueNames',
             ],
-        ));
+        )));
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'uniqueMember')
@@ -93,20 +92,19 @@ trait ValueMatchingWriteTestsTrait
             $found->first()?->get('uniqueMember')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=notabitstring,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=notabitstring,dc=foo,dc=bar'));
     }
 
     public function testUniqueMemberMatchesOnTheNameAndTheIdentifierTogether(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=uidmatch,dc=foo,dc=bar',
             [
                 'cn' => 'uidmatch',
                 'uniqueMember' => "cn=user,dc=foo,dc=bar#'0101'B",
                 'objectClass' => 'groupOfUniqueNames',
             ],
-        ));
+        )));
 
         $matches = fn(string $assertion): int => count($this->ldapClient()->search(
             Operations::search(Filters::equal('uniqueMember', $assertion))
@@ -128,26 +126,26 @@ trait ValueMatchingWriteTestsTrait
             $matches("cn=user,dc=foo,dc=bar#'1111'B"),
         );
 
-        $this->ldapClient()->delete('cn=uidmatch,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=uidmatch,dc=foo,dc=bar'));
     }
 
     public function testModifyAddOfACaseVariantOnACaseExactAttributeIsANewValue(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=exactadd,dc=foo,dc=bar',
-            [
-                'cn' => 'exactadd',
-                'sn' => 'Exact',
-                'labeledURI' => 'http://Example.COM/A',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-
-        $this->ldapClient()->send(Operations::modify(
-            'cn=exactadd,dc=foo,dc=bar',
-            Change::add(new Attribute('labeledURI', 'http://example.com/a')),
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=exactadd,dc=foo,dc=bar',
+                [
+                    'cn' => 'exactadd',
+                    'sn' => 'Exact',
+                    'labeledURI' => 'http://Example.COM/A',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->send(Operations::modify(
+                'cn=exactadd,dc=foo,dc=bar',
+                Change::add(new Attribute('labeledURI', 'http://example.com/a')),
+            ));
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'labeledURI')
@@ -159,7 +157,7 @@ trait ValueMatchingWriteTestsTrait
             $found->first()?->get('labeledURI')?->getValues() ?? [],
         );
 
-        $this->ldapClient()->delete('cn=exactadd,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=exactadd,dc=foo,dc=bar'));
     }
 
     public function testModifyDeleteOfACaseVariantOnACaseExactAttributeIsRefused(): void
@@ -187,6 +185,7 @@ trait ValueMatchingWriteTestsTrait
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'labeledURI')
@@ -198,26 +197,26 @@ trait ValueMatchingWriteTestsTrait
             $found->first()?->get('labeledURI')?->getValues(),
         );
 
-        $this->ldapClient()->delete('cn=exactdel,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=exactdel,dc=foo,dc=bar'));
     }
 
     public function testModifyDeleteOfACaseVariantOnACaseIgnoreAttributeSucceeds(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=ignoredel,dc=foo,dc=bar',
-            [
-                'cn' => 'ignoredel',
-                'sn' => 'Ignore',
-                'description' => 'Hello World',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-
-        $this->ldapClient()->send(Operations::modify(
-            'cn=ignoredel,dc=foo,dc=bar',
-            Change::delete(new Attribute('description', 'hello world')),
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=ignoredel,dc=foo,dc=bar',
+                [
+                    'cn' => 'ignoredel',
+                    'sn' => 'Ignore',
+                    'description' => 'Hello World',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->send(Operations::modify(
+                'cn=ignoredel,dc=foo,dc=bar',
+                Change::delete(new Attribute('description', 'hello world')),
+            ));
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'description')
@@ -226,27 +225,27 @@ trait ValueMatchingWriteTestsTrait
         );
         self::assertNull($found->first()?->get('description'));
 
-        $this->ldapClient()->delete('cn=ignoredel,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=ignoredel,dc=foo,dc=bar'));
     }
 
     public function testModifyDeleteFoldsInsignificantSpaceOnACaseIgnoreAttribute(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=spacedel,dc=foo,dc=bar',
-            [
-                'cn' => 'spacedel',
-                'sn' => 'Space',
-                'description' => 'Hello World',
-                'objectClass' => 'inetOrgPerson',
-            ],
-        ));
-
-        // RFC 4518 §2.6.1 folds inner whitespace, so the doubled space names the stored value.
-        $this->ldapClient()->send(Operations::modify(
-            'cn=spacedel,dc=foo,dc=bar',
-            Change::delete(new Attribute('description', 'Hello  World')),
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=spacedel,dc=foo,dc=bar',
+                [
+                    'cn' => 'spacedel',
+                    'sn' => 'Space',
+                    'description' => 'Hello World',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            // RFC 4518 §2.6.1 folds inner whitespace, so the doubled space names the stored value.
+            $admin->send(Operations::modify(
+                'cn=spacedel,dc=foo,dc=bar',
+                Change::delete(new Attribute('description', 'Hello  World')),
+            ));
+        });
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'), 'description')
@@ -255,6 +254,6 @@ trait ValueMatchingWriteTestsTrait
         );
         self::assertNull($found->first()?->get('description'));
 
-        $this->ldapClient()->delete('cn=spacedel,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=spacedel,dc=foo,dc=bar'));
     }
 }

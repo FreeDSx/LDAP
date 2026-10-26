@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Schema;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -56,10 +57,8 @@ final class LdapSchemaValidationTest extends ServerTestCase
 
     public function test_lenient_mode_allows_add_with_disallowed_attribute(): void
     {
-        $this->authenticateAdmin();
-
         // 'mail' is not permitted by the 'person' object class; rejected under Strict.
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=drift-add,dc=foo,dc=bar',
             [
                 'cn' => 'drift-add',
@@ -67,7 +66,7 @@ final class LdapSchemaValidationTest extends ServerTestCase
                 'objectClass' => 'person',
                 'mail' => 'drift-add@foo.bar',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'drift-add'))
@@ -84,21 +83,21 @@ final class LdapSchemaValidationTest extends ServerTestCase
 
     public function test_lenient_mode_allows_modify_into_violating_state(): void
     {
-        $this->authenticateAdmin();
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=drift-modify,dc=foo,dc=bar',
+                [
+                    'cn' => 'drift-modify',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                ],
+            ));
 
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=drift-modify,dc=foo,dc=bar',
-            [
-                'cn' => 'drift-modify',
-                'sn' => 'Drift',
-                'objectClass' => 'person',
-            ],
-        ));
-
-        // Adding 'mail' makes the merged entry violate the 'person' object class; rejected under Strict.
-        $entry = Entry::fromArray('cn=drift-modify,dc=foo,dc=bar');
-        $entry->set('mail', 'drift-modify@foo.bar');
-        $this->ldapClient()->update($entry);
+            // Adding 'mail' makes the merged entry violate the 'person' object class; rejected under Strict.
+            $entry = Entry::fromArray('cn=drift-modify,dc=foo,dc=bar');
+            $entry->set('mail', 'drift-modify@foo.bar');
+            $admin->update($entry);
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'drift-modify'))

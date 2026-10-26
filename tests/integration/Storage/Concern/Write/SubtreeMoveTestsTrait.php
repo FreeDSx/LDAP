@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -27,10 +28,9 @@ trait SubtreeMoveTestsTrait
 {
     public function testRenameMovesTheSubordinatesOfTheEntry(): void
     {
-        $this->authenticateAdmin();
         $this->seedSubtreeToMove();
 
-        $this->ldapClient()->rename('ou=dept,dc=foo,dc=bar', 'ou=division', true);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->rename('ou=dept,dc=foo,dc=bar', 'ou=division', true));
 
         self::assertSame(
             [
@@ -46,17 +46,16 @@ trait SubtreeMoveTestsTrait
 
     public function testRenamingASubtreeWithMultibyteDnsRekeysEveryDescendant(): void
     {
-        $this->authenticateAdmin();
-        $client = $this->ldapClient();
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray('ou=café,dc=foo,dc=bar', ['ou' => 'café', 'objectClass' => 'organizationalUnit']));
+            $admin->create(Entry::fromArray('ou=münchen,ou=café,dc=foo,dc=bar', ['ou' => 'münchen', 'objectClass' => 'organizationalUnit']));
+            $admin->create(Entry::fromArray(
+                'cn=josé,ou=münchen,ou=café,dc=foo,dc=bar',
+                ['cn' => 'josé', 'sn' => 'Ortiz', 'objectClass' => 'inetOrgPerson'],
+            ));
 
-        $client->create(Entry::fromArray('ou=café,dc=foo,dc=bar', ['ou' => 'café', 'objectClass' => 'organizationalUnit']));
-        $client->create(Entry::fromArray('ou=münchen,ou=café,dc=foo,dc=bar', ['ou' => 'münchen', 'objectClass' => 'organizationalUnit']));
-        $client->create(Entry::fromArray(
-            'cn=josé,ou=münchen,ou=café,dc=foo,dc=bar',
-            ['cn' => 'josé', 'sn' => 'Ortiz', 'objectClass' => 'inetOrgPerson'],
-        ));
-
-        $client->rename('ou=café,dc=foo,dc=bar', 'ou=zürich', true);
+            $admin->rename('ou=café,dc=foo,dc=bar', 'ou=zürich', true);
+        });
 
         self::assertSame(
             [
@@ -72,10 +71,9 @@ trait SubtreeMoveTestsTrait
 
     public function testRenameLeavesNothingBehindAtTheOldSubtree(): void
     {
-        $this->authenticateAdmin();
         $this->seedSubtreeToMove();
 
-        $this->ldapClient()->rename('ou=dept,dc=foo,dc=bar', 'ou=division', true);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->rename('ou=dept,dc=foo,dc=bar', 'ou=division', true));
 
         self::assertCount(
             0,
@@ -91,10 +89,9 @@ trait SubtreeMoveTestsTrait
 
     public function testMoveRelocatesTheEntryAndItsSubordinatesUnderANewSuperior(): void
     {
-        $this->authenticateAdmin();
         $this->seedSubtreeToMove();
 
-        $this->ldapClient()->move('ou=dept,dc=foo,dc=bar', 'ou=people,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->move('ou=dept,dc=foo,dc=bar', 'ou=people,dc=foo,dc=bar'));
 
         self::assertSame(
             [
@@ -110,10 +107,9 @@ trait SubtreeMoveTestsTrait
 
     public function testMovedSubordinatesAreStillFoundByAnIndexedFilter(): void
     {
-        $this->authenticateAdmin();
         $this->seedSubtreeToMove();
 
-        $this->ldapClient()->rename('ou=dept,dc=foo,dc=bar', 'ou=division', true);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->rename('ou=dept,dc=foo,dc=bar', 'ou=division', true));
 
         $found = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'deep'))
@@ -130,8 +126,8 @@ trait SubtreeMoveTestsTrait
 
     public function testMoveIntoItsOwnSubtreeIsRefused(): void
     {
-        $this->authenticateAdmin();
         $this->seedSubtreeToMove();
+        $this->authenticateAdmin();
 
         try {
             $this->ldapClient()->move('ou=dept,dc=foo,dc=bar', 'cn=lead,ou=dept,dc=foo,dc=bar');
@@ -148,7 +144,6 @@ trait SubtreeMoveTestsTrait
 
     public function testRenamingASubtreeIsRefusedForANormalUser(): void
     {
-        $this->authenticateAdmin();
         $this->seedSubtreeToMove();
 
         $this->authenticateUser();
@@ -163,7 +158,6 @@ trait SubtreeMoveTestsTrait
             );
         }
 
-        $this->authenticateAdmin();
         self::assertSame(
             [
                 'cn=deep,cn=lead,ou=dept,dc=foo,dc=bar',
@@ -178,7 +172,6 @@ trait SubtreeMoveTestsTrait
 
     public function testAnIdentityGrantedModifyDnCanRenameASubtree(): void
     {
-        $this->authenticateAdmin();
         $this->seedMover();
         $this->seedSubtreeToMove();
 
@@ -194,14 +187,12 @@ trait SubtreeMoveTestsTrait
             $this->dnsUnder('ou=division,dc=foo,dc=bar'),
         );
 
-        $this->authenticateAdmin();
         $this->deleteSubtree('ou=division,dc=foo,dc=bar');
-        $this->ldapClient()->delete(LdapBackendStorageCommand::MOVER_DN);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete(LdapBackendStorageCommand::MOVER_DN));
     }
 
     public function testRenamingInPlaceIsAllowedInsideAPinnedContainer(): void
     {
-        $this->authenticateAdmin();
         $this->seedMover();
         $this->seedPinnedContainer();
 
@@ -216,13 +207,11 @@ trait SubtreeMoveTestsTrait
             $this->dnsUnder(LdapBackendStorageCommand::PINNED_CONTAINER_DN),
         );
 
-        $this->authenticateAdmin();
         $this->cleanUpRelocationFixtures();
     }
 
     public function testMovingOutOfAPinnedContainerIsRefused(): void
     {
-        $this->authenticateAdmin();
         $this->seedMover();
         $this->seedPinnedContainer();
 
@@ -238,7 +227,7 @@ trait SubtreeMoveTestsTrait
             );
         }
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNotNull($this->ldapClient()->read('cn=held,ou=pinned,dc=foo,dc=bar'));
 
         $this->cleanUpRelocationFixtures();
@@ -246,13 +235,12 @@ trait SubtreeMoveTestsTrait
 
     public function testMovingThePinnedContainerItselfIsRefused(): void
     {
-        $this->authenticateAdmin();
         $this->seedMover();
         $this->seedPinnedContainer();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'ou=elsewhere,dc=foo,dc=bar',
             ['ou' => 'elsewhere', 'objectClass' => 'organizationalUnit'],
-        ));
+        )));
 
         $this->authenticateMover();
 
@@ -269,50 +257,54 @@ trait SubtreeMoveTestsTrait
             );
         }
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNotNull($this->ldapClient()->read('cn=held,ou=pinned,dc=foo,dc=bar'));
 
-        $this->ldapClient()->delete('ou=elsewhere,dc=foo,dc=bar');
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('ou=elsewhere,dc=foo,dc=bar'));
         $this->cleanUpRelocationFixtures();
     }
 
     public function testMovingAnUnguardedContainerIsAllowed(): void
     {
-        $this->authenticateAdmin();
         $this->seedMover();
-        $this->ldapClient()->create(Entry::fromArray(
-            'ou=loosecontainer,dc=foo,dc=bar',
-            ['ou' => 'loosecontainer', 'objectClass' => 'organizationalUnit'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            'ou=elsewhere,dc=foo,dc=bar',
-            ['ou' => 'elsewhere', 'objectClass' => 'organizationalUnit'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'ou=loosecontainer,dc=foo,dc=bar',
+                ['ou' => 'loosecontainer', 'objectClass' => 'organizationalUnit'],
+            ));
+            $admin->create(Entry::fromArray(
+                'ou=elsewhere,dc=foo,dc=bar',
+                ['ou' => 'elsewhere', 'objectClass' => 'organizationalUnit'],
+            ));
+        });
 
         $this->authenticateMover();
         $this->ldapClient()->move('ou=loosecontainer,dc=foo,dc=bar', 'ou=elsewhere,dc=foo,dc=bar');
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNotNull($this->ldapClient()->read('ou=loosecontainer,ou=elsewhere,dc=foo,dc=bar'));
 
-        $this->ldapClient()->delete('ou=loosecontainer,ou=elsewhere,dc=foo,dc=bar');
-        $this->ldapClient()->delete('ou=elsewhere,dc=foo,dc=bar');
-        $this->ldapClient()->delete(LdapBackendStorageCommand::MOVER_DN);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->delete('ou=loosecontainer,ou=elsewhere,dc=foo,dc=bar');
+            $admin->delete('ou=elsewhere,dc=foo,dc=bar');
+            $admin->delete(LdapBackendStorageCommand::MOVER_DN);
+        });
     }
 
     public function testMovingIntoASealedContainerIsRefused(): void
     {
-        $this->authenticateAdmin();
         $this->seedMover();
         $this->seedPinnedContainer();
-        $this->ldapClient()->create(Entry::fromArray(
-            LdapBackendStorageCommand::SEALED_CONTAINER_DN,
-            ['ou' => 'sealed', 'objectClass' => 'organizationalUnit'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=loose,dc=foo,dc=bar',
-            ['cn' => 'loose', 'sn' => 'Loose', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                LdapBackendStorageCommand::SEALED_CONTAINER_DN,
+                ['ou' => 'sealed', 'objectClass' => 'organizationalUnit'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=loose,dc=foo,dc=bar',
+                ['cn' => 'loose', 'sn' => 'Loose', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
 
         $this->authenticateMover();
 
@@ -326,11 +318,13 @@ trait SubtreeMoveTestsTrait
             );
         }
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNotNull($this->ldapClient()->read('cn=loose,dc=foo,dc=bar'));
 
-        $this->ldapClient()->delete('cn=loose,dc=foo,dc=bar');
-        $this->ldapClient()->delete(LdapBackendStorageCommand::SEALED_CONTAINER_DN);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->delete('cn=loose,dc=foo,dc=bar');
+            $admin->delete(LdapBackendStorageCommand::SEALED_CONTAINER_DN);
+        });
         $this->cleanUpRelocationFixtures();
     }
 
@@ -339,7 +333,7 @@ trait SubtreeMoveTestsTrait
      */
     private function seedMover(): void
     {
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             LdapBackendStorageCommand::MOVER_DN,
             [
                 'cn' => 'mover',
@@ -347,7 +341,7 @@ trait SubtreeMoveTestsTrait
                 'userPassword' => LdapBackendStorageCommand::MOVER_PASSWORD,
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
     }
 
     private function authenticateMover(): void
@@ -363,20 +357,22 @@ trait SubtreeMoveTestsTrait
      */
     private function seedPinnedContainer(): void
     {
-        $this->ldapClient()->create(Entry::fromArray(
-            LdapBackendStorageCommand::PINNED_CONTAINER_DN,
-            ['ou' => 'pinned', 'objectClass' => 'organizationalUnit'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=held,ou=pinned,dc=foo,dc=bar',
-            ['cn' => 'held', 'sn' => 'Held', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                LdapBackendStorageCommand::PINNED_CONTAINER_DN,
+                ['ou' => 'pinned', 'objectClass' => 'organizationalUnit'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=held,ou=pinned,dc=foo,dc=bar',
+                ['cn' => 'held', 'sn' => 'Held', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
     }
 
     private function cleanUpRelocationFixtures(): void
     {
         $this->deleteSubtree(LdapBackendStorageCommand::PINNED_CONTAINER_DN);
-        $this->ldapClient()->delete(LdapBackendStorageCommand::MOVER_DN);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete(LdapBackendStorageCommand::MOVER_DN));
     }
 
     /**
@@ -384,18 +380,20 @@ trait SubtreeMoveTestsTrait
      */
     private function seedSubtreeToMove(): void
     {
-        $this->ldapClient()->create(Entry::fromArray(
-            'ou=dept,dc=foo,dc=bar',
-            ['ou' => 'dept', 'objectClass' => 'organizationalUnit'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=lead,ou=dept,dc=foo,dc=bar',
-            ['cn' => 'lead', 'sn' => 'Lead', 'objectClass' => 'inetOrgPerson'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            'cn=deep,cn=lead,ou=dept,dc=foo,dc=bar',
-            ['cn' => 'deep', 'sn' => 'Deep', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'ou=dept,dc=foo,dc=bar',
+                ['ou' => 'dept', 'objectClass' => 'organizationalUnit'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=lead,ou=dept,dc=foo,dc=bar',
+                ['cn' => 'lead', 'sn' => 'Lead', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=deep,cn=lead,ou=dept,dc=foo,dc=bar',
+                ['cn' => 'deep', 'sn' => 'Deep', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
     }
 
     /**
@@ -422,14 +420,16 @@ trait SubtreeMoveTestsTrait
      */
     private function deleteSubtree(string $baseDn): void
     {
-        $dns = $this->dnsUnder($baseDn);
-        usort(
-            $dns,
-            static fn(string $a, string $b): int => substr_count($b, ',') <=> substr_count($a, ','),
-        );
+        $this->asAdmin(function (LdapClient $admin) use ($baseDn): void {
+            $dns = $this->dnsUnder($baseDn);
+            usort(
+                $dns,
+                static fn(string $a, string $b): int => substr_count($b, ',') <=> substr_count($a, ','),
+            );
 
-        foreach ($dns as $dn) {
-            $this->ldapClient()->delete($dn);
-        }
+            foreach ($dns as $dn) {
+                $admin->delete($dn);
+            }
+        });
     }
 }

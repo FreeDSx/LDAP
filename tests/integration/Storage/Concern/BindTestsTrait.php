@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 
@@ -71,7 +72,7 @@ trait BindTestsTrait
                 'crypt-user',
             ));
         } finally {
-            $this->deleteAsAdmin($dn);
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
         }
     }
 
@@ -105,7 +106,7 @@ trait BindTestsTrait
                 ],
             );
         } finally {
-            $this->deleteAsAdmin($dn);
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
         }
     }
 
@@ -164,8 +165,7 @@ trait BindTestsTrait
             'cn=%s,dc=foo,dc=bar',
             $cn,
         );
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             $dn,
             [
                 'cn' => $cn,
@@ -173,7 +173,7 @@ trait BindTestsTrait
                 'objectClass' => 'inetOrgPerson',
                 'userPassword' => $userPassword,
             ],
-        ));
+        )));
 
         return $dn;
     }
@@ -192,11 +192,5 @@ trait BindTestsTrait
         }
 
         return ResultCode::SUCCESS;
-    }
-
-    private function deleteAsAdmin(string $dn): void
-    {
-        $this->authenticateAdmin();
-        $this->ldapClient()->delete($dn);
     }
 }

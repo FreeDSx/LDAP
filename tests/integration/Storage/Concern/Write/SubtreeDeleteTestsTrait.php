@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use Tests\Support\FreeDSx\Ldap\LdapBackendStorageCommand;
@@ -27,7 +28,6 @@ trait SubtreeDeleteTestsTrait
 {
     public function testAnIdentityGrantedTheSubtreeDeleteControlRemovesTheSubtree(): void
     {
-        $this->authenticateAdmin();
         $this->seedPruner();
         $this->seedTreeToPrune('prunable');
 
@@ -37,7 +37,7 @@ trait SubtreeDeleteTestsTrait
             Controls::subtreeDelete(),
         );
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         foreach ([
             LdapBackendStorageCommand::PRUNABLE_CONTAINER_DN,
             LdapBackendStorageCommand::PRUNE_GUARDED_DN,
@@ -47,12 +47,11 @@ trait SubtreeDeleteTestsTrait
             self::assertNull($this->ldapClient()->read($dn));
         }
 
-        $this->ldapClient()->delete(LdapBackendStorageCommand::PRUNER_DN);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete(LdapBackendStorageCommand::PRUNER_DN));
     }
 
     public function testTheSubtreeDeleteGrantReachesAnEntryItsHolderCannotDeleteDirectly(): void
     {
-        $this->authenticateAdmin();
         $this->seedPruner();
         $this->seedTreeToPrune('prunable');
 
@@ -73,15 +72,14 @@ trait SubtreeDeleteTestsTrait
             Controls::subtreeDelete(),
         );
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNull($this->ldapClient()->read(LdapBackendStorageCommand::PRUNE_GUARDED_DN));
 
-        $this->ldapClient()->delete(LdapBackendStorageCommand::PRUNER_DN);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete(LdapBackendStorageCommand::PRUNER_DN));
     }
 
     public function testASubtreeDeleteIsRefusedWhereTheControlIsNotGranted(): void
     {
-        $this->authenticateAdmin();
         $this->seedPruner();
         $this->seedTreeToPrune('unprunable');
 
@@ -100,14 +98,16 @@ trait SubtreeDeleteTestsTrait
             );
         }
 
-        $this->authenticateAdmin();
+        $this->authenticateUser();
         self::assertNotNull($this->ldapClient()->read('cn=deep,ou=team,ou=unprunable,dc=foo,dc=bar'));
 
-        $this->ldapClient()->send(
-            Operations::delete('ou=unprunable,dc=foo,dc=bar'),
-            Controls::subtreeDelete(),
-        );
-        $this->ldapClient()->delete(LdapBackendStorageCommand::PRUNER_DN);
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->send(
+                Operations::delete('ou=unprunable,dc=foo,dc=bar'),
+                Controls::subtreeDelete(),
+            );
+            $admin->delete(LdapBackendStorageCommand::PRUNER_DN);
+        });
     }
 
     /**
@@ -115,7 +115,7 @@ trait SubtreeDeleteTestsTrait
      */
     private function seedPruner(): void
     {
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             LdapBackendStorageCommand::PRUNER_DN,
             [
                 'cn' => 'pruner',
@@ -123,7 +123,7 @@ trait SubtreeDeleteTestsTrait
                 'userPassword' => LdapBackendStorageCommand::PRUNER_PASSWORD,
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
     }
 
     private function authenticatePruner(): void
@@ -141,21 +141,23 @@ trait SubtreeDeleteTestsTrait
     {
         $base = "ou={$ou},dc=foo,dc=bar";
 
-        $this->ldapClient()->create(Entry::fromArray(
-            $base,
-            ['ou' => $ou, 'objectClass' => 'organizationalUnit'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            "cn=guarded,{$base}",
-            ['cn' => 'guarded', 'sn' => 'Guarded', 'objectClass' => 'inetOrgPerson'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            "ou=team,{$base}",
-            ['ou' => 'team', 'objectClass' => 'organizationalUnit'],
-        ));
-        $this->ldapClient()->create(Entry::fromArray(
-            "cn=deep,ou=team,{$base}",
-            ['cn' => 'deep', 'sn' => 'Deep', 'objectClass' => 'inetOrgPerson'],
-        ));
+        $this->asAdmin(function (LdapClient $admin) use ($base, $ou): void {
+            $admin->create(Entry::fromArray(
+                $base,
+                ['ou' => $ou, 'objectClass' => 'organizationalUnit'],
+            ));
+            $admin->create(Entry::fromArray(
+                "cn=guarded,{$base}",
+                ['cn' => 'guarded', 'sn' => 'Guarded', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->create(Entry::fromArray(
+                "ou=team,{$base}",
+                ['ou' => 'team', 'objectClass' => 'organizationalUnit'],
+            ));
+            $admin->create(Entry::fromArray(
+                "cn=deep,ou=team,{$base}",
+                ['cn' => 'deep', 'sn' => 'Deep', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
     }
 }

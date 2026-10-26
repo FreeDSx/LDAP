@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -179,6 +180,7 @@ final class ServerControlsTest extends ServerTestCase
                 $e->getCode(),
             );
         }
+        $this->authenticateUser();
 
         self::assertNull($this->ldapClient()->read($dn));
     }
@@ -402,18 +404,19 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_subtree_delete_removes_the_whole_subtree(): void
     {
-        $this->authenticateAdmin();
-        $this->ldapClient()->create(Entry::fromArray('ou=del-tree,dc=foo,dc=bar', [
-            'objectClass' => ['organizationalUnit'],
-            'ou' => ['del-tree'],
-        ]));
-        $this->ldapClient()->create($this->person('cn=c1,ou=del-tree,dc=foo,dc=bar', 'c1'));
-        $this->ldapClient()->create($this->person('cn=c2,ou=del-tree,dc=foo,dc=bar', 'c2'));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray('ou=del-tree,dc=foo,dc=bar', [
+                'objectClass' => ['organizationalUnit'],
+                'ou' => ['del-tree'],
+            ]));
+            $admin->create($this->person('cn=c1,ou=del-tree,dc=foo,dc=bar', 'c1'));
+            $admin->create($this->person('cn=c2,ou=del-tree,dc=foo,dc=bar', 'c2'));
 
-        $this->ldapClient()->send(
-            Operations::delete('ou=del-tree,dc=foo,dc=bar'),
-            Controls::subtreeDelete(),
-        );
+            $admin->send(
+                Operations::delete('ou=del-tree,dc=foo,dc=bar'),
+                Controls::subtreeDelete(),
+            );
+        });
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::present('objectClass'))

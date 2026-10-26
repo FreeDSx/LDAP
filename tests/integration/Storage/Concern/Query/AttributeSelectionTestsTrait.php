@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -336,9 +337,7 @@ trait AttributeSelectionTestsTrait
 
     public function testInexactFilterOnUnrequestedAttributeStillMatchesAndProjects(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=hazard,dc=foo,dc=bar',
             [
                 'cn' => 'hazard',
@@ -346,7 +345,7 @@ trait AttributeSelectionTestsTrait
                 'mail' => 'hazard@foo.bar',
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
 
         // Substring is inexact: SQL yields candidates and PHP re-evaluates (sn) on the hydrated entry, so storage must
         // materialize sn (filter-referenced) even though only cn was requested; projection then drops it.
@@ -372,16 +371,14 @@ trait AttributeSelectionTestsTrait
 
     public function testNoAttributesRequestStillMatchesAnInexactFilter(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=noattr,dc=foo,dc=bar',
             [
                 'cn' => 'noattr',
                 'sn' => 'Jones',
                 'objectClass' => 'inetOrgPerson',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::contains('sn', 'one'))

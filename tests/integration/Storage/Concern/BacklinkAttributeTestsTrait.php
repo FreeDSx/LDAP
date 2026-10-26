@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -100,10 +101,10 @@ trait BacklinkAttributeTestsTrait
     {
         [$member, $group] = $this->seedBacklinkPair('backlink-removed');
 
-        $this->ldapClient()->send(Operations::modify(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->send(Operations::modify(
             $group,
             Change::delete('member', $member),
-        ));
+        )));
 
         self::assertSame(
             [],
@@ -115,7 +116,7 @@ trait BacklinkAttributeTestsTrait
     {
         [$member, $group] = $this->seedBacklinkPair('backlink-deleted');
 
-        $this->ldapClient()->delete($group);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($group));
 
         self::assertSame(
             [],
@@ -327,7 +328,7 @@ trait BacklinkAttributeTestsTrait
 
     public function testASearchForAGroupThatHasNoMembersFindsNothing(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         self::assertSame(
             [],
@@ -337,7 +338,7 @@ trait BacklinkAttributeTestsTrait
 
     public function testASearchForAnAssertionThatIsNotADistinguishedNameFindsNothing(): void
     {
-        $this->authenticateAdmin();
+        $this->authenticateUser();
 
         self::assertSame(
             [],
@@ -368,6 +369,7 @@ trait BacklinkAttributeTestsTrait
     public function testWritingABacklinkIsRefused(): void
     {
         $member = $this->seedBacklinkMember('backlink-written');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
@@ -461,17 +463,16 @@ trait BacklinkAttributeTestsTrait
 
     private function seedBacklinkMember(string $name): string
     {
-        $this->authenticateAdmin();
         $dn = "cn={$name},dc=foo,dc=bar";
 
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             $dn,
             [
                 'cn' => $name,
                 'objectClass' => 'inetOrgPerson',
                 'sn' => $name,
             ],
-        ));
+        )));
 
         return $dn;
     }
@@ -482,14 +483,14 @@ trait BacklinkAttributeTestsTrait
     ): string {
         $dn = "cn={$name}-group,dc=foo,dc=bar";
 
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             $dn,
             [
                 'cn' => "{$name}-group",
                 'objectClass' => 'groupOfNames',
                 'member' => [$member],
             ],
-        ));
+        )));
 
         return $dn;
     }

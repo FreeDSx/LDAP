@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -73,9 +74,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_an_entry_using_a_loaded_object_class_is_accepted(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=loaded-ok,dc=foo,dc=bar',
             [
                 'cn' => 'loaded-ok',
@@ -83,7 +82,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
                 'projectCode' => 'apollo',
                 'projectNotes' => 'from a loaded schema',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'loaded-ok'))
@@ -136,16 +135,14 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_a_loaded_attribute_is_searchable_by_its_matching_rules(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=loaded-search,dc=foo,dc=bar',
             [
                 'cn' => 'loaded-search',
                 'objectClass' => 'projectRecord',
                 'projectCode' => 'Voyager',
             ],
-        ));
+        )));
 
         // The loaded definition declares caseIgnoreMatch and caseIgnoreSubstringsMatch.
         $entries = $this->ldapClient()->search(
@@ -354,16 +351,14 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_the_standard_schema_still_applies_alongside_loaded_definitions(): void
     {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             'cn=loaded-standard,dc=foo,dc=bar',
             [
                 'cn' => 'loaded-standard',
                 'sn' => 'Standard',
                 'objectClass' => 'person',
             ],
-        ));
+        )));
 
         $entries = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'loaded-standard'))
@@ -381,9 +376,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         string $cn,
         array $attributes,
     ): void {
-        $this->authenticateAdmin();
-
-        $this->ldapClient()->create(Entry::fromArray(
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
             "cn={$cn},dc=foo,dc=bar",
             [
                 'cn' => $cn,
@@ -391,7 +384,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
                 'projectCode' => 'Matching',
                 ...$attributes,
             ],
-        ));
+        )));
     }
 
     /**
