@@ -578,6 +578,7 @@ trait BacklinkAttributeTestsTrait
                 'cn' => $name,
                 'objectClass' => 'inetOrgPerson',
                 'sn' => $name,
+                'userPassword' => 'secret',
             ],
         )));
 

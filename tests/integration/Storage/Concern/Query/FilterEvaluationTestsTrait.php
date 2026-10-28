@@ -26,6 +26,18 @@ use PHPUnit\Framework\Attributes\DataProvider;
 trait FilterEvaluationTestsTrait
 {
     /**
+     * RFC 4511 4.5.1.8 and RFC 3673 choose what each matching entry returns, never which entries match.
+     */
+    private const ATTRIBUTE_SELECTIONS = [
+        'no attributes listed' => [],
+        'every user attribute' => ['*'],
+        'no attributes' => [SearchRequest::ATTRIBUTES_NONE],
+        'a named attribute' => ['cn'],
+        'every operational attribute' => ['+'],
+        'every attribute' => ['*', '+'],
+    ];
+
+    /**
      * Each filter choice RFC 4511 4.5.1 defines, and the absolute filters RFC 4526 adds.
      *
      * @return iterable<string, array{FilterInterface, int}>
@@ -937,6 +949,8 @@ trait FilterEvaluationTestsTrait
     #[DataProvider('substringRuleFilterProvider')]
     #[DataProvider('derivedAttributeFilterProvider')]
     #[DataProvider('objectClassFilterProvider')]
+    #[DataProvider('supertypeFilterProvider')]
+    #[DataProvider('linkedAttributeFilterProvider')]
     public function test_filter_evaluation_over_the_wire(
         FilterInterface $filter,
         int $expected,
@@ -955,31 +969,52 @@ trait FilterEvaluationTestsTrait
         );
     }
 
+    #[DataProvider('filterChoiceProvider')]
+    #[DataProvider('negationFilterProvider')]
+    #[DataProvider('attributeDescriptionFilterProvider')]
+    #[DataProvider('extensibleMatchFilterProvider')]
+    #[DataProvider('stringPreparationFilterProvider')]
+    #[DataProvider('matchingRuleFilterProvider')]
+    #[DataProvider('invalidAssertionValueFilterProvider')]
+    #[DataProvider('substringRuleFilterProvider')]
+    #[DataProvider('derivedAttributeFilterProvider')]
+    #[DataProvider('objectClassFilterProvider')]
     #[DataProvider('supertypeFilterProvider')]
-    public function testASupertypeFilterMatchesTheSameEntriesWhateverAttributesAreRequested(FilterInterface $filter): void
-    {
+    #[DataProvider('linkedAttributeFilterProvider')]
+    public function testNeitherTheAttributesRequestedNorTheScopeChangeWhichEntriesMatch(
+        FilterInterface $filter,
+        int $expected,
+    ): void {
         $this->authenticateUser();
-
-        $withEveryAttribute = $this->dnsMatching(
+        $baseline = $this->dnsMatching(
             $filter,
-            '*',
+            SearchRequest::ATTRIBUTES_NONE,
+        );
+        $matched = $this->dnsMatchingEachWay(
+            $filter,
+            'cn=user',
+        );
+        $this->authenticateAdmin();
+        $matched += $this->dnsMatchingEachWay(
+            $filter,
+            'admin',
         );
 
-        self::assertNotSame(
-            [],
-            $withEveryAttribute,
-        );
         self::assertSame(
-            $withEveryAttribute,
-            $this->dnsMatching(
-                $filter,
-                SearchRequest::ATTRIBUTES_NONE,
+            array_fill_keys(
+                array_keys($matched),
+                $baseline,
             ),
+            $matched,
+        );
+        self::assertCount(
+            $expected,
+            $baseline,
         );
     }
 
     /**
-     * @return iterable<string, array{FilterInterface}>
+     * @return iterable<string, array{FilterInterface, int}>
      */
     public static function supertypeFilterProvider(): iterable
     {
@@ -988,24 +1023,115 @@ trait FilterEvaluationTestsTrait
                 'name',
                 'alice',
             ),
+            1,
         ];
         yield 'a substring on a supertype' => [
             Filters::startsWith(
                 'name',
                 'ali',
             ),
+            1,
         ];
         yield 'a negated equality on a supertype' => [
             Filters::not(Filters::equal(
                 'name',
                 'alice',
             )),
+            7,
         ];
+        // The member, seeAlso and roleOccupant subtypes each hold it; uniqueMember declares no supertype.
         yield 'an equality reaching a DN-valued subtype' => [
             Filters::equal(
                 'distinguishedName',
                 'cn=admin,dc=foo,dc=bar',
             ),
+            5,
+        ];
+    }
+
+    /**
+     * Linked values are held apart from the entry, and a back-link is derived from the links naming it.
+     *
+     * @return iterable<string, array{FilterInterface, int}>
+     */
+    public static function linkedAttributeFilterProvider(): iterable
+    {
+        yield 'a linked value' => [
+            Filters::equal(
+                'member',
+                'cn=user,dc=foo,dc=bar',
+            ),
+            2,
+        ];
+        yield 'a linked attribute present' => [
+            Filters::present('member'),
+            3,
+        ];
+        yield 'a negated linked value' => [
+            Filters::not(Filters::equal(
+                'member',
+                'cn=user,dc=foo,dc=bar',
+            )),
+            6,
+        ];
+        yield 'a back-link' => [
+            Filters::equal(
+                'memberOf',
+                'cn=nosn,dc=foo,dc=bar',
+            ),
+            1,
+        ];
+        yield 'a back-link naming a group with an escaped name' => [
+            Filters::equal(
+                'memberOf',
+                'cn=Smith\, John,dc=foo,dc=bar',
+            ),
+            1,
+        ];
+        yield 'a back-link present' => [
+            Filters::present('memberOf'),
+            2,
+        ];
+        yield 'a negated back-link' => [
+            Filters::not(Filters::equal(
+                'memberOf',
+                'cn=admins,dc=foo,dc=bar',
+            )),
+            7,
+        ];
+        yield 'a back-link narrowing a conjunction' => [
+            Filters::and(
+                Filters::equal(
+                    'objectClass',
+                    'inetOrgPerson',
+                ),
+                Filters::equal(
+                    'memberOf',
+                    'cn=admins,dc=foo,dc=bar',
+                ),
+            ),
+            1,
+        ];
+        yield 'a back-link widening a disjunction' => [
+            Filters::or(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'memberOf',
+                    'cn=admins,dc=foo,dc=bar',
+                ),
+            ),
+            2,
+        ];
+        yield 'an extensible match on a back-link' => [
+            Filters::extensible(
+                'memberOf',
+                'cn=Smith\, John,dc=foo,dc=bar',
+                'distinguishedNameMatch',
+            ),
+            1,
         ];
     }
 
@@ -1108,18 +1234,79 @@ trait FilterEvaluationTestsTrait
     }
 
     /**
+     * The DNs the filter matches by a subtree search and by a base read of each entry, under every attribute selection.
+     *
+     * @return array<string, list<string>>
+     */
+    private function dnsMatchingEachWay(
+        FilterInterface $filter,
+        string $identity,
+    ): array {
+        $candidates = $this->dnsMatching(
+            Filters::present('objectClass'),
+            SearchRequest::ATTRIBUTES_NONE,
+        );
+        $matched = [];
+
+        foreach (self::ATTRIBUTE_SELECTIONS as $selection => $attributes) {
+            $matched["{$identity}, subtree search, {$selection}"] = $this->dnsMatching(
+                $filter,
+                ...$attributes,
+            );
+            $matched["{$identity}, base reads, {$selection}"] = $this->dnsMatchingByBaseReads(
+                $filter,
+                $candidates,
+                ...$attributes,
+            );
+        }
+
+        return $matched;
+    }
+
+    /**
+     * @param list<string> $candidates
+     *
+     * @return list<string>
+     */
+    private function dnsMatchingByBaseReads(
+        FilterInterface $filter,
+        array $candidates,
+        string ...$attributes,
+    ): array {
+        $dns = [];
+
+        foreach ($candidates as $dn) {
+            $entry = $this->ldapClient()->search(
+                Operations::search(
+                    $filter,
+                    ...$attributes,
+                )
+                    ->base($dn)
+                    ->useBaseScope(),
+            )->first();
+
+            if ($entry !== null) {
+                $dns[] = $entry->getDn()->toString();
+            }
+        }
+        sort($dns);
+
+        return $dns;
+    }
+
+    /**
      * @return list<string>
      */
     private function dnsMatching(
         FilterInterface $filter,
-        string $selector,
+        string ...$attributes,
     ): array {
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
             $this->ldapClient()->search(
                 Operations::search(
                     $filter,
-                    $selector,
+                    ...$attributes,
                 )
                     ->base('dc=foo,dc=bar')
                     ->useSubtreeScope(),

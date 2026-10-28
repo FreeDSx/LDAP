@@ -32,6 +32,10 @@ class FilterReadSet
 
     /**
      * @param list<string>|null $types Lowercased base types the filter reads, or null when every removal must be judged.
+     * @param list<string> $linked The lowercased linked types among them, whose values an entry need not carry.
      */
-    public function __construct(public readonly ?array $types) {}
+    public function __construct(
+        public readonly ?array $types,
+        public readonly array $linked = [],
+    ) {}
 }

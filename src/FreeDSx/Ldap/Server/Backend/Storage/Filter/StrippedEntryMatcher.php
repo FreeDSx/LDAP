@@ -18,12 +18,9 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use WeakMap;
 
-use function array_diff_key;
-use function array_values;
 use function count;
 
 /**
@@ -33,8 +30,6 @@ use function count;
  */
 class StrippedEntryMatcher
 {
-    use DerivedAttributeTrait;
-
     /**
      * @var WeakMap<FilterInterface, FilterReadSet>
      */
@@ -44,6 +39,7 @@ class StrippedEntryMatcher
         private readonly FilterEvaluatorInterface $evaluator,
         private readonly Schema $schema,
         private readonly LinkedAttributes $linked,
+        private readonly LinkedLeafWitness $linkedLeaves,
     ) {
         $this->readSets = new WeakMap();
     }
@@ -55,7 +51,7 @@ class StrippedEntryMatcher
         FilterInterface $filter,
         string $type,
     ): bool {
-        $readSet = $this->readSets[$filter] ??= $this->readSetOf($filter);
+        $readSet = $this->readSetOf($filter);
         if ($readSet->types === null) {
             return true;
         }
@@ -75,22 +71,42 @@ class StrippedEntryMatcher
     }
 
     /**
-     * Whether an entry that matched the filter still does without the attributes access control withheld from it.
+     * The lowercased linked types the filter names, which an entry may match on without carrying their values.
      *
-     * @param array<array-key, true> $withheld The keys the entry holds its withheld attributes at.
+     * @return list<string>
+     */
+    public function linkedTypes(FilterInterface $filter): array
+    {
+        return $this->readSetOf($filter)->linked;
+    }
+
+    /**
+     * Whether an entry that matched the filter still does without the types access control withheld from it.
+     *
+     * @param array<string, true> $withheld Lowercased base types the filter reads that may not be read on the entry.
      */
     public function stillMatches(
         Entry $entry,
         array $withheld,
         FilterInterface $filter,
     ): bool {
+        $readable = [];
+
+        foreach ($entry->getAttributes() as $attribute) {
+            if (!isset($withheld[Attribute::normalizeName($attribute->getName())])) {
+                $readable[] = $attribute;
+            }
+        }
+
+        // Linked values the entry does not carry still count, unless their type is withheld too.
         return $this->evaluator->evaluate(
-            Entry::raw(
-                $entry->getDn(),
-                array_values(array_diff_key(
-                    $entry->getAttributes(),
-                    $withheld,
-                )),
+            $this->linkedLeaves->witness(
+                Entry::raw(
+                    $entry->getDn(),
+                    $readable,
+                ),
+                $filter,
+                $withheld,
             ),
             $filter,
         );
@@ -98,16 +114,24 @@ class StrippedEntryMatcher
 
     private function readSetOf(FilterInterface $filter): FilterReadSet
     {
-        $types = FilterAttributes::referenced($filter);
+        return $this->readSets[$filter] ??= $this->newReadSet($filter);
+    }
 
-        // A filter naming a derived or linked type is always judged again.
+    private function newReadSet(FilterInterface $filter): FilterReadSet
+    {
+        $types = FilterAttributes::referenced($filter);
+        $linked = [];
+
         foreach ($types ?? [] as $type) {
-            if (self::describesAnyDerivedAttribute($type) || $this->linked->heldApart(new Attribute($type))) {
-                return new FilterReadSet(null);
+            if ($this->linked->heldApart(new Attribute($type))) {
+                $linked[] = $type;
             }
         }
 
-        return new FilterReadSet($types);
+        return new FilterReadSet(
+            $types,
+            $linked,
+        );
     }
 
     /**

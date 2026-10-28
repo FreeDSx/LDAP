@@ -101,3 +101,11 @@ dn: cn=blocked-late,dc=foo,dc=bar
 objectClass: groupOfNames
 cn: blocked-late
 member: cn=delegate,dc=foo,dc=bar
+
+# Holds a member whose memberOf no one may read, beside a member with a password and one without.
+dn: cn=quiet-members,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: quiet-members
+member: cn=nicknamed,dc=foo,dc=bar
+member: cn=alice,ou=people,dc=foo,dc=bar
+member: uid=bob,ou=people,dc=foo,dc=bar

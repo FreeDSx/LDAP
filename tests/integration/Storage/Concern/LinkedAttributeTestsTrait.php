@@ -629,6 +629,7 @@ trait LinkedAttributeTestsTrait
                 'cn' => $cn,
                 'sn' => $cn,
                 'objectClass' => ['person', ...$auxiliaries],
+                'userPassword' => 'secret',
                 ...$attributes,
             ],
         )));

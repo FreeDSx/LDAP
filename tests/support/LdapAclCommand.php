@@ -78,6 +78,11 @@ class LdapAclCommand extends Command
     public const LATE_MEMBER_GROUP_DN = 'cn=blocked-late,dc=foo,dc=bar';
 
     /**
+     * Holds the nicknamed entry, whose memberOf no one may read, beside two members whose memberOf is readable.
+     */
+    public const QUIET_GROUP_DN = 'cn=quiet-members,dc=foo,dc=bar';
+
+    /**
      * Defines secretCode as confidential; loaded so the harness exercises the same path an operator would.
      */
     private const SECRET_CODE_SCHEMA = __DIR__ . '/../resources/schema/acl-secret-code.ldif';
@@ -204,6 +209,12 @@ class LdapAclCommand extends Command
                                 Subject::anyone(),
                                 Target::dn(self::NICKNAMED_DN),
                                 'givenName',
+                            )->forRead(),
+                            // Only bites if a back-link, which no entry stores, is judged apart from the entry.
+                            AttributeRule::deny(
+                                Subject::anyone(),
+                                Target::dn(self::NICKNAMED_DN),
+                                'memberOf',
                             )->forRead(),
                             // Built through the public constructor with a mixed-case name, so the rule only bites
                             // if names are normalized wherever a rule is made.

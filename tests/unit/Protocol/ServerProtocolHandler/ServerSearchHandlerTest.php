@@ -50,7 +50,9 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -1215,6 +1217,11 @@ final class ServerSearchHandlerTest extends TestCase
                 $this->mockFilterEvaluator,
                 $this->schema,
                 new LinkedAttributes($this->schema),
+                new LinkedLeafWitness(
+                    new NoLinkedValues(),
+                    new LinkedAttributes($this->schema),
+                    $this->schema,
+                ),
             ),
             accessControl: $accessControl,
             schema: $this->schema,

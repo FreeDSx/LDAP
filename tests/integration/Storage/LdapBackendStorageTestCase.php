@@ -23,6 +23,7 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedAttributeTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\AliasDereferencingTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\AttributeSelectionTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\CompareTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\EntryReadTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\FilterEvaluationTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\FilterMatchingTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\PagingControlTestsTrait;
@@ -75,6 +76,7 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     use ReadEntryControlTestsTrait;
     use AssertionControlTestsTrait;
     use ControlValidationTestsTrait;
+    use EntryReadTestsTrait;
 
     protected const SHARED_MAX_ATTRIBUTE_VALUES = 500;
 
