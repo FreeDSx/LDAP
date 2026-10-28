@@ -65,6 +65,15 @@ trait SqlFilterTranslatorTrait
      */
     private function supportFor(FilterInterface $filter): AttributeFilterSupport
     {
+        $attribute = $filter instanceof FilterAttributeInterface
+            ? $filter->getAttribute()
+            : null;
+
+        // RFC 4511 4.5.1.7: a malformed description leaves only its own item Undefined.
+        if ($attribute !== null && !Attribute::isValidDescription($attribute)) {
+            return AttributeFilterSupport::NeverMatches;
+        }
+
         $conforms = !$filter instanceof AttributeValueAssertionInterface
             || $this->attributeContext->assertionValueConforms(
                 $filter->getAttribute(),
@@ -79,10 +88,6 @@ trait SqlFilterTranslatorTrait
         if ($filter instanceof SubstringFilter && !$this->attributeContext->hasSubstringRule($filter->getAttribute())) {
             return AttributeFilterSupport::NeverMatches;
         }
-
-        $attribute = $filter instanceof FilterAttributeInterface
-            ? $filter->getAttribute()
-            : null;
 
         return $attribute === null
             ? AttributeFilterSupport::Exact

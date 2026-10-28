@@ -551,6 +551,77 @@ trait FilterEvaluationTestsTrait
     }
 
     /**
+     * @return iterable<string, array{FilterInterface, int}>
+     */
+    public static function malformedDescriptionFilterProvider(): iterable
+    {
+        yield 'an or still matches through its other branch' => [
+            Filters::or(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'cn;',
+                    'alice',
+                ),
+            ),
+            1,
+        ];
+        yield 'an and with it matches nothing' => [
+            Filters::and(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'cn;',
+                    'alice',
+                ),
+            ),
+            0,
+        ];
+        // The and is False wherever its other item is False, which negates to True; it stays Undefined only for alice.
+        yield 'negating an and with it matches every entry its other item rules out' => [
+            Filters::not(Filters::and(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'cn;',
+                    'alice',
+                ),
+            )),
+            7,
+        ];
+        yield 'negating it matches nothing' => [
+            Filters::not(Filters::equal(
+                'cn;',
+                'x',
+            )),
+            0,
+        ];
+        yield 'its presence matches nothing' => [
+            Filters::present('cn;'),
+            0,
+        ];
+        yield 'a space in the type is malformed too' => [
+            Filters::or(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'c n',
+                    'alice',
+                ),
+            ),
+            1,
+        ];
+    }
+
+    /**
      * An assertion value the type's syntax rejects is Undefined, so it matches nothing even when negated.
      *
      * @return iterable<string, array{FilterInterface, int}>
@@ -946,6 +1017,7 @@ trait FilterEvaluationTestsTrait
     #[DataProvider('stringPreparationFilterProvider')]
     #[DataProvider('matchingRuleFilterProvider')]
     #[DataProvider('invalidAssertionValueFilterProvider')]
+    #[DataProvider('malformedDescriptionFilterProvider')]
     #[DataProvider('substringRuleFilterProvider')]
     #[DataProvider('derivedAttributeFilterProvider')]
     #[DataProvider('objectClassFilterProvider')]
@@ -976,6 +1048,7 @@ trait FilterEvaluationTestsTrait
     #[DataProvider('stringPreparationFilterProvider')]
     #[DataProvider('matchingRuleFilterProvider')]
     #[DataProvider('invalidAssertionValueFilterProvider')]
+    #[DataProvider('malformedDescriptionFilterProvider')]
     #[DataProvider('substringRuleFilterProvider')]
     #[DataProvider('derivedAttributeFilterProvider')]
     #[DataProvider('objectClassFilterProvider')]

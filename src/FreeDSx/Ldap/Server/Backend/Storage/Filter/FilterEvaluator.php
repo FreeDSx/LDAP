@@ -647,6 +647,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return true;
         }
 
+        // RFC 4511 4.5.1.7: a malformed description makes its item Undefined.
+        if (!Attribute::isValidDescription($attributeDescription)) {
+            return false;
+        }
+
         return self::describesAnyDerivedAttribute($attributeDescription)
             || $this->schema->getAttributeType(Attribute::normalizeName($attributeDescription)) !== null;
     }

@@ -1282,6 +1282,73 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
+    #[DataProvider('malformedDescriptionFilterProvider')]
+    public function test_an_item_naming_a_malformed_description_is_undefined(FilterInterface $filter): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    #[DataProvider('malformedDescriptionFilterProvider')]
+    public function test_a_negated_item_naming_a_malformed_description_stays_undefined(FilterInterface $filter): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            Filters::not($filter),
+        ));
+    }
+
+    public function test_an_or_still_matches_through_a_branch_beside_a_malformed_description(): void
+    {
+        self::assertTrue($this->subject->evaluate(
+            $this->entry,
+            Filters::or(
+                Filters::equal(
+                    'cn',
+                    'Alice',
+                ),
+                Filters::equal(
+                    'cn;',
+                    'Alice',
+                ),
+            ),
+        ));
+    }
+
+    public static function malformedDescriptionFilterProvider(): Generator
+    {
+        yield 'an empty option on an equality' => [
+            Filters::equal(
+                'cn;',
+                'Alice',
+            ),
+        ];
+        yield 'an empty option on a presence' => [
+            Filters::present('cn;'),
+        ];
+        yield 'an empty option on a substring' => [
+            Filters::startsWith(
+                'cn;',
+                'Al',
+            ),
+        ];
+        yield 'an empty option on an extensible match' => [
+            Filters::extensible(
+                'cn;',
+                'Alice',
+                null,
+            ),
+        ];
+        yield 'a space in the type' => [
+            Filters::equal(
+                'c n',
+                'Alice',
+            ),
+        ];
+    }
+
     public static function invalidAssertionValueProvider(): Generator
     {
         yield 'equality' => [
@@ -1610,6 +1677,13 @@ final class FilterEvaluatorTest extends TestCase
         ];
         yield 'unrecognized type under a present filter' => [
             Filters::present('shoeSize'),
+            UndefinedCause::UnrecognizedAttributeType,
+        ];
+        yield 'malformed description of a defined type' => [
+            Filters::equal(
+                'cn;',
+                'Alice',
+            ),
             UndefinedCause::UnrecognizedAttributeType,
         ];
         yield 'assertion value the syntax rejects' => [
