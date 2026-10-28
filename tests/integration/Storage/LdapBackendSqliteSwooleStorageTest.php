@@ -52,4 +52,9 @@ final class LdapBackendSqliteSwooleStorageTest extends LdapBackendStorageTestCas
     {
         return [...parent::storageExtraArgs(), '--storage=sqlite', '--runner=swoole'];
     }
+
+    protected static function sortsPastTheSigned64BitLimits(): bool
+    {
+        return false;
+    }
 }

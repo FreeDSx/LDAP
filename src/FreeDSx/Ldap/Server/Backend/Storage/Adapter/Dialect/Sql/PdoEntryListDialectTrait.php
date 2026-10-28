@@ -122,7 +122,7 @@ trait PdoEntryListDialectTrait
         foreach ($sortKeys as $index => $sortKey) {
             $alias = '__sk' . $index;
             $value = $sortKey->numeric
-                ? 'CAST(eav.value_lower AS SIGNED)'
+                ? 'CAST(eav.value_lower AS DECIMAL(65,0))'
                 : 'eav.value_lower';
             $projections[] = <<<SQL
                 (SELECT MIN({$value})

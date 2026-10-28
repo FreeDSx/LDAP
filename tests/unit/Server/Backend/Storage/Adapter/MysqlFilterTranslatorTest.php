@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -315,10 +316,61 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            'CAST(s.value_lower AS SIGNED) >= CAST(? AS SIGNED)',
+            'CAST(s.value_lower AS DECIMAL(65,0)) >= CAST(? AS DECIMAL(65,0))',
             $result->sql,
         );
         self::assertTrue($result->isExact);
+    }
+
+    #[DataProvider('integerCastRangeProvider')]
+    public function test_an_integer_ordering_is_exact_only_inside_the_cast_range(
+        FilterInterface $filter,
+        bool $isExact,
+    ): void {
+        $translator = new MysqlFilterTranslator(
+            $this->attributeContext(integerOrdered: true),
+            $this->indexForms,
+            $this->linked,
+        );
+
+        self::assertSame(
+            $isExact,
+            $translator->translate($filter)?->isExact,
+        );
+    }
+
+    /**
+     * @return Generator<string, array{FilterInterface, bool}>
+     */
+    public static function integerCastRangeProvider(): Generator
+    {
+        yield 'past the signed 64-bit maximum' => [
+            new GreaterThanOrEqualFilter(
+                'uidNumber',
+                '9223372036854775808',
+            ),
+            true,
+        ];
+        yield 'the widest decimal' => [
+            new GreaterThanOrEqualFilter(
+                'uidNumber',
+                str_repeat(
+                    '9',
+                    65,
+                ),
+            ),
+            false,
+        ];
+        yield 'past the widest decimal' => [
+            new LessThanOrEqualFilter(
+                'uidNumber',
+                '-1' . str_repeat(
+                    '0',
+                    65,
+                ),
+            ),
+            false,
+        ];
     }
 
     public function test_gte_filter_with_digit_value_is_inexact(): void

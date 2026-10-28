@@ -15,10 +15,73 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SqlFilterUtilityTest extends TestCase
 {
+    #[DataProvider('integerInsideProvider')]
+    public function test_an_integer_is_inside_a_bound_only_when_its_magnitude_is_below_it(
+        string $value,
+        bool $isInside,
+    ): void {
+        self::assertSame(
+            $isInside,
+            SqlFilterUtility::isIntegerInside(
+                $value,
+                '9223372036854775807',
+            ),
+        );
+    }
+
+    /**
+     * @return Generator<string, array{string, bool}>
+     */
+    public static function integerInsideProvider(): Generator
+    {
+        yield 'zero' => [
+            '0',
+            true,
+        ];
+        yield 'one below the bound' => [
+            '9223372036854775806',
+            true,
+        ];
+        yield 'one above the negated bound' => [
+            '-9223372036854775806',
+            true,
+        ];
+        yield 'the bound' => [
+            '9223372036854775807',
+            false,
+        ];
+        yield 'the negated bound' => [
+            '-9223372036854775807',
+            false,
+        ];
+        yield 'more digits than the bound' => [
+            '10000000000000000000',
+            false,
+        ];
+        yield 'leading zeros before a value inside' => [
+            '000123',
+            true,
+        ];
+        yield 'not an integer' => [
+            '12a',
+            false,
+        ];
+        yield 'a trailing newline' => [
+            "5\n",
+            false,
+        ];
+        yield 'empty' => [
+            '',
+            false,
+        ];
+    }
+
     public function test_escapes_percent(): void
     {
         self::assertSame(

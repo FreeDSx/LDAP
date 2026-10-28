@@ -65,7 +65,18 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
 
     private function castToNumeric(string $expression): string
     {
-        return "CAST($expression AS SIGNED)";
+        return "CAST($expression AS DECIMAL(65,0))";
+    }
+
+    /**
+     * MySQL saturates a cast to its widest decimal at 65 digits.
+     */
+    private function numericCastBound(): string
+    {
+        return str_repeat(
+            '9',
+            65,
+        );
     }
 
     private function prefixCondition(string $alias): string
