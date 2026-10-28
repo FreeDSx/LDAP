@@ -355,6 +355,43 @@ trait SortControlTestsTrait
         );
     }
 
+    public function testSortControlOrdersAnIntegerTypeWithNoOrderingRuleNumerically(): void
+    {
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->send(
+            Operations::search(
+                Filters::present('uidNumber'),
+                'uidNumber',
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::descending('uidNumber')),
+        );
+        $result = $response?->getResponse();
+        $sortResponse = $response?->controls()->get(Control::OID_SORTING_RESPONSE);
+
+        self::assertInstanceOf(
+            SearchResponse::class,
+            $result,
+        );
+        self::assertSame(
+            ['100', '99'],
+            array_map(
+                static fn(Entry $entry): string => $entry->get('uidNumber')?->firstValue() ?? '',
+                $result->getEntries()->toArray(),
+            ),
+        );
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortResponse,
+        );
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $sortResponse->getResult(),
+        );
+    }
+
     public function testSortControlRefusesATypeWithNoOrderingRule(): void
     {
         $this->authenticateUser();
