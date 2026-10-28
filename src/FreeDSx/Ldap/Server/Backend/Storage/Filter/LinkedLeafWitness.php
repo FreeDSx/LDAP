@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use WeakMap;
 
+use function array_diff_key;
+
 /**
  * Puts the linked values a filter asks about onto the entry it is judged against.
  *
@@ -48,16 +50,26 @@ final readonly class LinkedLeafWitness
 
     /**
      * The entry as the filter needs to see it, also holding whichever of the asserted values it links.
+     *
+     * @param array<string, true> $withheld Lowercased types left as the entry shows them.
      */
     public function witness(
         Entry $entry,
         FilterInterface $filter,
+        array $withheld = [],
     ): Entry {
         if ($this->linked->isEmpty()) {
             return $entry;
         }
         // The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
         $asserted = $this->assertedCache[$filter] ??= $this->assertedBy($filter);
+
+        if ($withheld !== []) {
+            $asserted = array_diff_key(
+                $asserted,
+                $withheld,
+            );
+        }
 
         if ($asserted === []) {
             return $entry;

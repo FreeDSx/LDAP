@@ -49,6 +49,11 @@ final class SearchResultGate
 
     private ReadScopeInterface $scope;
 
+    /**
+     * @var array<string, ReadVerdict> The linked types the filter names that are not readable on every entry.
+     */
+    private array $linkedReads;
+
     private function __construct(
         private readonly AccessControlInterface $accessControl,
         private readonly StrippedEntryMatcher $strippedMatcher,
@@ -57,6 +62,7 @@ final class SearchResultGate
         private readonly FilterInterface $filter,
     ) {
         $this->scope = $this->accessControl->readScope($this->token);
+        $this->linkedReads = $this->linkedReadsOf($this->scope);
     }
 
     public static function forRequest(
@@ -92,7 +98,7 @@ final class SearchResultGate
         $withheld = [];
 
         // Kept inline for performance reasons.
-        foreach ($all as $index => $attribute) {
+        foreach ($all as $attribute) {
             $admission = $this->admissions[$attribute->getDescription()] ?? $this->admissionFor($attribute);
 
             if ($admission === true) {
@@ -117,10 +123,17 @@ final class SearchResultGate
             if ($readable && $admission->returned) {
                 $returned[] = $attribute;
             } elseif (!$readable && $admission->concernsFilter) {
-                $withheld[$index] = true;
+                $withheld[$admission->name] = true;
             }
         }
         $this->remembering = true;
+
+        // The filter matches on the linked types it names whether or not the entry carries them.
+        foreach ($this->linkedReads as $type => $read) {
+            if ($read === ReadVerdict::Deny || !$this->scope->isReadableOn($type, $dn)) {
+                $withheld[$type] = true;
+            }
+        }
 
         if ($withheld !== [] && !$this->strippedMatcher->stillMatches($entry, $withheld, $this->filter)) {
             return null;
@@ -143,7 +156,26 @@ final class SearchResultGate
         }
 
         $this->scope = $this->accessControl->readScope($this->token);
+        $this->linkedReads = $this->linkedReadsOf($this->scope);
         $this->admissions = [];
+    }
+
+    /**
+     * @return array<string, ReadVerdict>
+     */
+    private function linkedReadsOf(ReadScopeInterface $scope): array
+    {
+        $reads = [];
+
+        foreach ($this->strippedMatcher->linkedTypes($this->filter) as $type) {
+            $read = $scope->verdict($type);
+
+            if ($read !== ReadVerdict::Allow) {
+                $reads[$type] = $read;
+            }
+        }
+
+        return $reads;
     }
 
     /**

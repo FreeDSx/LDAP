@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -305,6 +306,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             $container->get(FilterEvaluatorInterface::class),
             $container->get(ServerOptions::class)->getSchema(),
             $container->get(LinkedAttributes::class),
+            $container->get(LinkedLeafWitness::class),
         );
     }
 

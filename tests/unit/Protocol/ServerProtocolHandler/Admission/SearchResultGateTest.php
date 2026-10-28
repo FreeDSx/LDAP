@@ -30,15 +30,23 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class SearchResultGateTest extends TestCase
 {
+    use ServerContainerTrait;
+
+    private const STAFF = 'cn=staff,dc=foo,dc=bar';
+
     private Schema $schema;
 
     private FilterEvaluatorInterface&MockObject $mockEvaluator;
@@ -55,8 +63,17 @@ final class SearchResultGateTest extends TestCase
             $this->mockEvaluator,
             $this->schema,
             new LinkedAttributes($this->schema),
+            $this->fromContainer(LinkedLeafWitness::class),
         );
         $this->token = BindToken::fromDn('cn=user,dc=foo,dc=bar');
+        $this->fromContainer(InMemoryStorage::class)->store(EntryFixture::withUuid(new Entry(
+            new Dn(self::STAFF),
+            new Attribute(
+                'member',
+                'cn=a,dc=foo,dc=bar',
+                'cn=b,dc=foo,dc=bar',
+            ),
+        )));
     }
 
     public function test_an_entry_returned_whole_is_the_entry_itself(): void
@@ -142,6 +159,85 @@ final class SearchResultGateTest extends TestCase
         self::assertSame(
             ['cn', 'mail'],
             $this->descriptions($gate->admit($this->person('cn=a,dc=foo,dc=bar'))),
+        );
+    }
+
+    public function test_a_backlink_the_entry_does_not_carry_is_still_judged_by_the_rules(): void
+    {
+        $judged = null;
+        $this->mockEvaluator
+            ->expects(self::once())
+            ->method('evaluate')
+            ->willReturnCallback(static function (Entry $entry) use (&$judged): bool {
+                $judged = $entry;
+
+                return false;
+            });
+
+        $gate = $this->gate(
+            $this->allowing(AttributeRule::deny(
+                Subject::anyone(),
+                Target::any(),
+                'memberOf',
+            )->forRead()),
+            filter: Filters::equal(
+                'memberOf',
+                self::STAFF,
+            ),
+        );
+
+        self::assertNull($gate->admit($this->person('cn=a,dc=foo,dc=bar')));
+        self::assertInstanceOf(
+            Entry::class,
+            $judged,
+        );
+        self::assertFalse($judged->has('memberOf'));
+    }
+
+    public function test_a_backlink_unreadable_on_one_entry_judges_only_that_entry_again(): void
+    {
+        $this->mockEvaluator
+            ->expects(self::once())
+            ->method('evaluate')
+            ->willReturn(false);
+
+        $gate = $this->gate(
+            $this->allowing(AttributeRule::deny(
+                Subject::anyone(),
+                Target::dn('cn=a,dc=foo,dc=bar'),
+                'memberOf',
+            )->forRead()),
+            filter: Filters::equal(
+                'memberOf',
+                self::STAFF,
+            ),
+        );
+
+        self::assertNull($gate->admit($this->person('cn=a,dc=foo,dc=bar')));
+        self::assertNotNull($gate->admit($this->person('cn=b,dc=foo,dc=bar')));
+    }
+
+    public function test_withholding_what_the_filter_does_not_read_keeps_an_entry_matched_on_a_backlink(): void
+    {
+        $this->mockEvaluator
+            ->expects(self::never())
+            ->method('evaluate');
+
+        $returned = $this->gate(
+            $this->allowing(AttributeRule::deny(
+                Subject::anyone(),
+                Target::any(),
+                'userPassword',
+            )->forRead()),
+            filter: Filters::equal(
+                'memberOf',
+                self::STAFF,
+            ),
+        )->admit($this->person('cn=a,dc=foo,dc=bar'));
+
+        self::assertSame(
+            ['cn', 'mail'],
+            $this->descriptions($returned),
         );
     }
 

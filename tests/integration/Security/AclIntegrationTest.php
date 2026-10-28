@@ -626,6 +626,78 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($entry->get('givenName'));
     }
 
+    #[DataProvider('attributeSelectionProvider')]
+    public function testABacklinkFilterMatchesOnlyTheMembersWhoseBacklinkIsReadable(string ...$attributes): void
+    {
+        $this->authenticateUser();
+
+        self::assertEqualsCanonicalizing(
+            [
+                'cn=alice,ou=people,dc=foo,dc=bar',
+                'uid=bob,ou=people,dc=foo,dc=bar',
+            ],
+            $this->dnsMatching(
+                Filters::equal(
+                    'memberOf',
+                    LdapAclCommand::QUIET_GROUP_DN,
+                ),
+                ...$attributes,
+            ),
+        );
+    }
+
+    #[DataProvider('attributeSelectionProvider')]
+    public function testABaseReadCannotMatchThroughAnUnreadableBacklink(string ...$attributes): void
+    {
+        $this->authenticateUser();
+
+        self::assertCount(
+            0,
+            $this->ldapClient()->search(
+                Operations::search(
+                    Filters::equal(
+                        'memberOf',
+                        LdapAclCommand::QUIET_GROUP_DN,
+                    ),
+                    ...$attributes,
+                )
+                    ->base(LdapAclCommand::NICKNAMED_DN)
+                    ->useBaseScope(),
+            ),
+        );
+    }
+
+    public function testABacklinkPresenceFilterSkipsAMemberWhoseBacklinkIsUnreadable(): void
+    {
+        $this->authenticateUser();
+
+        $found = $this->dnsMatching(
+            Filters::present('memberOf'),
+            SearchRequest::ATTRIBUTES_NONE,
+        );
+
+        self::assertNotContains(
+            LdapAclCommand::NICKNAMED_DN,
+            $found,
+        );
+        self::assertContains(
+            'uid=bob,ou=people,dc=foo,dc=bar',
+            $found,
+        );
+    }
+
+    /**
+     * @return Generator<string, list<string>>
+     */
+    public static function attributeSelectionProvider(): Generator
+    {
+        yield 'no attributes listed' => [];
+        yield 'every user attribute' => [SearchRequest::ATTRIBUTES_ALL_USER];
+        yield 'no attributes' => [SearchRequest::ATTRIBUTES_NONE];
+        yield 'a named attribute' => ['cn'];
+        yield 'every operational attribute' => [SearchRequest::ATTRIBUTES_ALL_OPERATIONAL];
+    }
+
     public function testAReadDenyAppliesToAGroupMemberSpelledByNumericOid(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
@@ -1429,6 +1501,30 @@ final class AclIntegrationTest extends ServerTestCase
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         )->toArray());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function dnsMatching(
+        FilterInterface $filter,
+        string ...$attributes,
+    ): array {
+        $dns = [];
+        $entries = $this->ldapClient()->search(
+            Operations::search(
+                $filter,
+                ...$attributes,
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        foreach ($entries as $entry) {
+            $dns[] = $entry->getDn()->toString();
+        }
+
+        return $dns;
     }
 
     /**

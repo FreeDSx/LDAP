@@ -53,7 +53,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -1296,6 +1298,11 @@ class ServerPagingHandlerTest extends TestCase
                     $filterEvaluator ?? $this->mockFilterEvaluator,
                     $this->schema,
                     new LinkedAttributes($this->schema),
+                    new LinkedLeafWitness(
+                        new NoLinkedValues(),
+                        new LinkedAttributes($this->schema),
+                        $this->schema,
+                    ),
                 ),
                 $accessControl,
                 $this->schema,
