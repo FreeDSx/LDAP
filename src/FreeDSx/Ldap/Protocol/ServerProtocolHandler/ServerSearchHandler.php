@@ -85,7 +85,10 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
                 $message->controls(),
                 $request,
             ),
-            $this->controlsForBackend($message),
+            $this->controlsForBackend(
+                $message,
+                $sortResponse,
+            ),
             $this->limits,
         );
 

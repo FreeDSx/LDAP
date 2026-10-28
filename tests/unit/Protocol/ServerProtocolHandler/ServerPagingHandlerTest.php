@@ -1133,6 +1133,49 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_an_unsortable_non_critical_paged_sort_is_not_passed_to_the_backend(): void
+    {
+        $message = new LdapMessageRequest(
+            2,
+            $this->makeSearchRequest(),
+            new PagingControl(
+                10,
+                '',
+            ),
+            new SortingControl(SortKey::ascending('bogusAttr')),
+        );
+
+        $this->mockBackend
+            ->expects(self::atLeastOnce())
+            ->method('search')
+            ->with(
+                self::anything(),
+                self::anything(),
+                self::callback(static fn(ControlBag $controls): bool => !$controls->has(Control::OID_SORTING)),
+            )
+            ->willReturnCallback($this->sliceAware(
+                Entry::create(
+                    'dc=foo,dc=bar',
+                    ['cn' => 'foo'],
+                ),
+            ));
+
+        $this->drive(
+            $this->subject,
+            $message,
+        );
+
+        $response = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $response->getResultCode(),
+        );
+    }
+
     public function test_no_sort_control_does_not_append_sorting_response_control(): void
     {
         $message = $this->makeSearchMessage(size: 10);

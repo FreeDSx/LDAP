@@ -288,7 +288,11 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         $result = $this->backend->search(
             $this->withSyncUuid($request),
             SubentryVisibility::All, // we need all entries in a sync
-            $this->controlsForBackend($message),
+            // Sync does not support the sort control, which leaves a non-critical one ignored.
+            $this->controlsForBackend(
+                $message,
+                null,
+            ),
             (new SearchLimits(maxLinkedValues: 0))->mergedOver($this->limits),
         );
 

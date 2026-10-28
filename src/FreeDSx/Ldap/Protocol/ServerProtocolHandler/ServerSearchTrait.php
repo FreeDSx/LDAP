@@ -251,13 +251,21 @@ trait ServerSearchTrait
     }
 
     /**
-     * Returns a ControlBag with server-consumed controls stripped; only paging is excluded (sort passes through to backends).
+     * The controls the backend acts on.
      */
-    private function controlsForBackend(LdapMessageRequest $message): ControlBag
-    {
+    private function controlsForBackend(
+        LdapMessageRequest $message,
+        ?SortingResponseControl $sortResponse,
+    ): ControlBag {
+        // RFC 2891 §2: a non-critical sort that cannot be performed returns every result unsorted.
+        $sorts = $sortResponse?->getResult() === ResultCode::SUCCESS;
         $filtered = array_filter(
             $message->controls()->toArray(),
-            static fn(Control $control): bool => $control->getTypeOid() !== Control::OID_PAGING,
+            static fn(Control $control): bool => match ($control->getTypeOid()) {
+                Control::OID_PAGING => false,
+                Control::OID_SORTING => $sorts,
+                default => true,
+            },
         );
 
         return new ControlBag(...$filtered);
