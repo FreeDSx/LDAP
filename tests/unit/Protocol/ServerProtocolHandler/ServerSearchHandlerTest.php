@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
@@ -1162,6 +1163,64 @@ final class ServerSearchHandlerTest extends TestCase
         self::assertCount(
             2,
             $this->sentMessages,
+        );
+    }
+
+    public function test_an_unsortable_non_critical_sort_is_not_passed_to_the_backend(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('bogusAttr')),
+        );
+
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->with(
+                self::anything(),
+                self::anything(),
+                self::callback(static fn(ControlBag $controls): bool => !$controls->has(Control::OID_SORTING)),
+            )
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::NO_SUCH_ATTRIBUTE,
+            $this->sortResultOf(),
+        );
+    }
+
+    public function test_a_sort_that_can_be_performed_is_passed_to_the_backend(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('cn')),
+        );
+
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->with(
+                self::anything(),
+                self::anything(),
+                self::callback(static fn(ControlBag $controls): bool => $controls->has(Control::OID_SORTING)),
+            )
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $this->sortResultOf(),
         );
     }
 

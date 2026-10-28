@@ -340,7 +340,13 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         return new PagingRequest(
             $pagingControl,
             $request,
-            $this->controlsForBackend($message),
+            $this->controlsForBackend(
+                $message,
+                $this->sortingResponseControl(
+                    $this->sortingControl($message),
+                    $this->schema,
+                ),
+            ),
             $this->generateCookie(),
         );
     }

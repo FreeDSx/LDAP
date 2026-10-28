@@ -38,6 +38,19 @@ trait IntegerRangeTestsTrait
         '99999999999999999999',
     ];
 
+    /**
+     * The same integers, but out of order.
+     */
+    private const WIDE_INTEGERS_SEED_ORDER = [
+        '5',
+        '-99999999999999999999',
+        '99999999999999999999',
+        '-9223372036854775809',
+        '9223372036854775808',
+        '-9223372036854775808',
+        '9223372036854775807',
+    ];
+
     #[DataProvider('wideIntegerFilterProvider')]
     public function testAnIntegerFilterComparesPastTheSigned64BitLimits(
         FilterInterface $filter,
@@ -60,7 +73,10 @@ trait IntegerRangeTestsTrait
             self::WIDE_INTEGERS,
             $this->wideIntegersMatching(
                 Filters::present('gidNumber'),
-                new SortingControl(SortKey::ascending('gidNumber')),
+                new SortingControl(SortKey::ascending(
+                    'gidNumber',
+                    'integerOrderingMatch',
+                )),
             ),
         );
     }
@@ -74,7 +90,10 @@ trait IntegerRangeTestsTrait
             array_reverse(self::WIDE_INTEGERS),
             $this->wideIntegersMatching(
                 Filters::present('gidNumber'),
-                new SortingControl(SortKey::descending('gidNumber')),
+                new SortingControl(SortKey::descending(
+                    'gidNumber',
+                    'integerOrderingMatch',
+                )),
             ),
         );
     }
@@ -151,7 +170,7 @@ trait IntegerRangeTestsTrait
                 ],
             ));
 
-            foreach (self::WIDE_INTEGERS as $index => $gidNumber) {
+            foreach (self::WIDE_INTEGERS_SEED_ORDER as $index => $gidNumber) {
                 $admin->create(Entry::fromArray(
                     "cn=wide-{$index}," . self::WIDE_INTEGERS_DN,
                     [

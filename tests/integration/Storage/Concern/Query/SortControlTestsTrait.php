@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -108,6 +110,62 @@ trait SortControlTestsTrait
         self::assertCount(
             8,
             $entries,
+        );
+    }
+
+    public function testANonCriticalSortThatCannotBePerformedReturnsTheEntriesUnsorted(): void
+    {
+        $this->authenticateUser();
+        $unsorted = $this->dnsInOrder($this->ldapClient()->search($this->threeSeededPeople())->toArray());
+
+        $response = $this->ldapClient()->send(
+            $this->threeSeededPeople(),
+            $this->sortThatCannotBePerformed(),
+        );
+        $result = $response?->getResponse();
+        $sortResponse = $response?->controls()->get(Control::OID_SORTING_RESPONSE);
+
+        self::assertInstanceOf(
+            SearchResponse::class,
+            $result,
+        );
+        self::assertSame(
+            $unsorted,
+            $this->dnsInOrder($result->getEntries()->toArray()),
+        );
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortResponse,
+        );
+        self::assertSame(
+            ResultCode::NO_SUCH_ATTRIBUTE,
+            $sortResponse->getResult(),
+        );
+    }
+
+    public function testANonCriticalPagedSortThatCannotBePerformedReturnsTheEntriesUnsorted(): void
+    {
+        $this->authenticateUser();
+        $unsorted = $this->dnsInOrder($this->ldapClient()->search($this->threeSeededPeople())->toArray());
+
+        $paging = $this->ldapClient()
+            ->paging(
+                $this->threeSeededPeople(),
+                2,
+            )
+            ->useControls($this->sortThatCannotBePerformed());
+        $paged = [];
+
+        while ($paging->hasEntries()) {
+            array_push(
+                $paged,
+                ...$this->dnsInOrder($paging->getEntries()->toArray()),
+            );
+        }
+
+        self::assertSame(
+            $unsorted,
+            $paged,
         );
     }
 
@@ -263,7 +321,10 @@ trait SortControlTestsTrait
             Operations::search(Filters::present('uidNumber'), 'uidNumber')
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
-            new SortingControl(SortKey::ascending('uidNumber')),
+            new SortingControl(SortKey::descending(
+                'uidNumber',
+                'integerOrderingMatch',
+            )),
         );
 
         $values = array_map(
@@ -271,9 +332,9 @@ trait SortControlTestsTrait
             $entries->toArray(),
         );
 
-        // Ordered as text, '100' would come first.
+        // Stored as 99 then 100, and ordered as text, '99' would come first.
         self::assertSame(
-            ['99', '100'],
+            ['100', '99'],
             $values,
         );
     }
@@ -286,25 +347,36 @@ trait SortControlTestsTrait
         $this->authenticateUser();
 
         self::assertSame(
-            ['9', '10'],
-            $this->sortedDescriptions(SortKey::ascending(
+            ['10', '9'],
+            $this->sortedDescriptions(SortKey::descending(
                 'description',
                 'integerOrderingMatch',
             )),
         );
     }
 
-    /**
-     * A type declaring no ORDERING rule still has the server's own order, so it is sortable.
-     */
-    public function testSortControlOrdersATypeWithNoOrderingRule(): void
+    public function testSortControlRefusesATypeWithNoOrderingRule(): void
     {
         $this->authenticateUser();
 
-        // Ordered as numbers, '9' would come first.
+        $response = $this->ldapClient()->send(
+            Operations::search(
+                Filters::present('description'),
+                'description',
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::ascending('description')),
+        );
+
+        $sortResponse = $response?->controls()->get(Control::OID_SORTING_RESPONSE);
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortResponse,
+        );
         self::assertSame(
-            ['10', '9'],
-            $this->sortedDescriptions(SortKey::ascending('description')),
+            ResultCode::UNWILLING_TO_PERFORM,
+            $sortResponse->getResult(),
         );
     }
 
@@ -385,6 +457,50 @@ trait SortControlTestsTrait
         return array_values(array_map(
             static fn(Entry $entry): string => $entry->get('description')?->firstValue() ?? '',
             $entries->toArray(),
+        ));
+    }
+
+    private function threeSeededPeople(): SearchRequest
+    {
+        return Operations::search(
+            Filters::or(
+                Filters::equal(
+                    'cn',
+                    'user',
+                ),
+                Filters::equal(
+                    'cn',
+                    'admin',
+                ),
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+            ),
+            'sn',
+        )
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+    }
+
+    private function sortThatCannotBePerformed(): SortingControl
+    {
+        return new SortingControl(
+            SortKey::descending('sn'),
+            SortKey::ascending('bogusAttr'),
+        );
+    }
+
+    /**
+     * @param array<Entry> $entries
+     *
+     * @return list<string>
+     */
+    private function dnsInOrder(array $entries): array
+    {
+        return array_values(array_map(
+            static fn(Entry $entry): string => $entry->getDn()->toString(),
+            $entries,
         ));
     }
 }
