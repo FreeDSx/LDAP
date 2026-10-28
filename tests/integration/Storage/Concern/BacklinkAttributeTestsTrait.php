@@ -180,6 +180,88 @@ trait BacklinkAttributeTestsTrait
         );
     }
 
+    public function testAnExtensibleMatchFindsAMemberOfEachGroupItBelongsTo(): void
+    {
+        [$member, $group] = $this->seedBacklinkPair('backlink-extensible');
+        $second = $this->seedBacklinkGroup(
+            'backlink-extensible-second',
+            $member,
+        );
+
+        self::assertSame(
+            [
+                [$member],
+                [$member],
+            ],
+            [
+                $this->searchDns(Filters::extensible(
+                    'memberOf',
+                    $group,
+                    null,
+                )),
+                $this->searchDns(Filters::extensible(
+                    'memberOf',
+                    $second,
+                    null,
+                )),
+            ],
+        );
+    }
+
+    public function testAnExtensibleMatchByTheEqualityRuleFindsAMemberOfEachGroupItBelongsTo(): void
+    {
+        [$member, $group] = $this->seedBacklinkPair('backlink-extensible-rule');
+        $second = $this->seedBacklinkGroup(
+            'backlink-extensible-rule-second',
+            $member,
+        );
+
+        self::assertSame(
+            [
+                [$member],
+                [$member],
+            ],
+            [
+                $this->searchDns(Filters::extensible(
+                    'memberOf',
+                    $group,
+                    'distinguishedNameMatch',
+                )),
+                $this->searchDns(Filters::extensible(
+                    'memberOf',
+                    $second,
+                    'distinguishedNameMatch',
+                )),
+            ],
+        );
+    }
+
+    public function testABaseScopeExtensibleMatchFindsAMemberOfEachGroupItBelongsTo(): void
+    {
+        [$member, $group] = $this->seedBacklinkPair('backlink-extensible-base');
+        $second = $this->seedBacklinkGroup(
+            'backlink-extensible-base-second',
+            $member,
+        );
+
+        self::assertSame(
+            [
+                1,
+                1,
+            ],
+            [
+                $this->baseScopeMatches(
+                    $member,
+                    $group,
+                ),
+                $this->baseScopeMatches(
+                    $member,
+                    $second,
+                ),
+            ],
+        );
+    }
+
     public function testAOneLevelSearchFindsTheMembersOfAGroup(): void
     {
         [$member, $group] = $this->seedBacklinkPair('backlink-one-level');
@@ -417,6 +499,31 @@ trait BacklinkAttributeTestsTrait
         }
 
         return $found;
+    }
+
+    /**
+     * How many entries a base read of the member returns for an extensible match on the group.
+     */
+    private function baseScopeMatches(
+        string $member,
+        string $group,
+    ): int {
+        $filter = Filters::extensible(
+            'memberOf',
+            $group,
+            null,
+        );
+
+        return $this->ldapClient()
+            ->search(
+                Operations::search(
+                    $filter,
+                    'cn',
+                )
+                    ->base($member)
+                    ->useBaseScope(),
+            )
+            ->count();
     }
 
     /**

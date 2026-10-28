@@ -79,6 +79,7 @@ final class ServerDispatchHandlerTest extends TestCase
                 new LinkedLeafWitness(
                     new NoLinkedValues(),
                     new LinkedAttributes(new Schema()),
+                    new Schema(),
                 ),
             ),
             derived: new DerivedResolver($this->createMock(ReadEntryInterface::class)),

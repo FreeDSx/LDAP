@@ -165,6 +165,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return new LinkedLeafWitness(
             $container->get(LinkedValueLookupInterface::class),
             $container->get(LinkedAttributes::class),
+            $container->get(ServerOptions::class)->getSchema(),
         );
     }
 
