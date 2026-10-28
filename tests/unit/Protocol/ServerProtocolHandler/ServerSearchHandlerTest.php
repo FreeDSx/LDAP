@@ -94,7 +94,9 @@ final class ServerSearchHandlerTest extends TestCase
         $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $this->schema = SchemaResource::Core->load();
+        $this->schema = SchemaResource::Core
+            ->load()
+            ->merge(SchemaResource::Nis->load());
         $this->sentMessages = [];
 
         $this->mockAccessControl
@@ -917,6 +919,29 @@ final class ServerSearchHandlerTest extends TestCase
 
         self::assertSame(
             ResultCode::UNWILLING_TO_PERFORM,
+            $this->sortResultOf(),
+        );
+    }
+
+    public function test_sort_by_an_integer_type_with_no_ordering_rule_reports_success(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('uidNumber')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::SUCCESS,
             $this->sortResultOf(),
         );
     }

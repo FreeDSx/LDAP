@@ -411,8 +411,8 @@ trait ServerSearchTrait
                 );
             }
 
-            // Naming no rule asks for the type's own, and a type declaring none can only be ordered by invention.
-            if ($orderingRule === null && $schema->getOrderingRuleOid($attribute) === null) {
+            // Naming no rule asks for the type's own order, which only a declared rule or an INTEGER syntax gives.
+            if ($orderingRule === null && !$this->hasOwnOrder($schema, $attribute)) {
                 return new SortingResponseControl(
                     ResultCode::UNWILLING_TO_PERFORM,
                     $attribute,
@@ -421,6 +421,17 @@ trait ServerSearchTrait
         }
 
         return new SortingResponseControl(ResultCode::SUCCESS);
+    }
+
+    /**
+     * Whether the type orders by a rule it declares or, without one, numerically by its INTEGER syntax.
+     */
+    private function hasOwnOrder(
+        Schema $schema,
+        string $attribute,
+    ): bool {
+        return $schema->getOrderingRuleOid($attribute) !== null
+            || $schema->isIntegerOrdered($attribute) === true;
     }
 
     /**
