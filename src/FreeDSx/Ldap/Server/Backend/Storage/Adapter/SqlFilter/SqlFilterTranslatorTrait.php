@@ -143,6 +143,11 @@ trait SqlFilterTranslatorTrait
     abstract private function castToNumeric(string $expression): string;
 
     /**
+     * The max integer allowed for a cast for the dialect.
+     */
+    abstract private function numericCastBound(): string;
+
+    /**
      * A condition on the value alias matching every value that starts with the prefix prefixParams() binds.
      */
     abstract private function prefixCondition(string $alias): string;
@@ -492,8 +497,8 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
-     * Integer-ordered attributes narrow numerically (CAST, exact); others keep the lexical comparison, whose
-     * exactness the caller bounds via $lexicalCanBeExact (GTE can be exact, LTE cannot under truncation).
+     * Integer-ordered attributes narrow numerically (CAST, exact inside its range); others keep the lexical comparison,
+     * whose exactness the caller bounds via $lexicalCanBeExact (GTE can be exact, LTE cannot under truncation).
      */
     private function translateOrdered(
         string $rawAttribute,
@@ -505,6 +510,7 @@ trait SqlFilterTranslatorTrait
         $hasOption = $this->attributeHasOption($rawAttribute);
 
         if ($this->attributeContext->isIntegerOrdered($rawAttribute) === true) {
+            $prepared = $this->prepareMatchValue($value);
             $condition = sprintf(
                 '%s %s %s',
                 $this->castToNumeric($this->valueAlias()),
@@ -514,8 +520,12 @@ trait SqlFilterTranslatorTrait
 
             return new SqlFilterResult(
                 $this->buildValueExists($attribute, $condition),
-                [$this->prepareMatchValue($value)],
-                isExact: !$hasOption,
+                [$prepared],
+                // Past its range the cast saturates, which selects a superset the evaluator still has to narrow.
+                isExact: !$hasOption && SqlFilterUtility::isIntegerInside(
+                    $prepared,
+                    $this->numericCastBound(),
+                ),
                 sidecarCondition: $this->sidecarCondition($attribute, $condition),
             );
         }

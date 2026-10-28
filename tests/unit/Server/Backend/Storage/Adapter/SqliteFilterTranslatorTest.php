@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -516,6 +517,62 @@ final class SqliteFilterTranslatorTest extends TestCase
             ['30'],
             $result->params,
         );
+    }
+
+    #[DataProvider('integerCastRangeProvider')]
+    public function test_an_integer_ordering_is_exact_only_inside_the_cast_range(
+        FilterInterface $filter,
+        bool $isExact,
+    ): void {
+        self::assertSame(
+            $isExact,
+            $this->translateWith(
+                $filter,
+                $this->attributeContext(integerOrdered: true),
+            )?->isExact,
+        );
+    }
+
+    /**
+     * @return Generator<string, array{FilterInterface, bool}>
+     */
+    public static function integerCastRangeProvider(): Generator
+    {
+        yield 'just inside the maximum' => [
+            new GreaterThanOrEqualFilter(
+                'uidNumber',
+                '9223372036854775806',
+            ),
+            true,
+        ];
+        yield 'just inside the minimum' => [
+            new LessThanOrEqualFilter(
+                'uidNumber',
+                '-9223372036854775806',
+            ),
+            true,
+        ];
+        yield 'the maximum, where the cast saturates' => [
+            new GreaterThanOrEqualFilter(
+                'uidNumber',
+                '9223372036854775807',
+            ),
+            false,
+        ];
+        yield 'past the maximum' => [
+            new GreaterThanOrEqualFilter(
+                'uidNumber',
+                '99999999999999999999',
+            ),
+            false,
+        ];
+        yield 'past the minimum' => [
+            new LessThanOrEqualFilter(
+                'uidNumber',
+                '-9223372036854775809',
+            ),
+            false,
+        ];
     }
 
     public function test_gte_emits_lexical_comparison_for_non_integer_attribute(): void

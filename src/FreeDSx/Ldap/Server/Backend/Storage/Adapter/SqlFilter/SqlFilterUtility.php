@@ -97,6 +97,31 @@ final class SqlFilterUtility
     }
 
     /**
+     * Whether a value spells an integer strictly between -$max and $max.
+     */
+    public static function isIntegerInside(
+        string $value,
+        string $max,
+    ): bool {
+        if (preg_match('/^-?(\d+)$/D', $value, $matches) !== 1) {
+            return false;
+        }
+        $digits = ltrim(
+            $matches[1],
+            '0',
+        );
+
+        if (strlen($digits) !== strlen($max)) {
+            return strlen($digits) < strlen($max);
+        }
+
+        return strcmp(
+            $digits,
+            $max,
+        ) < 0;
+    }
+
+    /**
      * A prepared value cut to what the column holds; non-UTF-8 returns '', which matches binary-syntax rows only.
      */
     public static function truncate(string $value): string

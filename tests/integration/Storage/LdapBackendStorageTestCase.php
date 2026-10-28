@@ -26,6 +26,7 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\CompareTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\EntryReadTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\FilterEvaluationTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\FilterMatchingTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\IntegerRangeTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\PagingControlTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\SearchLimitTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query\SearchScopeTestsTrait;
@@ -77,6 +78,7 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     use AssertionControlTestsTrait;
     use ControlValidationTestsTrait;
     use EntryReadTestsTrait;
+    use IntegerRangeTestsTrait;
 
     protected const SHARED_MAX_ATTRIBUTE_VALUES = 500;
 
@@ -116,5 +118,13 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     protected static function storageExtraArgs(): array
     {
         return ['--max-attribute-values=' . self::SHARED_MAX_ATTRIBUTE_VALUES];
+    }
+
+    /**
+     * Whether the backend orders integers past the signed 64-bit limits by value.
+     */
+    protected static function sortsPastTheSigned64BitLimits(): bool
+    {
+        return true;
     }
 }

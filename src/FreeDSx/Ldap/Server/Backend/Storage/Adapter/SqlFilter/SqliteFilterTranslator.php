@@ -69,6 +69,14 @@ final class SqliteFilterTranslator implements FilterTranslatorInterface
     }
 
     /**
+     * SQLite saturates an integer cast at the signed 64-bit limits.
+     */
+    private function numericCastBound(): string
+    {
+        return '9223372036854775807';
+    }
+
+    /**
      * A byte range seeks the BINARY index on the already folded value, where SQLite's case-insensitive LIKE cannot.
      */
     private function prefixCondition(string $alias): string

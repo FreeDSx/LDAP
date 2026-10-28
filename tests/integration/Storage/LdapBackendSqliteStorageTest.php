@@ -148,4 +148,9 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
     {
         return [...parent::storageExtraArgs(), '--storage=sqlite'];
     }
+
+    protected static function sortsPastTheSigned64BitLimits(): bool
+    {
+        return false;
+    }
 }

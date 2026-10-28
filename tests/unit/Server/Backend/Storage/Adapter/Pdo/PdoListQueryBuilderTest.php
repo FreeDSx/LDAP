@@ -70,7 +70,7 @@ final class PdoListQueryBuilderTest extends TestCase
         ));
 
         self::assertStringContainsString(
-            'MIN(CAST(eav.value_lower AS SIGNED))',
+            'MIN(CAST(eav.value_lower AS DECIMAL(65,0)))',
             $query->sql,
         );
     }
