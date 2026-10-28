@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
@@ -734,14 +733,49 @@ final class SqliteFilterTranslatorTest extends TestCase
     }
 
     #[DataProvider('provideInvalidAttributeDescriptions')]
-    public function test_invalid_attribute_description_throws(string $attribute): void
-    {
-        $this->expectException(InvalidAttributeException::class);
-
-        $this->subject->translate(new EqualityFilter(
+    public function test_an_invalid_attribute_description_selects_nothing_without_reaching_the_sql(
+        string $attribute,
+    ): void {
+        $result = $this->subject->translate(new EqualityFilter(
             $attribute,
             'x',
         ));
+
+        self::assertNotNull($result);
+        self::assertSame(
+            '1 = 0',
+            $result->sql,
+        );
+        self::assertSame(
+            [],
+            $result->params,
+        );
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_an_or_still_selects_through_a_branch_beside_an_invalid_attribute_description(): void
+    {
+        $result = $this->subject->translate(new OrFilter(
+            new EqualityFilter(
+                'cn',
+                'alice',
+            ),
+            new EqualityFilter(
+                'cn;',
+                'x',
+            ),
+        ));
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            '1 = 0',
+            $result->sql,
+        );
+        self::assertContains(
+            'alice',
+            $result->params,
+        );
+        self::assertFalse($result->isExact);
     }
 
     /**

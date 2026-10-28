@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -401,28 +400,6 @@ final class StorageReadBackendTest extends TestCase
         self::assertCount(
             3,
             iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries()),
-        );
-    }
-
-    public function test_search_returns_empty_stream_when_storage_rejects_filter_attribute(): void
-    {
-        $lister = $this->createMock(ListEntryInterface::class);
-        $lister->method('list')
-            ->willThrowException(new InvalidAttributeException(
-                'Attribute description "bogus attr" is not a valid RFC 4512 attribute description.',
-            ));
-
-        $subject = $this->backendOver($lister);
-
-        $request = (new SearchRequest(new EqualityFilter('bogus attr', 'x')))
-            ->base('dc=example,dc=com')
-            ->useSubtreeScope();
-
-        $stream = $subject->search($request, SubentryVisibility::All);
-
-        self::assertSame(
-            [],
-            iterator_to_array($stream->entries()),
         );
     }
 

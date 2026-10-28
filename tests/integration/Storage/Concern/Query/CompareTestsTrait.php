@@ -53,6 +53,20 @@ trait CompareTestsTrait
         );
     }
 
+    public function testCompareRefusesAMalformedAttributeDescription(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'cn;',
+            'alice',
+        );
+    }
+
     public function testCompareRefusesAnAssertionValueTheSyntaxRejects(): void
     {
         $this->authenticateUser();

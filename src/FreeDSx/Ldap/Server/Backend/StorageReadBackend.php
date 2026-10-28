@@ -25,7 +25,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
@@ -135,15 +134,8 @@ final readonly class StorageReadBackend implements ReadBackendInterface
             $slice,
         );
 
-        try {
-            $stream = $this->lister->list($options);
-        } catch (InvalidAttributeException) {
-            # RFC 4511 §4.5.1.7: unrecognized attribute descriptions evaluate to Undefined; yield zero entries.
-            return self::emptyStream();
-        }
-
         return $this->searchStream->buildForList(
-            $stream,
+            $this->lister->list($options),
             $request,
             $effectiveLimits,
         );
