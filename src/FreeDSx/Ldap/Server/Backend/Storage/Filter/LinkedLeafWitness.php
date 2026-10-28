@@ -15,10 +15,12 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\AttributeValueAssertionInterface;
 use FreeDSx\Ldap\Search\Filter\FilterAttributeInterface;
 use FreeDSx\Ldap\Search\Filter\FilterContainerInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -39,6 +41,7 @@ final readonly class LinkedLeafWitness
     public function __construct(
         private LinkedValueLookupInterface $links,
         private LinkedAttributes $linked,
+        private Schema $schema,
     ) {
         $this->assertedCache = new WeakMap();
     }
@@ -162,9 +165,40 @@ final readonly class LinkedLeafWitness
         }
         $normalized = Attribute::normalizeName($name);
         $asserted[$normalized] ??= [];
+        $value = $this->assertedValueOf(
+            $filter,
+            $normalized,
+        );
 
-        if ($filter instanceof AttributeValueAssertionInterface) {
-            $asserted[$normalized][] = $filter->getValue();
+        if ($value !== null) {
+            $asserted[$normalized][] = $value;
         }
+    }
+
+    /**
+     * The value the leaf asserts, or null when a linked value matching it as a DN would not answer the leaf's rule.
+     */
+    private function assertedValueOf(
+        FilterAttributeInterface $filter,
+        string $name,
+    ): ?string {
+        if ($filter instanceof AttributeValueAssertionInterface) {
+            return $filter->getValue();
+        }
+
+        if (!$filter instanceof MatchingRuleFilter) {
+            return null;
+        }
+
+        // RFC 4511 4.5.1.7.7: an extensible match is an equality match when it names no rule or the type's own.
+        $rule = $filter->getMatchingRule();
+        if ($rule === null) {
+            return $filter->getValue();
+        }
+        $equality = $this->schema->getEqualityRuleOid($name);
+
+        return $equality !== null && $this->schema->getMatchingRule($rule)?->oid === $equality
+            ? $filter->getValue()
+            : null;
     }
 }

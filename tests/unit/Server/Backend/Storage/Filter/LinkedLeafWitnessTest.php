@@ -16,50 +16,54 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Filter;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\ServerOptions;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class LinkedLeafWitnessTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const ALICE = 'cn=alice,dc=example,dc=com';
 
     private const BOB = 'cn=bob,dc=example,dc=com';
+
+    private const GROUP_C = 'cn=group-c,dc=example,dc=com';
 
     private LinkedLeafWitness $subject;
 
     protected function setUp(): void
     {
+        $storage = $this->fromContainer(InMemoryStorage::class);
         $this->subject = new LinkedLeafWitness(
-            new class implements LinkedValueLookupInterface {
-                private const HELD = [
-                    'cn=group-a,dc=example,dc=com' => ['cn=alice,dc=example,dc=com'],
-                    'cn=group-b,dc=example,dc=com' => ['cn=bob,dc=example,dc=com'],
-                ];
-
-                public function heldLinkValues(
-                    Dn $owner,
-                    string $attribute,
-                    array $values,
-                ): array {
-                    return array_values(array_intersect(
-                        $values,
-                        self::HELD[$owner->toString()] ?? [],
-                    ));
-                }
-
-                public function anyLinkValue(
-                    Dn $owner,
-                    string $attribute,
-                ): ?string {
-                    return self::HELD[$owner->toString()][0] ?? null;
-                }
-            },
-            new LinkedAttributes(SchemaResource::Core->load()),
+            $storage,
+            $this->fromContainer(LinkedAttributes::class),
+            $this->fromContainer(ServerOptions::class)->getSchema(),
         );
+
+        foreach (EntryFixture::allWithUuid(
+            $this->group(
+                'a',
+                self::ALICE,
+            ),
+            $this->group(
+                'b',
+                self::BOB,
+            ),
+            $this->group(
+                'c',
+                self::ALICE,
+            ),
+        ) as $group) {
+            $storage->store($group);
+        }
     }
 
     public function test_one_filter_witnesses_each_entry_with_only_the_values_that_entry_holds(): void
@@ -109,14 +113,77 @@ final class LinkedLeafWitnessTest extends TestCase
         );
     }
 
-    private function group(string $name): Entry
+    #[DataProvider('equalityRuleProvider')]
+    public function test_an_extensible_match_by_equality_witnesses_the_value_it_asserts(?string $rule): void
+    {
+        self::assertSame(
+            [self::GROUP_C],
+            $this->subject->witness(
+                $this->person(),
+                Filters::extensible(
+                    'memberOf',
+                    self::GROUP_C,
+                    $rule,
+                ),
+            )->get('memberOf')?->getValues(),
+        );
+    }
+
+    public function test_an_extensible_match_by_another_rule_is_not_handed_the_value_it_asserts(): void
+    {
+        self::assertNotContains(
+            self::GROUP_C,
+            $this->subject->witness(
+                $this->person(),
+                Filters::extensible(
+                    'memberOf',
+                    self::GROUP_C,
+                    'caseIgnoreMatch',
+                ),
+            )->get('memberOf')?->getValues() ?? [],
+        );
+    }
+
+    /**
+     * @return Generator<string, array{?string}>
+     */
+    public static function equalityRuleProvider(): Generator
+    {
+        yield 'no rule' => [null];
+        yield 'the equality rule by name' => ['distinguishedNameMatch'];
+        yield 'the equality rule by OID' => ['2.5.13.1'];
+    }
+
+    private function person(): Entry
     {
         return new Entry(
+            new Dn(self::ALICE),
+            new Attribute(
+                'cn',
+                'alice',
+            ),
+        );
+    }
+
+    private function group(
+        string $name,
+        string ...$members,
+    ): Entry {
+        $group = new Entry(
             new Dn("cn=group-{$name},dc=example,dc=com"),
             new Attribute(
                 'cn',
                 "group-{$name}",
             ),
         );
+
+        if ($members !== []) {
+            $group->set(
+                'member',
+                ...$members,
+            );
+        }
+
+        return $group;
     }
 }

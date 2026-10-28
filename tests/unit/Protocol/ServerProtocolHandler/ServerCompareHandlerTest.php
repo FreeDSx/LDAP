@@ -71,6 +71,7 @@ final class ServerCompareHandlerTest extends TestCase
                 new LinkedLeafWitness(
                     new NoLinkedValues(),
                     new LinkedAttributes(new Schema()),
+                    new Schema(),
                 ),
             ),
             withheld: new WithheldAttributePolicy($this->mockAccessControl),
