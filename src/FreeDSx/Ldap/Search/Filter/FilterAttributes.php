@@ -15,8 +15,6 @@ namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Entry\Attribute;
 
-use function array_merge;
-use function array_unique;
 use function array_values;
 
 /**
@@ -38,11 +36,11 @@ final class FilterAttributes
             return null;
         }
 
-        return array_values(array_unique($names));
+        return array_values($names);
     }
 
     /**
-     * @return list<string>|null
+     * @return array<string, string>|null
      */
     private static function walk(FilterInterface $filter): ?array
     {
@@ -64,12 +62,15 @@ final class FilterAttributes
             return null;
         }
 
-        return [Attribute::normalizeName($attribute)];
+        // The name is the value too, since a numeric key reads back as an int.
+        $name = Attribute::normalizeName($attribute);
+
+        return [$name => $name];
     }
 
     /**
      * @param array<FilterInterface> $children
-     * @return list<string>|null
+     * @return array<string, string>|null
      */
     private static function walkChildren(array $children): ?array
     {
@@ -82,10 +83,8 @@ final class FilterAttributes
                 return null;
             }
 
-            $names = array_merge(
-                $names,
-                $childNames,
-            );
+            // A union adds only the child's names.
+            $names += $childNames;
         }
 
         return $names;

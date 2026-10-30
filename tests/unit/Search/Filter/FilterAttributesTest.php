@@ -54,6 +54,27 @@ final class FilterAttributesTest extends TestCase
         );
     }
 
+    public function test_it_returns_a_numeric_name_as_a_string(): void
+    {
+        self::assertSame(
+            ['123', 'cn'],
+            FilterAttributes::referenced(Filters::or(
+                Filters::equal(
+                    '123',
+                    'x',
+                ),
+                Filters::equal(
+                    'cn',
+                    'y',
+                ),
+                Filters::equal(
+                    '123',
+                    'z',
+                ),
+            )),
+        );
+    }
+
     public function test_it_collects_the_extensible_match_attribute_when_present(): void
     {
         self::assertSame(
