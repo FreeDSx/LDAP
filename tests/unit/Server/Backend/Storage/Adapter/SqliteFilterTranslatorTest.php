@@ -162,8 +162,14 @@ final class SqliteFilterTranslatorTest extends TestCase
     public function test_or_composes_correlated_exists_with_or(): void
     {
         $result = $this->subject->translate(new OrFilter(
-            new EqualityFilter('cn', 'Alice'),
-            new EqualityFilter('cn', 'Bob'),
+            new EqualityFilter(
+                'cn',
+                'Alice',
+            ),
+            new EqualityFilter(
+                'sn',
+                'Bob',
+            ),
         ));
 
         self::assertNotNull($result);
@@ -1124,6 +1130,158 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
+    public function test_an_or_of_equalities_on_one_attribute_is_a_single_value_list(): void
+    {
+        $result = $this->subject->translate(new OrFilter(
+            new EqualityFilter(
+                'cn',
+                'Alice',
+            ),
+            new EqualityFilter(
+                'cn',
+                'Bob',
+            ),
+        ));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+        self::assertSame(
+            ['alice', 'bob'],
+            $result->params,
+        );
+        self::assertSame(
+            "s.attr_name_lower = 'cn' AND s.value_lower IN (?, ?)",
+            $result->sidecarCondition,
+        );
+    }
+
+    public function test_an_or_merges_equalities_per_attribute_beside_its_other_children(): void
+    {
+        $result = $this->subject->translate(new OrFilter(
+            new EqualityFilter(
+                'cn',
+                'Alice',
+            ),
+            new EqualityFilter(
+                'sn',
+                'Smith',
+            ),
+            new PresentFilter('mail'),
+            new EqualityFilter(
+                'cn',
+                'Bob',
+            ),
+        ));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+        self::assertSame(
+            3,
+            substr_count(
+                $result->sql,
+                'entry_id IN (',
+            ),
+        );
+        self::assertSame(
+            ['alice', 'bob', 'smith'],
+            $result->params,
+        );
+        self::assertStringContainsString(
+            's.value_lower IN (?, ?)',
+            $result->sql,
+        );
+    }
+
+    public function test_a_nested_or_merges_into_the_value_list_of_its_parent(): void
+    {
+        $result = $this->subject->translate(new OrFilter(
+            new OrFilter(
+                new EqualityFilter(
+                    'cn',
+                    'Alice',
+                ),
+                new EqualityFilter(
+                    'cn',
+                    'Bob',
+                ),
+            ),
+            new EqualityFilter(
+                'cn',
+                'Carol',
+            ),
+        ));
+
+        self::assertNotNull($result);
+        self::assertSame(
+            ['alice', 'bob', 'carol'],
+            $result->params,
+        );
+        self::assertSame(
+            "s.attr_name_lower = 'cn' AND s.value_lower IN (?, ?, ?)",
+            $result->sidecarCondition,
+        );
+    }
+
+    public function test_an_inexact_equality_leaves_its_merged_value_list_inexact(): void
+    {
+        $result = $this->subject->translate(new OrFilter(
+            new EqualityFilter(
+                'cn',
+                'Alice',
+            ),
+            new EqualityFilter(
+                'cn',
+                str_repeat(
+                    'b',
+                    300,
+                ),
+            ),
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+        self::assertSame(
+            1,
+            substr_count(
+                $result->sql,
+                'entry_id IN (',
+            ),
+        );
+    }
+
+    public function test_an_or_of_a_thousand_items_that_do_not_merge_is_translated_whole(): void
+    {
+        $result = $this->subject->translate(new OrFilter(...self::presences(1000)));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+        self::assertSame(
+            1000,
+            substr_count(
+                $result->sql,
+                'entry_id IN (',
+            ),
+        );
+    }
+
+    public function test_an_and_of_a_thousand_negations_is_translated_exactly(): void
+    {
+        $result = $this->subject->translate(new AndFilter(...array_map(
+            static fn(EqualityFilter $item): NotFilter => new NotFilter($item),
+            self::equalities(
+                1000,
+                'uid',
+            ),
+        )));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+        self::assertCount(
+            1000,
+            $result->params,
+        );
+    }
+
     public function test_not_present_emits_plain_not(): void
     {
         $result = $this->subject->translate(
@@ -1581,5 +1739,40 @@ final class SqliteFilterTranslatorTest extends TestCase
         $context->method('oidSpellings')->willReturnCallback($this->schemaContext->oidSpellings(...));
 
         return $context;
+    }
+
+    /**
+     * @return list<EqualityFilter>
+     */
+    private static function equalities(
+        int $count,
+        string $attribute = 'sn',
+    ): array {
+        return array_map(
+            static fn(int $i): EqualityFilter => new EqualityFilter(
+                $attribute,
+                "v{$i}",
+            ),
+            range(
+                1,
+                $count,
+            ),
+        );
+    }
+
+    /**
+     * Items binding no value, which no OR merges.
+     *
+     * @return list<PresentFilter>
+     */
+    private static function presences(int $count): array
+    {
+        return array_map(
+            static fn(): PresentFilter => new PresentFilter('sn'),
+            range(
+                1,
+                $count,
+            ),
+        );
     }
 }

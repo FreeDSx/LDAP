@@ -73,6 +73,7 @@ final class PdoChangeJournalConcurrencyTest extends JournalConcurrencyTestCase
             $provider,
             new PdoStatementPool(
                 $provider,
+                $errors,
                 $connectionLoss,
             ),
             new PdoTransactor(

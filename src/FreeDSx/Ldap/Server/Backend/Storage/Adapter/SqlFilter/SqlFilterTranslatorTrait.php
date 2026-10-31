@@ -393,14 +393,8 @@ trait SqlFilterTranslatorTrait
         );
 
         if ($spellings !== null) {
-            $condition = sprintf(
-                '%s IN (%s)',
-                $alias,
-                SqlFilterUtility::markers(count($spellings)),
-            );
-
-            return new SqlFilterResult(
-                $this->buildValueExists($attribute, $condition),
+            return $this->valueListResult(
+                $attribute,
                 array_map(
                     fn(string $spelling): string => $this->prepareMatchValue($spelling),
                     $spellings,
@@ -408,10 +402,6 @@ trait SqlFilterTranslatorTrait
                 // Exact for stored values in the OID syntax, which is every value validation lets through.
                 isExact: !$this->attributeHasOption($filter->getAttribute())
                     && $this->spellingsIndexWhole($spellings),
-                sidecarCondition: $this->sidecarCondition(
-                    $attribute,
-                    $condition,
-                ),
             );
         }
 
@@ -459,19 +449,47 @@ trait SqlFilterTranslatorTrait
             return null;
         }
 
-        $condition = $this->valueAlias() . ' = ?';
-
         // Exactness is judged before truncation, since a cut key can collide with another value's.
-        return new SqlFilterResult(
-            $this->buildValueExists($attribute, $condition),
+        return $this->valueListResult(
+            $attribute,
             [SqlFilterUtility::truncate($key)],
             isExact: $this->isExactEquality($key)
                 && $this->indexForms->hasCanonicalEqualityKey($rawAttribute)
                 && !$this->attributeHasOption($rawAttribute),
+        );
+    }
+
+    /**
+     * A leaf selecting the entries that hold any of the values under the attribute.
+     *
+     * @param string $attribute Pre-validated; safe to embed in SQL.
+     * @param list<string> $values Prepared the way the sidecar's value column holds them.
+     */
+    private function valueListResult(
+        string $attribute,
+        array $values,
+        bool $isExact,
+    ): SqlFilterResult {
+        $condition = count($values) === 1
+            ? $this->valueAlias() . ' = ?'
+            : sprintf(
+                '%s IN (%s)',
+                $this->valueAlias(),
+                SqlFilterUtility::markers(count($values)),
+            );
+
+        return new SqlFilterResult(
+            $this->buildValueExists(
+                $attribute,
+                $condition,
+            ),
+            $values,
+            isExact: $isExact,
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
                 $condition,
             ),
+            valuesOf: $attribute,
         );
     }
 
@@ -756,45 +774,29 @@ trait SqlFilterTranslatorTrait
 
     private function translateAnd(AndFilter $filter): ?SqlFilterResult
     {
-        $parts = [];
-        $correlatedParts = [];
-        $params = [];
+        $kept = [];
         $drivableLeaves = [];
-        $hasUntranslatable = false;
-        $allCorrelatable = true;
+        $isComplete = true;
 
         foreach ($filter->get() as $child) {
             $result = $this->dispatch($child);
             if ($result === null) {
-                $hasUntranslatable = true;
+                $isComplete = false;
                 continue;
             }
-            if (!$result->isExact) {
-                $hasUntranslatable = true;
-            }
-            $parts[] = '(' . $result->sql . ')';
-            array_push($params, ...$result->params);
+            $kept[] = $result;
             array_push($drivableLeaves, ...$this->drivableLeavesOf($result));
-
-            if ($result->correlatedSql !== null) {
-                $correlatedParts[] = '(' . $result->correlatedSql . ')';
-            } else {
-                $allCorrelatable = false;
-            }
         }
 
-        if ($parts === []) {
+        if ($kept === []) {
             return null;
         }
 
-        return new SqlFilterResult(
-            implode(' AND ', $parts),
-            $params,
-            isExact: !$hasUntranslatable,
-            drivableLeaves: $drivableLeaves,
-            correlatedSql: $allCorrelatable
-                ? implode(' AND ', $correlatedParts)
-                : null,
+        return $this->composite(
+            $kept,
+            'AND',
+            $isComplete,
+            $drivableLeaves,
         );
     }
 
@@ -817,42 +819,98 @@ trait SqlFilterTranslatorTrait
         return $result->drivableLeaves;
     }
 
+    /**
+     * Equalities on one attribute merge into a single value list, one condition however many values it holds.
+     */
     private function translateOr(OrFilter $filter): ?SqlFilterResult
     {
-        $parts = [];
-        $correlatedParts = [];
-        $params = [];
-        $hasInexact = false;
-        $allCorrelatable = true;
+        $children = [];
+        $values = [];
+        $isExact = [];
 
         foreach ($filter->get() as $child) {
             $result = $this->dispatch($child);
             if ($result === null) {
                 return null;
             }
-            if (!$result->isExact) {
-                $hasInexact = true;
-            }
-            $parts[] = '(' . $result->sql . ')';
-            array_push($params, ...$result->params);
+            $attribute = $result->valuesOf;
+            if ($attribute === null) {
+                $children[] = $result;
 
-            if ($result->correlatedSql !== null) {
-                $correlatedParts[] = '(' . $result->correlatedSql . ')';
-            } else {
-                $allCorrelatable = false;
+                continue;
             }
+            $values[$attribute] ??= [];
+            array_push(
+                $values[$attribute],
+                ...$result->params,
+            );
+            $isExact[$attribute] = ($isExact[$attribute] ?? true) && $result->isExact;
         }
 
-        if ($parts === []) {
-            return null;
+        foreach ($values as $attribute => $list) {
+            $children[] = $this->valueListResult(
+                $attribute,
+                $list,
+                $isExact[$attribute] ?? false,
+            );
+        }
+
+        return match (count($children)) {
+            0 => null,
+            1 => $children[0],
+            default => $this->composite(
+                $children,
+                'OR',
+            ),
+        };
+    }
+
+    /**
+     * Children joined by the operator, exact only when every child is and none was left to the evaluator.
+     *
+     * @param list<SqlFilterResult> $children
+     * @param list<SidecarLeaf> $drivableLeaves
+     */
+    private function composite(
+        array $children,
+        string $operator,
+        bool $isComplete = true,
+        array $drivableLeaves = [],
+    ): SqlFilterResult {
+        $parts = [];
+        $correlatedParts = [];
+        $params = [];
+        $isExact = $isComplete;
+        $allCorrelatable = true;
+
+        foreach ($children as $child) {
+            $parts[] = '(' . $child->sql . ')';
+            array_push(
+                $params,
+                ...$child->params,
+            );
+            $isExact = $isExact && $child->isExact;
+
+            if ($child->correlatedSql === null) {
+                $allCorrelatable = false;
+            } else {
+                $correlatedParts[] = '(' . $child->correlatedSql . ')';
+            }
         }
 
         return new SqlFilterResult(
-            implode(' OR ', $parts),
+            SqlFilterUtility::grouped(
+                $parts,
+                $operator,
+            ),
             $params,
-            isExact: !$hasInexact,
+            isExact: $isExact,
+            drivableLeaves: $drivableLeaves,
             correlatedSql: $allCorrelatable
-                ? implode(' OR ', $correlatedParts)
+                ? SqlFilterUtility::grouped(
+                    $correlatedParts,
+                    $operator,
+                )
                 : null,
         );
     }

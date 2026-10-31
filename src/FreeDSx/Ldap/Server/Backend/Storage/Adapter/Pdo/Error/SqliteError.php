@@ -23,6 +23,11 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error;
 readonly class SqliteError implements PdoErrorInterface
 {
     /**
+     * The generic error code that only the message narrows down.
+     */
+    private const ERROR_GENERIC = 1;
+
+    /**
      * The database file is locked by another writer.
      */
     private const ERROR_BUSY = 5;
@@ -41,6 +46,16 @@ readonly class SqliteError implements PdoErrorInterface
      * The database file could not be opened.
      */
     private const ERROR_CANT_OPEN = 14;
+
+    /**
+     * A string or statement longer than the build allows.
+     */
+    private const ERROR_TOO_BIG = 18;
+
+    /**
+     * What the generic code reports for a statement binding more values than the build allows.
+     */
+    private const TOO_MANY_VARIABLES = 'too many SQL variables';
 
     /**
      * A constraint was violated, which the message then names.
@@ -87,6 +102,13 @@ readonly class SqliteError implements PdoErrorInterface
             self::ERROR_IO,
             self::ERROR_CANT_OPEN,
         );
+    }
+
+    public function isStatementTooLarge(): bool
+    {
+        return $this->info->hasDriverCode(self::ERROR_TOO_BIG)
+            || ($this->info->hasDriverCode(self::ERROR_GENERIC)
+                && $this->info->driverMessage() === self::TOO_MANY_VARIABLES);
     }
 
     /**

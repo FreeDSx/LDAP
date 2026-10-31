@@ -29,6 +29,11 @@ final class SqlFilterUtility
      */
     public const MAX_INDEXED_VALUE_CHARS = 255;
 
+    /**
+     * How many parts one AND or OR joins before it nests them in a group of their own.
+     */
+    private const GROUP_SIZE = 8;
+
     private static ?StringPrep $prep = null;
 
     /**
@@ -58,6 +63,36 @@ final class SqlFilterUtility
                 $count,
                 $marker,
             ),
+        );
+    }
+
+    /**
+     * Parenthesized parts joined by the operator in nested groups that keep a wide filter's parse tree shallow.
+     *
+     * @param list<string> $parts
+     */
+    public static function grouped(
+        array $parts,
+        string $operator,
+    ): string {
+        $glue = " {$operator} ";
+
+        while (count($parts) > self::GROUP_SIZE) {
+            $parts = array_map(
+                static fn(array $group): string => '(' . implode(
+                    $glue,
+                    $group,
+                ) . ')',
+                array_chunk(
+                    $parts,
+                    self::GROUP_SIZE,
+                ),
+            );
+        }
+
+        return implode(
+            $glue,
+            $parts,
         );
     }
 

@@ -238,18 +238,20 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
     private function makeConnection(Container $container): PdoConnection
     {
         $provider = $container->get(PdoConnectionProviderInterface::class);
+        $errors = $container->get(PdoErrorFactory::class);
         $connectionLoss = $container->get(ConnectionLoss::class);
 
         return new PdoConnection(
             $provider,
             new PdoStatementPool(
                 $provider,
+                $errors,
                 $connectionLoss,
             ),
             new PdoTransactor(
                 $provider,
                 $container->get(PdoDialectInterface::class),
-                $container->get(PdoErrorFactory::class),
+                $errors,
                 $connectionLoss,
                 $container->get(SleeperInterface::class),
             ),

@@ -50,6 +50,7 @@ final class PdoConnectionTest extends TestCase
             $provider,
             new PdoStatementPool(
                 $provider,
+                $errors,
                 $connectionLoss,
             ),
             new PdoTransactor(

@@ -32,6 +32,7 @@ final class SqlFilterResult
      * @param ?string $sidecarCondition Single drivable leaf's sidecar WHERE body for the streaming fast path.
      * @param list<SidecarLeaf> $drivableLeaves A composed filter's drivable child leaves, for composed-filter streaming.
      * @param ?string $correlatedSql Explicit correlated form for composites; leaves derive it from $sidecarCondition.
+     * @param ?string $valuesOf The attribute of a leaf matching on its params alone, which an OR merges by attribute.
      */
     public function __construct(
         public readonly string $sql,
@@ -40,6 +41,7 @@ final class SqlFilterResult
         public readonly ?string $sidecarCondition = null,
         public readonly array $drivableLeaves = [],
         ?string $correlatedSql = null,
+        public readonly ?string $valuesOf = null,
     ) {
         $this->correlatedSql = $correlatedSql
             ?? ($sidecarCondition !== null ? self::correlatedLeaf($sidecarCondition) : null);
