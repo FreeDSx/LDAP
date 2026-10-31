@@ -259,6 +259,13 @@ final class LdapBackendStorageCommand extends Command
                 'Enable the cn=monitor entry',
             )
             ->addOption(
+                'memory-limit',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'The PHP memory_limit the server runs under, holding it to a known budget whatever php.ini sets',
+                '',
+            )
+            ->addOption(
                 'journal',
                 null,
                 InputOption::VALUE_OPTIONAL,
@@ -310,6 +317,17 @@ final class LdapBackendStorageCommand extends Command
         OutputInterface $output,
     ): int {
         $io = new SymfonyStyle($input, $output);
+        $memoryLimit = $this->getStringOption(
+            $input,
+            'memory-limit',
+        );
+
+        if ($memoryLimit !== '') {
+            ini_set(
+                'memory_limit',
+                $memoryLimit,
+            );
+        }
 
         $transport = $this->getStringOption($input, 'transport');
         $storage = $this->getStringOption($input, 'storage');
