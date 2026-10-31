@@ -24,6 +24,8 @@ use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Matching\Comparator\ObjectIdentifierComparator;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Server\Utility\Memo\ArrayAccessMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
 
 /**
  * Registry of schema definitions; built incrementally via add*() methods.
@@ -43,9 +45,14 @@ final class Schema
     private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
 
     /**
-     * Pairs grow with the stored descriptions times the names filters and selections ask for, and get more room.
+     * Subtype answers are kept for this many descriptions asked about, as filters and selections name them.
      */
-    private const MAX_REMEMBERED_SUBTYPE_PAIRS = 8192;
+    private const MAX_ASKED_DESCRIPTIONS = 64;
+
+    /**
+     * Subtype answers are kept for this many stored descriptions per description asked about.
+     */
+    private const MAX_STORED_DESCRIPTIONS = 128;
 
     /**
      * Rules RFC 4517 and RFC 4530 define as ordering rules.
@@ -79,29 +86,32 @@ final class Schema
     private ?array $orderingRuleOids = null;
 
     /**
-     * Whether each description seen names a confidential type.
+     * Whether each description seen names a confidential type, dropped whenever the type set changes.
      *
-     * Dropped whenever the type set changes.
-     *
-     * @var array<string, bool>
+     * @var ArrayAccessMemo<bool>
      */
-    private array $confidentialDescriptions = [];
+    private ArrayAccessMemo $confidentialDescriptions;
 
     /**
      * Whether each description seen names a type with operational usage, dropped whenever the type set changes.
      *
-     * @var array<string, bool>
+     * @var BoundedMemo<string, bool>
      */
-    private array $operationalDescriptions = [];
+    private BoundedMemo $operationalDescriptions;
 
     /**
-     * Whether each pair of descriptions seen is a subtype pair, by description then by the one it was tested against.
+     * Whether each pair of descriptions seen is a subtype pair, by the one asked about then by the stored one.
      *
-     * @var array<string, array<string, bool>>
+     * @var ArrayAccessMemo<ArrayAccessMemo<bool>>
      */
-    private array $subtypeDescriptions = [];
+    private ArrayAccessMemo $subtypeDescriptions;
 
-    private int $subtypePairs = 0;
+    /**
+     * An empty memo of stored descriptions, copied for each description asked about.
+     *
+     * @var ArrayAccessMemo<bool>
+     */
+    private ArrayAccessMemo $noStoredDescriptions;
 
     /**
      * Bound to this schema, so it is built once rather than per lookup.
@@ -123,6 +133,21 @@ final class Schema
      */
     private array $ldapSyntaxes = [];
 
+    public function __construct()
+    {
+        $this->noStoredDescriptions = new ArrayAccessMemo(self::MAX_STORED_DESCRIPTIONS);
+        $this->forgetDescriptions();
+    }
+
+    /**
+     * A copy remembers nothing its original did, and resolves OID names against its own definitions.
+     */
+    public function __clone()
+    {
+        $this->forgetDescriptions();
+        $this->objectIdentifierComparator = null;
+    }
+
     public function addAttributeType(AttributeType $type): static
     {
         $this->attributeTypes[$type->oid] = $type;
@@ -131,10 +156,7 @@ final class Schema
         }
         $this->superTypeOids = null;
         $this->orderingRuleOids = null;
-        $this->confidentialDescriptions = [];
-        $this->operationalDescriptions = [];
-        $this->subtypeDescriptions = [];
-        $this->subtypePairs = 0;
+        $this->forgetDescriptions();
 
         return $this;
     }
@@ -181,17 +203,10 @@ final class Schema
      */
     public function isConfidential(string $description): bool
     {
-        if (isset($this->confidentialDescriptions[$description])) {
-            return $this->confidentialDescriptions[$description];
-        }
-        $confidential = $this->getAttributeType(Attribute::normalizeName($description))?->isConfidential() === true;
-
-        // Stored descriptions are arbitrary. Only remember a bound number.
-        if (count($this->confidentialDescriptions) < self::MAX_REMEMBERED_DESCRIPTIONS) {
-            $this->confidentialDescriptions[$description] = $confidential;
-        }
-
-        return $confidential;
+        return $this->confidentialDescriptions->answers[$description] ?? $this->confidentialDescriptions->remember(
+            $description,
+            $this->describesConfidentialType($description),
+        );
     }
 
     /**
@@ -201,17 +216,7 @@ final class Schema
      */
     public function isOperational(string $description): bool
     {
-        if (isset($this->operationalDescriptions[$description])) {
-            return $this->operationalDescriptions[$description];
-        }
-        $usage = $this->getAttributeType(Attribute::normalizeName($description))?->usage;
-        $operational = $usage !== null && $usage !== AttributeUsage::UserApplications;
-
-        if (count($this->operationalDescriptions) < self::MAX_REMEMBERED_DESCRIPTIONS) {
-            $this->operationalDescriptions[$description] = $operational;
-        }
-
-        return $operational;
+        return $this->operationalDescriptions->for($description);
     }
 
     /**
@@ -314,20 +319,18 @@ final class Schema
         string $description,
         string $ofDescription,
     ): bool {
-        if (isset($this->subtypeDescriptions[$description][$ofDescription])) {
-            return $this->subtypeDescriptions[$description][$ofDescription];
-        }
-        $isSubtype = $this->decideDescriptionSubtypeOf(
-            $description,
+        $stored = $this->subtypeDescriptions->answers[$ofDescription] ?? $this->subtypeDescriptions->remember(
             $ofDescription,
+            clone $this->noStoredDescriptions,
         );
 
-        if ($this->subtypePairs < self::MAX_REMEMBERED_SUBTYPE_PAIRS) {
-            $this->subtypeDescriptions[$description][$ofDescription] = $isSubtype;
-            $this->subtypePairs++;
-        }
-
-        return $isSubtype;
+        return $stored->answers[$description] ?? $stored->remember(
+            $description,
+            $this->decideDescriptionSubtypeOf(
+                $description,
+                $ofDescription,
+            ),
+        );
     }
 
     /**
@@ -711,5 +714,27 @@ final class Schema
         }
 
         return $result;
+    }
+
+    private function forgetDescriptions(): void
+    {
+        $this->confidentialDescriptions = new ArrayAccessMemo(self::MAX_REMEMBERED_DESCRIPTIONS);
+        $this->operationalDescriptions = new BoundedMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            $this->describesOperationalType(...),
+        );
+        $this->subtypeDescriptions = new ArrayAccessMemo(self::MAX_ASKED_DESCRIPTIONS);
+    }
+
+    private function describesConfidentialType(string $description): bool
+    {
+        return $this->getAttributeType(Attribute::normalizeName($description))?->isConfidential() === true;
+    }
+
+    private function describesOperationalType(string $description): bool
+    {
+        $usage = $this->getAttributeType(Attribute::normalizeName($description))?->usage;
+
+        return $usage !== null && $usage !== AttributeUsage::UserApplications;
     }
 }

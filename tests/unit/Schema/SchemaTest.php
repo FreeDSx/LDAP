@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Schema;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
@@ -832,6 +833,132 @@ final class SchemaTest extends TestCase
         ));
 
         self::assertTrue($this->subject->isOperational('tracked'));
+    }
+
+    public function test_a_confidential_type_is_still_recognized_after_more_descriptions_than_are_remembered(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+
+        self::assertTrue($this->subject->isConfidential('userPassword'));
+
+        for ($i = 0; $i < 1100; $i++) {
+            self::assertFalse($this->subject->isConfidential("unknownType{$i}"));
+        }
+
+        self::assertTrue($this->subject->isConfidential('userPassword'));
+    }
+
+    public function test_an_operational_type_is_still_recognized_after_more_descriptions_than_are_remembered(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.3.6.1.1.16.4',
+            names: ['entryUUID'],
+            usage: AttributeUsage::DirectoryOperation,
+        ));
+
+        self::assertTrue($this->subject->isOperational('entryUUID'));
+
+        for ($i = 0; $i < 1100; $i++) {
+            self::assertFalse($this->subject->isOperational("unknownType{$i}"));
+        }
+
+        self::assertTrue($this->subject->isOperational('entryUUID'));
+    }
+
+    public function test_a_subtype_answer_stays_right_after_more_descriptions_than_are_remembered(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.41',
+            names: ['name'],
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn'],
+            superTypeOid: '2.5.4.41',
+        ));
+
+        self::assertTrue($this->subject->isDescriptionSubtypeOf(
+            'cn',
+            'name',
+        ));
+
+        for ($i = 0; $i < 200; $i++) {
+            self::assertTrue($this->subject->isDescriptionSubtypeOf(
+                "cn;x-stored-{$i}",
+                'name',
+            ));
+            self::assertFalse($this->subject->isDescriptionSubtypeOf(
+                'cn',
+                "name;x-asked-{$i}",
+            ));
+        }
+
+        self::assertTrue($this->subject->isDescriptionSubtypeOf(
+            'cn',
+            'name',
+        ));
+    }
+
+    public function test_a_description_longer_than_any_type_name_is_still_answered(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+        $description = 'userPassword;x-' . str_repeat(
+            'o',
+            Attribute::MAX_TYPE_LENGTH,
+        );
+
+        self::assertTrue($this->subject->isConfidential($description));
+        self::assertTrue($this->subject->isDescriptionSubtypeOf(
+            $description,
+            'userPassword',
+        ));
+        self::assertFalse($this->subject->isDescriptionSubtypeOf(
+            'userPassword',
+            $description,
+        ));
+    }
+
+    public function test_a_merged_schema_resolves_object_identifiers_against_its_own_definitions(): void
+    {
+        $this->subject->addMatchingRule(new MatchingRule(
+            oid: MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH,
+            names: [MatchingRuleOid::NAME_OBJECT_IDENTIFIER_MATCH],
+            syntaxOid: SyntaxOid::OID_OID,
+            comparator: new CaseIgnoreComparator(),
+        ));
+        $this->subject->getComparator(MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH);
+
+        $merged = $this->subject->merge((new Schema())->addObjectClass($this->person));
+
+        self::assertTrue($merged->getComparator(MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH)?->equals(
+            'person',
+            '2.5.6.6',
+        ));
+    }
+
+    public function test_a_merged_schema_answers_from_its_own_types_after_its_source_changes(): void
+    {
+        $merged = $this->subject->merge((new Schema())->addObjectClass($this->person));
+
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.4',
+            names: ['secretTracked'],
+            usage: AttributeUsage::DsaOperation,
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+
+        self::assertFalse($merged->isConfidential('secretTracked'));
+        self::assertFalse($merged->isOperational('secretTracked'));
+        self::assertTrue($this->subject->isConfidential('secretTracked'));
+        self::assertTrue($this->subject->isOperational('secretTracked'));
     }
 
     public function test_a_standard_ordering_rule_is_an_ordering_rule_when_no_type_names_it(): void

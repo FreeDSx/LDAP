@@ -184,6 +184,32 @@ final class ValueLimitCheckTest extends TestCase
         );
     }
 
+    public function test_a_type_cap_still_holds_after_more_types_than_are_remembered(): void
+    {
+        $undefined = array_map(
+            static fn(int $i): Attribute => new Attribute(
+                "undefinedType{$i}",
+                'value',
+            ),
+            range(
+                1,
+                1100,
+            ),
+        );
+
+        self::assertSame(
+            [],
+            $this->check(SchemaWrite::add($this->gadgetEntry(...$undefined))),
+        );
+        self::assertEquals(
+            [self::violation('Attribute "gadgetStricter" holds 2 values, which is beyond the limit of 1.')],
+            $this->check(SchemaWrite::add($this->gadgetEntry(new Attribute(
+                'gadgetStricter',
+                ...self::values(2),
+            )))),
+        );
+    }
+
     public function test_a_modify_staying_within_the_value_limit_passes(): void
     {
         $write = SchemaWrite::modify(

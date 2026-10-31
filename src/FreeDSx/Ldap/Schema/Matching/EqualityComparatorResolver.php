@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Schema\Matching;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
 
 /**
  * Resolves the EQUALITY rule an attribute type has, so every path deciding value equality asks the same question.
@@ -24,24 +25,31 @@ use FreeDSx\Ldap\Schema\Schema;
  */
 final class EqualityComparatorResolver
 {
+    private const MAX_REMEMBERED_TYPES = 1024;
+
     /**
-     * @var array<string, MatchingRuleComparatorInterface> Memoized per type, since resolving walks the SUP chain.
+     * Memoized per type, since resolving walks the SUP chain.
+     *
+     * @var BoundedMemo<string, MatchingRuleComparatorInterface>
      */
-    private array $resolved = [];
+    private readonly BoundedMemo $resolved;
 
     public function __construct(
         private readonly Schema $schema,
         private readonly MatchingRuleComparatorInterface $default = new CaseIgnoreComparator(),
-    ) {}
+    ) {
+        $this->resolved = new BoundedMemo(
+            self::MAX_REMEMBERED_TYPES,
+            $this->resolve(...),
+        );
+    }
 
     /**
      * Falls back to the default when the type is undefined or has no rule anything implements.
      */
     public function for(string $attributeName): MatchingRuleComparatorInterface
     {
-        $type = Attribute::normalizeName($attributeName);
-
-        return $this->resolved[$type] ??= $this->resolve($type);
+        return $this->resolved->for(Attribute::normalizeName($attributeName));
     }
 
     private function resolve(string $type): MatchingRuleComparatorInterface
