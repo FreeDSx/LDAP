@@ -60,6 +60,31 @@ final class SqliteErrorTest extends TestCase
         self::assertFalse($this->errorWithDriverCode(19)->isConnectionLost());
     }
 
+    public function test_binding_more_values_than_the_build_allows_is_a_statement_too_large(): void
+    {
+        $error = $this->errorWithDriverCode(
+            1,
+            'too many SQL variables',
+        );
+
+        self::assertTrue($error->isStatementTooLarge());
+    }
+
+    public function test_a_statement_longer_than_the_build_allows_is_a_statement_too_large(): void
+    {
+        self::assertTrue($this->errorWithDriverCode(18)->isStatementTooLarge());
+    }
+
+    public function test_another_generic_error_is_not_a_statement_too_large(): void
+    {
+        $error = $this->errorWithDriverCode(
+            1,
+            'no such table: entries',
+        );
+
+        self::assertFalse($error->isStatementTooLarge());
+    }
+
     public function test_a_unique_failure_on_the_dn_is_a_duplicate_dn_only(): void
     {
         $error = $this->errorWithDriverCode(

@@ -171,4 +171,64 @@ final class SqlFilterUtilityTest extends TestCase
 
         SqlFilterUtility::prefixUpperBound("a\xFF");
     }
+
+    public function test_up_to_eight_parts_are_joined_without_nesting(): void
+    {
+        self::assertSame(
+            '(a) OR (b) OR (c) OR (d) OR (e) OR (f) OR (g) OR (h)',
+            SqlFilterUtility::grouped(
+                ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)', '(g)', '(h)'],
+                'OR',
+            ),
+        );
+    }
+
+    public function test_more_than_eight_parts_are_nested_in_groups_of_eight(): void
+    {
+        self::assertSame(
+            '((a) AND (b) AND (c) AND (d) AND (e) AND (f) AND (g) AND (h)) AND ((i))',
+            SqlFilterUtility::grouped(
+                ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)', '(g)', '(h)', '(i)'],
+                'AND',
+            ),
+        );
+    }
+
+    public function test_the_nesting_grows_with_the_log_of_the_parts(): void
+    {
+        $sql = SqlFilterUtility::grouped(
+            array_fill(
+                0,
+                4096,
+                '(x)',
+            ),
+            'OR',
+        );
+        $depth = 0;
+        $deepest = 0;
+
+        foreach (str_split($sql) as $character) {
+            $depth += match ($character) {
+                '(' => 1,
+                ')' => -1,
+                default => 0,
+            };
+            $deepest = max(
+                $deepest,
+                $depth,
+            );
+        }
+
+        self::assertSame(
+            4,
+            $deepest,
+        );
+        self::assertSame(
+            4096,
+            substr_count(
+                $sql,
+                '(x)',
+            ),
+        );
+    }
 }

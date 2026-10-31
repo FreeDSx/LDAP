@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StatementTooLargeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use PDO;
@@ -29,6 +30,11 @@ use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 
 final class PdoStatementPoolTest extends TestCase
 {
+    /**
+     * Past the 250,000 that distribution builds raise the bound-parameter limit to.
+     */
+    private const MORE_VALUES_THAN_ANY_BUILD_BINDS = 250_001;
+
     private RecordingPdo $pdo;
 
     private PdoStatementPool $subject;
@@ -86,6 +92,7 @@ final class PdoStatementPoolTest extends TestCase
         $provider = new SharedPdoConnectionProvider($this->pdo);
         $pool = new PdoStatementPool(
             $provider,
+            new PdoErrorFactory(PdoDriver::Sqlite),
             $this->connectionLossOver($provider),
             maxQueries: 2,
         );
@@ -234,10 +241,37 @@ final class PdoStatementPoolTest extends TestCase
         $this->subject->execute('SELECT missing FROM t');
     }
 
+    public function test_a_statement_binding_more_values_than_the_database_allows_is_an_administrative_limit(): void
+    {
+        $values = range(
+            1,
+            self::MORE_VALUES_THAN_ANY_BUILD_BINDS,
+        );
+
+        $this->expectException(StatementTooLargeException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->subject->execute(
+            sprintf(
+                'SELECT name FROM t WHERE id IN (%s)',
+                implode(
+                    ', ',
+                    array_fill(
+                        0,
+                        count($values),
+                        '?',
+                    ),
+                ),
+            ),
+            $values,
+        );
+    }
+
     private function poolOver(SharedPdoConnectionProvider $provider): PdoStatementPool
     {
         return new PdoStatementPool(
             $provider,
+            new PdoErrorFactory(PdoDriver::Sqlite),
             $this->connectionLossOver($provider),
         );
     }

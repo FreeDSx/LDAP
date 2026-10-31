@@ -498,6 +498,7 @@ final class PdoChangeJournalTest extends TestCase
             $provider,
             new PdoStatementPool(
                 $provider,
+                $errors,
                 $connectionLoss,
             ),
             new PdoTransactor(

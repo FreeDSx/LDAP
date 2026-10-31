@@ -45,6 +45,11 @@ readonly class MysqlError implements PdoErrorInterface
     private const ERROR_DATA_TOO_LONG = 1406;
 
     /**
+     * Prepared statement contains too many placeholders.
+     */
+    private const ERROR_TOO_MANY_PLACEHOLDERS = 1390;
+
+    /**
      * Errors after which the connection is gone, whether the client lost it or the server ended it.
      */
     private const CONNECTION_LOST_ERRORS = [
@@ -98,6 +103,11 @@ readonly class MysqlError implements PdoErrorInterface
     {
         return $this->info->isConnectionException()
             || $this->info->hasDriverCode(...self::CONNECTION_LOST_ERRORS);
+    }
+
+    public function isStatementTooLarge(): bool
+    {
+        return $this->info->hasDriverCode(self::ERROR_TOO_MANY_PLACEHOLDERS);
     }
 
     /**

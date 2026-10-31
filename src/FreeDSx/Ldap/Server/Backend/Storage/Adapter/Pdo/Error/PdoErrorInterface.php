@@ -44,4 +44,9 @@ interface PdoErrorInterface
      * Whether the connection itself is gone and has to be replaced before it is used again.
      */
     public function isConnectionLost(): bool;
+
+    /**
+     * Whether the database refused a statement for binding more values, or holding more text, than it accepts.
+     */
+    public function isStatementTooLarge(): bool;
 }

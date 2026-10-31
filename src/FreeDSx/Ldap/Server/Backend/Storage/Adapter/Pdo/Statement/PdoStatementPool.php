@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\ConnectionLoss;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StatementTooLargeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use PDO;
 use PDOException;
@@ -37,6 +39,7 @@ final class PdoStatementPool
 
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
+        private readonly PdoErrorFactory $errors,
         private readonly ConnectionLoss $connectionLoss,
         private readonly int $maxQueries = self::DEFAULT_MAX_QUERIES,
     ) {
@@ -50,6 +53,7 @@ final class PdoStatementPool
      * @param list<string|int|null> $params
      *
      * @throws StorageIoException when the statement cannot be prepared, or the connection to the database is lost
+     * @throws StatementTooLargeException when the database refuses the statement as too large
      */
     public function execute(
         string $query,
@@ -70,7 +74,7 @@ final class PdoStatementPool
             );
             $statement->execute();
         } catch (PDOException $e) {
-            throw $this->connectionLoss->translate($e);
+            throw $this->failureOf($e);
         }
 
         return new PooledStatement(
@@ -96,6 +100,21 @@ final class PdoStatementPool
     private function forget(PDO $pdo): void
     {
         unset($this->pools[spl_object_id($pdo)]);
+    }
+
+    /**
+     * A statement too large for the database is answerable, and anything else is checked for a lost connection.
+     */
+    private function failureOf(PDOException $exception): StatementTooLargeException|StorageIoException|PDOException
+    {
+        if ($this->errors->of($exception)->isStatementTooLarge()) {
+            return new StatementTooLargeException(
+                'The database refused the statement as too large.',
+                $exception,
+            );
+        }
+
+        return $this->connectionLoss->translate($exception);
     }
 
     /**

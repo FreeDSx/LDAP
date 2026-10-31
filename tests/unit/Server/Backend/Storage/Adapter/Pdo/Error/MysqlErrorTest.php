@@ -52,6 +52,16 @@ final class MysqlErrorTest extends TestCase
         self::assertTrue($this->errorWithDriverCode(1406)->isValueTooLong());
     }
 
+    public function test_too_many_placeholders_is_a_statement_too_large(): void
+    {
+        self::assertTrue($this->errorWithDriverCode(1390)->isStatementTooLarge());
+    }
+
+    public function test_an_unrelated_database_error_is_not_a_statement_too_large(): void
+    {
+        self::assertFalse($this->errorWithDriverCode(1064)->isStatementTooLarge());
+    }
+
     public function test_an_unrelated_database_error_is_not_a_value_too_long(): void
     {
         self::assertFalse($this->errorWithDriverCode(1062)->isValueTooLong());
