@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Utility\Memo;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 use PHPUnit\Framework\TestCase;
 
 use function str_repeat;
@@ -27,6 +28,11 @@ final class BoundedMemoTest extends TestCase
     private BoundedMemo $subject;
 
     /**
+     * @var BoundedMemo<string, string>
+     */
+    private BoundedMemo $requestMemo;
+
+    /**
      * @var list<string>
      */
     private array $computed = [];
@@ -35,6 +41,12 @@ final class BoundedMemoTest extends TestCase
     {
         $this->subject = new BoundedMemo(
             2,
+            MemoScope::Process,
+            $this->answerFor(...),
+        );
+        $this->requestMemo = new BoundedMemo(
+            2,
+            MemoScope::Request,
             $this->answerFor(...),
         );
     }
@@ -75,6 +87,20 @@ final class BoundedMemoTest extends TestCase
 
         self::assertSame(
             ['a', 'b', 'c', 'b'],
+            $this->computed,
+        );
+    }
+
+    public function test_a_request_memo_keeps_its_first_answers_when_full(): void
+    {
+        $this->requestMemo->for('a');
+        $this->requestMemo->for('b');
+        $this->requestMemo->for('c');
+        $this->requestMemo->for('a');
+        $this->requestMemo->for('c');
+
+        self::assertSame(
+            ['a', 'b', 'c', 'c'],
             $this->computed,
         );
     }

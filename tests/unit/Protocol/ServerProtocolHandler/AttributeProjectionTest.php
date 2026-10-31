@@ -55,6 +55,24 @@ final class AttributeProjectionTest extends TestCase
         );
     }
 
+    public function test_a_selection_stays_right_after_more_descriptions_than_are_remembered(): void
+    {
+        $projection = AttributeProjection::forRequest(
+            [new Attribute('cn')],
+            false,
+            $this->schema,
+        );
+
+        self::assertTrue($projection->includes(new Attribute('cn')));
+
+        for ($i = 0; $i < 1100; $i++) {
+            self::assertFalse($projection->includes(new Attribute("undefinedType{$i}")));
+        }
+
+        self::assertTrue($projection->includes(new Attribute('cn')));
+        self::assertFalse($projection->includes(new Attribute('sn')));
+    }
+
     public function test_star_selector_returns_only_user_attributes(): void
     {
         $projection = AttributeProjection::forRequest(

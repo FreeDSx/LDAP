@@ -139,6 +139,26 @@ final class StrippedEntryMatcherTest extends TestCase
         );
     }
 
+    public function test_an_answer_stays_right_after_more_types_than_are_remembered(): void
+    {
+        $filter = Filters::equal(
+            'name',
+            'alice',
+        );
+
+        for ($i = 0; $i < 300; $i++) {
+            self::assertFalse($this->subject->concerns(
+                $filter,
+                "undefinedtype{$i}",
+            ));
+        }
+
+        self::assertTrue($this->subject->concerns(
+            $filter,
+            'cn',
+        ));
+    }
+
     public function test_withholding_anything_concerns_an_extensible_match_naming_no_attribute(): void
     {
         self::assertTrue($this->subject->concerns(

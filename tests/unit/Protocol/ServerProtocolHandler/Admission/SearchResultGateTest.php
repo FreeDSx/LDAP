@@ -117,6 +117,40 @@ final class SearchResultGateTest extends TestCase
         );
     }
 
+    public function test_decisions_stay_right_for_descriptions_past_those_remembered(): void
+    {
+        $fillers = array_map(
+            static fn(int $i): string => "x-filler-{$i}",
+            range(
+                1,
+                1100,
+            ),
+        );
+        $entry = new Entry(
+            new Dn('cn=a,dc=foo,dc=bar'),
+            ...array_map(
+                static fn(string $name): Attribute => new Attribute(
+                    $name,
+                    'value',
+                ),
+                $fillers,
+            ),
+            ...$this->person('cn=a,dc=foo,dc=bar')->getAttributes(),
+        );
+        $gate = $this->gate($this->allowing(AttributeRule::deny(
+            Subject::anyone(),
+            Target::any(),
+            'userPassword',
+        )->forRead()));
+
+        $gate->admit($entry);
+
+        self::assertSame(
+            [...$fillers, 'cn', 'mail'],
+            $this->descriptions($gate->admit($entry)),
+        );
+    }
+
     public function test_an_entry_that_stops_matching_once_stripped_is_not_returned(): void
     {
         $this->mockEvaluator

@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Utility\Memo;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Server\Utility\Memo\ArrayAccessMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 use PHPUnit\Framework\TestCase;
 
 use function str_repeat;
@@ -26,9 +27,21 @@ final class ArrayAccessMemoTest extends TestCase
      */
     private ArrayAccessMemo $subject;
 
+    /**
+     * @var ArrayAccessMemo<string>
+     */
+    private ArrayAccessMemo $requestMemo;
+
     protected function setUp(): void
     {
-        $this->subject = new ArrayAccessMemo(2);
+        $this->subject = new ArrayAccessMemo(
+            2,
+            MemoScope::Process,
+        );
+        $this->requestMemo = new ArrayAccessMemo(
+            2,
+            MemoScope::Request,
+        );
     }
 
     public function test_it_returns_the_answer_it_remembers(): void
@@ -73,6 +86,33 @@ final class ArrayAccessMemoTest extends TestCase
         self::assertSame(
             ['c' => 'z'],
             $this->subject->answers,
+        );
+    }
+
+    public function test_a_request_memo_keeps_its_first_answers_when_full(): void
+    {
+        $this->requestMemo->remember(
+            'a',
+            'x',
+        );
+        $this->requestMemo->remember(
+            'b',
+            'y',
+        );
+
+        self::assertSame(
+            'z',
+            $this->requestMemo->remember(
+                'c',
+                'z',
+            ),
+        );
+        self::assertSame(
+            [
+                'a' => 'x',
+                'b' => 'y',
+            ],
+            $this->requestMemo->answers,
         );
     }
 
