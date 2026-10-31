@@ -13,29 +13,23 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
+use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+
 /**
  * The attribute types a filter reads, and which removed types have been found to concern them.
  *
  * @internal
  */
-class FilterReadSet
+readonly class FilterReadSet
 {
-    /**
-     * Bounds the removed types remembered per filter, since stored attribute names are arbitrary.
-     */
-    public const MAX_REMEMBERED = 256;
-
-    /**
-     * @var array<string, bool> Whether removing a lowercased base type can change what the filter reads.
-     */
-    public array $concerns = [];
-
     /**
      * @param list<string>|null $types Lowercased base types the filter reads, or null when every removal must be judged.
      * @param list<string> $linked The lowercased linked types among them, whose values an entry need not carry.
+     * @param BoundedMemo<string, bool> $concerns Whether removing a lowercased base type changes what the filter reads.
      */
     public function __construct(
-        public readonly ?array $types,
-        public readonly array $linked = [],
+        public ?array $types,
+        public array $linked,
+        public BoundedMemo $concerns,
     ) {}
 }

@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Utility\Memo\ArrayAccessMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 
 /**
  * Projects an entry onto a search request's attribute selection list (RFC 4511 §4.5.1.8, RFC 3673).
@@ -42,11 +44,16 @@ final class AttributeProjection
     ];
 
     /**
+     * Stored descriptions are arbitrary, and only these many decisions are remembered.
+     */
+    private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
+
+    /**
      * Per-instance memo of the selection decision keyed on attribute description.
      *
-     * @var array<string, bool>
+     * @var ArrayAccessMemo<bool>
      */
-    private array $includeByDescription = [];
+    private ArrayAccessMemo $includeByDescription;
 
     /**
      * @param string[] $names
@@ -61,7 +68,12 @@ final class AttributeProjection
         private readonly bool $namesNoType,
         private readonly array $rangeSliceTypes,
         private readonly Schema $schema,
-    ) {}
+    ) {
+        $this->includeByDescription = new ArrayAccessMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Request,
+        );
+    }
 
     /**
      * @param Attribute[] $requestedAttrs
@@ -101,10 +113,21 @@ final class AttributeProjection
         }
 
         $attributes = $entry->getAttributes();
-        $selected = array_values(array_filter(
-            $attributes,
-            $this->includes(...),
-        ));
+        $memo = $this->includeByDescription;
+        $selected = [];
+
+        // Kept inline for performance reasons.
+        foreach ($attributes as $attribute) {
+            $description = $attribute->getDescription();
+            $included = $memo->answers[$description] ?? $memo->remember(
+                $description,
+                $this->decideInclude($attribute),
+            );
+
+            if ($included) {
+                $selected[] = $attribute;
+            }
+        }
 
         return $this->withAttributes(
             $entry,
@@ -118,8 +141,12 @@ final class AttributeProjection
      */
     public function includes(Attribute $attribute): bool
     {
-        return $this->includeByDescription[$attribute->getDescription()]
-            ??= $this->decideInclude($attribute);
+        $description = $attribute->getDescription();
+
+        return $this->includeByDescription->answers[$description] ?? $this->includeByDescription->remember(
+            $description,
+            $this->decideInclude($attribute),
+        );
     }
 
     /**

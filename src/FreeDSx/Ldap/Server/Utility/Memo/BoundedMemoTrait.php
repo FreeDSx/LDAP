@@ -20,7 +20,7 @@ use function is_string;
 use function strlen;
 
 /**
- * Holds at most a fixed number of answers, emptying before it would hold more.
+ * Holds at most a fixed number of answers, emptying or keeping its first ones once full as its scope decides.
  *
  * @template T
  *
@@ -42,7 +42,11 @@ trait BoundedMemoTrait
         if (is_string($key) && strlen($key) > Attribute::MAX_TYPE_LENGTH) {
             return $answer;
         }
-        if (count($this->answers) >= $this->capacity) {
+        $full = count($this->answers) >= $this->capacity;
+        if ($full && $this->scope === MemoScope::Request) {
+            return $answer;
+        }
+        if ($full) {
             $this->answers = [];
         }
         $this->answers[$key] = $answer;

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 
 /**
  * Resolves the EQUALITY rule an attribute type has, so every path deciding value equality asks the same question.
@@ -40,6 +41,7 @@ final class EqualityComparatorResolver
     ) {
         $this->resolved = new BoundedMemo(
             self::MAX_REMEMBERED_TYPES,
+            MemoScope::Process,
             $this->resolve(...),
         );
     }

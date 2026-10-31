@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 
 use function count;
 use function sprintf;
@@ -52,6 +53,7 @@ class ValueLimitCheck implements SchemaCheckInterface
     ) {
         $this->valueLimits = new BoundedMemo(
             self::MAX_REMEMBERED_TYPES,
+            MemoScope::Process,
             $this->resolveValueLimit(...),
         );
     }

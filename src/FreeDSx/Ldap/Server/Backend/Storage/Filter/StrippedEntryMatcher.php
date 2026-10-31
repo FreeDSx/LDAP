@@ -19,9 +19,9 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 use WeakMap;
-
-use function count;
 
 /**
  * Tells whether withholding an attribute can change a filter's answer, and judges an entry again when it did.
@@ -30,6 +30,11 @@ use function count;
  */
 class StrippedEntryMatcher
 {
+    /**
+     * Bounds the removed types remembered per filter, since stored attribute names are arbitrary.
+     */
+    private const MAX_REMEMBERED_CONCERNS = 256;
+
     /**
      * @var WeakMap<FilterInterface, FilterReadSet>
      */
@@ -52,22 +57,9 @@ class StrippedEntryMatcher
         string $type,
     ): bool {
         $readSet = $this->readSetOf($filter);
-        if ($readSet->types === null) {
-            return true;
-        }
 
-        if (isset($readSet->concerns[$type])) {
-            return $readSet->concerns[$type];
-        }
-        $concerns = $this->isRead(
-            $readSet,
-            $type,
-        );
-        if (count($readSet->concerns) < FilterReadSet::MAX_REMEMBERED) {
-            $readSet->concerns[$type] = $concerns;
-        }
-
-        return $concerns;
+        return $readSet->types === null
+            || $readSet->concerns->for($type);
     }
 
     /**
@@ -131,17 +123,27 @@ class StrippedEntryMatcher
         return new FilterReadSet(
             $types,
             $linked,
+            new BoundedMemo(
+                self::MAX_REMEMBERED_CONCERNS,
+                MemoScope::Request,
+                fn(string $type): bool => $this->isRead(
+                    $types,
+                    $type,
+                ),
+            ),
         );
     }
 
     /**
      * Whether the filter reads the type, directly or as a subtype of one it names.
+     *
+     * @param list<string>|null $types
      */
     private function isRead(
-        FilterReadSet $readSet,
+        ?array $types,
         string $type,
     ): bool {
-        foreach ($readSet->types ?? [] as $readType) {
+        foreach ($types ?? [] as $readType) {
             if ($type === $readType || $this->schema->isTypeOrSubtypeOf($type, $readType)) {
                 return true;
             }

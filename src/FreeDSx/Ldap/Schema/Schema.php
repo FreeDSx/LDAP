@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Schema\Matching\Comparator\ObjectIdentifierComparator;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Server\Utility\Memo\ArrayAccessMemo;
 use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 
 /**
  * Registry of schema definitions; built incrementally via add*() methods.
@@ -135,7 +136,10 @@ final class Schema
 
     public function __construct()
     {
-        $this->noStoredDescriptions = new ArrayAccessMemo(self::MAX_STORED_DESCRIPTIONS);
+        $this->noStoredDescriptions = new ArrayAccessMemo(
+            self::MAX_STORED_DESCRIPTIONS,
+            MemoScope::Process,
+        );
         $this->forgetDescriptions();
     }
 
@@ -718,12 +722,19 @@ final class Schema
 
     private function forgetDescriptions(): void
     {
-        $this->confidentialDescriptions = new ArrayAccessMemo(self::MAX_REMEMBERED_DESCRIPTIONS);
+        $this->confidentialDescriptions = new ArrayAccessMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Process,
+        );
         $this->operationalDescriptions = new BoundedMemo(
             self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Process,
             $this->describesOperationalType(...),
         );
-        $this->subtypeDescriptions = new ArrayAccessMemo(self::MAX_ASKED_DESCRIPTIONS);
+        $this->subtypeDescriptions = new ArrayAccessMemo(
+            self::MAX_ASKED_DESCRIPTIONS,
+            MemoScope::Process,
+        );
     }
 
     private function describesConfidentialType(string $description): bool

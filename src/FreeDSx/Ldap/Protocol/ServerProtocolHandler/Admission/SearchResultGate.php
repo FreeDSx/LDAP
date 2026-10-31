@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
 use FreeDSx\Ldap\Server\AccessControl\Read\ReadVerdict;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\StrippedEntryMatcher;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\Server\Utility\Memo\ArrayAccessMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 
 use function count;
 
@@ -38,9 +40,11 @@ final class SearchResultGate
     private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
 
     /**
-     * @var array<string, AttributeAdmission|bool> A bool when the description is returned or dropped on every entry.
+     * A bool when the description is returned or dropped on every entry.
+     *
+     * @var ArrayAccessMemo<AttributeAdmission|bool>
      */
-    private array $admissions = [];
+    private ArrayAccessMemo $admissions;
 
     /**
      * Decisions are only kept from the second entry, since a request returning one gains nothing from them.
@@ -63,6 +67,10 @@ final class SearchResultGate
     ) {
         $this->scope = $this->accessControl->readScope($this->token);
         $this->linkedReads = $this->linkedReadsOf($this->scope);
+        $this->admissions = new ArrayAccessMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Request,
+        );
     }
 
     public static function forRequest(
@@ -94,12 +102,13 @@ final class SearchResultGate
 
         $dn = $entry->getDn();
         $all = $entry->getAttributes();
+        $admissions = $this->admissions;
         $returned = [];
         $withheld = [];
 
         // Kept inline for performance reasons.
         foreach ($all as $attribute) {
-            $admission = $this->admissions[$attribute->getDescription()] ?? $this->admissionFor($attribute);
+            $admission = $admissions->answers[$attribute->getDescription()] ?? $this->admissionFor($attribute);
 
             if ($admission === true) {
                 $returned[] = $attribute;
@@ -157,7 +166,10 @@ final class SearchResultGate
 
         $this->scope = $this->accessControl->readScope($this->token);
         $this->linkedReads = $this->linkedReadsOf($this->scope);
-        $this->admissions = [];
+        $this->admissions = new ArrayAccessMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Request,
+        );
     }
 
     /**
@@ -187,11 +199,14 @@ final class SearchResultGate
         $decided = $this->decideAdmission($attribute);
         $admission = $decided->returnedOnEveryEntry() ?? $decided;
 
-        if ($this->remembering && count($this->admissions) < self::MAX_REMEMBERED_DESCRIPTIONS) {
-            $this->admissions[$description] = $admission;
+        if (!$this->remembering) {
+            return $admission;
         }
 
-        return $admission;
+        return $this->admissions->remember(
+            $description,
+            $admission,
+        );
     }
 
     /**

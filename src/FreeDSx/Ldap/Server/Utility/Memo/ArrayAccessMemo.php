@@ -34,5 +34,8 @@ class ArrayAccessMemo
      */
     public array $answers = [];
 
-    public function __construct(private readonly int $capacity) {}
+    public function __construct(
+        private readonly int $capacity,
+        private readonly MemoScope $scope,
+    ) {}
 }

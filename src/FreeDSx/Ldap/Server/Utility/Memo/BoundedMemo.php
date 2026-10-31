@@ -44,6 +44,7 @@ class BoundedMemo
      */
     public function __construct(
         private readonly int $capacity,
+        private readonly MemoScope $scope,
         private readonly Closure $compute,
     ) {}
 
