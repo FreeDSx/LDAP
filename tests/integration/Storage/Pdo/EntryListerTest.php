@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnecti
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
@@ -32,6 +33,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
@@ -209,7 +212,7 @@ final class EntryListerTest extends TestCase
      */
     public function test_a_substring_match_past_the_indexed_window_is_still_a_candidate(): void
     {
-        [$subject, $storage] = $this->trigramIndexed();
+        [$subject, $storage] = $this->indexed(SubstringIndexMode::Trigram);
         $storage->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=late,dc=example,dc=com'),
             new Attribute('cn', 'late'),
@@ -227,7 +230,7 @@ final class EntryListerTest extends TestCase
 
     public function test_a_substring_inside_the_indexed_window_still_narrows(): void
     {
-        [$subject, $storage] = $this->trigramIndexed();
+        [$subject, $storage] = $this->indexed(SubstringIndexMode::Trigram);
         $storage->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=hit,dc=example,dc=com'),
             new Attribute('cn', 'hit'),
@@ -246,6 +249,87 @@ final class EntryListerTest extends TestCase
                 Filters::contains('sn', 'needle'),
             ),
         );
+    }
+
+    #[DataProvider('preparedSubstringProvider')]
+    public function test_a_substring_index_admits_a_value_its_rule_prepares_to_hold_the_fragment(
+        SubstringIndexMode $mode,
+        string $value,
+        string $fragment,
+    ): void {
+        if ($mode === SubstringIndexMode::Auto && !Fts5SubstringIndex::isSupported()) {
+            self::markTestSkipped('This SQLite build has no FTS5 trigram tokenizer.');
+        }
+        [$subject, $storage] = $this->indexed($mode);
+        $storage->store(EntryFixture::withUuid(new Entry(
+            new Dn('cn=prepared,dc=example,dc=com'),
+            new Attribute(
+                'cn',
+                'prepared',
+            ),
+            new Attribute(
+                'sn',
+                $value,
+            ),
+        )));
+
+        self::assertSame(
+            ['cn=prepared,dc=example,dc=com'],
+            $this->dnsFrom(
+                $subject,
+                Filters::contains(
+                    'sn',
+                    $fragment,
+                ),
+            ),
+        );
+    }
+
+    /**
+     * @return Generator<string, array{SubstringIndexMode, string, string}>
+     */
+    public static function preparedSubstringProvider(): Generator
+    {
+        $cases = [
+            'a sharp s asked for spelled out' => [
+                'Straße',
+                'strasse',
+            ],
+            'a spelled-out form asked for with a sharp s' => [
+                'Strasse',
+                'traße',
+            ],
+            'a ligature' => [
+                "Con\u{FB01}dential",
+                'onfid',
+            ],
+            'fullwidth letters' => [
+                "\u{FF33}\u{FF2D}\u{FF29}\u{FF34}\u{FF28}",
+                'mit',
+            ],
+            'a soft hyphen' => [
+                "Ever\u{00AD}green",
+                'ergre',
+            ],
+            'a no-break space' => [
+                "New\u{00A0}York",
+                'w y',
+            ],
+            'repeated spaces' => [
+                'Mary   Ann',
+                'ry an',
+            ],
+        ];
+
+        foreach ([SubstringIndexMode::Trigram, SubstringIndexMode::Auto] as $mode) {
+            foreach ($cases as $name => [$value, $fragment]) {
+                yield "{$mode->name} index, {$name}" => [
+                    $mode,
+                    $value,
+                    $fragment,
+                ];
+            }
+        }
     }
 
     public function test_a_listed_entry_carries_its_linked_values(): void
@@ -557,15 +641,15 @@ final class EntryListerTest extends TestCase
     }
 
     /**
-     * A lister and storage over a fresh database set up with the trigram substring index.
+     * A lister and storage over a fresh database set up with the given substring index.
      *
      * @return array{EntryLister, EntryWriter}
      */
-    private function trigramIndexed(): array
+    private function indexed(SubstringIndexMode $mode): array
     {
         $container = Container::forServer(TestServerOptions::forStorage(
             PdoConfig::forSqlite(':memory:')
-                ->setSubstringIndexMode(SubstringIndexMode::Trigram),
+                ->setSubstringIndexMode($mode),
         ));
         $storage = $container->get(EntryWriter::class);
         $storage->store(EntryFixture::withUuid(new Entry(

@@ -69,8 +69,9 @@ $server->reindex();
 ```
 
 It re-stores every entry in one transaction, leaving operational attributes untouched and journaling nothing. Run it
-after enabling substring indexing, changing which attributes it covers, or changing an attribute's `EQUALITY` or
-`SUBSTR` rule. It rewrites every row, so treat it as maintenance rather than a startup step.
+after enabling substring indexing, changing which attributes it covers, changing an attribute's `EQUALITY` or
+`SUBSTR` rule, or upgrading to a release whose CHANGELOG notes a change to how values are indexed. It rewrites every
+row, so treat it as maintenance rather than a startup step.
 
 ## The Linked Attribute Tables
 

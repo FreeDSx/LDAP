@@ -26,10 +26,10 @@ final class TrigramsTest extends TestCase
         );
     }
 
-    public function test_it_lowercases_before_extracting(): void
+    public function test_it_keeps_the_case_the_value_was_prepared_in(): void
     {
         self::assertSame(
-            ['smi', 'mit', 'ith'],
+            ['SMI', 'MIT', 'ITH'],
             Trigrams::of('SMITH'),
         );
     }

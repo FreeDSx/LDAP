@@ -564,7 +564,7 @@ final class EntryWriterTest extends TestCase
         );
     }
 
-    public function test_store_keeps_the_original_value_only_where_the_index_reads_it(): void
+    public function test_store_keeps_the_prepared_value_only_where_the_index_reads_it(): void
     {
         if (!Fts5SubstringIndex::isSupported()) {
             self::markTestSkipped('This SQLite build lacks the FTS5 trigram tokenizer.');
@@ -572,7 +572,7 @@ final class EntryWriterTest extends TestCase
 
         self::assertSame(
             [
-                'cn' => 'Smith',
+                'cn' => 'smith',
                 'description' => '',
             ],
             $this->originalValuesFor(SubstringIndexMode::Auto),

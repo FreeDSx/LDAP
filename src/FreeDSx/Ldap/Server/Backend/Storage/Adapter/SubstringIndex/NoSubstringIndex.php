@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 
@@ -41,7 +40,7 @@ final class NoSubstringIndex implements SubstringIndexInterface
 
     public function maintain(
         int $entryId,
-        Entry $entry,
+        array $values,
         callable $execute,
     ): void {}
 

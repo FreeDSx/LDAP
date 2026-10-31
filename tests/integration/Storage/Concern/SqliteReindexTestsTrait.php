@@ -69,6 +69,63 @@ trait SqliteReindexTestsTrait
         });
     }
 
+    public function test_reindex_rewrites_the_substring_index_in_the_prepared_form(): void
+    {
+        $this->withServer(function (
+            LdapServer $server,
+            Container $container,
+        ): void {
+            $assertion = Filters::contains(
+                'sn',
+                'strasse',
+            );
+            self::assertCount(
+                1,
+                $this->dnsMatching(
+                    $container,
+                    $assertion,
+                ),
+            );
+
+            $this->writeUnpreparedTrigrams();
+            self::assertCount(
+                0,
+                $this->dnsMatching(
+                    $container,
+                    $assertion,
+                ),
+            );
+
+            $server->reindex();
+            self::assertCount(
+                1,
+                $this->dnsMatching(
+                    $container,
+                    $assertion,
+                ),
+            );
+        });
+    }
+
+    /**
+     * Rewrites the sn trigrams the way an index over plainly lowercased values would have held them.
+     */
+    private function writeUnpreparedTrigrams(): void
+    {
+        $pdo = $this->pdo();
+        $pdo->exec("DELETE FROM entry_attribute_trigrams WHERE attr_name_lower = 'sn'");
+        $insert = $pdo->prepare(<<<SQL
+            INSERT INTO entry_attribute_trigrams (owner_entry_id, attr_name_lower, trigram)
+            SELECT owner_entry_id, attr_name_lower, ?
+            FROM entry_attribute_values
+            WHERE attr_name_lower = 'sn' AND value_lower = 'strasse'
+            SQL);
+
+        foreach (['str', 'tra', 'raß', 'aße'] as $trigram) {
+            $insert->execute([$trigram]);
+        }
+    }
+
     /**
      * Rewrites the sidecar the way a store keying by a plain case-folded profile would have.
      */
