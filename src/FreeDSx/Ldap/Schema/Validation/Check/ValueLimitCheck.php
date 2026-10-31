@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Schema\Validation\RuleViolation;
 use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Schema\Validation\SchemaWrite;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
 
 use function count;
 use function sprintf;
@@ -35,16 +36,25 @@ use function sprintf;
  */
 class ValueLimitCheck implements SchemaCheckInterface
 {
+    private const MAX_REMEMBERED_TYPES = 1024;
+
     /**
-     * @var array<string, int> Keyed on the base type, resolved on first use since the schema is fixed after startup.
+     * Keyed on the base type, resolved on first use since the schema is fixed after startup.
+     *
+     * @var BoundedMemo<string, int>
      */
-    private array $valueLimits = [];
+    private readonly BoundedMemo $valueLimits;
 
     public function __construct(
         private readonly Schema $schema,
         private readonly LinkedAttributes $linked,
         private readonly int $maxValues,
-    ) {}
+    ) {
+        $this->valueLimits = new BoundedMemo(
+            self::MAX_REMEMBERED_TYPES,
+            $this->resolveValueLimit(...),
+        );
+    }
 
     public function check(
         SchemaWrite $write,
@@ -84,9 +94,11 @@ class ValueLimitCheck implements SchemaCheckInterface
      */
     private function valueLimitFor(Attribute $attribute): int
     {
-        $name = Attribute::normalizeName($attribute->getName());
+        return $this->valueLimits->for(Attribute::normalizeName($attribute->getName()));
+    }
 
-        return $this->valueLimits[$name] ??= $this->schema->getAttributeType($name)?->maxValues()
-            ?? $this->maxValues;
+    private function resolveValueLimit(string $type): int
+    {
+        return $this->schema->getAttributeType($type)?->maxValues() ?? $this->maxValues;
     }
 }
