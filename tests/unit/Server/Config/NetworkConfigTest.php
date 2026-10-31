@@ -72,10 +72,10 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
-    public function test_max_request_size_defaults_to_five_mib(): void
+    public function test_max_request_size_defaults_to_two_and_a_half_mib(): void
     {
         self::assertSame(
-            5_242_880,
+            2_621_440,
             $this->subject->getMaxRequestSize(),
         );
     }

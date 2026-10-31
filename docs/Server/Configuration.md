@@ -16,6 +16,7 @@ LDAP Server Configuration
     * [NetworkConfig:setWriteTimeout](#setwritetimeout)
     * [NetworkConfig:setSocketAcceptTimeout](#setsocketaccepttimeout)
     * [NetworkConfig:setMaxConnections](#setmaxconnections)
+    * [NetworkConfig:setMaxRequestSize](#setmaxrequestsize)
     * [TLS](#tls)
         * [NetworkConfig:setUseSsl](#setusessl)
         * [NetworkConfig:setSslCert](#setsslcert)
@@ -328,6 +329,21 @@ The Pcntl runner forks a process per connection, so this bounds process count ra
 the host can fork, keeping the process limit and open file descriptors (`ulimit -n`) in mind.
 
 **Default**: `1024`
+
+------------------
+#### setMaxRequestSize
+
+The largest request, in bytes, the server reads from a client. A larger request is answered with a notice of
+disconnection (protocolError) and the connection is closed, which `connectionsRequestSizeExceeded` in
+[cn=monitor](Monitoring.md) counts. The proxy server applies it the same way. Set `0` for no limit.
+
+```php
+$options->getNetworkConfig()->setMaxRequestSize(1_048_576);
+```
+
+Raising it also raises the memory a single request can cost a worker.
+
+**Default**: `2621440` (2.5 MiB)
 
 ### TLS
 
