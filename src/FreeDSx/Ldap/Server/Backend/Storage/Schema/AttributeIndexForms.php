@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
@@ -32,16 +31,6 @@ use FreeDSx\Ldap\Schema\Schema;
  */
 readonly class AttributeIndexForms
 {
-    /**
-     * Substring rules matching a fragment contiguously inside a plainly lowercased value.
-     */
-    private const CONTIGUOUS_SUBSTRING_OIDS = [
-        MatchingRuleOid::OID_CASE_IGNORE_SUBSTRINGS_MATCH,
-        MatchingRuleOid::OID_CASE_EXACT_SUBSTRINGS_MATCH,
-        MatchingRuleOid::OID_CASE_IGNORE_IA5_SUBSTRINGS_MATCH,
-        MatchingRuleOid::OID_CASE_IGNORE_LIST_SUBSTRINGS_MATCH,
-    ];
-
     public function __construct(
         private Schema $schema,
         private EqualityComparatorResolver $equality,
@@ -102,18 +91,31 @@ readonly class AttributeIndexForms
     }
 
     /**
-     * A substring index storing plainly lowercased values narrows only the rules that match over that same form.
+     * The form a substring index keeps a value in, prepared as the SUBSTR rule prepares the value it matches.
      */
-    public function substringIndexApplies(string $attribute): bool
-    {
-        $ruleOid = $this->schema->getSubstringRuleOid(Attribute::normalizeName($attribute));
+    public function substringKey(
+        string $attribute,
+        string $value,
+    ): ?string {
+        $substring = $this->substringComparator($attribute);
 
-        return $ruleOid !== null
-            && in_array(
-                $ruleOid,
-                self::CONTIGUOUS_SUBSTRING_OIDS,
-                true,
-            );
+        return $substring instanceof IndexableComparatorInterface
+            ? $substring->indexKey($value)
+            : null;
+    }
+
+    /**
+     * The form a substring index is asked for a fragment in, prepared as the SUBSTR rule prepares an assertion.
+     */
+    public function substringFragment(
+        string $attribute,
+        string $fragment,
+    ): ?string {
+        $substring = $this->substringComparator($attribute);
+
+        return $substring instanceof IndexableComparatorInterface
+            ? $substring->indexFragment($fragment)
+            : null;
     }
 
     /**

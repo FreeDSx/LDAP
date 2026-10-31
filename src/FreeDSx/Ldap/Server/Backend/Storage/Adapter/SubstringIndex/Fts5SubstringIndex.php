@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
@@ -146,7 +145,7 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
     }
 
     /**
-     * The triggers copy the sidecar row's value into the FTS table, and only for the attributes in scope.
+     * The triggers copy the sidecar row's prepared value into the FTS table, and only for the attributes in scope.
      */
     public function readsOriginalValue(string $attributeLower): bool
     {
@@ -155,7 +154,7 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
 
     public function maintain(
         int $entryId,
-        Entry $entry,
+        array $values,
         callable $execute,
     ): void {
         // The sync triggers index/de-index off the sidecar rows the entry writer already writes; nothing to do per entry.

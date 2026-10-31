@@ -13,17 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use PHPUnit\Framework\TestCase;
 
 final class TrigramSubstringIndexTest extends TestCase
 {
-    private const DN = 'cn=smith,dc=example,dc=com';
-
     private const ENTRY_ID = 42;
 
     /**
@@ -40,10 +35,7 @@ final class TrigramSubstringIndexTest extends TestCase
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
             self::ENTRY_ID,
-            new Entry(
-                new Dn(self::DN),
-                new Attribute('cn', 'smith'),
-            ),
+            ['cn' => ['smith']],
             $this->recorder(),
         );
 
@@ -73,10 +65,7 @@ final class TrigramSubstringIndexTest extends TestCase
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
             self::ENTRY_ID,
-            new Entry(
-                new Dn(self::DN),
-                new Attribute('uid', 'smith'),
-            ),
+            ['uid' => ['smith']],
             $this->recorder(),
         );
 
@@ -94,11 +83,10 @@ final class TrigramSubstringIndexTest extends TestCase
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
             self::ENTRY_ID,
-            new Entry(
-                new Dn(self::DN),
-                new Attribute('cn', 'abc'),
-                new Attribute('description', 'ignored'),
-            ),
+            [
+                'cn' => ['abc'],
+                'description' => ['ignored'],
+            ],
             $this->recorder(),
         );
 
@@ -112,10 +100,7 @@ final class TrigramSubstringIndexTest extends TestCase
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
             self::ENTRY_ID,
-            new Entry(
-                new Dn(self::DN),
-                new Attribute('cn', 'smith', 'smithy'),
-            ),
+            ['cn' => ['smith', 'smithy']],
             $this->recorder(),
         );
 
@@ -169,10 +154,10 @@ final class TrigramSubstringIndexTest extends TestCase
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
             self::ENTRY_ID,
-            new Entry(
-                new Dn(self::DN),
-                new Attribute('cn', str_repeat('a', 300)),
-            ),
+            ['cn' => [str_repeat(
+                'a',
+                300,
+            )]],
             $this->recorder(),
         );
 
@@ -187,10 +172,21 @@ final class TrigramSubstringIndexTest extends TestCase
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
             self::ENTRY_ID,
-            new Entry(
-                new Dn(self::DN),
-                new Attribute('cn', "\xFF\xD8\xFF\xE0abc"),
-            ),
+            ['cn' => ["\xFF\xD8\xFF\xE0abc"]],
+            $this->recorder(),
+        );
+
+        self::assertSame(
+            [self::ENTRY_ID, 'cn', "\x01"],
+            $this->executed[1][1],
+        );
+    }
+
+    public function test_maintain_marks_an_attribute_holding_a_value_its_rule_cannot_prepare(): void
+    {
+        (new TrigramSubstringIndex(['cn']))->maintain(
+            self::ENTRY_ID,
+            ['cn' => ['smith', null]],
             $this->recorder(),
         );
 

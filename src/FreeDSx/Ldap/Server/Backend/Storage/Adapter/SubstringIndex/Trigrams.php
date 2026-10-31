@@ -32,13 +32,13 @@ final class Trigrams
     {
         return Text::isUtf8($value)
             && mb_strlen(
-                mb_strtolower($value, 'UTF-8'),
+                $value,
                 'UTF-8',
             ) <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
     }
 
     /**
-     * Distinct trigrams of the folded (lowercased, truncated) value; empty for non-UTF-8 or values shorter than 3 chars.
+     * Distinct trigrams of the value as its rule prepared it, truncated; empty for non-UTF-8 or under 3 chars.
      *
      * @return list<string>
      */
@@ -48,14 +48,18 @@ final class Trigrams
             return [];
         }
 
-        $folded = mb_substr(
-            mb_strtolower($value, 'UTF-8'),
+        $truncated = mb_substr(
+            $value,
             0,
             SqlFilterUtility::MAX_INDEXED_VALUE_CHARS,
             'UTF-8',
         );
 
-        $chars = mb_str_split($folded, 1, 'UTF-8');
+        $chars = mb_str_split(
+            $truncated,
+            1,
+            'UTF-8',
+        );
         $count = count($chars);
 
         if ($count < self::SIZE) {

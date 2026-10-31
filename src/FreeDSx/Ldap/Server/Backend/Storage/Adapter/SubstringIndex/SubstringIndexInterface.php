@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 
@@ -46,18 +45,19 @@ interface SubstringIndexInterface
     /**
      * Re-index one entry, running each write through the executor inside the caller's transaction.
      *
+     * @param array<string, list<string|null>> $values Prepared values by lowercased attribute, null if the rule cannot.
      * @param callable(string $sql, list<string|int> $params): void $execute
      */
     public function maintain(
         int $entryId,
-        Entry $entry,
+        array $values,
         callable $execute,
     ): void;
 
     /**
      * A candidate-narrowing WHERE fragment for a substring filter on an indexed attribute; null to decline.
      *
-     * @param list<string> $fragments
+     * @param list<string> $fragments Each as the attribute's SUBSTR rule prepares an assertion fragment.
      */
     public function buildSubstringPredicate(
         string $attributeLower,

@@ -665,34 +665,50 @@ trait SqlFilterTranslatorTrait
         if ($startsWith !== null) {
             return null;
         }
-
-        // The index holds plainly lowercased values, so a rule matching over some other form cannot narrow on it.
-        if (!$this->indexForms->substringIndexApplies($rawAttribute)) {
-            return null;
-        }
-
-        return $this->substringIndex->buildSubstringPredicate(
-            $attribute,
-            $this->substringFragments(
-                $contains,
-                $endsWith,
-            ),
+        $fragments = $this->substringFragments(
+            $rawAttribute,
+            $contains,
+            $endsWith,
         );
+
+        return $fragments === null
+            ? null
+            : $this->substringIndex->buildSubstringPredicate(
+                $attribute,
+                $fragments,
+            );
     }
 
     /**
+     * The fragments as the SUBSTR rule prepares them, which is how the index holds values, or null when it cannot.
+     *
+     * @param string $rawAttribute The description as asserted, which resolves the SUBSTR rule.
      * @param array<string> $contains
      *
-     * @return list<string>
+     * @return list<string>|null
      */
     private function substringFragments(
+        string $rawAttribute,
         array $contains,
         ?string $endsWith,
-    ): array {
-        $fragments = array_values($contains);
+    ): ?array {
+        $asserted = array_values($contains);
 
         if ($endsWith !== null) {
-            $fragments[] = $endsWith;
+            $asserted[] = $endsWith;
+        }
+        $fragments = [];
+
+        foreach ($asserted as $fragment) {
+            $prepared = $this->indexForms->substringFragment(
+                $rawAttribute,
+                $fragment,
+            );
+
+            if ($prepared === null) {
+                return null;
+            }
+            $fragments[] = $prepared;
         }
 
         return $fragments;

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
@@ -113,7 +112,7 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
 
     public function maintain(
         int $entryId,
-        Entry $entry,
+        array $values,
         callable $execute,
     ): void {
         $execute(
@@ -121,7 +120,10 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
             [$entryId],
         );
 
-        $rows = $this->rowsFor($entryId, $entry);
+        $rows = $this->rowsFor(
+            $entryId,
+            $values,
+        );
         if ($rows === []) {
             return;
         }
@@ -171,44 +173,54 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
     }
 
     /**
-     * @param array<array-key, string> $values
+     * The values when the trigrams cover every one of them, or null when none can be trusted to narrow.
+     *
+     * @param list<string|null> $values
+     *
+     * @return list<string>|null
      */
-    private function coversEvery(array $values): bool
+    private function covered(array $values): ?array
     {
+        $covered = [];
+
         foreach ($values as $value) {
-            if (!Trigrams::covers($value)) {
-                return false;
+            if ($value === null || !Trigrams::covers($value)) {
+                return null;
             }
+            $covered[] = $value;
         }
 
-        return true;
+        return $covered;
     }
 
     /**
+     * @param array<string, list<string|null>> $values
+     *
      * @return list<array{0: int, 1: string, 2: string}>
      */
     private function rowsFor(
         int $entryId,
-        Entry $entry,
+        array $values,
     ): array {
         $rows = [];
 
-        foreach ($entry->getAttributes() as $attribute) {
-            $attrLower = strtolower($attribute->getName());
+        foreach ($values as $attrLower => $prepared) {
             if (!isset($this->attributes[$attrLower])) {
                 continue;
             }
 
+            $covered = $this->covered($prepared);
+
             // A value the trigrams do not cover would otherwise be excluded by a predicate meant only to narrow.
             // The entry is then a candidate for every filter on this attribute, including for its shorter values.
-            if (!$this->coversEvery($attribute->getValues())) {
+            if ($covered === null) {
                 $rows[] = [$entryId, $attrLower, self::UNCOVERED];
 
                 continue;
             }
 
             $trigrams = [];
-            foreach ($attribute->getValues() as $value) {
+            foreach ($covered as $value) {
                 foreach (Trigrams::of($value) as $trigram) {
                     $trigrams[] = $trigram;
                 }

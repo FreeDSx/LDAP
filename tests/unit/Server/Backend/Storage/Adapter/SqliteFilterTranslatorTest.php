@@ -866,6 +866,29 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
+    public function test_contains_asks_the_substring_index_for_the_fragment_as_the_rule_prepares_it(): void
+    {
+        $translator = new SqliteFilterTranslator(
+            $this->attributeContext(),
+            $this->indexForms,
+            $this->linked,
+            new TrigramSubstringIndex(['cn']),
+        );
+
+        $result = $translator->translate(new SubstringFilter(
+            'cn',
+            null,
+            null,
+            'Straße',
+        ));
+
+        self::assertNotNull($result);
+        self::assertSame(
+            ['cn', 'str', 'tra', 'ras', 'ass', 'sse', 'cn', "\x01"],
+            $result->params,
+        );
+    }
+
     public function test_suffix_uses_the_substring_index_when_present(): void
     {
         $translator = new SqliteFilterTranslator(

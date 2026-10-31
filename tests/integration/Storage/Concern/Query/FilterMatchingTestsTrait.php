@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -192,6 +193,64 @@ trait FilterMatchingTestsTrait
         self::assertSame(
             'cn=alice,ou=people,dc=foo,dc=bar',
             $entries->first()?->getDn()->toString(),
+        );
+    }
+
+    public function testSubstringContainsMatchesAValueOnlyItsPreparationHoldsTheFragmentIn(): void
+    {
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            'cn=prepared-contains,dc=foo,dc=bar',
+            [
+                'objectClass' => 'inetOrgPerson',
+                'cn' => 'prepared-contains',
+                'sn' => "Haupt\u{00AD}straße Nord",
+            ],
+        )));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::contains(
+                'sn',
+                'STRASSE',
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=prepared-contains,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
+    public function testSubstringEndsWithMatchesAValueOnlyItsPreparationHoldsTheFragmentIn(): void
+    {
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            'cn=prepared-ends,dc=foo,dc=bar',
+            [
+                'objectClass' => 'inetOrgPerson',
+                'cn' => 'prepared-ends',
+                'sn' => "Neben\u{00AD}gaße",
+            ],
+        )));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::endsWith(
+                'sn',
+                'GASSE',
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=prepared-ends,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
         );
     }
 

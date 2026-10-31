@@ -13,9 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use PHPUnit\Framework\TestCase;
@@ -53,10 +50,7 @@ final class NoSubstringIndexTest extends TestCase
 
         $this->subject->maintain(
             42,
-            new Entry(
-                new Dn('cn=smith,dc=example,dc=com'),
-                new Attribute('cn', 'smith'),
-            ),
+            ['cn' => ['smith']],
             static function () use (&$executed): void {
                 $executed++;
             },

@@ -58,6 +58,11 @@ abstract class LdapReindexTestCase extends TestCase
         description: Group  Of  Admins
         member: CN=Admin, DC=Foo, DC=Bar
 
+        dn: cn=street,dc=foo,dc=bar
+        objectClass: person
+        cn: street
+        sn: Straße
+
         LDIF;
 
     protected string $path;

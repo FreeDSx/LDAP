@@ -240,7 +240,7 @@ final readonly class EntryIndexWriter
     ): void {
         $this->substringIndex->maintain(
             $entryId,
-            $entry,
+            $this->substringValues($entry),
             function (string $sql, array $params): void {
                 $this->connection->execute(
                     $sql,
@@ -248,6 +248,33 @@ final readonly class EntryIndexWriter
                 );
             },
         );
+    }
+
+    /**
+     * Each indexed attribute's values as its SUBSTR rule prepares them, which is the form a substring index keeps.
+     *
+     * @return array<string, list<string|null>>
+     */
+    private function substringValues(Entry $entry): array
+    {
+        $values = [];
+
+        foreach ($entry->getAttributes() as $attribute) {
+            $name = Attribute::normalizeName($attribute->getName());
+
+            if (!$this->substringIndex->indexes($name)) {
+                continue;
+            }
+
+            foreach ($attribute->getValues() as $value) {
+                $values[$name][] = $this->indexForms->substringKey(
+                    $name,
+                    $value,
+                );
+            }
+        }
+
+        return $values;
     }
 
     /**
@@ -321,15 +348,20 @@ final readonly class EntryIndexWriter
     }
 
     /**
-     * Kept only for an index that reads it back.
+     * Kept only for an index that reads it back, in the form the SUBSTR rule matches a fragment against.
      */
     private function valueOriginal(
         string $attribute,
         string $value,
     ): string {
-        return $this->substringIndex->readsOriginalValue($attribute)
-            ? $value
-            : '';
+        if (!$this->substringIndex->readsOriginalValue($attribute)) {
+            return '';
+        }
+
+        return $this->indexForms->substringKey(
+            $attribute,
+            $value,
+        ) ?? '';
     }
 
     /**
