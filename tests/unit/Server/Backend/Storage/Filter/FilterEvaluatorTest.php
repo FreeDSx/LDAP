@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
@@ -28,7 +29,6 @@ use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\AssertionLeafMemo;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
 use Generator;
@@ -1056,7 +1056,7 @@ final class FilterEvaluatorTest extends TestCase
             'Alice',
         );
 
-        for ($i = 0; $i < AssertionLeafMemo::MAX_DESCRIPTIONS + 50; $i++) {
+        for ($i = 0; $i < 300; $i++) {
             $entry = new Entry(
                 new Dn('cn=Alice,dc=example,dc=com'),
                 new Attribute(
@@ -1077,6 +1077,147 @@ final class FilterEvaluatorTest extends TestCase
                 ),
             );
         }
+    }
+
+    public function test_an_or_wider_than_the_values_remembered_answers_for_each_entry(): void
+    {
+        $filter = Filters::or(...array_map(
+            static fn(int $i): EqualityFilter => Filters::equal(
+                'cn',
+                "Person {$i}",
+            ),
+            range(
+                1,
+                200,
+            ),
+        ));
+
+        foreach (['Person 150' => true, 'Person 5' => true, 'Someone Else' => false] as $name => $matches) {
+            self::assertSame(
+                $matches,
+                $this->subject->evaluate(
+                    new Entry(
+                        new Dn('cn=x,dc=example,dc=com'),
+                        new Attribute(
+                            'cn',
+                            $name,
+                        ),
+                    ),
+                    $filter,
+                ),
+                $name,
+            );
+        }
+    }
+
+    public function test_a_reused_substring_filter_answers_for_each_entry(): void
+    {
+        $filter = Filters::contains(
+            'cn',
+            'lic',
+        );
+
+        foreach (['Alice' => true, 'Bob' => false, 'Felicity' => true] as $name => $matches) {
+            self::assertSame(
+                $matches,
+                $this->subject->evaluate(
+                    new Entry(
+                        new Dn('cn=x,dc=example,dc=com'),
+                        new Attribute(
+                            'cn',
+                            $name,
+                        ),
+                    ),
+                    $filter,
+                ),
+                $name,
+            );
+        }
+    }
+
+    public function test_a_reused_dn_attributes_filter_answers_from_each_entrys_own_dn(): void
+    {
+        $filter = Filters::and(
+            Filters::extensible(
+                'ou',
+                'people',
+                null,
+                true,
+            ),
+            Filters::extensible(
+                'dc',
+                'example',
+                null,
+                true,
+            ),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            new Entry(new Dn('cn=Alice,ou=people,dc=example,dc=com')),
+            $filter,
+        ));
+        self::assertFalse($this->subject->evaluate(
+            new Entry(new Dn('cn=Admins,ou=groups,dc=example,dc=com')),
+            $filter,
+        ));
+        self::assertTrue($this->subject->evaluate(
+            new Entry(new Dn('cn=Bob,ou=people,dc=example,dc=com')),
+            $filter,
+        ));
+    }
+
+    public function test_a_description_longer_than_any_type_name_is_still_matched(): void
+    {
+        $description = 'cn;x-' . str_repeat(
+            'o',
+            600,
+        );
+        $filter = Filters::equal(
+            $description,
+            'Alice',
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            new Entry(
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute(
+                    $description,
+                    'Alice',
+                ),
+            ),
+            $filter,
+        ));
+        self::assertFalse($this->subject->evaluate(
+            new Entry(
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute(
+                    'cn',
+                    'Alice',
+                ),
+            ),
+            $filter,
+        ));
+    }
+
+    public function test_a_defined_type_still_matches_after_more_undefined_descriptions_than_are_remembered(): void
+    {
+        for ($i = 0; $i < 1100; $i++) {
+            self::assertFalse($this->subject->evaluate(
+                $this->entry,
+                Filters::equal(
+                    "undefinedType{$i}",
+                    'Alice',
+                ),
+            ));
+        }
+
+        self::assertTrue($this->subject->evaluate(
+            $this->entry,
+            Filters::equal(
+                'cn',
+                'Alice',
+            ),
+        ));
     }
 
     public function test_a_reused_derived_attribute_filter_named_by_oid_answers_for_each_entry(): void

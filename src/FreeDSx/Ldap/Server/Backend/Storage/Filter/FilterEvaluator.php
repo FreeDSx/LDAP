@@ -44,7 +44,9 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
-use WeakMap;
+use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
+use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
+use Closure;
 
 /**
  * Pure-PHP FilterEvaluatorInterface using RFC 4511 §4.5.1 three-valued logic.
@@ -65,44 +67,56 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private const MATCHING_RULE_BIT_OR = '1.2.840.113556.1.4.804';
 
+    private const MAX_REMEMBERED_DESCRIPTIONS = 1024;
+
     /**
-     * Flattened RDN components of the current entry's DN; scoped to one evaluate() call.
+     * Assertion answers are kept for this many attribute descriptions or rules, each holding the values below.
+     */
+    private const MAX_REMEMBERED_NAMES = 64;
+
+    private const MAX_REMEMBERED_VALUES = 64;
+
+    /**
+     * Whether the schema defines each attribute description a filter names.
      *
-     * @var array<Rdn>|null
+     * @var BoundedMemo<string, bool>
      */
-    private ?array $cachedDnRdns = null;
+    private readonly BoundedMemo $recognizedDescriptions;
 
     /**
-     * @var WeakMap<object, SubstringAssertion>
-     */
-    private WeakMap $substringCache;
-
-    /**
-     * @var WeakMap<object, bool>
-     */
-    private WeakMap $assertionSyntaxCache;
-
-    /**
-     * @var WeakMap<object, bool>
-     */
-    private WeakMap $recognizedAttributeCache;
-
-    /**
-     * @var WeakMap<object, bool>
-     */
-    private WeakMap $recognizedDescriptorCache;
-
-    /**
-     * Resolved SUBSTR rule OID per filter, with false standing for a type that declares none.
+     * The derived attribute each description names, with false standing for one that names none.
      *
-     * @var WeakMap<object, string|false>
+     * @var BoundedMemo<string, string|false>
      */
-    private WeakMap $substringRuleCache;
+    private readonly BoundedMemo $derivedNames;
 
     /**
-     * @var WeakMap<FilterAttributeInterface, AssertionLeafMemo>
+     * The SUBSTR rule OID each description's type resolves to, with false standing for a type that declares none.
+     *
+     * @var BoundedMemo<string, string|false>
      */
-    private WeakMap $leafCache;
+    private readonly BoundedMemo $substringRules;
+
+    /**
+     * Whether each assertion value conforms to its attribute's syntax, by description then value.
+     *
+     * @var BoundedMemo<string, BoundedMemo<string, bool>>
+     */
+    private readonly BoundedMemo $conformingValues;
+
+    /**
+     * Whether each equality assertion value is valid for its attribute, by description then value.
+     *
+     * @var BoundedMemo<string, BoundedMemo<string, bool>>
+     */
+    private readonly BoundedMemo $validAssertions;
+
+    /**
+     * Whether each extensible match value conforms to its rule's syntax, by rule then value.
+     *
+     * @var BoundedMemo<string, BoundedMemo<string, bool>>
+     */
+    private readonly BoundedMemo $ruleConformingValues;
 
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
@@ -115,20 +129,32 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         private readonly IntegerComparator $integerComparator = new IntegerComparator(),
     ) {
         $this->syntaxResolver = $syntaxResolver ?? new AttributeSyntaxResolver($schema);
-        $this->substringCache = new WeakMap();
-        $this->assertionSyntaxCache = new WeakMap();
-        $this->recognizedAttributeCache = new WeakMap();
-        $this->recognizedDescriptorCache = new WeakMap();
-        $this->substringRuleCache = new WeakMap();
-        $this->leafCache = new WeakMap();
+        $this->recognizedDescriptions = new BoundedMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Process,
+            $this->schemaDefines(...),
+        );
+        $this->derivedNames = new BoundedMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Process,
+            static fn(string $description): string|false => self::derivedTypeName($description) ?? false,
+        );
+        $this->substringRules = new BoundedMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Process,
+            fn(string $description): string|false => $this->schema->getSubstringRuleOid(
+                Attribute::normalizeName($description),
+            ) ?? false,
+        );
+        $this->conformingValues = self::answersByValue($this->syntaxResolver->conforms(...));
+        $this->validAssertions = self::answersByValue($this->assertionValueIsValid(...));
+        $this->ruleConformingValues = self::answersByValue($this->ruleValueConforms(...));
     }
 
     public function evaluate(
         Entry $entry,
         FilterInterface $filter,
     ): bool {
-        $this->cachedDnRdns = null;
-
         return $this->evaluateFilter($entry, $filter) === FilterResult::True;
     }
 
@@ -144,7 +170,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return null;
         }
 
-        return $this->assertionSyntaxIsValid($filter) && $this->assertionDescriptorIsRecognized($filter)
+        return $this->assertionIsValid($filter)
             ? null
             : UndefinedCause::InvalidAssertionValue;
     }
@@ -242,7 +268,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         // RFC 4511 4.5.1.7.5: true when the type or a subtype of it is present.
         $values = $this->valuesForAssertion(
             $entry,
-            $filter,
             $filter->getAttribute(),
         );
 
@@ -255,15 +280,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         EqualityFilter|ApproximateFilter $filter,
     ): FilterResult {
-        if (!$this->assertionSyntaxIsValid($filter)) {
-            return FilterResult::Undefined;
-        }
-        if (!$this->assertionDescriptorIsRecognized($filter)) {
+        if (!$this->assertionIsValid($filter)) {
             return FilterResult::Undefined;
         }
         $values = $this->valuesForAssertion(
             $entry,
-            $filter,
             $filter->getAttribute(),
         );
 
@@ -298,7 +319,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         $values = $this->valuesForAssertion(
             $entry,
-            $filter,
             $filter->getAttribute(),
         );
 
@@ -333,7 +353,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         $values = $this->valuesForAssertion(
             $entry,
-            $filter,
             $filter->getAttribute(),
         );
 
@@ -404,7 +423,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         if ($filterAttributeName !== null) {
             $values = $this->valuesForAssertion(
                 $entry,
-                $filter,
                 $filterAttributeName,
             );
         } else {
@@ -438,13 +456,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         ?string $filterAttributeName,
     ): array {
-        $components = $this->cachedDnRdns
-            ?? ($this->cachedDnRdns = array_merge(
-                ...array_map(
-                    fn($rdn) => $rdn->getAll(),
-                    $entry->getDn()->toArray(),
-                ),
-            ));
+        $components = array_merge(
+            ...array_map(
+                fn($rdn) => $rdn->getAll(),
+                $entry->getDn()->toArray(),
+            ),
+        );
 
         if ($filterAttributeName !== null) {
             $components = array_filter(
@@ -546,7 +563,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private function buildSubstringAssertion(SubstringFilter $filter): SubstringAssertion
     {
-        return $this->substringCache[$filter] ??= new SubstringAssertion(
+        return new SubstringAssertion(
             initial: $filter->getStartsWith(),
             any: array_values($filter->getContains()),
             final: $filter->getEndsWith(),
@@ -563,33 +580,30 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private function valuesForAssertion(
         Entry $entry,
-        FilterAttributeInterface $item,
         string $filterAttributeName,
     ): array {
         // The filter may spell the type as a name or an OID, so it is canonicalized before being resolved.
-        $memo = $this->leafCache[$item] ??= new AssertionLeafMemo(
-            self::derivedTypeName($filterAttributeName),
-            !(new Attribute($filterAttributeName))->hasOptions(),
-        );
-        if ($memo->derivedName !== null) {
+        $derivedName = $this->derivedNames->for($filterAttributeName);
+
+        if ($derivedName !== false) {
             return [
                 $this->derivedResolver->resolve(
-                    $memo->derivedName,
+                    $derivedName,
                     $entry,
                 ),
             ];
         }
-
-        // An item tested against a single entry gains nothing from remembering its answers.
-        $remember = $memo->evaluations++ > 0;
+        // With no options asserted, one set of type names answers for every stored attribute.
+        if (!str_contains($filterAttributeName, ';')) {
+            return $this->valuesUnderTypes(
+                $entry,
+                $this->schema->typeAndSubtypeNames($filterAttributeName),
+            );
+        }
         $values = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            $feeds = $remember
-                ? $this->feedsAssertion($memo, $attribute, $filterAttributeName)
-                : $this->schema->isDescriptionSubtypeOf($attribute->getDescription(), $filterAttributeName);
-
-            if ($feeds) {
+            if ($this->schema->isDescriptionSubtypeOf($attribute->getDescription(), $filterAttributeName)) {
                 array_push(
                     $values,
                     ...$attribute->getValues(),
@@ -601,52 +615,41 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * Whether the item tests values stored under the attribute's description, memoized per item.
+     * @param array<string, true> $names Lowercased type names and OIDs.
+     * @return array<string>
      */
-    private function feedsAssertion(
-        AssertionLeafMemo $memo,
-        Attribute $attribute,
-        string $filterAttributeName,
-    ): bool {
-        $key = $memo->keyedByType
-            ? $attribute->getName()
-            : $attribute->getDescription();
+    private function valuesUnderTypes(
+        Entry $entry,
+        array $names,
+    ): array {
+        $values = [];
 
-        if (isset($memo->feeds[$key])) {
-            return $memo->feeds[$key];
-        }
-        $feeds = $this->schema->isDescriptionSubtypeOf(
-            $attribute->getDescription(),
-            $filterAttributeName,
-        );
-
-        if (count($memo->feeds) < AssertionLeafMemo::MAX_DESCRIPTIONS) {
-            $memo->feeds[$key] = $feeds;
+        foreach ($entry->getAttributes() as $attribute) {
+            if (isset($names[strtolower($attribute->getName())])) {
+                array_push(
+                    $values,
+                    ...$attribute->getValues(),
+                );
+            }
         }
 
-        return $feeds;
+        return $values;
     }
 
     /**
      * An attribute description the schema does not define makes the item Undefined (RFC 4511 4.5.1.7), whether or
      * not an entry happens to carry values under that name.
-     *
-     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
      */
     private function attributeIsRecognized(FilterAttributeInterface $filter): bool
     {
-        return $this->recognizedAttributeCache[$filter] ??= $this->schemaDefines($filter->getAttribute());
+        $description = $filter->getAttribute();
+
+        // An extensibleMatch may name no type at all.
+        return $description === null || $this->recognizedDescriptions->for($description);
     }
 
-    /**
-     * An extensibleMatch may name no type at all, which this rule has nothing to say about.
-     */
-    private function schemaDefines(?string $attributeDescription): bool
+    private function schemaDefines(string $attributeDescription): bool
     {
-        if ($attributeDescription === null) {
-            return true;
-        }
-
         // RFC 4511 4.5.1.7: a malformed description makes its item Undefined.
         if (!Attribute::isValidDescription($attributeDescription)) {
             return false;
@@ -658,15 +661,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     /**
      * An assertion value that does not conform to the type's syntax makes the item Undefined (RFC 4511 4.5.1.7).
-     *
-     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
      */
     private function assertionSyntaxIsValid(AttributeValueAssertionInterface $filter): bool
     {
-        return $this->assertionSyntaxCache[$filter] ??= $this->syntaxResolver->conforms(
-            $filter->getAttribute(),
-            $filter->getValue(),
-        );
+        return $this->conformingValues->for($filter->getAttribute())->for($filter->getValue());
     }
 
     /**
@@ -674,39 +672,48 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private function ruleAssertionIsValid(MatchingRuleFilter $filter): bool
     {
-        return $this->assertionSyntaxCache[$filter] ??= $this->ruleAssertionConforms($filter);
-    }
-
-    private function ruleAssertionConforms(MatchingRuleFilter $filter): bool
-    {
         $rule = $filter->getMatchingRule();
         $attribute = $filter->getAttribute();
 
-        if ($rule === null) {
-            return $attribute === null || $this->syntaxResolver->conforms(
-                $attribute,
-                $filter->getValue(),
-            );
+        if ($rule !== null) {
+            return $this->ruleConformingValues->for($rule)->for($filter->getValue());
         }
 
+        return $attribute === null || $this->conformingValues->for($attribute)->for($filter->getValue());
+    }
+
+    private function ruleValueConforms(
+        string $rule,
+        string $value,
+    ): bool {
         $syntaxOid = $this->schema->getMatchingRule($rule)?->syntaxOid;
 
         return $syntaxOid === null || $this->syntaxResolver->conformsToSyntax(
             $syntaxOid,
-            $filter->getValue(),
+            $value,
         );
     }
 
     /**
-     * RFC 4517 §4.2.26: an OID assertion naming a descriptor the schema does not define is Undefined.
-     *
-     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
+     * A value that does not conform to the type's syntax, or an OID naming a descriptor the schema does not define, is
+     * Undefined (RFC 4511 4.5.1.7, RFC 4517 §4.2.26).
      */
-    private function assertionDescriptorIsRecognized(AttributeValueAssertionInterface $filter): bool
+    private function assertionIsValid(AttributeValueAssertionInterface $filter): bool
     {
-        return $this->recognizedDescriptorCache[$filter] ??= $this->descriptorIsResolvable(
-            $filter->getAttribute(),
-            $filter->getValue(),
+        return $this->validAssertions->for($filter->getAttribute())->for($filter->getValue());
+    }
+
+    private function assertionValueIsValid(
+        string $attribute,
+        string $value,
+    ): bool {
+        if (!$this->syntaxResolver->conforms($attribute, $value)) {
+            return false;
+        }
+
+        return $this->descriptorIsResolvable(
+            $attribute,
+            $value,
         );
     }
 
@@ -729,17 +736,35 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     /**
      * The SUBSTR rule the filter's type resolves to, or null when it declares none.
-     *
-     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
      */
     private function substringRuleOid(SubstringFilter $filter): ?string
     {
-        $ruleOid = $this->substringRuleCache[$filter] ??= $this->schema->getSubstringRuleOid(
-            Attribute::normalizeName($filter->getAttribute()),
-        ) ?? false;
+        $ruleOid = $this->substringRules->for($filter->getAttribute());
 
         return $ruleOid === false
             ? null
             : $ruleOid;
+    }
+
+    /**
+     * Yes-or-no answers kept by attribute description or rule, and then by value.
+     *
+     * @param Closure(string, string): bool $check
+     * @return BoundedMemo<string, BoundedMemo<string, bool>>
+     */
+    private static function answersByValue(Closure $check): BoundedMemo
+    {
+        return new BoundedMemo(
+            self::MAX_REMEMBERED_NAMES,
+            MemoScope::Process,
+            static fn(string $name): BoundedMemo => new BoundedMemo(
+                self::MAX_REMEMBERED_VALUES,
+                MemoScope::Process,
+                static fn(string $value): bool => $check(
+                    $name,
+                    $value,
+                ),
+            ),
+        );
     }
 }
