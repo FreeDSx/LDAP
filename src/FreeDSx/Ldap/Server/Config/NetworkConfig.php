@@ -48,9 +48,9 @@ final class NetworkConfig
     private int $shutdownTimeout = 15;
 
     /**
-     * The largest incoming request PDU accepted, in bytes (5 MiB); 0 disables the limit.
+     * The largest incoming request PDU accepted, in bytes (2.5 MiB); 0 disables the limit.
      */
-    private int $maxRequestSize = 5_242_880;
+    private int $maxRequestSize = 2_621_440;
 
     /**
      * The maximum number of concurrent connections the server will accept; zero means no limit.
