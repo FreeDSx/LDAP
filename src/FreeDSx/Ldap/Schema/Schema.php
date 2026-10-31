@@ -108,6 +108,13 @@ final class Schema
     private ArrayAccessMemo $subtypeDescriptions;
 
     /**
+     * The names and OIDs each type seen covers through its subtypes, dropped whenever the type set changes.
+     *
+     * @var BoundedMemo<string, array<string, true>>
+     */
+    private BoundedMemo $subtypeNames;
+
+    /**
      * An empty memo of stored descriptions, copied for each description asked about.
      *
      * @var ArrayAccessMemo<bool>
@@ -335,6 +342,16 @@ final class Schema
                 $ofDescription,
             ),
         );
+    }
+
+    /**
+     * The lowercased names and OIDs of the type and of every type descending from it (RFC 4512 2.5.3).
+     *
+     * @return array<string, true>
+     */
+    public function typeAndSubtypeNames(string $nameOrOid): array
+    {
+        return $this->subtypeNames->for(Attribute::normalizeName($nameOrOid));
     }
 
     /**
@@ -604,6 +621,29 @@ final class Schema
     }
 
     /**
+     * The given spelling is kept even when the schema does not define it, as a type always covers itself.
+     *
+     * @return array<string, true>
+     */
+    private function collectSubtypeNames(string $type): array
+    {
+        $names = [$type => true];
+
+        foreach ($this->uniqueObjects($this->attributeTypes) as $candidate) {
+            if (!$this->isTypeOrSubtypeOf($candidate->oid, $type)) {
+                continue;
+            }
+            $names[strtolower($candidate->oid)] = true;
+
+            foreach ($candidate->names as $name) {
+                $names[strtolower($name)] = true;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
      * Whether every option the wanted description carries is also carried by the one being tested.
      */
     private static function optionsCover(
@@ -734,6 +774,11 @@ final class Schema
         $this->subtypeDescriptions = new ArrayAccessMemo(
             self::MAX_ASKED_DESCRIPTIONS,
             MemoScope::Process,
+        );
+        $this->subtypeNames = new BoundedMemo(
+            self::MAX_REMEMBERED_DESCRIPTIONS,
+            MemoScope::Process,
+            $this->collectSubtypeNames(...),
         );
     }
 

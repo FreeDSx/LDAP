@@ -903,6 +903,86 @@ final class SchemaTest extends TestCase
         ));
     }
 
+    public function test_the_names_a_type_covers_are_every_spelling_of_it_and_of_its_subtypes(): void
+    {
+        $this->seedSupertypeChain();
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.30',
+            names: ['unrelated'],
+        ));
+
+        self::assertEqualsCanonicalizing(
+            ['supertype', '1.2.3.10', 'intermediate', '1.2.3.20', 'subordinate', '1.2.3.21'],
+            array_keys($this->subject->typeAndSubtypeNames('Supertype')),
+        );
+    }
+
+    public function test_the_names_a_type_covers_exclude_its_supertypes(): void
+    {
+        $this->seedSupertypeChain();
+
+        self::assertEqualsCanonicalizing(
+            ['intermediate', '1.2.3.20', 'subordinate', '1.2.3.21'],
+            array_keys($this->subject->typeAndSubtypeNames('1.2.3.20')),
+        );
+    }
+
+    public function test_the_names_a_type_covers_include_every_name_it_is_known_by(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        self::assertEqualsCanonicalizing(
+            ['cn', 'commonname', '2.5.4.3'],
+            array_keys($this->subject->typeAndSubtypeNames('commonName')),
+        );
+    }
+
+    public function test_an_undefined_type_covers_only_its_own_name(): void
+    {
+        self::assertSame(
+            ['unknowntype' => true],
+            $this->subject->typeAndSubtypeNames('unknownType'),
+        );
+    }
+
+    public function test_the_names_a_type_covers_follow_a_subtype_added_after_they_were_asked(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.41',
+            names: ['name'],
+        ));
+
+        self::assertArrayNotHasKey(
+            'cn',
+            $this->subject->typeAndSubtypeNames('name'),
+        );
+
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn'],
+            superTypeOid: '2.5.4.41',
+        ));
+
+        self::assertArrayHasKey(
+            'cn',
+            $this->subject->typeAndSubtypeNames('name'),
+        );
+    }
+
+    public function test_the_names_a_type_covers_stay_right_after_more_types_than_are_remembered(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        for ($i = 0; $i < 1100; $i++) {
+            $this->subject->typeAndSubtypeNames("unknownType{$i}");
+        }
+
+        self::assertArrayHasKey(
+            '2.5.4.3',
+            $this->subject->typeAndSubtypeNames('cn'),
+        );
+    }
+
     public function test_a_description_longer_than_any_type_name_is_still_answered(): void
     {
         $this->subject->addAttributeType(new AttributeType(
