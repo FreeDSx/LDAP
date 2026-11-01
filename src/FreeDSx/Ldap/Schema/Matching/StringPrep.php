@@ -89,7 +89,13 @@ final readonly class StringPrep
             );
         }
 
-        $prepared = $this->normalize($this->caseFold($this->map($value)));
+        $folded = $this->caseFold($this->map($value));
+        $prepared = $this->normalize($folded);
+
+        // RFC 3454 B.2 also folds what NFKC produces with case, such as the TEL a telephone sign normalizes to.
+        if ($this->foldCase && $prepared !== $folded) {
+            $prepared = $this->normalize($this->caseFold($prepared));
+        }
 
         return $this->squeeze(
             $prepared,

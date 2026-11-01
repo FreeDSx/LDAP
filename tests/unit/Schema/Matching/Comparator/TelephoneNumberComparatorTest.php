@@ -124,6 +124,24 @@ final class TelephoneNumberComparatorTest extends TestCase
         );
     }
 
+    public function test_the_index_and_a_substring_match_agree_on_a_value_normalized_into_letters(): void
+    {
+        $value = "\u{2121} 555-1234";
+
+        self::assertTrue($this->subject->substringMatches(
+            $value,
+            new SubstringAssertion(any: ['tel5']),
+        ));
+        self::assertSame(
+            'tel5551234',
+            $this->subject->indexKey($value),
+        );
+        self::assertSame(
+            'tel5',
+            $this->subject->indexFragment('tel5'),
+        );
+    }
+
     public function test_index_fragment_strips_formatting_the_same_way_a_whole_value_does(): void
     {
         self::assertSame(
