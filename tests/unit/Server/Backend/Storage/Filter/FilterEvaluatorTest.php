@@ -1135,6 +1135,110 @@ final class FilterEvaluatorTest extends TestCase
         }
     }
 
+    public function test_a_reused_equality_filter_answers_from_each_entrys_own_values(): void
+    {
+        $filter = Filters::equal(
+            'cn',
+            'Alice',
+        );
+        $cases = [
+            'a differently cased value' => [true, ['ALICE']],
+            'a value differing only in insignificant spaces' => [true, ['  alice ']],
+            'the value among several' => [true, ['Bob', 'alice']],
+            'another value' => [false, ['Bob']],
+            'no value' => [false, []],
+        ];
+
+        foreach ($cases as $label => [$matches, $values]) {
+            $attributes = $values === []
+                ? [new Attribute('sn', 'Smith')]
+                : [new Attribute('cn', ...$values)];
+
+            self::assertSame(
+                $matches,
+                $this->subject->evaluate(
+                    new Entry(
+                        new Dn('cn=x,dc=example,dc=com'),
+                        ...$attributes,
+                    ),
+                    $filter,
+                ),
+                $label,
+            );
+        }
+    }
+
+    public function test_each_item_asserting_on_one_type_answers_for_itself(): void
+    {
+        $filter = Filters::and(
+            Filters::equal(
+                'cn',
+                'Alice',
+            ),
+            Filters::equal(
+                'cn',
+                'Ally',
+            ),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            new Entry(
+                new Dn('cn=x,dc=example,dc=com'),
+                new Attribute('cn', 'Alice', 'Ally'),
+            ),
+            $filter,
+        ));
+        self::assertFalse($this->subject->evaluate(
+            new Entry(
+                new Dn('cn=x,dc=example,dc=com'),
+                new Attribute('cn', 'Alice'),
+            ),
+            $filter,
+        ));
+    }
+
+    public function test_a_reused_filter_with_an_invalid_assertion_is_undefined_for_every_entry(): void
+    {
+        $filter = Filters::not(Filters::equal(
+            'uidNumber',
+            'not-a-number',
+        ));
+
+        self::assertFalse($this->subject->evaluate(
+            $this->uidNumberEntry(),
+            $filter,
+        ));
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    public function test_a_rule_without_a_canonical_key_compares_each_value_through_its_rule(): void
+    {
+        $filter = Filters::equal(
+            'createTimestamp',
+            '202601011300+0100',
+        );
+
+        foreach (['20260101120000Z' => true, '2026010112Z' => true, '20260101130000Z' => false] as $stored => $matches) {
+            self::assertSame(
+                $matches,
+                $this->subject->evaluate(
+                    new Entry(
+                        new Dn('cn=x,dc=example,dc=com'),
+                        new Attribute(
+                            'createTimestamp',
+                            $stored,
+                        ),
+                    ),
+                    $filter,
+                ),
+                $stored,
+            );
+        }
+    }
+
     public function test_a_reused_dn_attributes_filter_answers_from_each_entrys_own_dn(): void
     {
         $filter = Filters::and(
