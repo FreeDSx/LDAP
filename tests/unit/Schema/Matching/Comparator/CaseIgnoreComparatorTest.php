@@ -237,4 +237,16 @@ final class CaseIgnoreComparatorTest extends TestCase
             $this->subject->indexFragment(' Foo'),
         );
     }
+
+    public function test_a_value_normalized_into_letters_equals_their_folded_spelling(): void
+    {
+        self::assertTrue($this->subject->equals(
+            "\u{2121}",
+            'tel',
+        ));
+        self::assertSame(
+            $this->subject->indexKey('tel'),
+            $this->subject->indexKey("\u{2121}"),
+        );
+    }
 }

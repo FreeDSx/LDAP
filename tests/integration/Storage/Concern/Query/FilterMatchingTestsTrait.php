@@ -254,6 +254,35 @@ trait FilterMatchingTestsTrait
         );
     }
 
+    public function testEqualityMatchesAValueNormalizationTurnsIntoCapitalLetters(): void
+    {
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            'cn=normalized-equality,dc=foo,dc=bar',
+            [
+                'objectClass' => 'inetOrgPerson',
+                'cn' => 'normalized-equality',
+                'sn' => "\u{2121}",
+            ],
+        )));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal(
+                'sn',
+                'tel',
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=normalized-equality,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
     public function testGteAsciiExcludesLowerValue(): void
     {
         $this->authenticateUser();

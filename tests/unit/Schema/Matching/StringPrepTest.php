@@ -202,4 +202,50 @@ final class StringPrepTest extends TestCase
             $this->subject->prepareForEquality('É'),
         );
     }
+
+    #[DataProvider('normalizedToUppercaseProvider')]
+    public function test_folds_the_case_that_normalization_produces(
+        string $value,
+        string $expected,
+    ): void {
+        if (!class_exists(\Normalizer::class) || !function_exists('mb_convert_case')) {
+            self::markTestSkipped('This needs both NFKC and Unicode case folding.');
+        }
+
+        self::assertSame(
+            $expected,
+            $this->subject->prepareForEquality($value),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function normalizedToUppercaseProvider(): iterable
+    {
+        yield 'telephone sign' => [
+            "\u{2121}",
+            'tel',
+        ];
+        yield 'square hertz' => [
+            "\u{3390}",
+            'hz',
+        ];
+        yield 'roman numeral twelve' => [
+            "\u{216B}",
+            'xii',
+        ];
+    }
+
+    public function test_keeps_the_case_that_normalization_produces_when_not_folding(): void
+    {
+        if (!class_exists(\Normalizer::class)) {
+            self::markTestSkipped('NFKC requires ext-intl or symfony/polyfill-intl-normalizer.');
+        }
+
+        self::assertSame(
+            'TEL',
+            (new StringPrep(foldCase: false))->prepareForEquality("\u{2121}"),
+        );
+    }
 }
