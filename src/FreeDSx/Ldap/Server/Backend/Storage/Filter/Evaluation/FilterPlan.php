@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Filter\Evaluation;
 
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
+
 /**
  * What a filter's items need for every entry it is evaluated against.
  *
@@ -30,4 +32,25 @@ class FilterPlan
      * @var array<int, string|bool>
      */
     public array $equalities = [];
+
+    /**
+     * Whether each ordered or extensible match item's assertion is valid, by object id.
+     *
+     * @var array<int, bool>
+     */
+    public array $validItems = [];
+
+    /**
+     * The keys each OR's equality items merge into per attribute by the OR's object id, or false until it is grouped.
+     *
+     * @var array<int, array<string, array<int|string, true>>|false>
+     */
+    public array $keySets = [];
+
+    /**
+     * The children each grouped OR still evaluates one by one, by the OR's object id.
+     *
+     * @var array<int, list<FilterInterface>>
+     */
+    public array $ungrouped = [];
 }
