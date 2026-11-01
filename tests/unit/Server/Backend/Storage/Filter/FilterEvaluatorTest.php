@@ -1151,8 +1151,14 @@ final class FilterEvaluatorTest extends TestCase
 
         foreach ($cases as $label => [$matches, $values]) {
             $attributes = $values === []
-                ? [new Attribute('sn', 'Smith')]
-                : [new Attribute('cn', ...$values)];
+                ? [new Attribute(
+                    'sn',
+                    'Smith',
+                )]
+                : [new Attribute(
+                    'cn',
+                    ...$values,
+                )];
 
             self::assertSame(
                 $matches,
@@ -1184,17 +1190,181 @@ final class FilterEvaluatorTest extends TestCase
         self::assertTrue($this->subject->evaluate(
             new Entry(
                 new Dn('cn=x,dc=example,dc=com'),
-                new Attribute('cn', 'Alice', 'Ally'),
+                new Attribute(
+                    'cn',
+                    'Alice',
+                    'Ally',
+                ),
             ),
             $filter,
         ));
         self::assertFalse($this->subject->evaluate(
             new Entry(
                 new Dn('cn=x,dc=example,dc=com'),
-                new Attribute('cn', 'Alice'),
+                new Attribute(
+                    'cn',
+                    'Alice',
+                ),
             ),
             $filter,
         ));
+    }
+
+    public function test_an_or_of_equalities_on_one_type_matches_an_entry_holding_any_of_them(): void
+    {
+        $filter = Filters::or(...array_map(
+            static fn(int $i): EqualityFilter => Filters::equal(
+                'cn',
+                $i === 150 ? 'Alice' : "Person {$i}",
+            ),
+            range(
+                1,
+                300,
+            ),
+        ));
+        $cases = [
+            'a differently spelled member' => [true, ['  ALICE ']],
+            'a member among other values' => [true, ['Bob', 'person 7']],
+            'no member' => [false, ['Bob']],
+            'no value of the type' => [false, []],
+        ];
+
+        for ($pass = 0; $pass < 2; $pass++) {
+            foreach ($cases as $label => [$matches, $values]) {
+                $attributes = $values === []
+                    ? [new Attribute(
+                        'sn',
+                        'Smith',
+                    )]
+                    : [new Attribute(
+                        'cn',
+                        ...$values,
+                    )];
+
+                self::assertSame(
+                    $matches,
+                    $this->subject->evaluate(
+                        new Entry(
+                            new Dn('cn=x,dc=example,dc=com'),
+                            ...$attributes,
+                        ),
+                        $filter,
+                    ),
+                    $label,
+                );
+            }
+        }
+    }
+
+    public function test_an_or_merges_equalities_per_type_beside_its_other_children(): void
+    {
+        $filter = Filters::or(
+            Filters::equal(
+                'cn',
+                'Alice',
+            ),
+            Filters::contains(
+                'mail',
+                'example.org',
+            ),
+            Filters::equal(
+                'sn',
+                'Smith',
+            ),
+            Filters::equal(
+                'cn',
+                'Ally',
+            ),
+            Filters::equal(
+                'sn',
+                'Jones',
+            ),
+        );
+        $cases = [
+            'a member of the second type' => [
+                true,
+                new Attribute(
+                    'sn',
+                    'jones',
+                ),
+            ],
+            'a match for the other child' => [
+                true,
+                new Attribute(
+                    'mail',
+                    'bob@example.org',
+                ),
+            ],
+            'neither' => [
+                false,
+                new Attribute(
+                    'sn',
+                    'Brown',
+                ),
+            ],
+        ];
+
+        for ($pass = 0; $pass < 2; $pass++) {
+            foreach ($cases as $label => [$matches, $attribute]) {
+                self::assertSame(
+                    $matches,
+                    $this->subject->evaluate(
+                        new Entry(
+                            new Dn('cn=x,dc=example,dc=com'),
+                            $attribute,
+                        ),
+                        $filter,
+                    ),
+                    $label,
+                );
+            }
+        }
+    }
+
+    public function test_an_or_of_merged_equalities_and_an_undefined_item_is_undefined_when_none_match(): void
+    {
+        $members = [
+            Filters::equal(
+                'cn',
+                'Alice',
+            ),
+            Filters::equal(
+                'cn',
+                'Ally',
+            ),
+        ];
+        $withUndefined = [
+            ...$members,
+            Filters::equal(
+                'unknownType',
+                'x',
+            ),
+        ];
+        $bob = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute(
+                'cn',
+                'Bob',
+            ),
+        );
+        $notMembers = Filters::not(Filters::or(...$members));
+        $notWithUndefined = Filters::not(Filters::or(...$withUndefined));
+        $orWithUndefined = Filters::or(...$withUndefined);
+
+        for ($pass = 0; $pass < 2; $pass++) {
+            self::assertTrue($this->subject->evaluate(
+                $bob,
+                $notMembers,
+            ));
+            self::assertFalse($this->subject->evaluate(
+                $bob,
+                $notWithUndefined,
+            ));
+            self::assertTrue($this->subject->evaluate(
+                $this->entry,
+                $orWithUndefined,
+            ));
+        }
     }
 
     public function test_a_reused_filter_with_an_invalid_assertion_is_undefined_for_every_entry(): void
@@ -1221,7 +1391,13 @@ final class FilterEvaluatorTest extends TestCase
             '202601011300+0100',
         );
 
-        foreach (['20260101120000Z' => true, '2026010112Z' => true, '20260101130000Z' => false] as $stored => $matches) {
+        $cases = [
+            '20260101120000Z' => true,
+            '2026010112Z' => true,
+            '20260101130000Z' => false,
+        ];
+
+        foreach ($cases as $stored => $matches) {
             self::assertSame(
                 $matches,
                 $this->subject->evaluate(

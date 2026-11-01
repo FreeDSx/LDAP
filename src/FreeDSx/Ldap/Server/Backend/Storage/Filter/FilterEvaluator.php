@@ -52,14 +52,29 @@ use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 use Closure;
 use WeakMap;
 
+use function array_filter;
+use function array_map;
+use function array_merge;
+use function array_push;
+use function array_values;
+use function is_string;
+use function spl_object_id;
+use function str_contains;
+use function strcasecmp;
+use function strtolower;
+
 /**
  * Pure-PHP FilterEvaluatorInterface using RFC 4511 §4.5.1 three-valued logic.
  *
  * Uses schema-driven comparators with CaseIgnoreComparator as the default fallback per RFC 4511 §4.5.1.
  *
+ * Note: A filter must not be changed once it has been evaluated, as what its items need is planned once per filter.
+ *
+ * @internal
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class FilterEvaluator implements FilterEvaluatorInterface
+class FilterEvaluator implements FilterEvaluatorInterface
 {
     use DerivedAttributeTrait;
 
@@ -172,7 +187,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $this->plans[$filter] ??= new FilterPlan(),
         );
 
-        return $this->evaluateFilter($evaluation, $filter) === FilterResult::True;
+        $result = $this->evaluateFilter(
+            $evaluation,
+            $filter,
+        );
+
+        return $result === FilterResult::True;
     }
 
     /**
@@ -271,9 +291,28 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         FilterEvaluation $evaluation,
         OrFilter $filter,
     ): FilterResult {
+        $id = spl_object_id($filter);
+        $plan = $evaluation->plan;
+        $keySets = $this->keySetsOf(
+            $plan,
+            $id,
+            $filter,
+        );
+
+        foreach ($keySets as $description => $keys) {
+            $holdsAny = $this->holdsAnyKey(
+                $evaluation,
+                $description,
+                $keys,
+            );
+
+            if ($holdsAny) {
+                return FilterResult::True;
+            }
+        }
         $hasUndefined = false;
 
-        foreach ($filter->get() as $child) {
+        foreach ($plan->ungrouped[$id] ?? $filter->get() as $child) {
             $result = $this->evaluateFilter(
                 $evaluation,
                 $child,
@@ -418,6 +457,150 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         return false;
     }
 
+    /**
+     * @param array<int|string, true> $keys
+     */
+    private function holdsAnyKey(
+        FilterEvaluation $evaluation,
+        string $description,
+        array $keys,
+    ): bool {
+        $held = $evaluation->keys[$description] ?? $this->heldKeys(
+            $evaluation,
+            $description,
+        );
+
+        foreach ($held as $key => $_) {
+            if (isset($keys[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The canonical keys of every value the description selects, under its equality rule.
+     *
+     * @return array<int|string, true>
+     */
+    private function heldKeys(
+        FilterEvaluation $evaluation,
+        string $description,
+    ): array {
+        $comparator = $this->equalityResolver->for($description);
+        $keys = [];
+        $values = $this->valuesOf(
+            $evaluation,
+            $description,
+        );
+
+        foreach ($values as $value) {
+            $key = $comparator instanceof CanonicalIndexKeyInterface
+                ? $comparator->indexKey($value)
+                : null;
+
+            if ($key !== null) {
+                $keys[$key] = true;
+            }
+        }
+
+        return $evaluation->keys[$description] = $keys;
+    }
+
+    /**
+     * A filter evaluated only once never pays for grouping, which starts on an OR's second evaluation.
+     *
+     * @return array<string, array<int|string, true>>
+     */
+    private function keySetsOf(
+        FilterPlan $plan,
+        int $id,
+        OrFilter $filter,
+    ): array {
+        $keySets = $plan->keySets[$id] ?? null;
+
+        if ($keySets === null) {
+            $plan->keySets[$id] = false;
+
+            return [];
+        }
+
+        if ($keySets === false) {
+            return $plan->keySets[$id] = $this->groupEqualities(
+                $plan,
+                $id,
+                $filter,
+            );
+        }
+
+        return $keySets;
+    }
+
+    /**
+     * Equality items that share an attribute and a canonical rule merge into one set of keys.
+     *
+     * @return array<string, array<int|string, true>>
+     */
+    private function groupEqualities(
+        FilterPlan $plan,
+        int $id,
+        OrFilter $filter,
+    ): array {
+        $children = $filter->get();
+        $asserted = [];
+
+        foreach ($children as $child) {
+            if ($child instanceof EqualityFilter || $child instanceof ApproximateFilter) {
+                $description = $child->getAttribute();
+                $asserted[$description] = ($asserted[$description] ?? 0) + 1;
+            }
+        }
+        $keySets = [];
+        $ungrouped = [];
+
+        foreach ($children as $child) {
+            $isShared = ($child instanceof EqualityFilter || $child instanceof ApproximateFilter)
+                && $asserted[$child->getAttribute()] > 1;
+            $key = $isShared
+                ? $this->groupableKey(
+                    $plan,
+                    $child,
+                )
+                : null;
+
+            if ($key === null) {
+                $ungrouped[] = $child;
+
+                continue;
+            }
+            $keySets[$child->getAttribute()][$key] = true;
+        }
+
+        if ($keySets !== []) {
+            $plan->ungrouped[$id] = $ungrouped;
+        }
+
+        return $keySets;
+    }
+
+    /**
+     * The item's canonical key, or null when it is Undefined or its rule compares without one.
+     */
+    private function groupableKey(
+        FilterPlan $plan,
+        EqualityFilter|ApproximateFilter $item,
+    ): ?string {
+        if (!$this->attributeIsRecognized($item)) {
+            return null;
+        }
+        $prepared = $plan->equalities[spl_object_id($item)] ??= $this->prepareEquality($item);
+
+        return is_string($prepared)
+            ? $prepared
+            : null;
+    }
+
     private function evaluateSubstring(
         FilterEvaluation $evaluation,
         SubstringFilter $filter,
@@ -460,7 +643,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         FilterEvaluation $evaluation,
         GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
     ): FilterResult {
-        if (!$this->assertionSyntaxIsValid($filter)) {
+        $isValid = $evaluation->plan->validItems[spl_object_id($filter)] ??= $this->assertionSyntaxIsValid($filter);
+
+        if (!$isValid) {
             return FilterResult::Undefined;
         }
 
@@ -503,7 +688,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::Undefined;
         }
 
-        if (!$this->ruleAssertionIsValid($filter)) {
+        $isValid = $evaluation->plan->validItems[spl_object_id($filter)] ??= $this->ruleAssertionIsValid($filter);
+
+        if (!$isValid) {
             return FilterResult::Undefined;
         }
 
