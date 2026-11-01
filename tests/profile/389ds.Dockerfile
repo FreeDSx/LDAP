@@ -18,5 +18,8 @@ RUN mkdir -p /data/config /data/ssca /data/run \
     && chown -R dirsrv: /data /run/dirsrv \
     && chgrp -R dirsrv /etc/dirsrv
 
+# The packaged systemd unit preloads the bundled jemalloc but the container entrypoint does not, so the command does.
+RUN test -f /usr/lib64/dirsrv/lib/libjemalloc.so.2
+
 EXPOSE 3389 3636
-CMD ["/usr/libexec/dirsrv/dscontainer", "-r"]
+CMD ["env", "LD_PRELOAD=/usr/lib64/dirsrv/lib/libjemalloc.so.2", "/usr/libexec/dirsrv/dscontainer", "-r"]
