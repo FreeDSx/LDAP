@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
+use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\Comparator\BitMaskComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
@@ -44,9 +45,12 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\Evaluation\FilterEvaluation;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\Evaluation\FilterPlan;
 use FreeDSx\Ldap\Server\Utility\Memo\BoundedMemo;
 use FreeDSx\Ldap\Server\Utility\Memo\MemoScope;
 use Closure;
+use WeakMap;
 
 /**
  * Pure-PHP FilterEvaluatorInterface using RFC 4511 §4.5.1 three-valued logic.
@@ -118,6 +122,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private readonly BoundedMemo $ruleConformingValues;
 
+    /**
+     * The plan of each filter being evaluated, kept by the filter itself and dropped with it.
+     *
+     * @var WeakMap<FilterInterface, FilterPlan>
+     */
+    private readonly WeakMap $plans;
+
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
     public function __construct(
@@ -149,13 +160,19 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $this->conformingValues = self::answersByValue($this->syntaxResolver->conforms(...));
         $this->validAssertions = self::answersByValue($this->assertionValueIsValid(...));
         $this->ruleConformingValues = self::answersByValue($this->ruleValueConforms(...));
+        $this->plans = new WeakMap();
     }
 
     public function evaluate(
         Entry $entry,
         FilterInterface $filter,
     ): bool {
-        return $this->evaluateFilter($entry, $filter) === FilterResult::True;
+        $evaluation = new FilterEvaluation(
+            $entry,
+            $this->plans[$filter] ??= new FilterPlan(),
+        );
+
+        return $this->evaluateFilter($evaluation, $filter) === FilterResult::True;
     }
 
     /**
@@ -176,7 +193,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluateFilter(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         FilterInterface $filter,
     ): FilterResult {
         if ($filter instanceof FilterAttributeInterface && !$this->attributeIsRecognized($filter)) {
@@ -184,17 +201,41 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         }
 
         return match (true) {
-            $filter instanceof AndFilter => $this->evaluateAnd($entry, $filter),
-            $filter instanceof OrFilter => $this->evaluateOr($entry, $filter),
-            $filter instanceof NotFilter => $this->evaluateNot($entry, $filter),
-            $filter instanceof PresentFilter => $this->evaluatePresent($entry, $filter),
+            $filter instanceof AndFilter => $this->evaluateAnd(
+                $evaluation,
+                $filter,
+            ),
+            $filter instanceof OrFilter => $this->evaluateOr(
+                $evaluation,
+                $filter,
+            ),
+            $filter instanceof NotFilter => $this->evaluateNot(
+                $evaluation,
+                $filter,
+            ),
+            $filter instanceof PresentFilter => $this->evaluatePresent(
+                $evaluation,
+                $filter,
+            ),
             // RFC 4511 4.5.1.7.6: with no approximate rule implemented, an approximate item is treated as equality.
             $filter instanceof EqualityFilter,
-            $filter instanceof ApproximateFilter => $this->evaluateEquality($entry, $filter),
-            $filter instanceof SubstringFilter => $this->evaluateSubstring($entry, $filter),
+            $filter instanceof ApproximateFilter => $this->evaluateEquality(
+                $evaluation,
+                $filter,
+            ),
+            $filter instanceof SubstringFilter => $this->evaluateSubstring(
+                $evaluation,
+                $filter,
+            ),
             $filter instanceof GreaterThanOrEqualFilter,
-            $filter instanceof LessThanOrEqualFilter => $this->evaluateOrdered($entry, $filter),
-            $filter instanceof MatchingRuleFilter => $this->evaluateMatchingRule($entry, $filter),
+            $filter instanceof LessThanOrEqualFilter => $this->evaluateOrdered(
+                $evaluation,
+                $filter,
+            ),
+            $filter instanceof MatchingRuleFilter => $this->evaluateMatchingRule(
+                $evaluation,
+                $filter,
+            ),
             default => throw new OperationException(
                 'Unrecognized filter type.',
                 ResultCode::PROTOCOL_ERROR,
@@ -203,14 +244,14 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluateAnd(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         AndFilter $filter,
     ): FilterResult {
         $hasUndefined = false;
 
         foreach ($filter->get() as $child) {
             $result = $this->evaluateFilter(
-                $entry,
+                $evaluation,
                 $child,
             );
             if ($result === FilterResult::False) {
@@ -227,14 +268,14 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluateOr(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         OrFilter $filter,
     ): FilterResult {
         $hasUndefined = false;
 
         foreach ($filter->get() as $child) {
             $result = $this->evaluateFilter(
-                $entry,
+                $evaluation,
                 $child,
             );
             if ($result === FilterResult::True) {
@@ -251,10 +292,15 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluateNot(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         NotFilter $filter,
     ): FilterResult {
-        return match ($this->evaluateFilter($entry, $filter->get())) {
+        $result = $this->evaluateFilter(
+            $evaluation,
+            $filter->get(),
+        );
+
+        return match ($result) {
             FilterResult::True => FilterResult::False,
             FilterResult::False => FilterResult::True,
             FilterResult::Undefined => FilterResult::Undefined,
@@ -262,12 +308,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluatePresent(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         PresentFilter $filter,
     ): FilterResult {
         // RFC 4511 4.5.1.7.5: true when the type or a subtype of it is present.
-        $values = $this->valuesForAssertion(
-            $entry,
+        $values = $this->valuesOf(
+            $evaluation,
             $filter->getAttribute(),
         );
 
@@ -277,27 +323,46 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluateEquality(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         EqualityFilter|ApproximateFilter $filter,
     ): FilterResult {
-        if (!$this->assertionIsValid($filter)) {
+        $prepared = $evaluation->plan->equalities[spl_object_id($filter)] ??= $this->prepareEquality($filter);
+
+        if ($prepared === false) {
             return FilterResult::Undefined;
         }
-        $values = $this->valuesForAssertion(
-            $entry,
-            $filter->getAttribute(),
+        $description = $filter->getAttribute();
+        $values = $this->valuesOf(
+            $evaluation,
+            $description,
         );
 
         // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
             return FilterResult::False;
         }
+        $comparator = $this->equalityResolver->for($description);
 
-        $comparator = $this->equalityResolver->for($filter->getAttribute());
-        $filterValue = $filter->getValue();
+        if (is_string($prepared) && $comparator instanceof CanonicalIndexKeyInterface) {
+            $holdsKey = $this->holdsKey(
+                $evaluation,
+                $description,
+                $prepared,
+                $comparator,
+            );
+
+            return $holdsKey
+                ? FilterResult::True
+                : FilterResult::False;
+        }
 
         foreach ($values as $value) {
-            if ($comparator->equals($value, $filterValue)) {
+            $matches = $comparator->equals(
+                $value,
+                $filter->getValue(),
+            );
+
+            if ($matches) {
                 return FilterResult::True;
             }
         }
@@ -305,8 +370,56 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         return FilterResult::False;
     }
 
+    /**
+     * The assertion's canonical key, true when its rule compares without one, or false when the item is Undefined.
+     */
+    private function prepareEquality(EqualityFilter|ApproximateFilter $filter): string|bool
+    {
+        if (!$this->assertionIsValid($filter)) {
+            return false;
+        }
+        $comparator = $this->equalityResolver->for($filter->getAttribute());
+
+        return $comparator instanceof CanonicalIndexKeyInterface
+            ? $comparator->indexKey($filter->getValue()) ?? true
+            : true;
+    }
+
+    /**
+     * Keys are computed until one matches, and kept for the entry only once every value has been keyed.
+     */
+    private function holdsKey(
+        FilterEvaluation $evaluation,
+        string $description,
+        string $key,
+        CanonicalIndexKeyInterface $comparator,
+    ): bool {
+        if (isset($evaluation->keys[$description])) {
+            return isset($evaluation->keys[$description][$key]);
+        }
+        $keys = [];
+        $values = $this->valuesOf(
+            $evaluation,
+            $description,
+        );
+
+        foreach ($values as $value) {
+            $valueKey = $comparator->indexKey($value);
+
+            if ($valueKey === $key) {
+                return true;
+            }
+            if ($valueKey !== null) {
+                $keys[$valueKey] = true;
+            }
+        }
+        $evaluation->keys[$description] = $keys;
+
+        return false;
+    }
+
     private function evaluateSubstring(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         SubstringFilter $filter,
     ): FilterResult {
         // RFC 4511 4.5.1.7: the rule a substring item applies is the type's SUBSTR, so a type declaring none has
@@ -317,8 +430,8 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::Undefined;
         }
 
-        $values = $this->valuesForAssertion(
-            $entry,
+        $values = $this->valuesOf(
+            $evaluation,
             $filter->getAttribute(),
         );
 
@@ -344,15 +457,15 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      * Both ordered filters agree on everything but the direction of the final comparison.
      */
     private function evaluateOrdered(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
     ): FilterResult {
         if (!$this->assertionSyntaxIsValid($filter)) {
             return FilterResult::Undefined;
         }
 
-        $values = $this->valuesForAssertion(
-            $entry,
+        $values = $this->valuesOf(
+            $evaluation,
             $filter->getAttribute(),
         );
 
@@ -377,7 +490,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     private function evaluateMatchingRule(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         MatchingRuleFilter $filter,
     ): FilterResult {
         // RFC 4511 4.5.1.7: an unrecognized rule makes the item Undefined, and a server must not answer with an error.
@@ -395,7 +508,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         }
 
         $filterValue = $filter->getValue();
-        $values = $this->collectValuesToTest($entry, $filter);
+        $values = $this->collectValuesToTest(
+            $evaluation,
+            $filter,
+        );
 
         if ($values === []) {
             return FilterResult::False;
@@ -414,19 +530,19 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      * @return array<string>
      */
     private function collectValuesToTest(
-        Entry $entry,
+        FilterEvaluation $evaluation,
         MatchingRuleFilter $filter,
     ): array {
         $filterAttributeName = $filter->getAttribute();
         $values = [];
 
         if ($filterAttributeName !== null) {
-            $values = $this->valuesForAssertion(
-                $entry,
+            $values = $this->valuesOf(
+                $evaluation,
                 $filterAttributeName,
             );
         } else {
-            foreach ($entry->getAttributes() as $attribute) {
+            foreach ($evaluation->entry->getAttributes() as $attribute) {
                 array_push(
                     $values,
                     ...$attribute->getValues(),
@@ -438,7 +554,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $values = array_merge(
                 $values,
                 $this->collectDnValues(
-                    $entry,
+                    $evaluation->entry,
                     $filterAttributeName,
                 ),
             );
@@ -567,6 +683,19 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             initial: $filter->getStartsWith(),
             any: array_values($filter->getContains()),
             final: $filter->getEndsWith(),
+        );
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function valuesOf(
+        FilterEvaluation $evaluation,
+        string $description,
+    ): array {
+        return $evaluation->values[$description] ??= $this->valuesForAssertion(
+            $evaluation->entry,
+            $description,
         );
     }
 
