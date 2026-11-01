@@ -15,12 +15,14 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\FilterDepthExceededException;
+use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\FilterContainerInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
@@ -43,6 +45,11 @@ class FilterFactory
     public const MAX_NESTING_DEPTH = 30;
 
     /**
+     * The most items a received filter may hold, each substring part and each empty AND or OR counting as one.
+     */
+    public const MAX_ITEMS = 1000;
+
+    /**
      * @var array<int, class-string>
      */
     private static array $map = [
@@ -61,13 +68,16 @@ class FilterFactory
     /**
      * @param AbstractType<mixed> $type
      * @param int $depth How many AND, OR, or NOT filters enclose this one.
+     * @param FilterItemTally $tally The items counted so far across the whole received filter.
      * @throws FilterDepthExceededException
+     * @throws FilterTooWideException
      * @throws ProtocolException
      * @throws RuntimeException
      */
     public static function get(
         AbstractType $type,
         int $depth = 0,
+        FilterItemTally $tally = new FilterItemTally(),
     ): FilterInterface {
         if ($depth > self::MAX_NESTING_DEPTH) {
             throw new FilterDepthExceededException(sprintf(
@@ -96,6 +106,7 @@ class FilterFactory
             $filterConstruct,
             $type,
             $depth,
+            $tally,
         );
 
         if (!$filter instanceof FilterInterface) {
@@ -104,6 +115,15 @@ class FilterFactory
                 FilterInterface::class,
                 is_object($filter) ? $filter::class : gettype($filter),
             ));
+        }
+
+        // An AND, OR, or NOT counted the items beneath it as it decoded them, and an empty AND or OR stands for one.
+        $isItem = $filter instanceof FilterContainerInterface
+            ? $filter->get() === []
+            : !$filter instanceof NotFilter;
+
+        if ($isItem) {
+            $tally->add($filter);
         }
 
         return $filter;
@@ -115,6 +135,8 @@ class FilterFactory
     }
 
     /**
+     * A filter class that decodes child filters must pass the tally it receives on to get().
+     *
      * @throws InvalidArgumentException
      */
     public static function set(

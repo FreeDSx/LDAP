@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Factory;
 use Closure;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\FilterDepthExceededException;
+use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -71,6 +72,127 @@ final class FilterFactoryTest extends TestCase
         FilterFactory::get(self::receivedAsn1($filter));
     }
 
+    public function test_it_decodes_a_filter_holding_the_maximum_items(): void
+    {
+        $filter = Filters::or(...self::equalities(FilterFactory::MAX_ITEMS));
+
+        self::assertEquals(
+            $filter,
+            FilterFactory::get(self::receivedAsn1($filter)),
+        );
+    }
+
+    public function test_it_refuses_a_filter_holding_more_than_the_maximum_items_as_an_administrative_limit(): void
+    {
+        $filter = Filters::or(...self::equalities(FilterFactory::MAX_ITEMS + 1));
+
+        $this->expectException(FilterTooWideException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        FilterFactory::get(self::receivedAsn1($filter));
+    }
+
+    public function test_it_counts_the_items_of_every_nested_filter_together(): void
+    {
+        $half = intdiv(
+            FilterFactory::MAX_ITEMS,
+            2,
+        );
+        $filter = Filters::and(
+            Filters::or(...self::equalities($half)),
+            Filters::not(Filters::or(...self::equalities($half + 1))),
+        );
+
+        $this->expectException(FilterTooWideException::class);
+
+        FilterFactory::get(self::receivedAsn1($filter));
+    }
+
+    /**
+     * @return iterable<string, array{Closure(): FilterInterface}>
+     */
+    public static function emptySetProvider(): iterable
+    {
+        yield 'empty and' => [
+            static fn(): FilterInterface => Filters::and(),
+        ];
+        yield 'empty or' => [
+            static fn(): FilterInterface => Filters::or(),
+        ];
+        yield 'negated empty and' => [
+            static fn(): FilterInterface => Filters::not(Filters::and()),
+        ];
+    }
+
+    /**
+     * @param Closure(): FilterInterface $emptySet
+     */
+    #[DataProvider('emptySetProvider')]
+    public function test_it_counts_each_empty_set_as_an_item(Closure $emptySet): void
+    {
+        $filter = Filters::or(...array_map(
+            static fn(): FilterInterface => $emptySet(),
+            range(
+                0,
+                FilterFactory::MAX_ITEMS,
+            ),
+        ));
+
+        $this->expectException(FilterTooWideException::class);
+
+        FilterFactory::get(self::receivedAsn1($filter));
+    }
+
+    public function test_it_decodes_empty_sets_that_reach_the_maximum_items(): void
+    {
+        $filter = Filters::or(...array_map(
+            static fn(): FilterInterface => Filters::and(),
+            range(
+                1,
+                FilterFactory::MAX_ITEMS,
+            ),
+        ));
+
+        self::assertEquals(
+            $filter,
+            FilterFactory::get(self::receivedAsn1($filter)),
+        );
+    }
+
+    public function test_it_counts_each_part_of_a_substring_item(): void
+    {
+        $filter = Filters::or(
+            Filters::substring(
+                'cn',
+                'a',
+                'z',
+                'm',
+            ),
+            ...self::equalities(FilterFactory::MAX_ITEMS - 2),
+        );
+
+        $this->expectException(FilterTooWideException::class);
+
+        FilterFactory::get(self::receivedAsn1($filter));
+    }
+
+    public function test_it_decodes_a_substring_item_whose_parts_reach_the_maximum_items(): void
+    {
+        $filter = Filters::or(
+            Filters::substring(
+                'cn',
+                'a',
+                'z',
+            ),
+            ...self::equalities(FilterFactory::MAX_ITEMS - 2),
+        );
+
+        self::assertEquals(
+            $filter,
+            FilterFactory::get(self::receivedAsn1($filter)),
+        );
+    }
+
     public function test_it_should_check_if_a_mapping_exists(): void
     {
         self::assertTrue(FilterFactory::has(0));
@@ -108,6 +230,23 @@ final class FilterFactoryTest extends TestCase
         }
 
         return $filter;
+    }
+
+    /**
+     * @return list<EqualityFilter>
+     */
+    private static function equalities(int $count): array
+    {
+        return array_map(
+            static fn(int $i): EqualityFilter => new EqualityFilter(
+                'cn',
+                "v{$i}",
+            ),
+            range(
+                1,
+                $count,
+            ),
+        );
     }
 
     /**

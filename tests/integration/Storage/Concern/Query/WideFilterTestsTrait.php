@@ -16,29 +16,20 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
-use PHPUnit\Framework\Attributes\After;
 
 /**
- * Filters of tens of thousands of items, answered by a server with PHP's default memory limit.
+ * Filters at the item limit, answered by a server with PHP's default memory limit.
  */
 trait WideFilterTestsTrait
 {
-    private const WIDE_FILTER_ITEMS = 80_000;
-
-    /**
-     * Building a request this wide costs the test process far more than the server, which alone is held to 128M.
-     */
-    private const CLIENT_MEMORY_LIMIT = '512M';
-
-    private string $memoryLimitBeforeWideFilter = '';
-
-    public function testAVeryWideOrMatchesTheEntriesItNames(): void
+    public function testAnOrAtTheItemLimitMatchesTheEntriesItNames(): void
     {
         $this->startWideFilterServer();
-        $items = $this->absentUidItems();
-        $items[40_000] = Filters::equal(
+        $items = $this->absentUidItems(FilterFactory::MAX_ITEMS - 1);
+        $items[500] = Filters::equal(
             'uid',
             'wide-1',
         );
@@ -56,12 +47,45 @@ trait WideFilterTestsTrait
         );
     }
 
-    public function testAVeryWideAndMatchesTheEntriesItLeavesIn(): void
+    public function testAnOrAtTheItemLimitOfItemsThatDoNotMergeMatchesTheEntriesItNames(): void
+    {
+        $this->startWideFilterServer();
+        $items = array_map(
+            static fn(int $i): FilterInterface => Filters::greaterThanOrEqual(
+                'cn',
+                "zzz-{$i}",
+            ),
+            range(
+                1,
+                FilterFactory::MAX_ITEMS - 2,
+            ),
+        );
+
+        self::assertEqualsCanonicalizing(
+            [
+                'uid=wide-1,ou=wide,dc=foo,dc=bar',
+                'uid=wide-3,ou=wide,dc=foo,dc=bar',
+            ],
+            $this->wideSearch(Filters::or(
+                Filters::equal(
+                    'uid',
+                    'wide-1',
+                ),
+                Filters::equal(
+                    'uid',
+                    'wide-3',
+                ),
+                ...$items,
+            )),
+        );
+    }
+
+    public function testAnAndAtTheItemLimitMatchesTheEntriesItLeavesIn(): void
     {
         $this->startWideFilterServer();
         $items = array_map(
             static fn(FilterInterface $item): FilterInterface => Filters::not($item),
-            $this->absentUidItems(),
+            $this->absentUidItems(FilterFactory::MAX_ITEMS - 2),
         );
 
         self::assertEqualsCanonicalizing(
@@ -83,34 +107,12 @@ trait WideFilterTestsTrait
         );
     }
 
-    public function testAnOrInsideTheSqlBudgetMatchesTheEntriesItNames(): void
-    {
-        $this->startWideFilterServer();
-        $items = $this->absentUidItems(500);
-        $items[250] = Filters::equal(
-            'uid',
-            'wide-1',
-        );
-        $items[] = Filters::equal(
-            'uid',
-            'wide-3',
-        );
-
-        self::assertEqualsCanonicalizing(
-            [
-                'uid=wide-1,ou=wide,dc=foo,dc=bar',
-                'uid=wide-3,ou=wide,dc=foo,dc=bar',
-            ],
-            $this->wideSearch(Filters::or(...$items)),
-        );
-    }
-
-    public function testAnAndOfNegationsInsideTheSqlBudgetMatchesTheEntriesItLeavesIn(): void
+    public function testAnAndOfNegationsAloneAtTheItemLimitMatchesTheEntriesItLeavesIn(): void
     {
         $this->startWideFilterServer();
         $items = array_map(
             static fn(FilterInterface $item): FilterInterface => Filters::not($item),
-            $this->absentUidItems(500),
+            $this->absentUidItems(FilterFactory::MAX_ITEMS - 1),
         );
 
         self::assertEqualsCanonicalizing(
@@ -129,19 +131,6 @@ trait WideFilterTestsTrait
         );
     }
 
-    #[After]
-    protected function restoreMemoryLimitAfterWideFilter(): void
-    {
-        if ($this->memoryLimitBeforeWideFilter === '') {
-            return;
-        }
-        ini_set(
-            'memory_limit',
-            $this->memoryLimitBeforeWideFilter,
-        );
-        $this->memoryLimitBeforeWideFilter = '';
-    }
-
     /**
      * The arguments that route the server at the backend under test.
      *
@@ -151,15 +140,6 @@ trait WideFilterTestsTrait
 
     private function startWideFilterServer(): void
     {
-        $limit = (string) ini_get('memory_limit');
-
-        if ($limit !== '-1') {
-            $this->memoryLimitBeforeWideFilter = $limit;
-            ini_set(
-                'memory_limit',
-                self::CLIENT_MEMORY_LIMIT,
-            );
-        }
         $this->stopServer();
         $this->createServerProcess(
             'tcp',
@@ -196,7 +176,7 @@ trait WideFilterTestsTrait
     /**
      * @return list<FilterInterface>
      */
-    private function absentUidItems(int $count = self::WIDE_FILTER_ITEMS): array
+    private function absentUidItems(int $count): array
     {
         return array_map(
             static fn(int $i): FilterInterface => Filters::equal(

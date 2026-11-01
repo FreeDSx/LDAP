@@ -208,6 +208,39 @@ final class LdapMessageRequestTest extends TestCase
         }
     }
 
+    public function test_a_search_filter_past_the_item_limit_is_answered_as_an_administrative_limit(): void
+    {
+        try {
+            self::decodeReceived(new LdapMessageRequest(
+                7,
+                Operations::search(self::filterPastTheItemLimit())->base('dc=foo,dc=bar'),
+            ));
+            self::fail('The wide filter should have been refused.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                [7, 3, ResultCode::ADMIN_LIMIT_EXCEEDED],
+                [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
+            );
+        }
+    }
+
+    public function test_an_assertion_filter_past_the_item_limit_is_answered_as_an_administrative_limit(): void
+    {
+        try {
+            self::decodeReceived(new LdapMessageRequest(
+                8,
+                new DeleteRequest('dc=foo,dc=bar'),
+                new AssertionControl(self::filterPastTheItemLimit()),
+            ));
+            self::fail('The wide assertion filter should have been refused.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                [8, 10, ResultCode::ADMIN_LIMIT_EXCEEDED],
+                [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
+            );
+        }
+    }
+
     /**
      * An unrecognized operation cannot be answered, so it must stay a plain failure that ends the session.
      */
@@ -252,6 +285,17 @@ final class LdapMessageRequestTest extends TestCase
         }
 
         return $filter;
+    }
+
+    private static function filterPastTheItemLimit(): FilterInterface
+    {
+        return Filters::or(...array_map(
+            static fn(int $i): FilterInterface => Filters::present("a{$i}"),
+            range(
+                0,
+                FilterFactory::MAX_ITEMS,
+            ),
+        ));
     }
 
     private static function decodeReceived(LdapMessageRequest $message): LdapMessageRequest
