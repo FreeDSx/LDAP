@@ -703,6 +703,10 @@ The vendorVersion attribute for the RootDSE.
 Server-side caps applied independently of what the client requests. When both the client and server specify a limit, the
 stricter value wins. A server value of `0` means no server-side cap.
 
+A received filter, in a search or an assertion control, has two fixed limits. It may hold at most 1,000 items, each part
+of a substring item and each empty AND or OR counting as one, and a wider filter is refused with `ADMIN_LIMIT_EXCEEDED`.
+It may nest at most 30 levels of AND, OR and NOT, and a deeper filter is refused with `UNWILLING_TO_PERFORM`.
+
 ------------------
 #### setMaxSearchSize
 

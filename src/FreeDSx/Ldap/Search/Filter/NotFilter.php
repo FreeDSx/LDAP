@@ -19,9 +19,11 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\FilterDepthExceededException;
+use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
+use FreeDSx\Ldap\Protocol\Factory\FilterItemTally;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
 
@@ -84,14 +86,17 @@ class NotFilter implements FilterInterface, Stringable
      *
      * @param AbstractType<mixed> $type
      * @param int $depth How many AND, OR, or NOT filters enclose this one.
+     * @param FilterItemTally $tally The items counted so far across the whole received filter.
      * @throws ProtocolException
      * @throws EncoderException
      * @throws FilterDepthExceededException
+     * @throws FilterTooWideException
      * @throws RuntimeException
      */
     public static function fromAsn1(
         AbstractType $type,
         int $depth = 0,
+        FilterItemTally $tally = new FilterItemTally(),
     ): static {
         $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && count($type) === 1)) {
@@ -105,6 +110,7 @@ class NotFilter implements FilterInterface, Stringable
         return new static(FilterFactory::get(
             $child,
             $depth + 1,
+            $tally,
         ));
     }
 }

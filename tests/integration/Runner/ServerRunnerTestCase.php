@@ -140,6 +140,67 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         );
     }
 
+    public function testASearchFilterPastTheItemLimitIsRefusedAsAnAdministrativeLimitAndTheSessionContinues(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(self::filterOfItems(FilterFactory::MAX_ITEMS + 1))->base('dc=foo,dc=bar'),
+            );
+            self::fail('The wide filter should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e->getCode(),
+            );
+        }
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(self::filterOfItems(FilterFactory::MAX_ITEMS))->base('dc=foo,dc=bar'),
+        );
+        self::assertGreaterThan(
+            0,
+            $entries->count(),
+        );
+    }
+
+    public function testASearchFilterOfEmptySetsPastTheItemLimitIsRefusedAsAnAdministrativeLimit(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->search(
+            Operations::search(Filters::or(
+                Filters::present('objectClass'),
+                ...array_map(
+                    static fn(): FilterInterface => Filters::and(),
+                    range(
+                        1,
+                        FilterFactory::MAX_ITEMS,
+                    ),
+                ),
+            ))->base('dc=foo,dc=bar'),
+        );
+    }
+
+    public function testAnAssertionFilterPastTheItemLimitIsRefusedAsAnAdministrativeLimit(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->compare(
+            'cn=user,dc=foo,dc=bar',
+            'cn',
+            'user',
+            Controls::assertion(self::filterOfItems(FilterFactory::MAX_ITEMS + 1)),
+        );
+    }
+
     public function testARequestNestedPastTheDecodeDepthLimitEndsTheSessionWithAProtocolError(): void
     {
         $queue = $this->rawQueue();
@@ -328,6 +389,26 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         return $filter;
+    }
+
+    /**
+     * An OR whose first item matches every entry and whose others name values no entry holds.
+     */
+    private static function filterOfItems(int $count): FilterInterface
+    {
+        return Filters::or(
+            Filters::present('objectClass'),
+            ...array_map(
+                static fn(int $i): FilterInterface => Filters::equal(
+                    'cn',
+                    "absent-{$i}",
+                ),
+                range(
+                    2,
+                    $count,
+                ),
+            ),
+        );
     }
 
     /**
