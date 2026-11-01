@@ -24,7 +24,6 @@ use Generator;
 use function array_chunk;
 use function count;
 use function is_array;
-use function strtolower;
 
 /**
  * Holds the values a write named but no entry answers to, until one does.
@@ -71,15 +70,15 @@ final readonly class PendingLinkWriter implements ReferenceIntegrityInterface
 
         foreach ($values as $name => $attributeValues) {
             foreach ($attributeValues as $value) {
-                $normalized = Dn::normalizedOrNull($value);
+                $targetLcDn = (new Dn($value))->normalizedString();
 
-                if ($normalized !== null && isset($resolved[$normalized])) {
+                if (isset($resolved[$targetLcDn])) {
                     continue;
                 }
 
                 $pending[] = [
                     $name,
-                    $normalized ?? strtolower($value),
+                    $targetLcDn,
                     $value,
                 ];
             }

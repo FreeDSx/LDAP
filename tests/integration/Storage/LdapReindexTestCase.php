@@ -63,6 +63,17 @@ abstract class LdapReindexTestCase extends TestCase
         cn: street
         sn: Straße
 
+        # o=Acme™ Widgets,dc=foo,dc=bar
+        dn:: bz1BY21l4oSiIFdpZGdldHMsZGM9Zm9vLGRjPWJhcg==
+        objectClass: organization
+        o:: QWNtZeKEoiBXaWRnZXRz
+
+        # cn=bob,o=Acme™ Widgets,dc=foo,dc=bar
+        dn:: Y249Ym9iLG89QWNtZeKEoiBXaWRnZXRzLGRjPWZvbyxkYz1iYXI=
+        objectClass: person
+        cn: bob
+        sn: bob
+
         LDIF;
 
     protected string $path;
