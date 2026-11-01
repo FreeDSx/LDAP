@@ -23,10 +23,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\DnKeyRebuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DnKeyRebuilderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoDnKeyRebuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ResolvedReferences;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
@@ -77,6 +80,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             LinkedLeafWitness::class => $this->makeLinkedLeafWitness(...),
             LinkedChanges::class => $this->makeLinkedChanges(...),
             LinkedChangeReplay::class => $this->makeLinkedChangeReplay(...),
+            DnKeyRebuilderInterface::class => $this->makeDnKeyRebuilder(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
@@ -124,6 +128,13 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return $this->isPdo($container)
             ? $container->get(SerializedEntryWriter::class)
             : new UnlockedRows($container->get(ReadEntryInterface::class));
+    }
+
+    private function makeDnKeyRebuilder(Container $container): DnKeyRebuilderInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(DnKeyRebuilder::class)
+            : new NoDnKeyRebuilder();
     }
 
     /**
@@ -176,6 +187,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $container->get(ListEntryInterface::class),
             $container->get(WriteEntryInterface::class),
             $container->get(TransactionalWriteInterface::class),
+            $container->get(DnKeyRebuilderInterface::class),
         );
     }
 

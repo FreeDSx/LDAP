@@ -73,6 +73,12 @@ after enabling substring indexing, changing which attributes it covers, changing
 `SUBSTR` rule, or upgrading to a release whose CHANGELOG notes a change to how values are indexed. It rewrites every
 row, so treat it as maintenance rather than a startup step.
 
+It also rebuilds the normalized key each entry's DN is found by. If two entries' DNs now share one key, it stops and
+changes nothing until one of them is renamed. Every server with its own database needs its own run, replicas included.
+
+Run it while no other server process writes to the same database. SQLite holds other writers off for the whole run;
+MySQL does not.
+
 ## The Linked Attribute Tables
 
 Values of an attribute the schema marks `X-LINKED` live in `entry_attribute_links`, one row per value, referencing the

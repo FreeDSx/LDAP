@@ -14,16 +14,20 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DnKeyRebuilderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnKeyCollisionException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * Rebuilds every secondary index by re-storing each entry; run it after enabling substring indexing on an existing directory, changing the indexed attributes, or changing an attribute's matching rules.
+ * Rebuilds every stored DN key and secondary index; run it after enabling substring indexing on an existing directory, changing the indexed attributes, changing an attribute's matching rules, or upgrading to a release that changes how DNs or values are normalized.
  *
  * @api
  *
@@ -36,17 +40,23 @@ final readonly class EntryIndexReindexer
         private ListEntryInterface $lister,
         private WriteEntryInterface $writer,
         private TransactionalWriteInterface $transaction,
+        private DnKeyRebuilderInterface $dnKeys,
     ) {}
 
     /**
-     * Re-store every entry in one transaction via raw storage: the indexes are rebuilt while operational attributes are preserved verbatim and no change is journaled.
+     * Rebuild the DN keys, then re-store every entry in the same transaction via raw storage: the indexes are rebuilt while operational attributes are preserved verbatim and no change is journaled.
+     *
+     * @throws DnKeyCollisionException when two entries' DNs now share one key
+     * @throws DnTooLongException when a rebuilt DN key exceeds what the storage holds
+     * @throws InvalidDnSyntaxException when a stored DN no longer parses
      */
     public function reindex(): void
     {
-        $dns = $this->collectDns();
+        $this->transaction->atomic(function (): void {
+            // Rebuilt first: every entry below is listed and read by its DN key.
+            $this->dnKeys->rebuild();
 
-        $this->transaction->atomic(function () use ($dns): void {
-            foreach ($dns as $dn) {
+            foreach ($this->collectDns() as $dn) {
                 // re-indexing leaves links alone and never has to read them.
                 $entry = $this->reader->find(
                     $dn,

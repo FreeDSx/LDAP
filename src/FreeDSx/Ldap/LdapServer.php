@@ -17,10 +17,13 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RecordRefusedException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnKeyCollisionException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Ldif\LdifChangeRecord;
 use FreeDSx\Ldap\Ldif\LdifParser;
@@ -171,9 +174,14 @@ class LdapServer
     }
 
     /**
-     * Rebuilds the configured backend's secondary indexes from the entries themselves.
+     * Rebuilds the configured backend's stored DN keys and secondary indexes from the entries themselves.
      *
-     * Needed after changing substring indexing or an attribute's matching rules, since both decide how a value is indexed.
+     * Needed after changing substring indexing or an attribute's matching rules, or after upgrading to a release that
+     * changes how DNs or values are normalized.
+     *
+     * @throws DnKeyCollisionException when two entries' DNs now share one key
+     * @throws DnTooLongException when a rebuilt DN key exceeds what the storage holds
+     * @throws InvalidDnSyntaxException when a stored DN no longer parses
      */
     public function reindex(): self
     {

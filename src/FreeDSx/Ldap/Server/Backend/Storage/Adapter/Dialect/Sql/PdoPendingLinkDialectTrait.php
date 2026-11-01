@@ -52,9 +52,10 @@ trait PdoPendingLinkDialectTrait
             ? 'p.target_lc_dn = ? AND'
             : '';
 
+        // Two parked values can name one entry once their keys are rebuilt.
         return <<<SQL
             INSERT INTO entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id, target_uid)
-            SELECT p.owner_entry_id, p.attr_name_lower, e.entry_id, p.target_uid
+            SELECT DISTINCT p.owner_entry_id, p.attr_name_lower, e.entry_id, p.target_uid
             FROM entry_link_pending p
             JOIN entries e ON e.lc_dn = p.target_lc_dn
             WHERE $limit NOT EXISTS (

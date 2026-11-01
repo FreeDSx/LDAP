@@ -30,6 +30,7 @@ interface TransactionalWriteInterface
      * @template TResult
      *
      * @param callable(): TResult $operation Reads and writes issued from it join the transaction this opens.
+     * @param-immediately-invoked-callable $operation
      *
      * @return TResult what the operation produced, so a caller needs no reference to reach out of it
      *
