@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\UpdateOperation;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class UpdateOperationTest extends TestCase
@@ -580,5 +582,75 @@ final class UpdateOperationTest extends TestCase
             'alicia',
             $cn->getValues(),
         );
+    }
+
+    #[DataProvider('changeSequenceProvider')]
+    public function test_the_same_changes_apply_again_to_a_fresh_copy_of_the_entry(Change ...$changes): void
+    {
+        $command = new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            $changes,
+        );
+
+        $first = $this->subject->execute(
+            $this->entry->makeCopy(),
+            $command,
+        );
+        $second = $this->subject->execute(
+            $this->entry->makeCopy(),
+            $command,
+        );
+
+        self::assertEquals(
+            $first->toArray(),
+            $second->toArray(),
+        );
+    }
+
+    /**
+     * @return Generator<string, list<Change>>
+     */
+    public static function changeSequenceProvider(): Generator
+    {
+        yield 'a replace then an add' => [
+            Change::replace(
+                'mail',
+                'x@example.com',
+            ),
+            Change::add(
+                'mail',
+                'y@example.com',
+            ),
+        ];
+        yield 'a replace then a delete' => [
+            Change::replace(
+                'mail',
+                'x@example.com',
+            ),
+            Change::delete(
+                'mail',
+                'x@example.com',
+            ),
+        ];
+        yield 'two adds to an absent attribute' => [
+            Change::add(
+                'description',
+                'x',
+            ),
+            Change::add(
+                'description',
+                'y',
+            ),
+        ];
+        yield 'an add then a delete of an absent attribute' => [
+            Change::add(
+                'description',
+                'x',
+            ),
+            Change::delete(
+                'description',
+                'x',
+            ),
+        ];
     }
 }
