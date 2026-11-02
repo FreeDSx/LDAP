@@ -439,6 +439,71 @@ final class AddEntryHandlerTest extends TestCase
         }
     }
 
+    #[DataProvider('operationalRdnProvider')]
+    public function test_an_add_named_by_an_operational_attribute_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+        string $rdn,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                $rdn . ',dc=example,dc=com',
+                [
+                    'objectClass' => ['device'],
+                    'cn' => ['Named'],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode, string}>
+     */
+    public static function operationalRdnProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield $mode->name . ' entryUUID' => [
+                $mode,
+                'entryUUID=a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            ];
+            yield $mode->name . ' createTimestamp' => [
+                $mode,
+                'createTimestamp=20200101000000Z',
+            ];
+        }
+    }
+
+    #[DataProvider('validationModeProvider')]
+    public function test_an_add_holding_two_entry_uuids_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                'cn=Alice,dc=example,dc=com',
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Alice'],
+                    'sn' => ['Smith'],
+                    'entryUUID' => [
+                        self::SUPPLIED_UUID,
+                        'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+                    ],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
     #[DataProvider('undefinableTypeProvider')]
     public function test_an_add_naming_a_type_no_schema_can_define_is_refused_in_every_validation_mode(
         SchemaValidationMode $mode,

@@ -345,6 +345,52 @@ final class LdapImporterTest extends TestCase
         );
     }
 
+    public function test_importEntries_ignoreValidation_still_refuses_an_entry_named_by_an_operational_attribute(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->importerFor(
+            $this->storage,
+            TestServerOptions::validatedCore(SchemaValidationMode::Strict),
+        )->importEntries(
+            entries: [
+                $this->domain(),
+                new Entry(
+                    new Dn('entryUUID=a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d,dc=example,dc=com'),
+                    new Attribute('objectClass', 'device'),
+                    new Attribute('cn', 'Named'),
+                ),
+            ],
+            ignoreValidation: true,
+        );
+    }
+
+    public function test_importEntries_ignoreValidation_still_refuses_an_entry_holding_two_entry_uuids(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->importerFor(
+            $this->storage,
+            TestServerOptions::validatedCore(SchemaValidationMode::Strict),
+        )->importEntries(
+            entries: [
+                new Entry(
+                    new Dn('dc=example,dc=com'),
+                    new Attribute('dc', 'example'),
+                    new Attribute('objectClass', 'top', 'domain'),
+                    new Attribute(
+                        'entryUUID',
+                        'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+                        '597ae2f6-16a6-1027-98f4-d28b5365dc14',
+                    ),
+                ),
+            ],
+            ignoreValidation: true,
+        );
+    }
+
     public function test_importEntries_stores_an_entry_spelled_with_aliases_under_the_primary_names(): void
     {
         $this->importer()->importEntries([

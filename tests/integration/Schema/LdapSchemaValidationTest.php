@@ -161,12 +161,28 @@ final class LdapSchemaValidationTest extends ServerTestCase
         ));
     }
 
+    public function test_lenient_mode_refuses_adding_an_entry_named_by_an_operational_attribute(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'createTimestamp=20200101000000Z,dc=foo,dc=bar',
+            [
+                'cn' => 'drift-operational-rdn',
+                'objectClass' => 'device',
+            ],
+        ));
+    }
+
     public function test_lenient_mode_refuses_renaming_an_entry_to_an_entry_uuid(): void
     {
         $person = $this->createPerson('drift-uuid-rdn');
 
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::NAMING_VIOLATION);
 
         $this->ldapClient()->rename(
             $person,
