@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -215,6 +216,13 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'How many values an attribute may hold when its type declares no cap of its own',
                 (string) SchemaValidator::DEFAULT_MAX_VALUES,
+            )
+            ->addOption(
+                'max-password-values',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'How many userPassword values the password configuration lets an entry hold',
+                '1',
             )
             ->addOption(
                 'allow-relax',
@@ -416,6 +424,9 @@ final class LdapBackendStorageCommand extends Command
                 $validationMode,
                 $this->getStringOption($input, 'schema-ldif'),
                 (int) $this->getStringOption($input, 'max-attribute-values'),
+            ),
+            passwordConfig: new PasswordConfig(
+                maxPasswordValues: (int) $this->getStringOption($input, 'max-password-values'),
             ),
         ))
             ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))

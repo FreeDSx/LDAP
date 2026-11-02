@@ -337,6 +337,14 @@ final class CoreSchemaResourceTest extends TestCase
         self::assertTrue($attr->noUserModification);
     }
 
+    public function test_user_password_holds_one_value(): void
+    {
+        self::assertSame(
+            1,
+            $this->schema->getAttributeType(AttributeTypeOid::NAME_USER_PASSWORD)?->maxValues(),
+        );
+    }
+
     public function test_object_class_attribute_registered(): void
     {
         self::assertNotNull(
