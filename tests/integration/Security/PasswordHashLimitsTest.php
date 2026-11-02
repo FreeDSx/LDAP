@@ -24,9 +24,13 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
@@ -68,6 +72,39 @@ final class PasswordHashLimitsTest extends TestCase
         );
     }
 
+    public function test_a_bind_against_a_stored_hash_over_the_limits_is_logged_naming_the_entry(): void
+    {
+        $logger = new RecordingLogger();
+        $authenticator = $this->authenticatorWith(
+            new PasswordHashLimits(bcryptCost: 4),
+            $logger,
+        );
+
+        try {
+            $authenticator->authenticate(
+                self::USER_DN,
+                self::PASSWORD,
+            );
+            self::fail('The bind should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_CREDENTIALS,
+                $e->getCode(),
+            );
+        }
+
+        $targets = [];
+        foreach ($logger->records as $record) {
+            if (($record['context'][EventContext::EVENT] ?? null) === ServerEvent::PasswordHashOverLimits->value) {
+                $targets[] = $record['context'][EventContext::TARGET] ?? null;
+            }
+        }
+        self::assertSame(
+            [[EventContext::DN => self::USER_DN]],
+            $targets,
+        );
+    }
+
     public function test_a_manager_password_hash_over_the_limits_is_refused_at_startup(): void
     {
         $container = $this->containerFor(
@@ -90,8 +127,10 @@ final class PasswordHashLimitsTest extends TestCase
     /**
      * The user holds a cost 5 bcrypt hash, and the server hashes with SSHA so its own cost raises no bcrypt limit.
      */
-    private function authenticatorWith(PasswordHashLimits $limits): PasswordAuthenticatableInterface
-    {
+    private function authenticatorWith(
+        PasswordHashLimits $limits,
+        ?LoggerInterface $logger = null,
+    ): PasswordAuthenticatableInterface {
         return $this->containerFor(
             EntryFixture::inMemoryStorage(
                 new Entry(
@@ -114,16 +153,23 @@ final class PasswordHashLimitsTest extends TestCase
                     ),
                 ),
             ),
-            $this->optionsWith($limits),
+            $this->optionsWith(
+                $limits,
+                $logger,
+            ),
         )->get(PasswordAuthenticatableInterface::class);
     }
 
-    private function optionsWith(PasswordHashLimits $limits): ServerOptions
-    {
-        return TestServerOptions::defaults()->setPasswordConfig(
-            (new PasswordConfig())
-                ->setHashLimits($limits)
-                ->setHashScheme(PasswordHashScheme::Ssha),
-        );
+    private function optionsWith(
+        PasswordHashLimits $limits,
+        ?LoggerInterface $logger,
+    ): ServerOptions {
+        return TestServerOptions::defaults()
+            ->setLogger($logger)
+            ->setPasswordConfig(
+                (new PasswordConfig())
+                    ->setHashLimits($limits)
+                    ->setHashScheme(PasswordHashScheme::Ssha),
+            );
     }
 }

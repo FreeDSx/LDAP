@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
@@ -41,6 +42,9 @@ use function sprintf;
  */
 readonly class StoredPasswordGuard
 {
+    /**
+     * @param positive-int $maxValues
+     */
     public function __construct(
         private PasswordHashService $hashService,
         private int $maxValues = 1,
@@ -71,7 +75,7 @@ readonly class StoredPasswordGuard
     }
 
     /**
-     * @param list<string> $heldBefore The values the entry held before the write, which it may keep as they are.
+     * @param list<string> $heldBefore The values the entry held before the write; it may keep these as they are.
      *
      * @throws OperationException
      */
@@ -82,7 +86,8 @@ readonly class StoredPasswordGuard
     ): void {
         $values = $this->valuesOf($entry);
 
-        if (count($values) > $this->maxValues) {
+        // Only a write adding values is held to the limit; an entry already over it can still be written.
+        if (count($values) > $this->maxValues && count($values) > count($heldBefore)) {
             throw new OperationException(
                 sprintf(
                     'The attribute "%s" holds more values than the %d allowed.',
@@ -144,8 +149,15 @@ readonly class StoredPasswordGuard
     ): bool {
         $token = $context->getToken();
 
-        return $context->isSystem()
-            || $token instanceof PrivilegedTokenInterface
-            || $this->administrators?->matches($token, $dn) === true;
+        if ($context->isSystem() || $token instanceof PrivilegedTokenInterface) {
+            return true;
+        }
+
+        try {
+            return $this->administrators?->matches($token, $dn) === true;
+        } catch (SubjectEvaluationException) {
+            // An administrators group that cannot be read grants nothing.
+            return false;
+        }
     }
 }

@@ -55,6 +55,7 @@ final readonly class EventLogPolicy
             ServerEvent::StartTlsBufferDiscarded,
             ServerEvent::PasswordModifySuccess,
             ServerEvent::PasswordModifyFailed,
+            ServerEvent::PasswordHashOverLimits,
             ServerEvent::AuthorizationDeniedWrite,
             ServerEvent::AuthorizationDeniedRead,
             ServerEvent::ProxyAuthorizationDenied,

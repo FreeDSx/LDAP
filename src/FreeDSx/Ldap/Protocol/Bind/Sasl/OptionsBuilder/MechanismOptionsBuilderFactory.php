@@ -32,8 +32,8 @@ final readonly class MechanismOptionsBuilderFactory
      */
     public function __construct(
         private PasswordAuthenticatableInterface $authenticator,
+        private PasswordHashService $hashService,
         private ?Closure $externalBuilderFactory = null,
-        private PasswordHashService $hashService = new PasswordHashService(),
     ) {}
 
     /**

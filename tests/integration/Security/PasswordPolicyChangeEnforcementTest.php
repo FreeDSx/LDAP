@@ -372,6 +372,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
                 targetResolver: $container->get(PasswordModifyTargetResolver::class),
                 accessControl: $this->createMock(AccessControlInterface::class),
                 writeDispatcher: $container->get(WriteOperationDispatcher::class),
+                hashService: $container->get(PasswordHashService::class),
                 changeGuard: new PasswordPolicyChangeGuard(
                     $this->engine(),
                     new PasswordPolicyResolver(
@@ -381,6 +382,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
                     ),
                     $this->context,
                     new EventLogger(null, EventLogPolicy::all()),
+                    $container->get(PasswordHashService::class),
                 ),
                 passwordPolicyContext: $this->context,
             ),

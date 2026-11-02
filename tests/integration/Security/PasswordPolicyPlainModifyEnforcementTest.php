@@ -415,12 +415,14 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
             ),
             $this->context,
             new EventLogger(null),
+            $container->get(PasswordHashService::class),
         );
         $writes = $container->get(WriteOperationDispatcher::class);
         $policyWriteHandler = new PasswordPolicyWriteHandler(
             $this->backend,
             $writes,
             $guard,
+            $container->get(PasswordHashService::class),
         );
 
         return new ServerDispatchHandler(

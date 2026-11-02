@@ -34,7 +34,7 @@ final readonly class PasswordAuthenticator implements PasswordAuthenticatableInt
     public function __construct(
         private BindNameResolverInterface $resolver,
         private ReadBackendInterface $backend,
-        private PasswordHashService $hashService = new PasswordHashService(),
+        private PasswordHashService $hashService,
     ) {}
 
     public function authenticate(
@@ -57,7 +57,7 @@ final readonly class PasswordAuthenticator implements PasswordAuthenticatableInt
         }
 
         foreach ($credentials as $stored) {
-            if ($this->hashService->verify($password, $stored)) {
+            if ($this->hashService->verify($password, $stored, $entry->getDn())) {
                 return new BindToken(
                     AuthzId::fromDn($entry->getDn()),
                     $name,

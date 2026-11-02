@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
@@ -440,12 +441,14 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
             ),
             $this->context,
             new EventLogger(null, EventLogPolicy::all()),
+            $container->get(PasswordHashService::class),
         );
 
         return new PasswordPolicyWriteHandler(
             $this->backend,
             $writes,
             $guard,
+            $container->get(PasswordHashService::class),
         );
     }
 

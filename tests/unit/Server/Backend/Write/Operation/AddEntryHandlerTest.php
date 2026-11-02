@@ -465,7 +465,7 @@ final class AddEntryHandlerTest extends TestCase
         );
     }
 
-    public function test_an_add_supplying_a_pre_hashed_password_is_refused_from_a_writer_who_is_not_an_administrator(): void
+    public function test_an_add_with_a_pre_hashed_password_from_a_non_administrator_is_refused(): void
     {
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);

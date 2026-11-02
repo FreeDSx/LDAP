@@ -28,9 +28,13 @@ use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class PasswordAuthenticatorTest extends TestCase
 {
+    use ServerContainerTrait;
+
     /**
      * Low enough to keep the suite quick, high enough to stay well clear of measurement noise.
      */
@@ -406,6 +410,10 @@ final class PasswordAuthenticatorTest extends TestCase
         $identity = (new PasswordAuthenticator(
             $this->mockResolver,
             $this->mockBackend,
+            $this->fromContainer(
+                PasswordHashService::class,
+                options: TestServerOptions::cheaplyHashed(),
+            ),
         ))->getSaslIdentity('alice', MechanismName::SCRAM_SHA256);
 
         self::assertInstanceOf(SaslIdentity::class, $identity);
@@ -507,6 +515,10 @@ final class PasswordAuthenticatorTest extends TestCase
         return new PasswordAuthenticator(
             $this->mockResolver,
             $this->mockBackend,
+            $this->fromContainer(
+                PasswordHashService::class,
+                options: TestServerOptions::cheaplyHashed(),
+            ),
         );
     }
 }

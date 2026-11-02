@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -49,9 +50,13 @@ use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class SaslBindTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private SaslBind $subject;
 
     private ServerQueue&MockObject $mockQueue;
@@ -428,7 +433,13 @@ final class SaslBindTest extends TestCase
         return new SaslExchange(
             $this->mockQueue,
             new ResponseFactory(),
-            new MechanismOptionsBuilderFactory($this->mockAuthenticator),
+            new MechanismOptionsBuilderFactory(
+                $this->mockAuthenticator,
+                $this->fromContainer(
+                    PasswordHashService::class,
+                    options: TestServerOptions::cheaplyHashed(),
+                ),
+            ),
             $authzIdResolver ?? $this->authzIdResolver(),
             new CriticalControlValidator(),
             new PasswordPolicyContext(),

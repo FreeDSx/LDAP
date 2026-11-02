@@ -30,7 +30,7 @@ class PlainMechanismOptionsBuilder implements MechanismOptionsBuilderInterface
 
     public function __construct(
         private readonly PasswordAuthenticatableInterface $authenticator,
-        private readonly PasswordHashService $hashService = new PasswordHashService(),
+        private readonly PasswordHashService $hashService,
     ) {}
 
     /**
@@ -54,7 +54,7 @@ class PlainMechanismOptionsBuilder implements MechanismOptionsBuilderInterface
                     return false;
                 }
 
-                if (!$this->hashService->verify($password, $identity->password)) {
+                if (!$this->hashService->verify($password, $identity->password, $identity->resolvedDn)) {
                     return false;
                 }
 

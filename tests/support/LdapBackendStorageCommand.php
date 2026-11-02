@@ -426,7 +426,10 @@ final class LdapBackendStorageCommand extends Command
                 (int) $this->getStringOption($input, 'max-attribute-values'),
             ),
             passwordConfig: new PasswordConfig(
-                maxPasswordValues: (int) $this->getStringOption($input, 'max-password-values'),
+                maxPasswordValues: max(
+                    1,
+                    (int) $this->getStringOption($input, 'max-password-values'),
+                ),
             ),
         ))
             ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))

@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -682,6 +683,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             new PasswordAuthenticator(
                 $nameResolver,
                 $this->backend,
+                $this->fromContainer(PasswordHashService::class),
             ),
             $nameResolver,
             $this->backend,
