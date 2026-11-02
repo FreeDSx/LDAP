@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\PrivilegedTokenInterface;
+use SensitiveParameter;
 
 use function array_diff;
 use function array_push;
@@ -34,7 +35,7 @@ use function sprintf;
 /**
  * Refuses userPassword values a bind could not verify within the limits, or that the writer may not supply.
  *
- * Note: Every value is verified on a failed bind, so how many an entry holds bounds what one bind can cost.
+ * Note: How many values an entry holds bounds what one failed bind can cost.
  *
  * @internal
  *
@@ -98,7 +99,12 @@ readonly class StoredPasswordGuard
             );
         }
 
-        foreach (array_diff($values, $heldBefore) as $value) {
+        $supplied = array_diff(
+            $values,
+            $heldBefore,
+        );
+
+        foreach ($supplied as $value) {
             $this->assertSupplied(
                 $value,
                 $entry->getDn(),
@@ -116,6 +122,8 @@ readonly class StoredPasswordGuard
         WriteContext $context,
     ): void {
         if (!$this->hashService->isHashed($value)) {
+            $this->assertCleartextLength($value);
+
             return;
         }
         if (!$this->hashService->isWithinLimits($value)) {
@@ -141,6 +149,26 @@ readonly class StoredPasswordGuard
     }
 
     /**
+     * @throws OperationException
+     */
+    private function assertCleartextLength(
+        #[SensitiveParameter]
+        string $value,
+    ): void {
+        if ($this->hashService->isWithinMaxLength($value)) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'A cleartext "%s" value is longer than the configured hash limits allow.',
+                AttributeTypeOid::NAME_USER_PASSWORD,
+            ),
+            ResultCode::CONSTRAINT_VIOLATION,
+        );
+    }
+
+    /**
      * The server's own writes, the manager, and the configured administrators.
      */
     private function isAdministrator(
@@ -154,7 +182,10 @@ readonly class StoredPasswordGuard
         }
 
         try {
-            return $this->administrators?->matches($token, $dn) === true;
+            return $this->administrators?->matches(
+                $token,
+                $dn,
+            ) === true;
         } catch (SubjectEvaluationException) {
             // An administrators group that cannot be read grants nothing.
             return false;

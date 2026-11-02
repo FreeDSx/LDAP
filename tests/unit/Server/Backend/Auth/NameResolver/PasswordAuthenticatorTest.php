@@ -69,6 +69,34 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->subject(null)->authenticate('cn=Unknown,dc=example,dc=com', 'secret');
     }
 
+    public function test_a_password_holding_a_nul_byte_is_refused_as_invalid_credentials_when_no_entry_is_found(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->subject(null)->authenticate(
+            'cn=Unknown,dc=example,dc=com',
+            "pass\0word",
+        );
+    }
+
+    public function test_a_password_over_the_length_limit_is_refused_as_invalid_credentials_even_when_it_matches(): void
+    {
+        $password = str_repeat('a', 513);
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', $password),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->subject($entry)->authenticate(
+            'cn=Alice,dc=example,dc=com',
+            $password,
+        );
+    }
+
     public function test_throws_when_entry_has_no_user_password(): void
     {
         $entry = new Entry(

@@ -109,7 +109,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     }
 
     /**
-     * The ceiling is built from the same scheme and cost as the service, so it never refuses a hash the service made.
+     * The ceiling is built from the service's own scheme and cost; it never refuses a hash the service made.
      */
     private function makePasswordHashService(Container $container): PasswordHashService
     {

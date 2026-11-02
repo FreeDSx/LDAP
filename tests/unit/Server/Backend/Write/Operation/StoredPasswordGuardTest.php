@@ -155,6 +155,58 @@ final class StoredPasswordGuardTest extends TestCase
         );
     }
 
+    public function test_a_cleartext_password_at_the_length_limit_is_storable(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertStorable(
+            $this->userWith(str_repeat('a', 512)),
+            [],
+            $this->contextFor(self::USER_DN),
+        );
+    }
+
+    public function test_a_cleartext_password_over_the_length_limit_is_refused_even_from_a_system_write(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage(
+            'A cleartext "userPassword" value is longer than the configured hash limits allow.',
+        );
+
+        $this->subject->assertStorable(
+            $this->userWith(str_repeat('a', 513)),
+            [],
+            WriteContext::system(
+                $this->tokenFor(self::ADMIN_DN),
+                new ControlBag(),
+            ),
+        );
+    }
+
+    public function test_a_cleartext_password_over_the_length_limit_the_entry_already_held_is_kept(): void
+    {
+        $this->expectNotToPerformAssertions();
+        $held = str_repeat('a', 513);
+
+        $this->subject->assertStorable(
+            $this->userWith($held),
+            [$held],
+            $this->contextFor(self::USER_DN),
+        );
+    }
+
+    public function test_a_pre_hashed_password_is_not_held_to_the_length_limit(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertStorable(
+            $this->userWith('{SSHA}' . str_repeat('a', 600)),
+            [],
+            $this->contextFor(self::ADMIN_DN),
+        );
+    }
+
     public function test_more_password_values_than_allowed_are_refused(): void
     {
         $this->expectException(OperationException::class);

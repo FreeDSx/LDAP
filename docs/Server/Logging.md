@@ -52,7 +52,7 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | `ldap.starttls.buffer_discarded`      | on      | warning | Plaintext was pipelined behind a StartTLS request and dropped unread |
 | `ldap.password_modify.success`        | on      | info    | Password modify completes                                 |
 | `ldap.password_modify.failed`         | on      | notice  | Password modify rejected by ACL or constraint             |
-| `ldap.password.hash_over_limits`      | on      | warning | A stored password hash over the hash limits was not verified |
+| `ldap.password.hash_over_limits`      | on      | warning | A stored hash over the hash limits was not verified       |
 | `ldap.authz.denied.write`             | on      | notice  | ACL denies an Add / Modify / Delete / ModifyDn / Compare  |
 | `ldap.authz.denied.read`              | on      | notice  | ACL denies a Search or Paging request                     |
 | `ldap.authz.denied.proxy`             | on      | notice  | A Proxied Authorization control is refused                |

@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use function sprintf;
 
 /**
- * The most work a stored password hash may ask of the server, since verifying it costs what its own parameters say.
+ * The most work verifying a password may ask of the server, which the stored hash and the presented length decide.
  *
  * @api
  *
@@ -27,14 +27,20 @@ use function sprintf;
 final class PasswordHashLimits
 {
     /**
+     * The length of a generated password, which the length limit never falls below.
+     */
+    private const MIN_PASSWORD_LENGTH = 16;
+
+    /**
      * @param positive-int $shaCryptRounds
      * @param positive-int $bcryptCost
      * @param positive-int $extendedDesRounds
      * @param positive-int $argon2Memory
      * @param positive-int $argon2MemoryPasses
      * @param positive-int $argon2Threads
+     * @param positive-int $maxPasswordLength
      *
-     * @throws InvalidArgumentException when a limit is below 1
+     * @throws InvalidArgumentException when a limit is below its minimum
      */
     public function __construct(
         private int $shaCryptRounds = 1_000_000,
@@ -43,13 +49,43 @@ final class PasswordHashLimits
         private int $argon2Memory = 262_144,
         private int $argon2MemoryPasses = 1_048_576,
         private int $argon2Threads = 4,
+        private int $maxPasswordLength = 512,
     ) {
-        self::atLeastOne($shaCryptRounds, 'shaCryptRounds');
-        self::atLeastOne($bcryptCost, 'bcryptCost');
-        self::atLeastOne($extendedDesRounds, 'extendedDesRounds');
-        self::atLeastOne($argon2Memory, 'argon2Memory');
-        self::atLeastOne($argon2MemoryPasses, 'argon2MemoryPasses');
-        self::atLeastOne($argon2Threads, 'argon2Threads');
+        self::atLeast(
+            $shaCryptRounds,
+            1,
+            'shaCryptRounds',
+        );
+        self::atLeast(
+            $bcryptCost,
+            1,
+            'bcryptCost',
+        );
+        self::atLeast(
+            $extendedDesRounds,
+            1,
+            'extendedDesRounds',
+        );
+        self::atLeast(
+            $argon2Memory,
+            1,
+            'argon2Memory',
+        );
+        self::atLeast(
+            $argon2MemoryPasses,
+            1,
+            'argon2MemoryPasses',
+        );
+        self::atLeast(
+            $argon2Threads,
+            1,
+            'argon2Threads',
+        );
+        self::atLeast(
+            $maxPasswordLength,
+            self::MIN_PASSWORD_LENGTH,
+            'maxPasswordLength',
+        );
     }
 
     /**
@@ -69,7 +105,11 @@ final class PasswordHashLimits
      */
     public function setShaCryptRounds(int $rounds): self
     {
-        $this->shaCryptRounds = self::atLeastOne($rounds, 'shaCryptRounds');
+        $this->shaCryptRounds = self::atLeast(
+            $rounds,
+            1,
+            'shaCryptRounds',
+        );
 
         return $this;
     }
@@ -91,7 +131,11 @@ final class PasswordHashLimits
      */
     public function setBcryptCost(int $cost): self
     {
-        $this->bcryptCost = self::atLeastOne($cost, 'bcryptCost');
+        $this->bcryptCost = self::atLeast(
+            $cost,
+            1,
+            'bcryptCost',
+        );
 
         return $this;
     }
@@ -113,7 +157,11 @@ final class PasswordHashLimits
      */
     public function setExtendedDesRounds(int $rounds): self
     {
-        $this->extendedDesRounds = self::atLeastOne($rounds, 'extendedDesRounds');
+        $this->extendedDesRounds = self::atLeast(
+            $rounds,
+            1,
+            'extendedDesRounds',
+        );
 
         return $this;
     }
@@ -135,7 +183,11 @@ final class PasswordHashLimits
      */
     public function setArgon2Memory(int $kibibytes): self
     {
-        $this->argon2Memory = self::atLeastOne($kibibytes, 'argon2Memory');
+        $this->argon2Memory = self::atLeast(
+            $kibibytes,
+            1,
+            'argon2Memory',
+        );
 
         return $this;
     }
@@ -157,7 +209,11 @@ final class PasswordHashLimits
      */
     public function setArgon2MemoryPasses(int $kibibytePasses): self
     {
-        $this->argon2MemoryPasses = self::atLeastOne($kibibytePasses, 'argon2MemoryPasses');
+        $this->argon2MemoryPasses = self::atLeast(
+            $kibibytePasses,
+            1,
+            'argon2MemoryPasses',
+        );
 
         return $this;
     }
@@ -179,27 +235,61 @@ final class PasswordHashLimits
      */
     public function setArgon2Threads(int $threads): self
     {
-        $this->argon2Threads = self::atLeastOne($threads, 'argon2Threads');
+        $this->argon2Threads = self::atLeast(
+            $threads,
+            1,
+            'argon2Threads',
+        );
 
         return $this;
     }
 
     /**
+     * The longest password, in bytes, the server verifies or accepts as a new cleartext password.
+     *
+     * @return positive-int
+     */
+    public function getMaxPasswordLength(): int
+    {
+        return $this->maxPasswordLength;
+    }
+
+    /**
+     * @param positive-int $bytes
+     *
+     * @throws InvalidArgumentException when the limit is below the length of a generated password
+     */
+    public function setMaxPasswordLength(int $bytes): self
+    {
+        $this->maxPasswordLength = self::atLeast(
+            $bytes,
+            self::MIN_PASSWORD_LENGTH,
+            'maxPasswordLength',
+        );
+
+        return $this;
+    }
+
+    /**
+     * @param positive-int $minimum
+     *
      * @return positive-int
      *
      * @throws InvalidArgumentException
      */
-    private static function atLeastOne(
+    private static function atLeast(
         int $value,
+        int $minimum,
         string $limit,
     ): int {
-        if ($value >= 1) {
+        if ($value >= $minimum) {
             return $value;
         }
 
         throw new InvalidArgumentException(sprintf(
-            'The "%s" password hash limit must be at least 1.',
+            'The "%s" password hash limit must be at least %d.',
             $limit,
+            $minimum,
         ));
     }
 }
