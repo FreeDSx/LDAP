@@ -439,6 +439,71 @@ final class AddEntryHandlerTest extends TestCase
         }
     }
 
+    #[DataProvider('validationModeProvider')]
+    public function test_an_add_holding_more_passwords_than_allowed_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                'cn=Alice,dc=example,dc=com',
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Alice'],
+                    'sn' => ['Smith'],
+                    'userPassword' => [
+                        'first',
+                        'second',
+                    ],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
+    public function test_an_add_supplying_a_pre_hashed_password_is_refused_from_a_writer_who_is_not_an_administrator(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=New,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+                new Attribute('userPassword', '{SSHA}c2FsdGVkaGFzaA=='),
+            )),
+            $this->context(),
+        );
+    }
+
+    public function test_an_add_supplying_a_pre_hashed_password_is_stored_when_any_writer_may_supply_one(): void
+    {
+        $options = TestServerOptions::unvalidatedCore();
+        $options->getPasswordConfig()->setAllowPreHashedPasswords(true);
+        $this->writeGraph(
+            EntryFixture::inMemoryStorage(...$this->fixture()),
+            $options,
+        );
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=New,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+                new Attribute('userPassword', '{SSHA}c2FsdGVkaGFzaA=='),
+            )),
+            $this->context(),
+        );
+
+        self::assertSame(
+            ['{SSHA}c2FsdGVkaGFzaA=='],
+            $this->find('cn=New,dc=example,dc=com')?->get('userPassword')?->getValues(),
+        );
+    }
+
     #[DataProvider('operationalRdnProvider')]
     public function test_an_add_named_by_an_operational_attribute_is_refused_in_every_validation_mode(
         SchemaValidationMode $mode,

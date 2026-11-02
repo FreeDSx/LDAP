@@ -345,6 +345,30 @@ final class LdapImporterTest extends TestCase
         );
     }
 
+    public function test_importEntries_keeps_a_pre_hashed_password_within_the_hash_limits(): void
+    {
+        $this->importer()->importEntries([
+            $this->domain(),
+            $this->personWithPassword('{SSHA}c2FsdGVkaGFzaA=='),
+        ]);
+
+        self::assertSame(
+            ['{SSHA}c2FsdGVkaGFzaA=='],
+            $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))?->get('userPassword')?->getValues(),
+        );
+    }
+
+    public function test_importEntries_refuses_a_pre_hashed_password_over_the_hash_limits(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->importer()->importEntries([
+            $this->domain(),
+            $this->personWithPassword('{CRYPT}$6$rounds=2000000$saltsaltsalt$hash'),
+        ]);
+    }
+
     public function test_importEntries_ignoreValidation_still_refuses_an_entry_named_by_an_operational_attribute(): void
     {
         self::expectException(OperationException::class);
@@ -474,6 +498,17 @@ final class LdapImporterTest extends TestCase
             new Attribute('sn', 'Anderson'),
             new Attribute('objectClass', 'top', 'person'),
         );
+    }
+
+    private function personWithPassword(string $password): Entry
+    {
+        $person = $this->person('cn=Alice,dc=example,dc=com');
+        $person->add(new Attribute(
+            'userPassword',
+            $password,
+        ));
+
+        return $person;
     }
 
     private function schemaViolation(): Entry

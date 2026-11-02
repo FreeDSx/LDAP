@@ -600,6 +600,28 @@ final class UpdateEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_adding_a_second_password_is_refused(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->modify(Change::add(
+            'userPassword',
+            'other',
+        ));
+    }
+
+    public function test_replacing_the_password_with_a_pre_hashed_one_is_refused_from_a_writer_who_is_not_an_administrator(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->modify(Change::replace(
+            'userPassword',
+            '{SSHA}c2FsdGVkaGFzaA==',
+        ));
+    }
+
     /**
      * Validation is opted into by the tests that assert on it, rather than applied to every fixture here.
      */

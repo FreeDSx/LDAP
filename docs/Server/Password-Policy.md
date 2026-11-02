@@ -377,6 +377,7 @@ clients:
 ## Not Yet Enforced / Limitations
 
 - Policy is assumed to apply to `userPassword`. Custom password attributes are not supported.
-- A plain `ldapmodify` stores the submitted value verbatim. Pre-hashed value cannot be inspected.
+- A plain `ldapmodify` stores the submitted value verbatim. Pre-hashed values cannot be inspected, and only
+  administrators may supply them by default.
 - The password policy response control is returned whenever there is something to report, regardless of whether the
   client sent the request control.

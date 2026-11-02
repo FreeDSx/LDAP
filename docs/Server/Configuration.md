@@ -36,6 +36,8 @@ LDAP Server Configuration
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
     * [PasswordConfig:setHashLimits](#passwordconfigsethashlimits)
+    * [PasswordConfig:setAllowPreHashedPasswords](#passwordconfigsetallowprehashedpasswords)
+    * [PasswordConfig:setMaxPasswordValues](#passwordconfigsetmaxpasswordvalues)
 * [Schema](#schema)
     * [SchemaConfig:setSources](#schemaconfigsetsources)
     * [SchemaConfig:setValidationMode](#schemaconfigsetvalidationmode)
@@ -625,10 +627,8 @@ Password Modify requests.
 ------------------
 #### PasswordConfig:setHashLimits
 
-The most work a stored password hash may ask for. A hash names its own work factor, and verifying it costs whatever
-that says, wrong passwords included. A hash over a limit never verifies, and each tag verifies only its own format:
-`{BCRYPT}` only bcrypt, and `{ARGON2}` only argon2i or argon2id. The limits never fall below what the configured hash
-scheme and cost produce.
+The most work a stored password hash may ask for. A hash over a limit never verifies, and is refused on write. The
+limits never fall below the configured hash scheme and cost.
 
 ```php
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
@@ -642,6 +642,21 @@ $options = new ServerOptions(passwordConfig: new PasswordConfig(
 
 **Default**: SHA crypt 1,000,000 rounds, bcrypt cost 14, extended DES 1,000,000 rounds, and argon2 256 MiB of memory,
 memory times passes of 1 GiB and 4 threads
+
+------------------
+#### PasswordConfig:setAllowPreHashedPasswords
+
+Whether any writer may store a pre-hashed `userPassword` value. When off, only
+[administrators](Access-Control.md#administrators), the manager and server writes (such as seeding) may.
+
+**Default**: `false`
+
+------------------
+#### PasswordConfig:setMaxPasswordValues
+
+How many `userPassword` values an entry may hold. Any one value authenticates, and a failed bind verifies them all.
+
+**Default**: `1`
 
 ## Schema
 

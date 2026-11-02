@@ -142,6 +142,18 @@ final class MoveEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_a_rename_adding_a_second_password_through_its_rdn_is_refused(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->rename(
+            self::ALICE,
+            'userPassword=other',
+            deleteOldRdn: false,
+        );
+    }
+
     public function test_a_rename_keeping_the_entry_uuid_that_named_the_entry_succeeds(): void
     {
         $this->writeGraph(EntryFixture::inMemoryStorage(...[

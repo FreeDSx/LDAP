@@ -239,9 +239,14 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
      */
     public function test_multi_value_set_records_the_replaced_values_in_history(): void
     {
-        $handler = $this->handler(new PasswordPolicy(
-            quality: new PasswordQualityRules(inHistory: 5),
-        ));
+        $options = TestServerOptions::cheaplyHashed();
+        $options->getPasswordConfig()->setMaxPasswordValues(2);
+        $handler = $this->handler(
+            new PasswordPolicy(
+                quality: new PasswordQualityRules(inHistory: 5),
+            ),
+            options: $options,
+        );
 
         $handler->handle(
             new UpdateCommand(

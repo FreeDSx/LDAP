@@ -41,6 +41,7 @@ use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
+use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
@@ -74,6 +75,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\UnrecordedChanges;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\LockedEntryAccess;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\ReferenceGuard;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\StoredPasswordGuard;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\TransactionalEntryWrite;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
@@ -221,10 +223,12 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $c->get(SubentryPlacementGuard::class),
                 new AliasResolver($c->get(ReadEntryInterface::class)),
             ),
+            StoredPasswordGuard::class => $this->makeStoredPasswordGuard(...),
             EntryMutation::class => static fn(Container $c): EntryMutation => new EntryMutation(
                 $c->get(WriteEntryOperationHandler::class),
                 $c->get(SchemaViolationGate::class),
                 $c->get(OperationalAttributeGenerator::class),
+                $c->get(StoredPasswordGuard::class),
             ),
             LockedEntryAccess::class => $this->makeLockedEntryAccess(...),
             TransactionalEntryWrite::class => $this->makeTransactionalEntryWrite(...),
@@ -402,6 +406,26 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             rdnValues: $container->get(RdnAttributeValues::class),
+            passwords: $container->get(StoredPasswordGuard::class),
+        );
+    }
+
+    private function makeStoredPasswordGuard(Container $container): StoredPasswordGuard
+    {
+        $options = $container->get(ServerOptions::class);
+        $config = $options->getPasswordConfig();
+        $administrators = $options->getAdministrators();
+
+        // A group of administrators reads its members through the same backend access control does.
+        if ($administrators instanceof BackendAwareInterface) {
+            $administrators->setBackend($container->get(ReadBackendInterface::class));
+        }
+
+        return new StoredPasswordGuard(
+            $container->get(PasswordHashService::class),
+            $config->getMaxPasswordValues(),
+            $config->isAllowPreHashedPasswords(),
+            $administrators,
         );
     }
 

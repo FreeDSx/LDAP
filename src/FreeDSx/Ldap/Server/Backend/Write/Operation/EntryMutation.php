@@ -35,6 +35,7 @@ readonly class EntryMutation
         private WriteEntryOperationHandler $entryHandler,
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,
+        private StoredPasswordGuard $passwords,
     ) {}
 
     /**
@@ -48,7 +49,14 @@ readonly class EntryMutation
         WriteContext $context,
         LinkDelta $links = new LinkDelta(),
     ): Entry {
+        // Read first, since applying the changes alters the entry in place.
+        $passwordsBefore = $this->passwords->valuesOf($entry);
         $updated = $this->entryHandler->apply($entry, $command);
+        $this->passwords->assertStorable(
+            $updated,
+            $passwordsBefore,
+            $context,
+        );
         $this->schemaGate->assertModifyAllowed(
             $command,
             self::withLinkedAdditions(
@@ -74,7 +82,13 @@ readonly class EntryMutation
         MoveCommand $command,
         WriteContext $context,
     ): Entry {
+        $passwordsBefore = $this->passwords->valuesOf($entry);
         $moved = $this->entryHandler->apply($entry, $command);
+        $this->passwords->assertStorable(
+            $moved,
+            $passwordsBefore,
+            $context,
+        );
         $this->schemaGate->assertMoveAllowed(
             $moved,
             $context,

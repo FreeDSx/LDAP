@@ -137,7 +137,7 @@ readonly class PasswordHashService
                 $scheme,
             ));
         }
-        if ($this->ceiling->admits($scheme, substr($stored, strlen($scheme) + 2))) {
+        if ($this->isWithinLimits($stored)) {
             return;
         }
 
@@ -145,6 +145,22 @@ readonly class PasswordHashService
             'The "{%s}" password hash asks for more work than the configured limits allow.',
             $scheme,
         ));
+    }
+
+    /**
+     * Whether a value asks for no more work than the limits allow, which cleartext and unrecognized schemes never do.
+     */
+    public function isWithinLimits(string $stored): bool
+    {
+        $scheme = $this->schemeOf($stored);
+
+        return $scheme === null || $this->ceiling->admits(
+            $scheme,
+            substr(
+                $stored,
+                strlen($scheme) + 2,
+            ),
+        );
     }
 
     /**
