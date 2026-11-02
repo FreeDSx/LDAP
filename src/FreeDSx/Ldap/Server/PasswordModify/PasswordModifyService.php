@@ -46,7 +46,7 @@ final readonly class PasswordModifyService
         private PasswordModifyTargetResolver $targetResolver,
         private AccessControlInterface $accessControl,
         private WriteHandlerInterface $writeDispatcher,
-        private PasswordHashService $hashService = new PasswordHashService(),
+        private PasswordHashService $hashService,
         private ?PasswordPolicyChangeGuard $changeGuard = null,
         private ?PasswordPolicyContext $passwordPolicyContext = null,
     ) {}
@@ -208,7 +208,7 @@ final readonly class PasswordModifyService
         }
 
         foreach ($entry->get('userPassword')?->getValues() ?? [] as $stored) {
-            if ($this->hashService->verify($oldPassword, $stored)) {
+            if ($this->hashService->verify($oldPassword, $stored, $entry->getDn())) {
                 return;
             }
         }

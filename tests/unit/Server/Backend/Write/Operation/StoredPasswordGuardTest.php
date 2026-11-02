@@ -192,6 +192,60 @@ final class StoredPasswordGuardTest extends TestCase
         );
     }
 
+    public function test_an_entry_already_over_the_limit_can_still_be_written(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertStorable(
+            $this->userWith(
+                'first',
+                'second',
+            ),
+            [
+                'first',
+                'second',
+            ],
+            WriteContext::system(
+                $this->tokenFor(self::USER_DN),
+                new ControlBag(),
+            ),
+        );
+    }
+
+    public function test_an_entry_already_over_the_limit_cannot_gain_another_value(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->subject->assertStorable(
+            $this->userWith(
+                'first',
+                'second',
+                'third',
+            ),
+            [
+                'first',
+                'second',
+            ],
+            $this->contextFor(self::ADMIN_DN),
+        );
+    }
+
+    public function test_an_administrators_group_that_cannot_be_read_grants_nothing(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        (new StoredPasswordGuard(
+            new PasswordHashService(hashCost: 4),
+            administrators: Subject::group('cn=admins,dc=foo,dc=bar'),
+        ))->assertStorable(
+            $this->userWith(self::PRE_HASHED),
+            [],
+            $this->contextFor(self::ADMIN_DN),
+        );
+    }
+
     public function test_a_raised_limit_allows_more_password_values(): void
     {
         $this->expectNotToPerformAssertions();

@@ -49,6 +49,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
@@ -61,10 +62,14 @@ use FreeDSx\Sasl\SaslContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Throwable;
 
 final class SaslExchangeTest extends TestCase
 {
+    use ServerContainerTrait;
+
     /**
      * Using PLAIN so that the real MechanismOptionsBuilderFactory can produce a
      * PlainMechanismOptionsBuilder. The mock challenge ignores the options, so the
@@ -630,7 +635,13 @@ final class SaslExchangeTest extends TestCase
         return new SaslExchange(
             queue: $this->mockQueue,
             responseFactory: new ResponseFactory(),
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory($authenticator),
+            optionsBuilderFactory: new MechanismOptionsBuilderFactory(
+                $authenticator,
+                $this->fromContainer(
+                    PasswordHashService::class,
+                    options: TestServerOptions::cheaplyHashed(),
+                ),
+            ),
             authzIdResolver: new AuthzIdResolver(
                 $this->createMock(AccessControlInterface::class),
                 $this->createMock(ReadBackendInterface::class),

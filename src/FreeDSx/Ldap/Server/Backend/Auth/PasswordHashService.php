@@ -14,8 +14,28 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Auth;
 
 use Closure;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use SensitiveParameter;
+
+use function base64_decode;
+use function base64_encode;
+use function bin2hex;
+use function crypt;
+use function hash_equals;
+use function md5;
+use function password_hash;
+use function password_verify;
+use function preg_match;
+use function random_bytes;
+use function sha1;
+use function sprintf;
+use function strlen;
+use function strtoupper;
+use function substr;
 
 /**
  * Hashes, generates, and verifies userPassword values; writes the configured scheme and reads {SHA}/{MD5}/{SMD5}/{CRYPT}.
@@ -36,6 +56,7 @@ readonly class PasswordHashService
         private PasswordHashScheme $scheme = PasswordHashScheme::Bcrypt,
         private ?int $hashCost = null,
         private HashCostCeiling $ceiling = new HashCostCeiling(),
+        private EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
     /**
@@ -78,11 +99,14 @@ readonly class PasswordHashService
 
     /**
      * A hash asking for more work than the limits allow never matches, though it still costs a dummy verify.
+     *
+     * @param ?Dn $owner The entry holding the value, named when a hash over the limits is recorded.
      */
     public function verify(
         #[SensitiveParameter]
         string $plain,
         string $stored,
+        ?Dn $owner = null,
     ): bool {
         // An empty value on either side is the absence of a credential, never a match for one.
         if ($plain === '' || $stored === '') {
@@ -102,12 +126,16 @@ readonly class PasswordHashService
         if ($verifier === null) {
             return false;
         }
-        $encoded = substr(
+        $encoded = self::encodedOf(
             $stored,
-            strlen($scheme) + 2,
+            $scheme,
         );
 
         if (!$this->ceiling->admits($scheme, $encoded)) {
+            $this->recordOverLimits(
+                $scheme,
+                $owner,
+            );
             $this->verifyDummy($plain);
 
             return false;
@@ -148,7 +176,7 @@ readonly class PasswordHashService
     }
 
     /**
-     * Whether a value asks for no more work than the limits allow, which cleartext and unrecognized schemes never do.
+     * Whether a value asks for no more work than the limits allow; cleartext and unrecognized schemes always do.
      */
     public function isWithinLimits(string $stored): bool
     {
@@ -156,9 +184,9 @@ readonly class PasswordHashService
 
         return $scheme === null || $this->ceiling->admits(
             $scheme,
-            substr(
+            self::encodedOf(
                 $stored,
-                strlen($scheme) + 2,
+                $scheme,
             ),
         );
     }
@@ -171,6 +199,38 @@ readonly class PasswordHashService
         string $plain,
     ): void {
         $this->hash($plain);
+    }
+
+    /**
+     * Names the entry and the scheme, never the value.
+     */
+    private function recordOverLimits(
+        string $scheme,
+        ?Dn $owner,
+    ): void {
+        $context = [EventContext::SCHEME => $scheme];
+
+        if ($owner !== null) {
+            $context[EventContext::TARGET] = [EventContext::DN => $owner->toString()];
+        }
+
+        $this->eventLogger->record(
+            ServerEvent::PasswordHashOverLimits,
+            $context,
+        );
+    }
+
+    /**
+     * The value after its {SCHEME} prefix.
+     */
+    private static function encodedOf(
+        string $stored,
+        string $scheme,
+    ): string {
+        return substr(
+            $stored,
+            strlen($scheme) + 2,
+        );
     }
 
     /**

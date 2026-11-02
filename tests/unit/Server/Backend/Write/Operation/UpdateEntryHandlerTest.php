@@ -611,7 +611,7 @@ final class UpdateEntryHandlerTest extends TestCase
         ));
     }
 
-    public function test_replacing_the_password_with_a_pre_hashed_one_is_refused_from_a_writer_who_is_not_an_administrator(): void
+    public function test_a_pre_hashed_password_replace_from_a_non_administrator_is_refused(): void
     {
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);

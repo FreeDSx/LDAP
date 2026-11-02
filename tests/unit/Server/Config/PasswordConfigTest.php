@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Config;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
@@ -29,6 +30,14 @@ final class PasswordConfigTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new PasswordConfig();
+    }
+
+    public function test_a_password_value_limit_below_one_is_refused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        // @phpstan-ignore argument.type
+        $this->subject->setMaxPasswordValues(0);
     }
 
     public function test_no_password_policy_source_is_configured_by_default(): void

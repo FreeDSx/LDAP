@@ -73,6 +73,56 @@ final class HashCostCeilingTest extends TestCase
             '$2b$15$' . self::BCRYPT_TAIL,
             false,
         ];
+        yield 'bcrypt with the 2x prefix under the crypt tag at the cost limit' => [
+            'CRYPT',
+            '$2x$14$' . self::BCRYPT_TAIL,
+            true,
+        ];
+        yield 'bcrypt with the 2x prefix under the crypt tag over the cost limit' => [
+            'CRYPT',
+            '$2x$15$' . self::BCRYPT_TAIL,
+            false,
+        ];
+        yield 'bcrypt with the 2x prefix under the bcrypt tag over the cost limit' => [
+            'BCRYPT',
+            '$2x$15$' . self::BCRYPT_TAIL,
+            false,
+        ];
+        yield 'a bcrypt prefix this does not read under the crypt tag' => [
+            'CRYPT',
+            '$2c$10$' . self::BCRYPT_TAIL,
+            false,
+        ];
+        yield 'sha-crypt rounds spelled with a plus sign' => [
+            'CRYPT',
+            '$6$rounds=+3000000$saltsalt$hash',
+            false,
+        ];
+        yield 'sha-crypt rounds spelled with a leading space' => [
+            'CRYPT',
+            '$6$rounds= 3000000$saltsalt$hash',
+            false,
+        ];
+        yield 'sha-crypt rounds spelled with a leading tab' => [
+            'CRYPT',
+            "\$6\$rounds=\t3000000\$saltsalt\$hash",
+            false,
+        ];
+        yield 'sha-crypt rounds that wrap around from a negative count' => [
+            'CRYPT',
+            '$6$rounds=-18446744073707551616$saltsalt$hash',
+            false,
+        ];
+        yield 'a malformed extended DES hash' => [
+            'CRYPT',
+            '_!!!!saltabcdefghijk',
+            false,
+        ];
+        yield 'a crypt format PHP does not verify' => [
+            'CRYPT',
+            '$y$j9T$saltsalt$hash',
+            false,
+        ];
         yield 'sha-512 crypt under the bcrypt tag' => [
             'BCRYPT',
             '$6$rounds=5000$saltsalt$hash',

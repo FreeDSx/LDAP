@@ -13,11 +13,17 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Auth;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -485,9 +491,47 @@ final class PasswordHashServiceTest extends TestCase
     public function test_a_hash_over_the_limits_is_refused_as_unverifiable(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('The "{CRYPT}" password hash asks for more work than the configured limits allow.');
+        $this->expectExceptionMessage(
+            'The "{CRYPT}" password hash asks for more work than the configured limits allow.',
+        );
 
         $this->subject->assertVerifiable('{CRYPT}$6$rounds=2000000$saltsaltsalt$hash');
+    }
+
+    public function test_a_hash_over_the_limits_is_recorded_by_entry_and_scheme_but_not_value(): void
+    {
+        $logger = new RecordingLogger();
+        $subject = new PasswordHashService(
+            hashCost: 4,
+            eventLogger: new EventLogger(
+                $logger,
+                EventLogPolicy::all(),
+            ),
+        );
+
+        $subject->verify(
+            'mypassword',
+            '{CRYPT}$6$rounds=2000000$saltsaltsalt$hash',
+            new Dn('cn=user,dc=foo,dc=bar'),
+        );
+
+        $context = $logger->records[0]['context'] ?? [];
+        self::assertSame(
+            ServerEvent::PasswordHashOverLimits->value,
+            $context[EventContext::EVENT] ?? null,
+        );
+        self::assertSame(
+            'CRYPT',
+            $context[EventContext::SCHEME] ?? null,
+        );
+        self::assertSame(
+            [EventContext::DN => 'cn=user,dc=foo,dc=bar'],
+            $context[EventContext::TARGET] ?? null,
+        );
+        self::assertStringNotContainsString(
+            'saltsaltsalt',
+            (string) json_encode($logger->records),
+        );
     }
 
     private function limitedToBcryptCostFour(): PasswordHashService

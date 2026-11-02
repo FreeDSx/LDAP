@@ -43,7 +43,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         private ReadBackendInterface $backend,
         private WriteHandlerInterface $writes,
         private PasswordPolicyChangeGuard $changeGuard,
-        private PasswordHashService $hashService = new PasswordHashService(),
+        private PasswordHashService $hashService,
     ) {}
 
     /**

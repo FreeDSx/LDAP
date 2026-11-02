@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
@@ -107,9 +108,13 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
         );
     }
 
+    /**
+     * The ceiling is built from the same scheme and cost as the service, so it never refuses a hash the service made.
+     */
     private function makePasswordHashService(Container $container): PasswordHashService
     {
-        $config = $container->get(ServerOptions::class)->getPasswordConfig();
+        $options = $container->get(ServerOptions::class);
+        $config = $options->getPasswordConfig();
 
         return new PasswordHashService(
             $config->getHashScheme(),
@@ -118,6 +123,10 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
                 $config->getHashLimits(),
                 $config->getHashScheme(),
                 $config->getHashCost(),
+            ),
+            new EventLogger(
+                $options->getLogger(),
+                $options->getEventLogPolicy(),
             ),
         );
     }

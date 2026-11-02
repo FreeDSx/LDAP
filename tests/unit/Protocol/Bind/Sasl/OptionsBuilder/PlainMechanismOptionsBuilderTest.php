@@ -22,9 +22,13 @@ use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\PlainOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class PlainMechanismOptionsBuilderTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private PasswordAuthenticatableInterface&MockObject $mockAuthenticator;
 
     private PlainMechanismOptionsBuilder $subject;
@@ -32,7 +36,13 @@ final class PlainMechanismOptionsBuilderTest extends TestCase
     protected function setUp(): void
     {
         $this->mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
-        $this->subject = new PlainMechanismOptionsBuilder($this->mockAuthenticator);
+        $this->subject = new PlainMechanismOptionsBuilder(
+            $this->mockAuthenticator,
+            $this->fromContainer(
+                PasswordHashService::class,
+                options: TestServerOptions::cheaplyHashed(),
+            ),
+        );
     }
 
     public function test_it_builds_options_with_a_validate_callable(): void

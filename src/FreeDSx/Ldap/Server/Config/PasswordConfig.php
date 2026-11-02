@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Config;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
@@ -36,11 +37,18 @@ final class PasswordConfig
 
     private ?PasswordQualityCheckerInterface $qualityChecker = null;
 
+    /**
+     * @param positive-int $maxPasswordValues
+     *
+     * @throws InvalidArgumentException when the password value limit is below 1
+     */
     public function __construct(
         private PasswordHashLimits $hashLimits = new PasswordHashLimits(),
         private bool $allowPreHashedPasswords = false,
         private int $maxPasswordValues = 1,
-    ) {}
+    ) {
+        self::assertMaxPasswordValues($maxPasswordValues);
+    }
 
     /**
      * In-memory fallback policy applied to users that do not resolve a pwdPolicy entry from the DIT.
@@ -106,7 +114,7 @@ final class PasswordConfig
     }
 
     /**
-     * The most work a stored hash may ask for, which never falls below what the configured scheme and cost produce.
+     * The most work a stored hash may ask for; it never falls below what the configured scheme and cost produce.
      */
     public function getHashLimits(): PasswordHashLimits
     {
@@ -136,15 +144,23 @@ final class PasswordConfig
     }
 
     /**
-     * How many userPassword values an entry may hold, each of which a failed bind verifies.
+     * How many userPassword values an entry may hold; a failed bind verifies every one.
+     *
+     * @return positive-int
      */
     public function getMaxPasswordValues(): int
     {
         return $this->maxPasswordValues;
     }
 
+    /**
+     * @param positive-int $max
+     *
+     * @throws InvalidArgumentException when the limit is below 1
+     */
     public function setMaxPasswordValues(int $max): self
     {
+        self::assertMaxPasswordValues($max);
         $this->maxPasswordValues = $max;
 
         return $this;
@@ -163,5 +179,17 @@ final class PasswordConfig
         $this->qualityChecker = $checker;
 
         return $this;
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    private static function assertMaxPasswordValues(int $max): void
+    {
+        if ($max >= 1) {
+            return;
+        }
+
+        throw new InvalidArgumentException('The password value limit must be at least 1.');
     }
 }

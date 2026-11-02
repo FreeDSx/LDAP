@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
@@ -246,6 +247,7 @@ final class PasswordPolicyChangeGuardTest extends TestCase
                 $this->logger,
                 EventLogPolicy::all(),
             ),
+            $this->fromContainer(PasswordHashService::class),
         );
     }
 

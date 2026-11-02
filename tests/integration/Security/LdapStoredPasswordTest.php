@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 final class LdapStoredPasswordTest extends ServerTestCase
@@ -66,14 +68,32 @@ final class LdapStoredPasswordTest extends ServerTestCase
         $this->assertBindsAsUser(self::HASHED_SECRET);
     }
 
-    public function test_a_pre_hashed_password_over_the_hash_limits_is_refused_even_from_an_administrator(): void
-    {
+    #[DataProvider('overTheLimitsProvider')]
+    public function test_a_pre_hashed_password_over_the_hash_limits_is_refused_even_from_an_administrator(
+        string $password,
+    ): void {
         $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
 
-        $this->replacePassword('{CRYPT}$6$rounds=2000000$saltsaltsalt$hash');
+        $this->replacePassword($password);
+    }
+
+    /**
+     * @return Generator<string, array{string}>
+     */
+    public static function overTheLimitsProvider(): Generator
+    {
+        yield 'sha-crypt rounds' => [
+            '{CRYPT}$6$rounds=2000000$saltsaltsalt$hash',
+        ];
+        yield 'sha-crypt rounds spelled with a plus sign' => [
+            '{CRYPT}$6$rounds=+2000000$saltsaltsalt$hash',
+        ];
+        yield 'bcrypt with the 2x prefix' => [
+            '{CRYPT}$2x$15$abcdefghijklmnopqrstuuabcdefghijklmnopqrstuvwxyz01234',
+        ];
     }
 
     public function test_a_second_password_value_is_refused(): void
@@ -89,7 +109,7 @@ final class LdapStoredPasswordTest extends ServerTestCase
         );
     }
 
-    public function test_the_schema_still_holds_a_second_password_value_when_only_the_password_configuration_allows_one(): void
+    public function test_the_schema_refuses_a_second_password_even_when_the_configuration_allows_two(): void
     {
         $this->createServerProcess(
             'tcp',

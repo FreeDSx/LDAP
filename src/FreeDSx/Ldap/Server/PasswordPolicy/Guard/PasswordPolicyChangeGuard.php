@@ -40,7 +40,7 @@ final readonly class PasswordPolicyChangeGuard
         private PasswordPolicyResolver $resolver,
         private PasswordPolicyContext $context,
         private EventLogger $eventLogger,
-        private PasswordHashService $hashService = new PasswordHashService(),
+        private PasswordHashService $hashService,
     ) {}
 
     /**
@@ -118,7 +118,7 @@ final readonly class PasswordPolicyChangeGuard
         }
 
         foreach ($attempt->target->get($policy->pwdAttribute)?->getValues() ?? [] as $stored) {
-            if ($this->hashService->verify($oldPassword, $stored)) {
+            if ($this->hashService->verify($oldPassword, $stored, $attempt->target->getDn())) {
                 return;
             }
         }

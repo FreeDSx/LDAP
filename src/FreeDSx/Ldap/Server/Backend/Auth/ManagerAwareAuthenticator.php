@@ -52,7 +52,7 @@ final readonly class ManagerAwareAuthenticator implements PasswordAuthenticatabl
 
         // The manager DN is owned by the config identity: a wrong password fails outright, never falling through
         // to a colliding directory entry, and never touching password-policy lockout.
-        if (!$this->hashService->verify($password, $this->manager->hashedPassword())) {
+        if (!$this->hashService->verify($password, $this->manager->hashedPassword(), $this->manager->dn())) {
             throw new OperationException(
                 'Invalid credentials.',
                 ResultCode::INVALID_CREDENTIALS,

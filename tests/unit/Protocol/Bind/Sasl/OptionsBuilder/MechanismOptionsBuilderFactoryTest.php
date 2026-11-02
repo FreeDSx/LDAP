@@ -20,9 +20,7 @@ use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\CramMD5MechanismOptionsBuilde
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\PlainMechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ScramMechanismOptionsBuilder;
-use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
@@ -30,9 +28,13 @@ use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\PlainOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class MechanismOptionsBuilderFactoryTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private PasswordAuthenticatableInterface&MockObject $mockAuthenticator;
 
     private MechanismOptionsBuilderFactory $subject;
@@ -40,7 +42,13 @@ final class MechanismOptionsBuilderFactoryTest extends TestCase
     protected function setUp(): void
     {
         $this->mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
-        $this->subject = new MechanismOptionsBuilderFactory($this->mockAuthenticator);
+        $this->subject = new MechanismOptionsBuilderFactory(
+            $this->mockAuthenticator,
+            $this->fromContainer(
+                PasswordHashService::class,
+                options: TestServerOptions::cheaplyHashed(),
+            ),
+        );
     }
 
     public function test_make_plain_returns_plain_builder(): void
@@ -83,7 +91,7 @@ final class MechanismOptionsBuilderFactoryTest extends TestCase
         $this->subject->make(MechanismName::ANONYMOUS);
     }
 
-    public function test_plain_verifies_through_the_hash_service_it_was_given(): void
+    public function test_plain_refuses_a_hash_over_the_limits_of_the_hash_service_it_was_given(): void
     {
         $this->mockAuthenticator
             ->method('getSaslIdentity')
@@ -95,15 +103,13 @@ final class MechanismOptionsBuilderFactoryTest extends TestCase
                 ),
                 new Dn('cn=user,dc=foo,dc=bar'),
             ));
+        $options = TestServerOptions::cheaplyHashed();
+        $options->getPasswordConfig()->setHashLimits(new PasswordHashLimits(bcryptCost: 4));
         $subject = new MechanismOptionsBuilderFactory(
             $this->mockAuthenticator,
-            hashService: new PasswordHashService(
-                hashCost: 4,
-                ceiling: new HashCostCeiling(
-                    new PasswordHashLimits(bcryptCost: 4),
-                    PasswordHashScheme::Bcrypt,
-                    4,
-                ),
+            $this->fromContainer(
+                PasswordHashService::class,
+                options: $options,
             ),
         );
 

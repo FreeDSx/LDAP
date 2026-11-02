@@ -627,15 +627,15 @@ Password Modify requests.
 ------------------
 #### PasswordConfig:setHashLimits
 
-The most work a stored password hash may ask for. A hash over a limit never verifies, and is refused on write. The
-limits never fall below the configured hash scheme and cost.
+The most work a stored password hash may ask for. A hash over a limit never verifies, is refused on write, and is
+logged as `ldap.password.hash_over_limits`. The limits never fall below the configured hash scheme and cost; lowering
+either stops stronger stored hashes from verifying.
 
 ```php
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
-use FreeDSx\Ldap\ServerOptions;
 
-$options = new ServerOptions(passwordConfig: new PasswordConfig(
+$options->setPasswordConfig(new PasswordConfig(
     new PasswordHashLimits(bcryptCost: 12),
 ));
 ```
@@ -646,7 +646,7 @@ memory times passes of 1 GiB and 4 threads
 ------------------
 #### PasswordConfig:setAllowPreHashedPasswords
 
-Whether any writer may store a pre-hashed `userPassword` value. When off, only
+Whether any writer may store a pre-hashed `userPassword` value, one starting with a `{SCHEME}` prefix. When off, only
 [administrators](Access-Control.md#administrators), the manager and server writes (such as seeding) may.
 
 **Default**: `false`
@@ -654,8 +654,11 @@ Whether any writer may store a pre-hashed `userPassword` value. When off, only
 ------------------
 #### PasswordConfig:setMaxPasswordValues
 
-How many `userPassword` values an entry may hold. Any one value authenticates, and a failed bind verifies them all. The
-core schema also caps `userPassword` at one value (`X-MAX-VALUES`), so raising this takes a schema override too.
+How many `userPassword` values an entry may hold, counting those under attribute options. A simple bind accepts any of
+them and verifies them all when it fails. An entry already over the limit keeps its values but cannot gain more. The
+core schema also caps `userPassword` at one value (`X-MAX-VALUES`), so raising this takes a schema override too. Under
+`Strict` or `Lenient` validation, that cap refuses every write to an entry over it, bind bookkeeping included, until
+its passwords are replaced.
 
 **Default**: `1`
 

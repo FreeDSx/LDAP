@@ -40,6 +40,7 @@ enum ServerEvent: string
     case CompareCompleted               = 'ldap.compare.completed';
     case PasswordModifySuccess          = 'ldap.password_modify.success';
     case PasswordModifyFailed           = 'ldap.password_modify.failed';
+    case PasswordHashOverLimits         = 'ldap.password.hash_over_limits';
     case AuthorizationDeniedWrite       = 'ldap.authz.denied.write';
     case AuthorizationDeniedRead        = 'ldap.authz.denied.read';
     case ProxyAuthorizationDenied       = 'ldap.authz.denied.proxy';
@@ -106,6 +107,7 @@ enum ServerEvent: string
             self::ClientTlsFailed,
             self::ClientNotifyFailed,
             self::MetricsSnapshotFailed,
+            self::PasswordHashOverLimits,
             self::ConcurrencyLimited => LogLevel::WARNING,
             self::BindFailure,
             self::StartTlsFailed,
@@ -148,6 +150,7 @@ enum ServerEvent: string
             self::CompareCompleted => 'A compare completed.',
             self::PasswordModifySuccess => 'A password was modified.',
             self::PasswordModifyFailed => 'A password modify was rejected.',
+            self::PasswordHashOverLimits => 'A stored password hash was over the hash limits and was not verified.',
             self::AuthorizationDeniedWrite => 'Access control denied a write.',
             self::AuthorizationDeniedRead => 'Access control denied a read.',
             self::ProxyAuthorizationDenied => 'Proxied authorization was denied.',

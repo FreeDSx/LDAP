@@ -18,8 +18,10 @@ use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use function intdiv;
 use function max;
 use function preg_match;
+use function str_starts_with;
 use function strlen;
 use function strpos;
+use function substr;
 
 /**
  * Decides whether a stored hash asks for no more work than the limits allow, and is in the format its scheme names.
@@ -33,14 +35,19 @@ use function strpos;
 readonly class HashCostCeiling
 {
     /**
-     * A bcrypt hash: "$2a$", "$2b$" or "$2y$", then its two-digit cost.
+     * A bcrypt hash: "$2a$", "$2b$", "$2x$" or "$2y$", then its two-digit cost.
      */
-    private const BCRYPT = '/^\$2[aby]\$(\d{2})\$/';
+    private const BCRYPT = '/^\$2[abxy]\$(\d{2})\$/';
 
     /**
-     * A SHA-256 ("$5$") or SHA-512 ("$6$") crypt hash, with its optional "rounds=N$".
+     * A SHA-256 ("$5$") or SHA-512 ("$6$") crypt hash.
      */
-    private const SHA_CRYPT = '/^\$[56]\$(?:rounds=(\d+)\$)?/';
+    private const SHA_CRYPT = '/^\$[56]\$/';
+
+    /**
+     * The round count of a SHA crypt hash, in the only spelling of it this reads.
+     */
+    private const SHA_CRYPT_ROUNDS = '/^\$[56]\$rounds=(\d+)\$/';
 
     /**
      * An extended DES crypt hash: an underscore, then four characters encoding its round count.
@@ -109,22 +116,32 @@ readonly class HashCostCeiling
 
     private function admitsCrypt(string $encoded): bool
     {
-        if (preg_match(self::BCRYPT, $encoded) === 1) {
+        if (str_starts_with($encoded, '$2')) {
             return $this->admitsBcrypt($encoded);
         }
-        if (preg_match(self::SHA_CRYPT, $encoded, $matches) === 1) {
-            $rounds = ($matches[1] ?? '') === ''
-                ? self::SHA_CRYPT_DEFAULT_ROUNDS
-                : (int) $matches[1];
-
-            return $rounds <= $this->limits->getShaCryptRounds();
+        if (preg_match(self::SHA_CRYPT, $encoded) === 1) {
+            return $this->admitsShaCrypt($encoded);
         }
-        if (preg_match(self::EXTENDED_DES, $encoded, $matches) === 1) {
-            return self::extendedDesRounds($matches[1]) <= $this->limits->getExtendedDesRounds();
+        if (str_starts_with($encoded, '_')) {
+            return preg_match(self::EXTENDED_DES, $encoded, $matches) === 1
+                && self::extendedDesRounds($matches[1]) <= $this->limits->getExtendedDesRounds();
         }
 
-        // Every other format crypt() reads costs the same each time, or is one it refuses outright.
-        return true;
+        // MD5 and traditional DES cost the same every time; no other "$" format is worth a verify.
+        return str_starts_with($encoded, '$1$') || !str_starts_with($encoded, '$');
+    }
+
+    /**
+     * A round count spelled other than in plain digits is refused, since crypt() reads spellings this does not.
+     */
+    private function admitsShaCrypt(string $encoded): bool
+    {
+        if (!str_starts_with(substr($encoded, 3), 'rounds=')) {
+            return self::SHA_CRYPT_DEFAULT_ROUNDS <= $this->limits->getShaCryptRounds();
+        }
+
+        return preg_match(self::SHA_CRYPT_ROUNDS, $encoded, $matches) === 1
+            && (int) $matches[1] <= $this->limits->getShaCryptRounds();
     }
 
     private function bcryptCost(): int

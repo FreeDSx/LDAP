@@ -151,7 +151,8 @@ A value-level `add` or `delete` against an unreadable attribute is refused with
 ## Attributes Have a Value Ceiling
 
 RFC 4512 places no limits on the number of values a multi-value attribute may hold. An attribute here holds at most
-10,000 values by default, and a write beyond that is refused with `adminLimitExceeded`.
+10,000 values by default, and a write beyond that is refused with `adminLimitExceeded`. `userPassword` holds one value
+by default, where RFC 4519 sets no limit.
 
 Unbound values are not a scalable / sustainable directory configuration. Neither the Relax Rules control nor a lenient
 validation policy waives the limit. Linked attributes are exempt.

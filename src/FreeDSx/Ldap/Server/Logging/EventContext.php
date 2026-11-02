@@ -58,6 +58,8 @@ final class EventContext
 
     public const MECHANISM = 'mechanism';
 
+    public const SCHEME = 'scheme';
+
     public const VERSION = 'version';
 
     public const ATTRIBUTE = 'attribute';
