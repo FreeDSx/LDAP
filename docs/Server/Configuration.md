@@ -627,21 +627,28 @@ Password Modify requests.
 ------------------
 #### PasswordConfig:setHashLimits
 
-The most work a stored password hash may ask for. A hash over a limit never verifies, is refused on write, and is
-logged as `ldap.password.hash_over_limits`. The limits never fall below the configured hash scheme and cost; lowering
-either stops stronger stored hashes from verifying.
+The most work a stored password hash may ask for. A hash over a limit is refused on write and never verifies; a bind
+that meets one logs `ldap.password.hash_over_limits`. The limits never fall below the configured hash scheme and cost;
+lowering either stops stronger stored hashes from verifying.
+
+`maxPasswordLength` caps the bytes of a password the server verifies, since some schemes cost more the longer it is. A
+longer password fails to bind, and a cleartext `userPassword` or Password Modify new password over it is refused with
+`constraintViolation`. It cannot be set below 16, the length of a generated password.
 
 ```php
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 
 $options->setPasswordConfig(new PasswordConfig(
-    new PasswordHashLimits(bcryptCost: 12),
+    new PasswordHashLimits(
+        bcryptCost: 12,
+        maxPasswordLength: 256,
+    ),
 ));
 ```
 
-**Default**: SHA crypt 1,000,000 rounds, bcrypt cost 14, extended DES 1,000,000 rounds, and argon2 256 MiB of memory,
-memory times passes of 1 GiB and 4 threads
+**Default**: SHA crypt 1,000,000 rounds, bcrypt cost 14, extended DES 1,000,000 rounds, argon2 256 MiB of memory,
+memory times passes of 1 GiB and 4 threads, and passwords of 512 bytes
 
 ------------------
 #### PasswordConfig:setAllowPreHashedPasswords
@@ -654,9 +661,9 @@ Whether any writer may store a pre-hashed `userPassword` value, one starting wit
 ------------------
 #### PasswordConfig:setMaxPasswordValues
 
-How many `userPassword` values an entry may hold, counting those under attribute options. A simple bind accepts any of
-them and verifies them all when it fails. An entry already over the limit keeps its values but cannot gain more. The
-core schema also caps `userPassword` at one value (`X-MAX-VALUES`), so raising this takes a schema override too. Under
+How many `userPassword` values an entry may hold, counting those under attribute options. A failed simple bind verifies
+each value it reads. An entry already over the limit keeps its values but cannot gain more. The core schema also caps
+each `userPassword` description at one value (`X-MAX-VALUES`), so raising this takes a schema override too. Under
 `Strict` or `Lenient` validation, that cap refuses every write to an entry over it, bind bookkeeping included, until
 its passwords are replaced.
 

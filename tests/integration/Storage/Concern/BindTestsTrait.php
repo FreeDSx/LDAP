@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Authentication against the backend.
@@ -104,6 +105,96 @@ trait BindTestsTrait
                         $stored,
                     ),
                 ],
+            );
+        } finally {
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
+        }
+    }
+
+    public function testABindToAnUnknownDnWithAPasswordHoldingANulByteIsInvalidCredentials(): void
+    {
+        self::assertSame(
+            ResultCode::INVALID_CREDENTIALS,
+            $this->bindResultCode(
+                'cn=nobody,dc=foo,dc=bar',
+                "pass\0word",
+            ),
+        );
+
+        // The connection survives the refusal, as it does for an entry that exists.
+        $this->authenticateUser();
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function cryptBasedHashProvider(): array
+    {
+        return [
+            'sha-512 crypt' => [
+                '{CRYPT}' . crypt(
+                    'secret',
+                    '$6$saltsaltsalt$',
+                ),
+            ],
+            'bcrypt' => [
+                '{BCRYPT}' . password_hash(
+                    'secret',
+                    PASSWORD_BCRYPT,
+                    ['cost' => 4],
+                ),
+            ],
+        ];
+    }
+
+    #[DataProvider('cryptBasedHashProvider')]
+    public function testAPasswordHoldingANulByteNeverMatchesAHashOfWhatPrecedesIt(string $stored): void
+    {
+        $dn = $this->createUserWithPassword(
+            'nul-password-user',
+            $stored,
+        );
+
+        try {
+            self::assertSame(
+                [
+                    ResultCode::INVALID_CREDENTIALS,
+                    ResultCode::SUCCESS,
+                ],
+                [
+                    $this->bindResultCode(
+                        $dn,
+                        "secret\0junk",
+                    ),
+                    $this->bindResultCode(
+                        $dn,
+                        'secret',
+                    ),
+                ],
+            );
+        } finally {
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));
+        }
+    }
+
+    public function testAPasswordOverTheLengthLimitNeverAuthenticates(): void
+    {
+        $password = str_repeat('a', 513);
+        $dn = $this->createUserWithPassword(
+            'long-password-user',
+            '{SHA}' . base64_encode(sha1(
+                $password,
+                true,
+            )),
+        );
+
+        try {
+            self::assertSame(
+                ResultCode::INVALID_CREDENTIALS,
+                $this->bindResultCode(
+                    $dn,
+                    $password,
+                ),
             );
         } finally {
             $this->asAdmin(fn(LdapClient $admin) => $admin->delete($dn));

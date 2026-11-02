@@ -45,6 +45,8 @@ final class PasswordModifyServiceTest extends TestCase
 
     private AccessControlInterface&MockObject $accessControl;
 
+    private WriteHandlerInterface&MockObject $writeHandler;
+
     private PasswordPolicyContext $context;
 
     private Entry $userEntry;
@@ -58,7 +60,7 @@ final class PasswordModifyServiceTest extends TestCase
         $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->resolver = $this->createMock(BindNameResolverInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
-        $writeHandler = $this->createMock(WriteHandlerInterface::class);
+        $this->writeHandler = $this->createMock(WriteHandlerInterface::class);
         $this->context = new PasswordPolicyContext();
 
         $this->userEntry = new Entry(
@@ -75,7 +77,7 @@ final class PasswordModifyServiceTest extends TestCase
                 $this->resolver,
             ),
             accessControl: $this->accessControl,
-            writeDispatcher: $writeHandler,
+            writeDispatcher: $this->writeHandler,
             hashService: new PasswordHashService(hashCost: 4),
             passwordPolicyContext: $this->context,
         );
@@ -321,6 +323,76 @@ final class PasswordModifyServiceTest extends TestCase
         self::assertSame(
             16,
             strlen($result->generatedPassword),
+        );
+    }
+
+    public function test_a_new_password_over_the_length_limit_is_refused_without_a_write(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn($this->userEntry);
+        $this->writeHandler
+            ->expects(self::never())
+            ->method('handle');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('The new password is longer than the configured hash limits allow.');
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                null,
+                '12345',
+                str_repeat('a', 513),
+            ),
+            $this->userToken,
+            new ControlBag(),
+        );
+    }
+
+    public function test_a_new_password_holding_a_nul_byte_is_refused_under_bcrypt_without_a_write(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn($this->userEntry);
+        $this->writeHandler
+            ->expects(self::never())
+            ->method('handle');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage(
+            'The new password holds a NUL byte, which the configured hash scheme cannot take.',
+        );
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                null,
+                '12345',
+                "new\0password",
+            ),
+            $this->userToken,
+            new ControlBag(),
+        );
+    }
+
+    public function test_a_new_password_at_the_length_limit_is_written(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn($this->userEntry);
+        $this->writeHandler
+            ->expects(self::once())
+            ->method('handle');
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                null,
+                '12345',
+                str_repeat('a', 512),
+            ),
+            $this->userToken,
+            new ControlBag(),
         );
     }
 

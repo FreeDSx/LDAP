@@ -96,6 +96,25 @@ final class LdapStoredPasswordTest extends ServerTestCase
         ];
     }
 
+    public function test_a_cleartext_password_over_the_length_limit_is_refused(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->replacePassword(str_repeat('a', 513));
+    }
+
+    public function test_a_cleartext_password_at_the_length_limit_binds(): void
+    {
+        $this->authenticateUser();
+
+        $this->replacePassword(str_repeat('a', 512));
+
+        $this->assertBindsAsUser(str_repeat('a', 512));
+    }
+
     public function test_a_second_password_value_is_refused(): void
     {
         $this->authenticateAdmin();

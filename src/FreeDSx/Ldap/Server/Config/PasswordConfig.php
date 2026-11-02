@@ -114,7 +114,7 @@ final class PasswordConfig
     }
 
     /**
-     * The most work a stored hash may ask for; it never falls below what the configured scheme and cost produce.
+     * The most work a verify may ask for, by password length and stored hash; it admits every hash the server makes.
      */
     public function getHashLimits(): PasswordHashLimits
     {
@@ -144,7 +144,7 @@ final class PasswordConfig
     }
 
     /**
-     * How many userPassword values an entry may hold; a failed bind verifies every one.
+     * How many userPassword values an entry may hold, counting those under attribute options.
      *
      * @return positive-int
      */

@@ -161,6 +161,27 @@ final class LdapSchemaValidationTest extends ServerTestCase
         ));
     }
 
+    public function test_lenient_mode_refuses_adding_an_entry_holding_two_entry_uuids(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=drift-two-uuids,dc=foo,dc=bar',
+            [
+                'cn' => 'drift-two-uuids',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+                'entryUUID' => [
+                    'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+                    '597ae2f6-16a6-1027-98f4-d28b5365dc14',
+                ],
+            ],
+        ));
+    }
+
     public function test_lenient_mode_refuses_adding_an_entry_named_by_an_operational_attribute(): void
     {
         $this->authenticateAdmin();

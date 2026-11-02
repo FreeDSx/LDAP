@@ -33,6 +33,8 @@ use function preg_match;
 use function random_bytes;
 use function sha1;
 use function sprintf;
+use function str_contains;
+use function str_replace;
 use function strlen;
 use function strtoupper;
 use function substr;
@@ -98,7 +100,7 @@ readonly class PasswordHashService
     }
 
     /**
-     * A hash asking for more work than the limits allow never matches, though it still costs a dummy verify.
+     * A password or hash over the limits never matches, though it still costs a dummy verify.
      *
      * @param ?Dn $owner The entry holding the value, named when a hash over the limits is recorded.
      */
@@ -110,6 +112,11 @@ readonly class PasswordHashService
     ): bool {
         // An empty value on either side is the absence of a credential, never a match for one.
         if ($plain === '' || $stored === '') {
+            return false;
+        }
+        if (!$this->isWithinMaxLength($plain)) {
+            $this->verifyDummy($plain);
+
             return false;
         }
 
@@ -176,6 +183,30 @@ readonly class PasswordHashService
     }
 
     /**
+     * Whether a password is short enough to be verified, which a new cleartext password must be to stay usable.
+     */
+    public function isWithinMaxLength(
+        #[SensitiveParameter]
+        string $plain,
+    ): bool {
+        return $this->ceiling->admitsPassword($plain);
+    }
+
+    /**
+     * Whether the configured scheme can hash a password, which bcrypt cannot when it holds a NUL byte.
+     */
+    public function isHashable(
+        #[SensitiveParameter]
+        string $plain,
+    ): bool {
+        return $this->scheme !== PasswordHashScheme::Bcrypt
+            || !str_contains(
+                $plain,
+                "\0",
+            );
+    }
+
+    /**
      * Whether a value asks for no more work than the limits allow; cleartext and unrecognized schemes always do.
      */
     public function isWithinLimits(string $stored): bool
@@ -198,7 +229,8 @@ readonly class PasswordHashService
         #[SensitiveParameter]
         string $plain,
     ): void {
-        $this->hash($plain);
+        // Bcrypt refuses a NUL byte.
+        $this->hash(self::withoutNul($plain));
     }
 
     /**
@@ -258,26 +290,48 @@ readonly class PasswordHashService
     {
         return match ('{' . $scheme . '}') {
             PasswordHashScheme::Ssha->value => $this->verifySsha(...),
-            PasswordHashScheme::Bcrypt->value, PasswordHashScheme::Argon2->value => password_verify(...),
+            PasswordHashScheme::Bcrypt->value, '{CRYPT}' => $this->verifyCrypt(...),
+            PasswordHashScheme::Argon2->value => password_verify(...),
             '{SHA}' => $this->verifySha(...),
             '{MD5}' => $this->verifyMd5(...),
             '{SMD5}' => $this->verifySmd5(...),
-            '{CRYPT}' => $this->verifyCrypt(...),
             default => null,
         };
     }
 
+    /**
+     * A password holding a NUL byte never matches, as crypt() would stop reading at it, though it still costs a verify.
+     */
     private function verifyCrypt(
         #[SensitiveParameter]
         string $plain,
         string $encoded,
     ): bool {
-        return hash_equals(
+        $matches = hash_equals(
             $encoded,
             crypt(
-                $plain,
+                self::withoutNul($plain),
                 $encoded,
             ),
+        );
+
+        return $matches && !str_contains(
+            $plain,
+            "\0",
+        );
+    }
+
+    /**
+     * The password with each NUL byte swapped for another, which crypt() reads in full at the same cost.
+     */
+    private static function withoutNul(
+        #[SensitiveParameter]
+        string $plain,
+    ): string {
+        return str_replace(
+            "\0",
+            "\1",
+            $plain,
         );
     }
 

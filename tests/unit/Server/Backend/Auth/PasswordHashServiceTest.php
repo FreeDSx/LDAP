@@ -534,6 +534,133 @@ final class PasswordHashServiceTest extends TestCase
         );
     }
 
+    public function test_a_password_at_the_length_limit_verifies(): void
+    {
+        $password = str_repeat('a', 512);
+
+        self::assertTrue($this->subject->verify(
+            $password,
+            $this->subject->hash($password),
+        ));
+    }
+
+    public function test_a_password_over_the_length_limit_does_not_verify_even_against_itself(): void
+    {
+        $password = str_repeat('a', 513);
+
+        self::assertFalse($this->subject->verify(
+            $password,
+            $password,
+        ));
+    }
+
+    public function test_a_password_over_the_length_limit_is_not_within_it(): void
+    {
+        self::assertFalse($this->subject->isWithinMaxLength(str_repeat('a', 513)));
+    }
+
+    public function test_a_password_holding_a_nul_byte_does_not_verify_against_a_hash_over_the_limits(): void
+    {
+        self::assertFalse($this->subject->verify(
+            "pass\0word",
+            '{CRYPT}$6$rounds=2000000$saltsaltsalt$hash',
+        ));
+    }
+
+    public function test_a_password_holding_a_nul_byte_over_the_length_limit_does_not_verify(): void
+    {
+        self::assertFalse($this->subject->verify(
+            "\0" . str_repeat('a', 512),
+            '{BCRYPT}' . password_hash(
+                'mypassword',
+                PASSWORD_BCRYPT,
+                ['cost' => 4],
+            ),
+        ));
+    }
+
+    #[DataProvider('schemeProvider')]
+    public function test_a_dummy_verify_accepts_a_password_holding_a_nul_byte(PasswordHashScheme $scheme): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        (new PasswordHashService(
+            $scheme,
+            hashCost: 4,
+        ))->verifyDummy("pass\0word");
+    }
+
+    #[DataProvider('cryptSaltProvider')]
+    public function test_a_nul_byte_never_matches_a_crypt_hash_of_what_precedes_it(string $salt): void
+    {
+        self::assertFalse($this->subject->verify(
+            "mypassword\0junk",
+            '{CRYPT}' . crypt(
+                'mypassword',
+                $salt,
+            ),
+        ));
+    }
+
+    public function test_a_nul_byte_never_matches_a_bcrypt_hash_of_what_precedes_it(): void
+    {
+        self::assertFalse($this->subject->verify(
+            "mypassword\0junk",
+            '{BCRYPT}' . password_hash(
+                'mypassword',
+                PASSWORD_BCRYPT,
+                ['cost' => 4],
+            ),
+        ));
+    }
+
+    public function test_a_cleartext_password_holding_a_nul_byte_verifies_only_in_full(): void
+    {
+        self::assertTrue($this->subject->verify(
+            "my\0password",
+            "my\0password",
+        ));
+        self::assertFalse($this->subject->verify(
+            'my',
+            "my\0password",
+        ));
+    }
+
+    /**
+     * @return array<string, array{0: PasswordHashScheme}>
+     */
+    public static function everyByteSchemeProvider(): array
+    {
+        return [
+            'ssha' => [PasswordHashScheme::Ssha],
+            'argon2' => [PasswordHashScheme::Argon2],
+        ];
+    }
+
+    #[DataProvider('everyByteSchemeProvider')]
+    public function test_a_scheme_reading_every_byte_hashes_a_password_holding_a_nul_byte(
+        PasswordHashScheme $scheme,
+    ): void {
+        $hasher = new PasswordHashService($scheme);
+        $hashed = $hasher->hash("my\0password");
+
+        self::assertTrue($hasher->isHashable("my\0password"));
+        self::assertTrue($hasher->verify(
+            "my\0password",
+            $hashed,
+        ));
+        self::assertFalse($hasher->verify(
+            'my',
+            $hashed,
+        ));
+    }
+
+    public function test_bcrypt_cannot_hash_a_password_holding_a_nul_byte(): void
+    {
+        self::assertFalse($this->subject->isHashable("my\0password"));
+        self::assertTrue($this->subject->isHashable('mypassword'));
+    }
+
     private function limitedToBcryptCostFour(): PasswordHashService
     {
         return new PasswordHashService(

@@ -600,6 +600,34 @@ final class UpdateEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_a_server_stamped_value_is_stored_apart_from_the_command_that_carried_it(): void
+    {
+        $stamp = Change::replace(
+            'description',
+            'stamped',
+        );
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ALICE),
+                [
+                    Change::replace(
+                        'sn',
+                        'Smith',
+                    ),
+                ],
+                [$stamp],
+            ),
+            $this->context(),
+        );
+
+        $stamp->getAttribute()->add('changed later');
+
+        self::assertSame(
+            ['stamped'],
+            $this->find(self::ALICE)?->get('description')?->getValues(),
+        );
+    }
+
     public function test_adding_a_second_password_is_refused(): void
     {
         self::expectException(OperationException::class);

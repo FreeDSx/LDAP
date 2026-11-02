@@ -115,6 +115,64 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $this->assertStoredPasswordIsHashed();
     }
 
+    public function testANewPasswordOverTheLengthLimitIsRefused(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+                null,
+                self::USER_PASSWORD,
+                str_repeat('a', 513),
+            ));
+            $this->fail('A new password over the length limit should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $verifyClient = $this->buildClient('tcp');
+        $verifyClient->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+        $verifyClient->unbind();
+    }
+
+    public function testANewPasswordHoldingANulByteIsRefusedUnderBcrypt(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+                null,
+                self::USER_PASSWORD,
+                "new\0password",
+            ));
+            $this->fail('A new password holding a NUL byte should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $verifyClient = $this->buildClient('tcp');
+        $verifyClient->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+        $verifyClient->unbind();
+    }
+
     /**
      * RFC 3062 2.1: a request value carries one or more fields, so one naming nothing cannot rotate a password.
      */

@@ -760,6 +760,9 @@ the supplied password against the `userPassword` attribute. Supported schemes: `
 `{CRYPT}` uses PHP's `crypt()`: no yescrypt (`$y$`, `$gy$`) or scrypt (`$7$`), and DES checks only 8 characters. A
 plaintext password starting with a `{scheme}` prefix never verifies.
 
+`{CRYPT}` and `{BCRYPT}` never match a password holding a NUL byte. While bcrypt is the configured scheme, as it is by
+default, Password Modify refuses a new password holding one with `constraintViolation`.
+
 This means simple bind authentication works out of the box with any backend that stores `userPassword` on entries —
 no additional configuration required.
 

@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
+use SensitiveParameter;
 
 /**
  * Performs the RFC 3062 password change.
@@ -103,6 +104,7 @@ final readonly class PasswordModifyService
             $generated = $this->hashService->generate();
             $newPassword = $generated;
         }
+        $this->assertNewPasswordStorable($newPassword);
 
         $hashed = $this->hashService->hash($newPassword);
         $deltas = $this->changeGuard?->enforce(new PasswordModifyAttempt(
@@ -216,6 +218,31 @@ final readonly class PasswordModifyService
         throw new OperationException(
             'Invalid credentials.',
             ResultCode::INVALID_CREDENTIALS,
+        );
+    }
+
+    /**
+     * Refuses a new password that a bind could not verify or that the configured scheme could not hash.
+     *
+     * @throws OperationException
+     */
+    private function assertNewPasswordStorable(
+        #[SensitiveParameter]
+        string $newPassword,
+    ): void {
+        if (!$this->hashService->isWithinMaxLength($newPassword)) {
+            throw new OperationException(
+                'The new password is longer than the configured hash limits allow.',
+                ResultCode::CONSTRAINT_VIOLATION,
+            );
+        }
+        if ($this->hashService->isHashable($newPassword)) {
+            return;
+        }
+
+        throw new OperationException(
+            'The new password holds a NUL byte, which the configured hash scheme cannot take.',
+            ResultCode::CONSTRAINT_VIOLATION,
         );
     }
 

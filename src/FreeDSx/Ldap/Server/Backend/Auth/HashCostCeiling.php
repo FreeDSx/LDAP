@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Auth;
 
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
+use SensitiveParameter;
 
 use function intdiv;
 use function max;
@@ -24,9 +25,9 @@ use function strpos;
 use function substr;
 
 /**
- * Decides whether a stored hash asks for no more work than the limits allow, and is in the format its scheme names.
+ * Decides whether a verify fits the limits, by the presented password's length and the stored hash's cost and format.
  *
- * Note: The limits never fall below what the server's own scheme and cost produce, so its own hashes always verify.
+ * Note: The limits never fall below what the server's own scheme and cost produce; its own hashes always verify.
  *
  * @internal
  *
@@ -76,6 +77,16 @@ readonly class HashCostCeiling
     ) {}
 
     /**
+     * Whether a presented password is short enough for the server to spend a verify on.
+     */
+    public function admitsPassword(
+        #[SensitiveParameter]
+        string $plain,
+    ): bool {
+        return strlen($plain) <= $this->limits->getMaxPasswordLength();
+    }
+
+    /**
      * Whether a value stored under the scheme (without its prefix) is one the server may spend a verify on.
      */
     public function admits(
@@ -110,7 +121,10 @@ readonly class HashCostCeiling
         );
 
         return $memory <= $this->argon2Memory()
-            && (int) $matches[2] <= intdiv($this->argon2MemoryPasses(), $memory)
+            && (int) $matches[2] <= intdiv(
+                $this->argon2MemoryPasses(),
+                $memory,
+            )
             && (int) $matches[3] <= $this->argon2Threads();
     }
 
@@ -123,12 +137,17 @@ readonly class HashCostCeiling
             return $this->admitsShaCrypt($encoded);
         }
         if (str_starts_with($encoded, '_')) {
-            return preg_match(self::EXTENDED_DES, $encoded, $matches) === 1
-                && self::extendedDesRounds($matches[1]) <= $this->limits->getExtendedDesRounds();
+            return $this->admitsExtendedDes($encoded);
+        }
+        // MD5 and traditional DES cost the same every time; no other "$" format is worth a verify.
+        if (str_starts_with($encoded, '$1$')) {
+            return true;
         }
 
-        // MD5 and traditional DES cost the same every time; no other "$" format is worth a verify.
-        return str_starts_with($encoded, '$1$') || !str_starts_with($encoded, '$');
+        return !str_starts_with(
+            $encoded,
+            '$',
+        );
     }
 
     /**
@@ -139,9 +158,20 @@ readonly class HashCostCeiling
         if (!str_starts_with(substr($encoded, 3), 'rounds=')) {
             return self::SHA_CRYPT_DEFAULT_ROUNDS <= $this->limits->getShaCryptRounds();
         }
+        if (preg_match(self::SHA_CRYPT_ROUNDS, $encoded, $matches) !== 1) {
+            return false;
+        }
 
-        return preg_match(self::SHA_CRYPT_ROUNDS, $encoded, $matches) === 1
-            && (int) $matches[1] <= $this->limits->getShaCryptRounds();
+        return (int) $matches[1] <= $this->limits->getShaCryptRounds();
+    }
+
+    private function admitsExtendedDes(string $encoded): bool
+    {
+        if (preg_match(self::EXTENDED_DES, $encoded, $matches) !== 1) {
+            return false;
+        }
+
+        return self::extendedDesRounds($matches[1]) <= $this->limits->getExtendedDesRounds();
     }
 
     private function bcryptCost(): int
@@ -197,7 +227,11 @@ readonly class HashCostCeiling
         $rounds = 0;
 
         for ($i = 0; $i < strlen($count); $i++) {
-            $rounds |= (int) strpos(self::CRYPT_ALPHABET, $count[$i]) << (6 * $i);
+            $digit = (int) strpos(
+                self::CRYPT_ALPHABET,
+                $count[$i],
+            );
+            $rounds |= $digit << (6 * $i);
         }
 
         return $rounds;
