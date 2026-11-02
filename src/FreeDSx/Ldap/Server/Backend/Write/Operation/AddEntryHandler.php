@@ -36,6 +36,7 @@ readonly class AddEntryHandler
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,
         private RdnAttributeValues $rdnValues,
+        private StoredPasswordGuard $passwords,
     ) {}
 
     /**
@@ -68,6 +69,11 @@ readonly class AddEntryHandler
 
         $bulkLoad = $context->bulkLoadOptions();
 
+        $this->passwords->assertStorable(
+            $entry,
+            [],
+            $context,
+        );
         // Before the insert, whose entryUUID key would otherwise tell a client barred from supplying one which are held.
         $this->schemaGate->assertAddAllowed(
             $entry,

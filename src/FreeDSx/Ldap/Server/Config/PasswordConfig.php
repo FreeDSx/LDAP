@@ -38,6 +38,8 @@ final class PasswordConfig
 
     public function __construct(
         private PasswordHashLimits $hashLimits = new PasswordHashLimits(),
+        private bool $allowPreHashedPasswords = false,
+        private int $maxPasswordValues = 1,
     ) {}
 
     /**
@@ -114,6 +116,36 @@ final class PasswordConfig
     public function setHashLimits(PasswordHashLimits $limits): self
     {
         $this->hashLimits = $limits;
+
+        return $this;
+    }
+
+    /**
+     * Whether any writer may store a pre-hashed userPassword value, rather than only administrators and the server.
+     */
+    public function isAllowPreHashedPasswords(): bool
+    {
+        return $this->allowPreHashedPasswords;
+    }
+
+    public function setAllowPreHashedPasswords(bool $allow): self
+    {
+        $this->allowPreHashedPasswords = $allow;
+
+        return $this;
+    }
+
+    /**
+     * How many userPassword values an entry may hold, each of which a failed bind verifies.
+     */
+    public function getMaxPasswordValues(): int
+    {
+        return $this->maxPasswordValues;
+    }
+
+    public function setMaxPasswordValues(int $max): self
+    {
+        $this->maxPasswordValues = $max;
 
         return $this;
     }

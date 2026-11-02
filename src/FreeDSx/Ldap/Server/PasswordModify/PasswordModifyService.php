@@ -220,10 +220,6 @@ final readonly class PasswordModifyService
     }
 
     /**
-     * Persists the new password plus any policy bookkeeping deltas in one command. When deltas are present the
-     * command is system-flagged so the NO-USER-MODIFICATION operational attributes are accepted; ACL was already
-     * checked in authorizeRequest().
-     *
      * @throws OperationException
      */
     private function applyPasswordChange(
@@ -237,22 +233,15 @@ final readonly class PasswordModifyService
             Change::replace('userPassword', $hashed),
             ...$deltas->changes,
         ];
-        $context = $deltas->isEmpty()
-            ? new WriteContext(
-                $token,
-                $controls,
-            )
-            : WriteContext::system(
-                $token,
-                $controls,
-            );
-
         $this->writeDispatcher->handle(
             new UpdateCommand(
                 $targetDn,
                 $changes,
             ),
-            $context,
+            WriteContext::system(
+                $token,
+                $controls,
+            ),
         );
     }
 }
