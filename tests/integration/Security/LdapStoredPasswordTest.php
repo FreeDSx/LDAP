@@ -89,6 +89,26 @@ final class LdapStoredPasswordTest extends ServerTestCase
         );
     }
 
+    public function test_the_schema_still_holds_a_second_password_value_when_only_the_password_configuration_allows_one(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--storage=sqlite',
+                '--max-password-values=2',
+            ],
+        );
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->replacePassword(
+            'first-secret',
+            'second-secret',
+        );
+    }
+
     private function replacePassword(string ...$passwords): void
     {
         $this->ldapClient()->send(Operations::modify(

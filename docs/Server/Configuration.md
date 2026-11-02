@@ -654,7 +654,8 @@ Whether any writer may store a pre-hashed `userPassword` value. When off, only
 ------------------
 #### PasswordConfig:setMaxPasswordValues
 
-How many `userPassword` values an entry may hold. Any one value authenticates, and a failed bind verifies them all.
+How many `userPassword` values an entry may hold. Any one value authenticates, and a failed bind verifies them all. The
+core schema also caps `userPassword` at one value (`X-MAX-VALUES`), so raising this takes a schema override too.
 
 **Default**: `1`
 
