@@ -35,6 +35,7 @@ LDAP Server Configuration
 * [Authentication](#authentication)
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
+    * [PasswordConfig:setHashLimits](#passwordconfigsethashlimits)
 * [Schema](#schema)
     * [SchemaConfig:setSources](#schemaconfigsetsources)
     * [SchemaConfig:setValidationMode](#schemaconfigsetvalidationmode)
@@ -620,6 +621,27 @@ operations is your responsibility and this option has no effect on bind authenti
 Password Modify requests.
 
 **Default**: `null` (`DnBindNameResolver` is tried first; falls back to `AttributeSearchBindNameResolver`)
+
+------------------
+#### PasswordConfig:setHashLimits
+
+The most work a stored password hash may ask for. A hash names its own work factor, and verifying it costs whatever
+that says, wrong passwords included. A hash over a limit never verifies, and each tag verifies only its own format:
+`{BCRYPT}` only bcrypt, and `{ARGON2}` only argon2i or argon2id. The limits never fall below what the configured hash
+scheme and cost produce.
+
+```php
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
+use FreeDSx\Ldap\ServerOptions;
+
+$options = new ServerOptions(passwordConfig: new PasswordConfig(
+    new PasswordHashLimits(bcryptCost: 12),
+));
+```
+
+**Default**: SHA crypt 1,000,000 rounds, bcrypt cost 14, extended DES 1,000,000 rounds, and argon2 256 MiB of memory,
+memory times passes of 1 GiB and 4 threads
 
 ## Schema
 

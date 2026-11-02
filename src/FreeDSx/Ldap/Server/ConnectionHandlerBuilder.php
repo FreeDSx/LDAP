@@ -315,8 +315,13 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         array $saslMechanisms,
         AuthzIdResolver $authzIdResolver,
     ): MechanismOptionsBuilderFactory {
+        $hashService = $this->container->get(PasswordHashService::class);
+
         if (!in_array(ServerOptions::SASL_EXTERNAL, $saslMechanisms, true)) {
-            return new MechanismOptionsBuilderFactory($authenticator);
+            return new MechanismOptionsBuilderFactory(
+                $authenticator,
+                hashService: $hashService,
+            );
         }
 
         $options = $this->serverOptions();
@@ -329,6 +334,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $options->getExternalCredentialMapper() ?? new SubjectDnCredentialMapper(),
                 $authzIdResolver,
             ),
+            $hashService,
         );
     }
 

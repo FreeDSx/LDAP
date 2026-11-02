@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Auth;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -427,5 +429,76 @@ final class PasswordHashServiceTest extends TestCase
             $stored,
             $stored,
         ));
+    }
+
+    public function test_a_hash_over_the_limits_does_not_verify_even_with_the_right_password(): void
+    {
+        $subject = $this->limitedToBcryptCostFour();
+
+        self::assertFalse($subject->verify(
+            'mypassword',
+            '{BCRYPT}' . password_hash(
+                'mypassword',
+                PASSWORD_BCRYPT,
+                ['cost' => 5],
+            ),
+        ));
+    }
+
+    public function test_a_hash_at_the_limits_verifies(): void
+    {
+        $subject = $this->limitedToBcryptCostFour();
+
+        self::assertTrue($subject->verify(
+            'mypassword',
+            '{BCRYPT}' . password_hash(
+                'mypassword',
+                PASSWORD_BCRYPT,
+                ['cost' => 4],
+            ),
+        ));
+    }
+
+    public function test_a_bcrypt_tag_holding_another_crypt_format_does_not_verify(): void
+    {
+        self::assertFalse($this->subject->verify(
+            'mypassword',
+            '{BCRYPT}' . crypt(
+                'mypassword',
+                '$6$rounds=5000$saltsaltsalt$',
+            ),
+        ));
+    }
+
+    public function test_an_argon2_tag_holding_a_bcrypt_hash_does_not_verify(): void
+    {
+        self::assertFalse($this->subject->verify(
+            'mypassword',
+            '{ARGON2}' . password_hash(
+                'mypassword',
+                PASSWORD_BCRYPT,
+                ['cost' => 4],
+            ),
+        ));
+    }
+
+    public function test_a_hash_over_the_limits_is_refused_as_unverifiable(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The "{CRYPT}" password hash asks for more work than the configured limits allow.');
+
+        $this->subject->assertVerifiable('{CRYPT}$6$rounds=2000000$saltsaltsalt$hash');
+    }
+
+    private function limitedToBcryptCostFour(): PasswordHashService
+    {
+        return new PasswordHashService(
+            hashCost: 4,
+            ceiling: new HashCostCeiling(
+                new PasswordHashLimits(bcryptCost: 4),
+                PasswordHashScheme::Bcrypt,
+                4,
+            ),
+        );
     }
 }
