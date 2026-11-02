@@ -23,7 +23,9 @@ use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Write\BulkLoadOptions;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
@@ -32,6 +34,10 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteCommandFactory;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
+use FreeDSx\Ldap\Server\Token\SystemToken;
+use Generator;
+use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class WriteCommandFactoryTest extends TestCase
@@ -177,11 +183,68 @@ final class WriteCommandFactoryTest extends TestCase
         );
     }
 
+    #[DataProvider('nonAddRequestProvider')]
+    public function test_a_bulk_load_refuses_anything_but_an_add(RequestInterface $request): void
+    {
+        self::expectException(LogicException::class);
+
+        $this->subject->fromRequest(
+            $request,
+            $this->bulkLoadContext(),
+        );
+    }
+
+    /**
+     * @return Generator<string, array{RequestInterface}>
+     */
+    public static function nonAddRequestProvider(): Generator
+    {
+        yield 'modify' => [
+            new ModifyRequest(
+                'cn=foo,dc=bar',
+                Change::replace(
+                    'description',
+                    'changed',
+                ),
+            ),
+        ];
+        yield 'delete' => [
+            new DeleteRequest('cn=foo,dc=bar'),
+        ];
+        yield 'rename' => [
+            new ModifyDnRequest(
+                'cn=foo,dc=bar',
+                'cn=renamed',
+                true,
+            ),
+        ];
+    }
+
+    public function test_a_bulk_load_still_creates_an_add_command(): void
+    {
+        self::assertInstanceOf(
+            AddCommand::class,
+            $this->subject->fromRequest(
+                new AddRequest(Entry::create('cn=foo,dc=bar')),
+                $this->bulkLoadContext(),
+            ),
+        );
+    }
+
     private function context(Control ...$controls): WriteContext
     {
         return new WriteContext(
             new AnonToken(),
             new ControlBag(...$controls),
+        );
+    }
+
+    private function bulkLoadContext(): WriteContext
+    {
+        return WriteContext::bulkLoad(
+            new SystemToken(),
+            new ControlBag(),
+            new BulkLoadOptions(),
         );
     }
 }
