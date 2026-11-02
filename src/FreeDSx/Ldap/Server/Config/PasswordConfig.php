@@ -36,6 +36,10 @@ final class PasswordConfig
 
     private ?PasswordQualityCheckerInterface $qualityChecker = null;
 
+    public function __construct(
+        private PasswordHashLimits $hashLimits = new PasswordHashLimits(),
+    ) {}
+
     /**
      * In-memory fallback policy applied to users that do not resolve a pwdPolicy entry from the DIT.
      */
@@ -95,6 +99,21 @@ final class PasswordConfig
     public function setHashCost(?int $cost): self
     {
         $this->hashCost = $cost;
+
+        return $this;
+    }
+
+    /**
+     * The most work a stored hash may ask for, which never falls below what the configured scheme and cost produce.
+     */
+    public function getHashLimits(): PasswordHashLimits
+    {
+        return $this->hashLimits;
+    }
+
+    public function setHashLimits(PasswordHashLimits $limits): self
+    {
+        $this->hashLimits = $limits;
 
         return $this;
     }

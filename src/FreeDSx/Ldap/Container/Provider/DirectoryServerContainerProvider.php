@@ -299,6 +299,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             ?? new PasswordAuthenticator(
                 $container->get(BindNameResolverInterface::class),
                 $container->get(ReadBackendInterface::class),
+                $container->get(PasswordHashService::class),
             );
     }
 

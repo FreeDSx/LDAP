@@ -13,14 +13,21 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\CramMD5MechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\PlainMechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ScramMechanismOptionsBuilder;
+use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
+use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use FreeDSx\Sasl\Mechanism\MechanismName;
+use FreeDSx\Sasl\Options\PlainOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -74,5 +81,47 @@ final class MechanismOptionsBuilderFactoryTest extends TestCase
         self::expectExceptionCode(ResultCode::OTHER);
 
         $this->subject->make(MechanismName::ANONYMOUS);
+    }
+
+    public function test_plain_verifies_through_the_hash_service_it_was_given(): void
+    {
+        $this->mockAuthenticator
+            ->method('getSaslIdentity')
+            ->willReturn(new SaslIdentity(
+                '{BCRYPT}' . password_hash(
+                    'secret',
+                    PASSWORD_BCRYPT,
+                    ['cost' => 5],
+                ),
+                new Dn('cn=user,dc=foo,dc=bar'),
+            ));
+        $subject = new MechanismOptionsBuilderFactory(
+            $this->mockAuthenticator,
+            hashService: new PasswordHashService(
+                hashCost: 4,
+                ceiling: new HashCostCeiling(
+                    new PasswordHashLimits(bcryptCost: 4),
+                    PasswordHashScheme::Bcrypt,
+                    4,
+                ),
+            ),
+        );
+
+        $options = $subject->make(MechanismName::PLAIN)->buildOptions(
+            null,
+            MechanismName::PLAIN,
+        );
+
+        self::assertInstanceOf(
+            PlainOptions::class,
+            $options,
+        );
+        $validate = $options->getValidate();
+        self::assertNotNull($validate);
+        self::assertFalse($validate(
+            null,
+            'user',
+            'secret',
+        ));
     }
 }

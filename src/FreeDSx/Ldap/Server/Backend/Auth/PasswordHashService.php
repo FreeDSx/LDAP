@@ -35,6 +35,7 @@ readonly class PasswordHashService
     public function __construct(
         private PasswordHashScheme $scheme = PasswordHashScheme::Bcrypt,
         private ?int $hashCost = null,
+        private HashCostCeiling $ceiling = new HashCostCeiling(),
     ) {}
 
     /**
@@ -75,6 +76,9 @@ readonly class PasswordHashService
         return bin2hex(random_bytes(8));
     }
 
+    /**
+     * A hash asking for more work than the limits allow never matches, though it still costs a dummy verify.
+     */
     public function verify(
         #[SensitiveParameter]
         string $plain,
@@ -95,30 +99,50 @@ readonly class PasswordHashService
         }
         $verifier = $this->verifierFor($scheme);
 
-        return $verifier !== null && $verifier(
+        if ($verifier === null) {
+            return false;
+        }
+        $encoded = substr(
+            $stored,
+            strlen($scheme) + 2,
+        );
+
+        if (!$this->ceiling->admits($scheme, $encoded)) {
+            $this->verifyDummy($plain);
+
+            return false;
+        }
+
+        return $verifier(
             $plain,
-            substr(
-                $stored,
-                strlen($scheme) + 2,
-            ),
+            $encoded,
         );
     }
 
     /**
-     * Refuses a stored value under a scheme with no verification.
+     * Refuses a stored value under a scheme with no verification, or one asking for more work than the limits allow.
      *
-     * @throws InvalidArgumentException naming the unsupported scheme
+     * @throws InvalidArgumentException naming the scheme
      */
     public function assertVerifiable(string $stored): void
     {
         $scheme = $this->schemeOf($stored);
 
-        if ($scheme === null || $this->verifierFor($scheme) !== null) {
+        if ($scheme === null) {
+            return;
+        }
+        if ($this->verifierFor($scheme) === null) {
+            throw new InvalidArgumentException(sprintf(
+                'The "{%s}" password scheme is not supported.',
+                $scheme,
+            ));
+        }
+        if ($this->ceiling->admits($scheme, substr($stored, strlen($scheme) + 2))) {
             return;
         }
 
         throw new InvalidArgumentException(sprintf(
-            'The "{%s}" password scheme is not supported.',
+            'The "{%s}" password hash asks for more work than the configured limits allow.',
             $scheme,
         ));
     }

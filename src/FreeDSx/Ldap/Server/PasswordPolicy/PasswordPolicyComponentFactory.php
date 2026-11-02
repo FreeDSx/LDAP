@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\PasswordPolicy;
 
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
@@ -32,6 +33,7 @@ final readonly class PasswordPolicyComponentFactory
         private WriteHandlerInterface $writeDispatcher,
         private PasswordPolicyEngine $passwordPolicyEngine,
         private PasswordPolicyResolver $policyResolver,
+        private PasswordHashService $hashService,
     ) {}
 
     public function makeWriteHandler(
@@ -51,6 +53,7 @@ final readonly class PasswordPolicyComponentFactory
             $this->backend,
             $this->writeDispatcher,
             $guard,
+            $this->hashService,
         );
     }
 
@@ -80,6 +83,7 @@ final readonly class PasswordPolicyComponentFactory
             $this->policyResolver,
             $passwordPolicyContext,
             $eventLogger,
+            $this->hashService,
         );
     }
 }

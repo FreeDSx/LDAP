@@ -17,6 +17,7 @@ use Closure;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 
 /**
@@ -32,6 +33,7 @@ final readonly class MechanismOptionsBuilderFactory
     public function __construct(
         private PasswordAuthenticatableInterface $authenticator,
         private ?Closure $externalBuilderFactory = null,
+        private PasswordHashService $hashService = new PasswordHashService(),
     ) {}
 
     /**
@@ -41,7 +43,10 @@ final readonly class MechanismOptionsBuilderFactory
     {
         return match (true) {
             $mechanism === MechanismName::PLAIN
-                => new PlainMechanismOptionsBuilder($this->authenticator),
+                => new PlainMechanismOptionsBuilder(
+                    $this->authenticator,
+                    $this->hashService,
+                ),
             $mechanism === MechanismName::CRAM_MD5
                 => new CramMD5MechanismOptionsBuilder($this->authenticator),
             $mechanism->isScram()

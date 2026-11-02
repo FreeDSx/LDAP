@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
@@ -113,6 +114,11 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
         return new PasswordHashService(
             $config->getHashScheme(),
             $config->getHashCost(),
+            new HashCostCeiling(
+                $config->getHashLimits(),
+                $config->getHashScheme(),
+                $config->getHashCost(),
+            ),
         );
     }
 
@@ -139,6 +145,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             writeDispatcher: $container->get(WriteOperationDispatcher::class),
             passwordPolicyEngine: $container->get(PasswordPolicyEngine::class),
             policyResolver: $container->get(PasswordPolicyResolver::class),
+            hashService: $container->get(PasswordHashService::class),
         );
     }
 }
