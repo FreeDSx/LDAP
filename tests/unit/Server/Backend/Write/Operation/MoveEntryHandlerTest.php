@@ -46,6 +46,10 @@ final class MoveEntryHandlerTest extends TestCase
 
     private const ALICE = 'cn=Alice,dc=example,dc=com';
 
+    private const UUID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
+
+    private const NAMED_BY_UUID = 'entryUUID=' . self::UUID . ',dc=example,dc=com';
+
     protected function setUp(): void
     {
         $this->writeGraph();
@@ -108,12 +112,52 @@ final class MoveEntryHandlerTest extends TestCase
         );
 
         self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
 
         $this->rename(
             self::ALICE,
             'entryUUID=a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
             deleteOldRdn: false,
+        );
+    }
+
+    #[DataProvider('validationModeProvider')]
+    public function test_a_rename_dropping_the_entry_uuid_that_named_the_entry_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->writeGraph(
+            EntryFixture::inMemoryStorage(...[
+                ...$this->fixture(),
+                $this->namedByItsEntryUuid(),
+            ]),
+            TestServerOptions::validatedCore($mode),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->rename(
+            self::NAMED_BY_UUID,
+            'cn=Freed',
+        );
+    }
+
+    public function test_a_rename_keeping_the_entry_uuid_that_named_the_entry_succeeds(): void
+    {
+        $this->writeGraph(EntryFixture::inMemoryStorage(...[
+            ...$this->fixture(),
+            $this->namedByItsEntryUuid(),
+        ]));
+
+        $this->rename(
+            self::NAMED_BY_UUID,
+            'cn=Freed',
+            deleteOldRdn: false,
+        );
+
+        self::assertSame(
+            [self::UUID],
+            $this->find('cn=Freed,dc=example,dc=com')?->get('entryUUID')?->getValues(),
         );
     }
 
@@ -417,6 +461,18 @@ final class MoveEntryHandlerTest extends TestCase
                 null,
             ),
             $this->context(),
+        );
+    }
+
+    /**
+     * Stored straight into storage, since no write can name an entry by its entryUUID any more.
+     */
+    private function namedByItsEntryUuid(): Entry
+    {
+        return new Entry(
+            new Dn(self::NAMED_BY_UUID),
+            new Attribute('objectClass', 'device'),
+            new Attribute('entryUUID', self::UUID),
         );
     }
 

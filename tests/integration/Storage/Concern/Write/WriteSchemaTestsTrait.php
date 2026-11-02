@@ -426,12 +426,12 @@ trait WriteSchemaTestsTrait
         $this->ldapClient()->rename('cn=user,dc=foo,dc=bar', 'dc=user', false);
     }
 
-    public function testRenameToANoUserModificationAttributeIsRefused(): void
+    public function testRenameToAnOperationalAttributeIsRefusedAsANamingViolation(): void
     {
         $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::NAMING_VIOLATION);
 
         $this->ldapClient()->rename('cn=user,dc=foo,dc=bar', 'hasSubordinates=TRUE', false);
     }

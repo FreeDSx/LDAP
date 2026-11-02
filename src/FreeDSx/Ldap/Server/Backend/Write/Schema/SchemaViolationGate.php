@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Exception\SchemaValidationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Schema\Validation\RuleViolation;
@@ -44,6 +45,7 @@ final readonly class SchemaViolationGate
     public function __construct(
         private SchemaValidator $validator,
         private LinkedAttributes $linked,
+        private Schema $schema,
     ) {}
 
     /**
@@ -104,7 +106,9 @@ final readonly class SchemaViolationGate
         WriteContext $context,
     ): void {
         $this->assertTypesStorable($write->entry);
+        $this->assertNamedByUserAttributes($write);
         $this->assertServerOwnedUntouched($write);
+        $this->assertOneEntryUuid($write);
 
         try {
             $this->validator->validate($write);
@@ -154,6 +158,34 @@ final readonly class SchemaViolationGate
     }
 
     /**
+     * Only a user attribute can name an entry, whatever the mode allows.
+     *
+     * @throws OperationException
+     */
+    private function assertNamedByUserAttributes(SchemaWrite $write): void
+    {
+        $dn = $write->entry->getDn();
+
+        if (!$write->namesEntry() || $dn->isRootDse()) {
+            return;
+        }
+
+        foreach ($dn->getRdn()->getAll() as $component) {
+            if (!$this->schema->isOperational($component->getName())) {
+                continue;
+            }
+
+            throw new OperationException(
+                sprintf(
+                    'The operational attribute "%s" cannot name an entry.',
+                    $component->getName(),
+                ),
+                ResultCode::NAMING_VIOLATION,
+            );
+        }
+    }
+
+    /**
      * @throws OperationException
      */
     private function assertServerOwnedUntouched(SchemaWrite $write): void
@@ -186,6 +218,28 @@ final readonly class SchemaViolationGate
 
         return self::describesAnyDerivedAttribute($name)
             || $this->linked->linkedBy($name) !== null;
+    }
+
+    /**
+     * An entry is identified by one entryUUID: an Add may leave it to the server, and no other write may remove it.
+     *
+     * @throws OperationException
+     */
+    private function assertOneEntryUuid(SchemaWrite $write): void
+    {
+        $held = count($write->entry->get(AttributeTypeOid::NAME_ENTRY_UUID)?->getValues() ?? []);
+
+        if ($held === 1 || ($held === 0 && $write->operation === OperationType::Add)) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'The attribute "%s" is maintained by the server and must hold exactly one value.',
+                AttributeTypeOid::NAME_ENTRY_UUID,
+            ),
+            ResultCode::CONSTRAINT_VIOLATION,
+        );
     }
 
     private static function namesEntryUuid(string $name): bool

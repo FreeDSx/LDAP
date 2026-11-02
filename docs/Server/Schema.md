@@ -52,7 +52,7 @@ Every `add`, `modify` and `modify DN` is checked before reaching storage:
 - Values conform to their attribute's syntax, and so do RDN values.
 - No attribute is given twice, and no value is repeated under an equivalent spelling.
 - The structural object class of an existing entry does not change.
-- Naming attributes have an equality matching rule.
+- Naming attributes have an equality matching rule, and none of them is operational.
 
 Failures return one of these codes, with a diagnostic naming the attribute or class:
 
@@ -65,7 +65,7 @@ Failures return one of these codes, with a diagnostic naming the attribute or cl
 | `constraintViolation` (19)       | Several values on a single-valued attribute, a `NO-USER-MODIFICATION` attribute |
 | `attributeOrValueExists` (20)    | An attribute given twice, a value repeated under an equivalent spelling         |
 | `objectClassModsProhibited` (69) | Changing the structural object class                                            |
-| `namingViolation` (64)           | A naming attribute with no equality matching rule                               |
+| `namingViolation` (64)           | A naming attribute with no equality matching rule, or an operational one        |
 | `adminLimitExceeded` (11)        | More values than the attribute's limit                                          |
 
 ## Entry Requirements
@@ -163,12 +163,15 @@ existing entry.
 | Writing `createTimestamp`, `modifyTimestamp`, `creatorsName` or `modifiersName`                                                              | Waived              | Waived    |
 | Writing `entryUUID` on Add                                                                                                                   | Waived              | Waived    |
 | Changing `entryUUID`, writing a derived attribute (`entryDN`, `hasSubordinates`, `subschemaSubentry`) or a back-link such as `memberOf`      | Refused             | Refused   |
+| Naming an entry by an operational attribute                                                                                                  | Refused             | Refused   |
 | Writing any other `NO-USER-MODIFICATION` attribute                                                                                           | Refused             | Waived    |
 | Required and allowed attributes, a structural object class, undefined types, undefined object classes, single-valued types, naming attributes | Refused             | Waived    |
 | Attribute syntax, the value limit, equivalent values, an attribute description given twice                                                   | Refused             | Refused   |
 
 Each violation is logged and the first that is not waived decides the result code. An entry's identity and the values
-the server derives for it are refused with `constraintViolation` in every mode, `Off` included.
+the server derives for it are refused with `constraintViolation` in every mode, `Off` included: an entry holds exactly
+one `entryUUID`, and a rename may not drop it. An entry named by an operational attribute is refused with
+`namingViolation` in every mode as well.
 
 A value a relaxed write supplies for one of these attributes is stored as given. A timestamp may not be in the future,
 and `createTimestamp` may not be later than `modifyTimestamp`. A supplied `entryUUID` may not be one another entry holds.
