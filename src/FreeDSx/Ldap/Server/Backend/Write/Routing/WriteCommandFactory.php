@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
+use LogicException;
 
 /**
  * Translates LDAP protocol request objects into write command DTOs, refusing those no command could carry out.
@@ -45,11 +46,16 @@ final readonly class WriteCommandFactory
 
     /**
      * @throws OperationException
+     * @throws LogicException when a bulk load carries anything but an add
      */
     public function fromRequest(
         RequestInterface $request,
         WriteContext $context,
     ): WriteRequestInterface {
+        $this->assertBulkLoadOnlyAdds(
+            $request,
+            $context,
+        );
         $this->generatedEntries->assertWritable($request, $context);
 
         return match (true) {
@@ -65,6 +71,22 @@ final readonly class WriteCommandFactory
                 ResultCode::NO_SUCH_OPERATION,
             ),
         };
+    }
+
+    /**
+     * A bulk load parks references to entries it has not stored yet, and only an add leaves those references whole.
+     *
+     * @throws LogicException
+     */
+    private function assertBulkLoadOnlyAdds(
+        RequestInterface $request,
+        WriteContext $context,
+    ): void {
+        if ($context->bulkLoadOptions() === null || $request instanceof AddRequest) {
+            return;
+        }
+
+        throw new LogicException('A bulk load only adds entries.');
     }
 
     /**
