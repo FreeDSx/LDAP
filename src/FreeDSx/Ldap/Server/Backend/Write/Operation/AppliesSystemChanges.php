@@ -34,7 +34,8 @@ trait AppliesSystemChanges
     ): void {
         foreach ($changes as $change) {
             if ($change->getType() === Change::TYPE_REPLACE) {
-                $entry->set($change->getAttribute());
+                // A retried transaction applies the same command again...so copy it.
+                $entry->set(clone $change->getAttribute());
 
                 continue;
             }

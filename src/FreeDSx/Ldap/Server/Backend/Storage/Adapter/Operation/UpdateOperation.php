@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 /**
  * Applies attribute changes (ADD / DELETE / REPLACE) to an Entry.
  *
+ * Note: The entry gets copies of the changed attributes, since a retried transaction applies the same changes again.
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class UpdateOperation
@@ -73,7 +75,7 @@ final readonly class UpdateOperation
         $existing = $entry->get($attribute, true);
 
         if ($existing === null) {
-            $entry->add($attribute);
+            $entry->add(clone $attribute);
             return;
         }
         $held = EquivalentValues::of(
@@ -221,7 +223,7 @@ final readonly class UpdateOperation
             );
         }
 
-        $entry->set($attribute);
+        $entry->set(clone $attribute);
     }
 
     /**
