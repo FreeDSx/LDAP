@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
@@ -70,36 +71,45 @@ final class PasswordConfigTest extends TestCase
         );
     }
 
-    public function test_the_hash_scheme_defaults_to_bcrypt(): void
+    public function test_new_passwords_are_hashed_with_argon2id_at_7_mib_and_five_passes_by_default(): void
     {
+        $hashing = $this->subject->getHashing();
+
         self::assertSame(
-            PasswordHashScheme::Bcrypt,
-            $this->subject->getHashScheme(),
+            [
+                PasswordHashScheme::Argon2,
+                7168,
+                5,
+                1,
+            ],
+            [
+                $hashing->getScheme(),
+                $hashing->getArgon2Memory(),
+                $hashing->getArgon2Passes(),
+                $hashing->getArgon2Threads(),
+            ],
         );
     }
 
-    public function test_setting_the_hash_scheme_is_round_tripped(): void
+    public function test_the_hashing_given_to_the_constructor_is_retained(): void
     {
-        $this->subject->setHashScheme(PasswordHashScheme::Argon2);
+        $hashing = PasswordHashing::ssha();
 
         self::assertSame(
-            PasswordHashScheme::Argon2,
-            $this->subject->getHashScheme(),
+            $hashing,
+            (new PasswordConfig(hashing: $hashing))->getHashing(),
         );
     }
 
-    public function test_the_hash_cost_defers_to_the_scheme_by_default(): void
+    public function test_setting_the_hashing_is_round_tripped(): void
     {
-        self::assertNull($this->subject->getHashCost());
-    }
+        $hashing = PasswordHashing::ssha();
 
-    public function test_setting_the_hash_cost_is_round_tripped(): void
-    {
-        $this->subject->setHashCost(6);
+        $this->subject->setHashing($hashing);
 
         self::assertSame(
-            6,
-            $this->subject->getHashCost(),
+            $hashing,
+            $this->subject->getHashing(),
         );
     }
 

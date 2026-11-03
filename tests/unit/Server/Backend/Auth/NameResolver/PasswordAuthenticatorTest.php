@@ -20,10 +20,10 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -457,10 +457,7 @@ final class PasswordAuthenticatorTest extends TestCase
 
     public function test_a_name_resolving_to_nothing_is_refused_at_the_cost_of_a_comparison(): void
     {
-        $hashService = new PasswordHashService(
-            PasswordHashScheme::Bcrypt,
-            self::CHEAP_BCRYPT_COST,
-        );
+        $hashService = $this->measurableHashService();
         $entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
             new Attribute('userPassword', $hashService->hash('secret')),
@@ -477,10 +474,7 @@ final class PasswordAuthenticatorTest extends TestCase
 
     public function test_an_entry_without_a_password_is_refused_at_the_cost_of_a_comparison(): void
     {
-        $hashService = new PasswordHashService(
-            PasswordHashScheme::Bcrypt,
-            self::CHEAP_BCRYPT_COST,
-        );
+        $hashService = $this->measurableHashService();
         $entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
             new Attribute('userPassword', $hashService->hash('secret')),
@@ -501,10 +495,7 @@ final class PasswordAuthenticatorTest extends TestCase
 
     public function test_a_password_over_the_length_limit_is_refused_at_the_cost_of_a_comparison(): void
     {
-        $hashService = new PasswordHashService(
-            PasswordHashScheme::Bcrypt,
-            self::CHEAP_BCRYPT_COST,
-        );
+        $hashService = $this->measurableHashService();
         $authenticator = $this->authenticatorFor(
             new Entry(
                 new Dn('cn=Alice,dc=example,dc=com'),
@@ -558,6 +549,20 @@ final class PasswordAuthenticatorTest extends TestCase
         }
 
         return (float) $fastest;
+    }
+
+    /**
+     * A bcrypt service at a cost each verify measures well above scheduling noise.
+     */
+    private function measurableHashService(): PasswordHashService
+    {
+        $options = TestServerOptions::cheaplyHashed();
+        $options->getPasswordConfig()->setHashing(PasswordHashing::bcrypt(self::CHEAP_BCRYPT_COST));
+
+        return $this->fromContainer(
+            PasswordHashService::class,
+            options: $options,
+        );
     }
 
     private function authenticatorFor(

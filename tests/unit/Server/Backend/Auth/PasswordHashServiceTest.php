@@ -16,8 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Auth;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -37,26 +37,52 @@ final class PasswordHashServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new PasswordHashService(hashCost: 4);
+        $hashing = PasswordHashing::bcrypt(4);
+        $this->subject = new PasswordHashService(
+            $hashing,
+            new HashCostCeiling(
+                new PasswordHashLimits(),
+                $hashing,
+            ),
+        );
     }
 
-    public function test_default_scheme_is_bcrypt(): void
+    public function test_a_bcrypt_hash_carries_its_cost(): void
     {
         self::assertStringStartsWith(
-            '{BCRYPT}',
+            '{BCRYPT}$2y$04$',
             $this->subject->hash('secret'),
         );
     }
 
+    public function test_an_argon2id_hash_carries_its_settings(): void
+    {
+        $hasher = $this->hasherFor(PasswordHashing::argon2id(
+            memoryKiB: 16,
+            passes: 2,
+        ));
+
+        self::assertStringStartsWith(
+            '{ARGON2}$argon2id$v=19$m=16,t=2,p=1$',
+            $hasher->hash('secret'),
+        );
+    }
+
     /**
-     * @return array<string, array{0: PasswordHashScheme, 1: non-empty-string}>
+     * @return array<string, array{0: PasswordHashing, 1: non-empty-string}>
      */
     public static function schemeProvider(): array
     {
         return [
-            'ssha' => [PasswordHashScheme::Ssha, '{SSHA}'],
-            'bcrypt' => [PasswordHashScheme::Bcrypt, '{BCRYPT}'],
-            'argon2' => [PasswordHashScheme::Argon2, '{ARGON2}'],
+            'ssha' => [PasswordHashing::ssha(), '{SSHA}'],
+            'bcrypt' => [PasswordHashing::bcrypt(4), '{BCRYPT}'],
+            'argon2' => [
+                PasswordHashing::argon2id(
+                    memoryKiB: 8,
+                    passes: 1,
+                ),
+                '{ARGON2}',
+            ],
         ];
     }
 
@@ -65,10 +91,10 @@ final class PasswordHashServiceTest extends TestCase
      */
     #[DataProvider('schemeProvider')]
     public function test_each_scheme_produces_its_prefix(
-        PasswordHashScheme $scheme,
+        PasswordHashing $hashing,
         string $expectedPrefix,
     ): void {
-        $hashed = (new PasswordHashService($scheme, hashCost: 4))->hash('secret');
+        $hashed = $this->hasherFor($hashing)->hash('secret');
 
         self::assertStringStartsWith(
             $expectedPrefix,
@@ -78,9 +104,9 @@ final class PasswordHashServiceTest extends TestCase
 
     #[DataProvider('schemeProvider')]
     public function test_each_scheme_round_trips(
-        PasswordHashScheme $scheme,
+        PasswordHashing $hashing,
     ): void {
-        $hashed = (new PasswordHashService($scheme, hashCost: 4))->hash('mypassword');
+        $hashed = $this->hasherFor($hashing)->hash('mypassword');
 
         self::assertTrue($this->subject->verify(
             'mypassword',
@@ -90,9 +116,9 @@ final class PasswordHashServiceTest extends TestCase
 
     #[DataProvider('schemeProvider')]
     public function test_wrong_password_does_not_verify_a_freshly_hashed_value(
-        PasswordHashScheme $scheme,
+        PasswordHashing $hashing,
     ): void {
-        $hashed = (new PasswordHashService($scheme, hashCost: 4))->hash('mypassword');
+        $hashed = $this->hasherFor($hashing)->hash('mypassword');
 
         self::assertFalse($this->subject->verify(
             'wrong',
@@ -102,9 +128,9 @@ final class PasswordHashServiceTest extends TestCase
 
     #[DataProvider('schemeProvider')]
     public function test_two_hashes_of_same_input_differ_due_to_random_salt(
-        PasswordHashScheme $scheme,
+        PasswordHashing $hashing,
     ): void {
-        $hasher = new PasswordHashService($scheme, hashCost: 4);
+        $hasher = $this->hasherFor($hashing);
 
         self::assertNotSame(
             $hasher->hash('password'),
@@ -505,8 +531,8 @@ final class PasswordHashServiceTest extends TestCase
     public function test_a_hash_over_the_limits_is_recorded_by_entry_and_scheme_but_not_value(): void
     {
         $logger = new RecordingLogger();
-        $subject = new PasswordHashService(
-            hashCost: 4,
+        $subject = $this->hasherFor(
+            PasswordHashing::bcrypt(4),
             eventLogger: new EventLogger(
                 $logger,
                 EventLogPolicy::all(),
@@ -617,14 +643,11 @@ final class PasswordHashServiceTest extends TestCase
     }
 
     #[DataProvider('schemeProvider')]
-    public function test_a_dummy_verify_accepts_a_password_holding_a_nul_byte(PasswordHashScheme $scheme): void
+    public function test_a_dummy_verify_accepts_a_password_holding_a_nul_byte(PasswordHashing $hashing): void
     {
         $this->expectNotToPerformAssertions();
 
-        (new PasswordHashService(
-            $scheme,
-            hashCost: 4,
-        ))->verifyDummy("pass\0word");
+        $this->hasherFor($hashing)->verifyDummy("pass\0word");
     }
 
     #[DataProvider('cryptSaltProvider')]
@@ -664,21 +687,26 @@ final class PasswordHashServiceTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: PasswordHashScheme}>
+     * @return array<string, array{0: PasswordHashing}>
      */
     public static function everyByteSchemeProvider(): array
     {
         return [
-            'ssha' => [PasswordHashScheme::Ssha],
-            'argon2' => [PasswordHashScheme::Argon2],
+            'ssha' => [PasswordHashing::ssha()],
+            'argon2' => [
+                PasswordHashing::argon2id(
+                    memoryKiB: 8,
+                    passes: 1,
+                ),
+            ],
         ];
     }
 
     #[DataProvider('everyByteSchemeProvider')]
     public function test_a_scheme_reading_every_byte_hashes_a_password_holding_a_nul_byte(
-        PasswordHashScheme $scheme,
+        PasswordHashing $hashing,
     ): void {
-        $hasher = new PasswordHashService($scheme);
+        $hasher = $this->hasherFor($hashing);
         $hashed = $hasher->hash("my\0password");
 
         self::assertTrue($hasher->isHashable("my\0password"));
@@ -698,15 +726,54 @@ final class PasswordHashServiceTest extends TestCase
         self::assertTrue($this->subject->isHashable('mypassword'));
     }
 
+    public function test_bcrypt_cannot_hash_a_password_past_72_bytes(): void
+    {
+        self::assertTrue($this->subject->isHashable(str_repeat(
+            'a',
+            72,
+        )));
+        self::assertFalse($this->subject->isHashable(str_repeat(
+            'a',
+            73,
+        )));
+    }
+
+    public function test_argon2id_can_hash_a_password_past_72_bytes(): void
+    {
+        $hasher = $this->hasherFor(PasswordHashing::argon2id(
+            memoryKiB: 8,
+            passes: 1,
+        ));
+
+        self::assertTrue($hasher->isHashable(str_repeat(
+            'a',
+            73,
+        )));
+    }
+
     private function limitedToBcryptCostFour(): PasswordHashService
     {
+        return $this->hasherFor(
+            PasswordHashing::bcrypt(4),
+            new PasswordHashLimits(bcryptCost: 4),
+        );
+    }
+
+    /**
+     * A service hashing as given, under a ceiling built from the same hashing as the container builds it.
+     */
+    private function hasherFor(
+        PasswordHashing $hashing,
+        PasswordHashLimits $limits = new PasswordHashLimits(),
+        EventLogger $eventLogger = new EventLogger(null),
+    ): PasswordHashService {
         return new PasswordHashService(
-            hashCost: 4,
-            ceiling: new HashCostCeiling(
-                new PasswordHashLimits(bcryptCost: 4),
-                PasswordHashScheme::Bcrypt,
-                4,
+            $hashing,
+            new HashCostCeiling(
+                $limits,
+                $hashing,
             ),
+            $eventLogger,
         );
     }
 }

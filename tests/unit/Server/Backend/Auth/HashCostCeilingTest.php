@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Auth;
 
 use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -30,7 +30,10 @@ final class HashCostCeilingTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new HashCostCeiling();
+        $this->subject = new HashCostCeiling(
+            new PasswordHashLimits(),
+            PasswordHashing::argon2id(),
+        );
     }
 
     #[DataProvider('defaultLimitsProvider')]
@@ -227,7 +230,10 @@ final class HashCostCeilingTest extends TestCase
 
     public function test_lowered_limits_refuse_what_the_defaults_admit(): void
     {
-        $subject = new HashCostCeiling(new PasswordHashLimits(shaCryptRounds: 10_000));
+        $subject = new HashCostCeiling(
+            new PasswordHashLimits(shaCryptRounds: 10_000),
+            PasswordHashing::argon2id(),
+        );
 
         self::assertFalse($subject->admits(
             'CRYPT',
@@ -239,8 +245,7 @@ final class HashCostCeilingTest extends TestCase
     {
         $subject = new HashCostCeiling(
             new PasswordHashLimits(bcryptCost: 10),
-            PasswordHashScheme::Bcrypt,
-            12,
+            PasswordHashing::bcrypt(12),
         );
 
         self::assertTrue($subject->admits(
@@ -253,7 +258,7 @@ final class HashCostCeilingTest extends TestCase
         ));
     }
 
-    public function test_the_argon2_limits_never_fall_below_what_the_server_hashes_with(): void
+    public function test_the_argon2_limits_rise_to_the_settings_the_server_hashes_with(): void
     {
         $subject = new HashCostCeiling(
             new PasswordHashLimits(
@@ -261,12 +266,40 @@ final class HashCostCeilingTest extends TestCase
                 argon2MemoryPasses: 1024,
                 argon2Threads: 1,
             ),
-            PasswordHashScheme::Argon2,
+            PasswordHashing::argon2id(
+                memoryKiB: 4096,
+                passes: 3,
+            ),
         );
 
         self::assertTrue($subject->admits(
             'ARGON2',
-            '$argon2id$v=19$m=65536,t=4,p=1$c2FsdA$aGFzaA',
+            '$argon2id$v=19$m=4096,t=3,p=1$c2FsdA$aGFzaA',
+        ));
+        self::assertFalse($subject->admits(
+            'ARGON2',
+            '$argon2id$v=19$m=4096,t=4,p=1$c2FsdA$aGFzaA',
+        ));
+    }
+
+    public function test_the_argon2_thread_limit_rises_to_the_threads_the_server_hashes_with(): void
+    {
+        $subject = new HashCostCeiling(
+            new PasswordHashLimits(argon2Threads: 1),
+            PasswordHashing::argon2id(
+                memoryKiB: 16,
+                passes: 1,
+                threads: 2,
+            ),
+        );
+
+        self::assertTrue($subject->admits(
+            'ARGON2',
+            '$argon2id$v=19$m=16,t=1,p=2$c2FsdA$aGFzaA',
+        ));
+        self::assertFalse($subject->admits(
+            'ARGON2',
+            '$argon2id$v=19$m=16,t=1,p=3$c2FsdA$aGFzaA',
         ));
     }
 
@@ -274,8 +307,7 @@ final class HashCostCeilingTest extends TestCase
     {
         $subject = new HashCostCeiling(
             new PasswordHashLimits(bcryptCost: 10),
-            PasswordHashScheme::Argon2,
-            12,
+            PasswordHashing::argon2id(),
         );
 
         self::assertFalse($subject->admits(
@@ -302,7 +334,10 @@ final class HashCostCeilingTest extends TestCase
 
     public function test_a_password_over_a_lowered_length_limit_is_refused(): void
     {
-        $subject = new HashCostCeiling(new PasswordHashLimits(maxPasswordLength: 64));
+        $subject = new HashCostCeiling(
+            new PasswordHashLimits(maxPasswordLength: 64),
+            PasswordHashing::argon2id(),
+        );
 
         self::assertFalse($subject->admitsPassword(str_repeat(
             'a',

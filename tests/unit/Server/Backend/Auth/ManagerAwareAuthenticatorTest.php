@@ -23,9 +23,13 @@ use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\ManagerToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ManagerAwareAuthenticatorTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const MANAGER_DN = 'cn=manager';
 
     private const MANAGER_PASSWORD = '12345';
@@ -45,7 +49,10 @@ final class ManagerAwareAuthenticatorTest extends TestCase
                 new Dn(self::MANAGER_DN),
                 self::MANAGER_HASH,
             ),
-            new PasswordHashService(),
+            $this->fromContainer(
+                PasswordHashService::class,
+                options: TestServerOptions::cheaplyHashed(),
+            ),
         );
     }
 

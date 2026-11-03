@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Auth;
 use Closure;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -52,12 +53,13 @@ readonly class PasswordHashService
     private const SCHEME_PREFIX = '/^\{([A-Za-z0-9.\/_-]+)\}/';
 
     /**
-     * @param int|null $hashCost bcrypt cost forwarded to password_hash(); null uses the PHP default. Does not apply to argon2.
+     * The most bytes of a password bcrypt reads.
      */
+    private const BCRYPT_MAX_BYTES = 72;
+
     public function __construct(
-        private PasswordHashScheme $scheme = PasswordHashScheme::Bcrypt,
-        private ?int $hashCost = null,
-        private HashCostCeiling $ceiling = new HashCostCeiling(),
+        private PasswordHashing $hashing,
+        private HashCostCeiling $ceiling,
         private EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
@@ -76,17 +78,23 @@ readonly class PasswordHashService
         #[SensitiveParameter]
         string $plain,
     ): string {
-        return match ($this->scheme) {
+        return match ($this->hashing->getScheme()) {
             PasswordHashScheme::Ssha => $this->hashSsha($plain),
-            PasswordHashScheme::Bcrypt => $this->hashWithPhpAlgo(
+            PasswordHashScheme::Bcrypt => self::hashWithPhpAlgo(
                 $plain,
                 PASSWORD_BCRYPT,
                 PasswordHashScheme::Bcrypt,
+                ['cost' => $this->hashing->getBcryptCost()],
             ),
-            PasswordHashScheme::Argon2 => $this->hashWithPhpAlgo(
+            PasswordHashScheme::Argon2 => self::hashWithPhpAlgo(
                 $plain,
                 PASSWORD_ARGON2ID,
                 PasswordHashScheme::Argon2,
+                [
+                    'memory_cost' => $this->hashing->getArgon2Memory(),
+                    'time_cost' => $this->hashing->getArgon2Passes(),
+                    'threads' => $this->hashing->getArgon2Threads(),
+                ],
             ),
         };
     }
@@ -195,14 +203,18 @@ readonly class PasswordHashService
     }
 
     /**
-     * Whether the configured scheme can hash a password, which bcrypt cannot when it holds a NUL byte.
+     * Whether the configured scheme can hash a password in full, which bcrypt cannot past 72 bytes or with a NUL byte.
      */
     public function isHashable(
         #[SensitiveParameter]
         string $plain,
     ): bool {
-        return $this->scheme !== PasswordHashScheme::Bcrypt
-            || !str_contains(
+        if ($this->hashing->getScheme() !== PasswordHashScheme::Bcrypt) {
+            return true;
+        }
+
+        return strlen($plain) <= self::BCRYPT_MAX_BYTES
+            && !str_contains(
                 $plain,
                 "\0",
             );
@@ -361,18 +373,20 @@ readonly class PasswordHashService
             . base64_encode(sha1($plain . $salt, true) . $salt);
     }
 
-    private function hashWithPhpAlgo(
+    /**
+     * @param array<string, int> $options
+     */
+    private static function hashWithPhpAlgo(
         #[SensitiveParameter]
         string $plain,
         string $algo,
         PasswordHashScheme $scheme,
+        array $options,
     ): string {
         $hash = password_hash(
             $plain,
             $algo,
-            $this->hashCost !== null
-                ? ['cost' => $this->hashCost]
-                : [],
+            $options,
         );
 
         return $scheme->value . $hash;

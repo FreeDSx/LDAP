@@ -240,7 +240,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         $entry = $this->backend->get(new Dn(self::USER_DN));
         self::assertNotNull($entry);
         self::assertTrue(
-            (new PasswordHashService(hashCost: 4))->verify(
+            $this->fromContainer(PasswordHashService::class)->verify(
                 'a-fresh-password',
                 (string) $entry->get('userPassword')?->firstValue(),
             ),

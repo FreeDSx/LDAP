@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -223,6 +224,12 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'How many userPassword values the password configuration lets an entry hold',
                 '1',
+            )
+            ->addOption(
+                'hash-scheme',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'The scheme new passwords are hashed with instead of the default: argon2, bcrypt or ssha',
             )
             ->addOption(
                 'allow-relax',
@@ -430,6 +437,7 @@ final class LdapBackendStorageCommand extends Command
                     1,
                     (int) $this->getStringOption($input, 'max-password-values'),
                 ),
+                hashing: $this->hashingFor($input->getOption('hash-scheme')),
             ),
         ))
             ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))
@@ -758,6 +766,23 @@ final class LdapBackendStorageCommand extends Command
             default => throw new RuntimeException(sprintf(
                 'Unknown --journal mode "%s".',
                 is_string($mode) ? $mode : gettype($mode),
+            )),
+        };
+    }
+
+    /**
+     * Null leaves the password configuration on its own default.
+     */
+    private function hashingFor(mixed $scheme): ?PasswordHashing
+    {
+        return match ($scheme) {
+            null => null,
+            'argon2' => PasswordHashing::argon2id(),
+            'bcrypt' => PasswordHashing::bcrypt(),
+            'ssha' => PasswordHashing::ssha(),
+            default => throw new RuntimeException(sprintf(
+                'Unknown --hash-scheme "%s".',
+                is_string($scheme) ? $scheme : gettype($scheme),
             )),
         };
     }

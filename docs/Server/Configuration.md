@@ -35,7 +35,7 @@ LDAP Server Configuration
 * [Authentication](#authentication)
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
-    * [PasswordConfig:setHashScheme](#passwordconfigsethashscheme)
+    * [PasswordConfig:setHashing](#passwordconfigsethashing)
     * [PasswordConfig:setHashLimits](#passwordconfigsethashlimits)
     * [PasswordConfig:setAllowPreHashedPasswords](#passwordconfigsetallowprehashedpasswords)
     * [PasswordConfig:setMaxPasswordValues](#passwordconfigsetmaxpasswordvalues)
@@ -626,30 +626,33 @@ Password Modify requests.
 **Default**: `null` (`DnBindNameResolver` is tried first; falls back to `AttributeSearchBindNameResolver`)
 
 ------------------
-#### PasswordConfig:setHashScheme
+#### PasswordConfig:setHashing
 
-The scheme Password Modify hashes a new password with. Values already stored keep verifying under their own scheme.
-`{CRYPT}` and `{BCRYPT}` never match a password holding a NUL byte, and while bcrypt is the configured scheme, Password
-Modify refuses a new password holding one with `constraintViolation`.
+The scheme and work factor Password Modify hashes a new password with: `PasswordHashing::argon2id()`,
+`PasswordHashing::bcrypt()` or `PasswordHashing::ssha()`. Values already stored keep verifying under their own scheme.
+`{CRYPT}` and `{BCRYPT}` never match a password holding a NUL byte. While bcrypt is the configured scheme, Password
+Modify refuses a new password holding one, or longer than the 72 bytes bcrypt reads, with `constraintViolation`.
 
 ```php
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 
 $options->setPasswordConfig(
-    (new PasswordConfig())->setHashScheme(PasswordHashScheme::Argon2),
+    (new PasswordConfig())->setHashing(PasswordHashing::argon2id(
+        memoryKiB: 19456,
+        passes: 2,
+    )),
 );
 ```
 
-**Default**: `PasswordHashScheme::Bcrypt`
+**Default**: `PasswordHashing::argon2id()`, with 7 MiB of memory, 5 passes and 1 thread
 
 ------------------
 #### PasswordConfig:setHashLimits
 
 The most work a stored password hash may ask for. A hash over a limit is refused on write and never verifies. Any
 password check that meets one logs `ldap.password.hash_over_limits`: a bind, an old password check, or the password
-history check. The limits never fall below the configured hash scheme and cost; lowering either stops stronger stored
-hashes from verifying.
+history check. The limits never fall below the configured hashing.
 
 `maxPasswordLength` caps the bytes of a password the server verifies, since some schemes cost more the longer it is. A
 longer password fails to bind, and a cleartext `userPassword` or Password Modify new password over it is refused with
