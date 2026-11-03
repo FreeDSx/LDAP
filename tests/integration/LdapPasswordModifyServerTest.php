@@ -25,6 +25,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\FreeDSx\Ldap\LdapBackendStorageCommand;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
+use function str_repeat;
+
 final class LdapPasswordModifyServerTest extends ServerTestCase
 {
     use RawClientQueueTrait;
@@ -126,7 +128,10 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
             $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
                 null,
                 self::USER_PASSWORD,
-                str_repeat('a', 513),
+                str_repeat(
+                    'a',
+                    513,
+                ),
             ));
             $this->fail('A new password over the length limit should have been refused.');
         } catch (OperationException $e) {

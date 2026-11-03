@@ -35,6 +35,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
+use function str_repeat;
+
 final class PasswordModifyServiceTest extends TestCase
 {
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
@@ -343,7 +345,10 @@ final class PasswordModifyServiceTest extends TestCase
             new PasswordModifyRequest(
                 null,
                 '12345',
-                str_repeat('a', 513),
+                str_repeat(
+                    'a',
+                    513,
+                ),
             ),
             $this->userToken,
             new ControlBag(),
@@ -389,7 +394,10 @@ final class PasswordModifyServiceTest extends TestCase
             new PasswordModifyRequest(
                 null,
                 '12345',
-                str_repeat('a', 512),
+                str_repeat(
+                    'a',
+                    512,
+                ),
             ),
             $this->userToken,
             new ControlBag(),

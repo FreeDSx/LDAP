@@ -38,6 +38,10 @@ final readonly class HistoryConstraint implements PasswordChangeConstraint
         if ($depth === null || $depth === 0) {
             return null;
         }
+        // A password over the length limit matches nothing, and each comparison would spend a dummy hash.
+        if (!$this->hashService->isWithinMaxLength($attempt->newPassword)) {
+            return null;
+        }
 
         foreach ($attempt->currentPasswords as $current) {
             if ($this->hashService->verify($attempt->newPassword, $current)) {

@@ -102,6 +102,8 @@ use Psr\Log\LogLevel;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
+use function str_repeat;
+
 class ContainerTest extends TestCase
 {
     use RequiresExtensionsTrait;
@@ -319,6 +321,24 @@ class ContainerTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The manager password can never be verified. The "{PBKDF2-SHA512}" password scheme is not supported.');
+
+        $container->get(ServerProtocolFactoryInterface::class);
+    }
+
+    public function test_a_cleartext_manager_password_over_the_length_limit_is_refused(): void
+    {
+        $container = $this->containerFor(
+            TestServerOptions::defaults()->setManager(new ManagerIdentity(
+                new Dn('cn=manager'),
+                str_repeat(
+                    'a',
+                    513,
+                ),
+            )),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('A cleartext password is longer than the configured hash limits allow.');
 
         $container->get(ServerProtocolFactoryInterface::class);
     }

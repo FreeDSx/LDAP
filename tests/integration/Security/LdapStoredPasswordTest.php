@@ -22,6 +22,8 @@ use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
+use function str_repeat;
+
 final class LdapStoredPasswordTest extends ServerTestCase
 {
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
@@ -103,16 +105,23 @@ final class LdapStoredPasswordTest extends ServerTestCase
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
 
-        $this->replacePassword(str_repeat('a', 513));
+        $this->replacePassword(str_repeat(
+            'a',
+            513,
+        ));
     }
 
     public function test_a_cleartext_password_at_the_length_limit_binds(): void
     {
+        $password = str_repeat(
+            'a',
+            512,
+        );
         $this->authenticateUser();
 
-        $this->replacePassword(str_repeat('a', 512));
+        $this->replacePassword($password);
 
-        $this->assertBindsAsUser(str_repeat('a', 512));
+        $this->assertBindsAsUser($password);
     }
 
     public function test_a_second_password_value_is_refused(): void

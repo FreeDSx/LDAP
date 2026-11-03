@@ -31,6 +31,8 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
+use function str_repeat;
+
 final class PasswordAuthenticatorTest extends TestCase
 {
     use ServerContainerTrait;
@@ -82,10 +84,16 @@ final class PasswordAuthenticatorTest extends TestCase
 
     public function test_a_password_over_the_length_limit_is_refused_as_invalid_credentials_even_when_it_matches(): void
     {
-        $password = str_repeat('a', 513);
+        $password = str_repeat(
+            'a',
+            513,
+        );
         $entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
-            new Attribute('userPassword', $password),
+            new Attribute(
+                'userPassword',
+                $password,
+            ),
         );
 
         self::expectException(OperationException::class);
@@ -491,18 +499,55 @@ final class PasswordAuthenticatorTest extends TestCase
         );
     }
 
+    public function test_a_password_over_the_length_limit_is_refused_at_the_cost_of_a_comparison(): void
+    {
+        $hashService = new PasswordHashService(
+            PasswordHashScheme::Bcrypt,
+            self::CHEAP_BCRYPT_COST,
+        );
+        $authenticator = $this->authenticatorFor(
+            new Entry(
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute(
+                    'userPassword',
+                    $hashService->hash('secret'),
+                ),
+            ),
+            $hashService,
+        );
+
+        $compared = self::timeRefusedBind($authenticator);
+        $overLength = self::timeRefusedBind(
+            $authenticator,
+            str_repeat(
+                'a',
+                513,
+            ),
+        );
+
+        self::assertGreaterThan(
+            $compared * self::MIN_COMPARISON_COST_RATIO,
+            $overLength,
+        );
+    }
+
     /**
      * Fastest of several attempts at refusing a bind that cannot succeed, in seconds.
      */
-    private static function timeRefusedBind(PasswordAuthenticator $authenticator): float
-    {
+    private static function timeRefusedBind(
+        PasswordAuthenticator $authenticator,
+        string $password = 'wrong',
+    ): float {
         $fastest = null;
 
         for ($sample = 0; $sample < self::TIMING_SAMPLES; $sample++) {
             $start = microtime(true);
 
             try {
-                $authenticator->authenticate('cn=Alice,dc=example,dc=com', 'wrong');
+                $authenticator->authenticate(
+                    'cn=Alice,dc=example,dc=com',
+                    $password,
+                );
             } catch (OperationException) {
             }
 
