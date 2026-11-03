@@ -109,20 +109,19 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     }
 
     /**
-     * The ceiling is built from the service's own scheme and cost; it never refuses a hash the service made.
+     * The ceiling is built from the service's own hashing; it never refuses a hash the service made.
      */
     private function makePasswordHashService(Container $container): PasswordHashService
     {
         $options = $container->get(ServerOptions::class);
         $config = $options->getPasswordConfig();
+        $hashing = $config->getHashing();
 
         return new PasswordHashService(
-            $config->getHashScheme(),
-            $config->getHashCost(),
+            $hashing,
             new HashCostCeiling(
                 $config->getHashLimits(),
-                $config->getHashScheme(),
-                $config->getHashCost(),
+                $hashing,
             ),
             new EventLogger(
                 $options->getLogger(),

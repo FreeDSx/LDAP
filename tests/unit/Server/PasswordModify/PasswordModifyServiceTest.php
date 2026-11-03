@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
@@ -34,11 +35,15 @@ use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 use function str_repeat;
 
 final class PasswordModifyServiceTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
 
     private ReadBackendInterface&MockObject $backend;
@@ -72,6 +77,8 @@ final class PasswordModifyServiceTest extends TestCase
         $this->userToken = BindToken::fromDn(
             self::USER_DN,
         );
+        $options = TestServerOptions::cheaplyHashed();
+        $options->getPasswordConfig()->setHashing(PasswordHashing::bcrypt(4));
 
         $this->subject = new PasswordModifyService(
             targetResolver: new PasswordModifyTargetResolver(
@@ -80,7 +87,10 @@ final class PasswordModifyServiceTest extends TestCase
             ),
             accessControl: $this->accessControl,
             writeDispatcher: $this->writeHandler,
-            hashService: new PasswordHashService(hashCost: 4),
+            hashService: $this->fromContainer(
+                PasswordHashService::class,
+                options: $options,
+            ),
             passwordPolicyContext: $this->context,
         );
     }
@@ -366,9 +376,7 @@ final class PasswordModifyServiceTest extends TestCase
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
-        $this->expectExceptionMessage(
-            'The new password holds a NUL byte, which the configured hash scheme cannot take.',
-        );
+        $this->expectExceptionMessage('The configured hash scheme cannot hash the new password in full.');
 
         $this->subject->change(
             new PasswordModifyRequest(
@@ -381,7 +389,34 @@ final class PasswordModifyServiceTest extends TestCase
         );
     }
 
-    public function test_a_new_password_at_the_length_limit_is_written(): void
+    public function test_a_new_password_over_72_bytes_is_refused_under_bcrypt_without_a_write(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn($this->userEntry);
+        $this->writeHandler
+            ->expects(self::never())
+            ->method('handle');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('The configured hash scheme cannot hash the new password in full.');
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                null,
+                '12345',
+                str_repeat(
+                    'a',
+                    73,
+                ),
+            ),
+            $this->userToken,
+            new ControlBag(),
+        );
+    }
+
+    public function test_a_new_password_of_72_bytes_is_written_under_bcrypt(): void
     {
         $this->backend
             ->method('get')
@@ -396,7 +431,7 @@ final class PasswordModifyServiceTest extends TestCase
                 '12345',
                 str_repeat(
                     'a',
-                    512,
+                    72,
                 ),
             ),
             $this->userToken,

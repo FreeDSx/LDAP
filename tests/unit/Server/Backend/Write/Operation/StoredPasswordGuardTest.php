@@ -28,11 +28,15 @@ use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\ManagerToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 use function str_repeat;
 
 final class StoredPasswordGuardTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
 
     private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
@@ -41,12 +45,18 @@ final class StoredPasswordGuardTest extends TestCase
 
     private const OVER_THE_LIMITS = '{CRYPT}$6$rounds=2000000$saltsaltsalt$hash';
 
+    private PasswordHashService $hashService;
+
     private StoredPasswordGuard $subject;
 
     protected function setUp(): void
     {
+        $this->hashService = $this->fromContainer(
+            PasswordHashService::class,
+            options: TestServerOptions::cheaplyHashed(),
+        );
         $this->subject = new StoredPasswordGuard(
-            new PasswordHashService(hashCost: 4),
+            $this->hashService,
             administrators: Subject::dn(self::ADMIN_DN),
         );
     }
@@ -119,7 +129,7 @@ final class StoredPasswordGuardTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         (new StoredPasswordGuard(
-            new PasswordHashService(hashCost: 4),
+            $this->hashService,
             allowPreHashed: true,
         ))->assertStorable(
             $this->userWith(self::PRE_HASHED),
@@ -303,7 +313,7 @@ final class StoredPasswordGuardTest extends TestCase
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
 
         (new StoredPasswordGuard(
-            new PasswordHashService(hashCost: 4),
+            $this->hashService,
             administrators: Subject::group('cn=admins,dc=foo,dc=bar'),
         ))->assertStorable(
             $this->userWith(self::PRE_HASHED),
@@ -317,7 +327,7 @@ final class StoredPasswordGuardTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         (new StoredPasswordGuard(
-            new PasswordHashService(hashCost: 4),
+            $this->hashService,
             maxValues: 2,
         ))->assertStorable(
             $this->userWith(

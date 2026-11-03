@@ -40,6 +40,8 @@ use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 /**
  * Covers the transport seam: decoding, response building, and error mapping. The use case itself is exercised by
@@ -47,6 +49,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class ServerPasswordModifyHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private ReadBackendInterface&MockObject $mockBackend;
 
     private WriteHandlerInterface&MockObject $mockWriteHandler;
@@ -78,7 +82,10 @@ final class ServerPasswordModifyHandlerTest extends TestCase
                 ),
                 accessControl: $this->createMock(AccessControlInterface::class),
                 writeDispatcher: $this->mockWriteHandler,
-                hashService: new PasswordHashService(hashCost: 4),
+                hashService: $this->fromContainer(
+                    PasswordHashService::class,
+                    options: TestServerOptions::cheaplyHashed(),
+                ),
             ),
         );
     }

@@ -241,7 +241,7 @@ final readonly class PasswordModifyService
         }
 
         throw new OperationException(
-            'The new password holds a NUL byte, which the configured hash scheme cannot take.',
+            'The configured hash scheme cannot hash the new password in full.',
             ResultCode::CONSTRAINT_VIOLATION,
         );
     }

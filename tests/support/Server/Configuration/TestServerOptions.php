@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
@@ -28,8 +29,6 @@ use FreeDSx\Ldap\ServerOptions;
  */
 final class TestServerOptions
 {
-    public const TEST_HASH_COST = 4;
-
     /**
      * What a test asserting on storage or filter semantics wants, rather than on schema enforcement.
      */
@@ -125,14 +124,25 @@ final class TestServerOptions
     }
 
     /**
-     * The lowest bcrypt cost, since hashing at the production factor dominates the runtime of a password test.
+     * Stock options hashing at the lowest work factor, for a password test that does not assert on hashing cost.
      */
     public static function cheaplyHashed(): ServerOptions
     {
         return new ServerOptions(
             self::transientStorage(),
             schemaConfig: self::unvalidatedCoreSchema(),
-            passwordConfig: (new PasswordConfig())->setHashCost(self::TEST_HASH_COST),
+            passwordConfig: (new PasswordConfig())->setHashing(self::cheapHashing()),
+        );
+    }
+
+    /**
+     * The least work argon2id accepts, since hashing at the production factor dominates the runtime of a password test.
+     */
+    public static function cheapHashing(): PasswordHashing
+    {
+        return PasswordHashing::argon2id(
+            memoryKiB: 8,
+            passes: 1,
         );
     }
 

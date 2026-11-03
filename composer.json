@@ -46,6 +46,7 @@
     "ext-pdo_sqlite": "For the SQLite storage backend.",
     "ext-pdo_mysql": "For the MySQL storage backend.",
     "ext-intl": "Unicode NFKC normalization (RFC 4518) for string matching.",
+    "ext-sodium": "For argon2id password hashing (the server default) on PHP builds without libargon2.",
     "symfony/polyfill-intl-normalizer": "Deterministic Unicode NFKC normalization (RFC 4518) for string matching when ext-intl is absent.",
     "symfony/polyfill-mbstring": "Unicode-aware case folding (RFC 4518) for string matching when ext-mbstring is absent."
   },

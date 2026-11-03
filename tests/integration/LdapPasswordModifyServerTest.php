@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
@@ -26,6 +27,7 @@ use Tests\Support\FreeDSx\Ldap\LdapBackendStorageCommand;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 use function str_repeat;
+use function substr;
 
 final class LdapPasswordModifyServerTest extends ServerTestCase
 {
@@ -149,8 +151,122 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $verifyClient->unbind();
     }
 
+    public function testANewPasswordHoldingANulByteBindsOnlyInFullUnderTheDefaultHashing(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+            null,
+            self::USER_PASSWORD,
+            "new\0password",
+        ));
+
+        $this->assertSame(
+            [
+                ResultCode::SUCCESS,
+                ResultCode::INVALID_CREDENTIALS,
+            ],
+            [
+                $this->bindResultCode("new\0password"),
+                $this->bindResultCode('new'),
+            ],
+        );
+    }
+
+    public function testANewPasswordAtTheLengthLimitBindsOnlyInFullUnderTheDefaultHashing(): void
+    {
+        $password = str_repeat(
+            'a',
+            512,
+        );
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+            null,
+            self::USER_PASSWORD,
+            $password,
+        ));
+
+        $this->assertSame(
+            [
+                ResultCode::SUCCESS,
+                ResultCode::INVALID_CREDENTIALS,
+            ],
+            [
+                $this->bindResultCode($password),
+                $this->bindResultCode(substr(
+                    $password,
+                    0,
+                    72,
+                )),
+            ],
+        );
+    }
+
+    public function testANewPasswordOver72BytesIsRefusedUnderBcrypt(): void
+    {
+        $this->restartHashingWithBcrypt();
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+                null,
+                self::USER_PASSWORD,
+                str_repeat(
+                    'a',
+                    73,
+                ),
+            ));
+            $this->fail('A new password over 72 bytes should have been refused under bcrypt.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $this->bindResultCode(self::USER_PASSWORD),
+        );
+    }
+
+    public function testANewPasswordOf72BytesBindsUnderBcrypt(): void
+    {
+        $password = str_repeat(
+            'a',
+            72,
+        );
+        $this->restartHashingWithBcrypt();
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+            null,
+            self::USER_PASSWORD,
+            $password,
+        ));
+
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $this->bindResultCode($password),
+        );
+    }
+
     public function testANewPasswordHoldingANulByteIsRefusedUnderBcrypt(): void
     {
+        $this->restartHashingWithBcrypt();
         $this->ldapClient()->bind(
             self::USER_DN,
             self::USER_PASSWORD,
@@ -408,8 +524,38 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
 
         $this->assertNotNull($entry);
         $this->assertStringStartsWith(
-            '{BCRYPT}',
+            '{ARGON2}$argon2id$v=19$m=7168,t=5,p=1$',
             (string) $entry->get('userPassword')?->firstValue(),
         );
+    }
+
+    private function restartHashingWithBcrypt(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--storage=sqlite',
+                '--manager',
+                '--hash-scheme=bcrypt',
+            ],
+        );
+    }
+
+    private function bindResultCode(string $password): int
+    {
+        $client = $this->buildClient('tcp');
+
+        try {
+            $client->bind(
+                self::USER_DN,
+                $password,
+            );
+        } catch (BindException $e) {
+            return $e->getCode();
+        } finally {
+            $client->unbind();
+        }
+
+        return ResultCode::SUCCESS;
     }
 }

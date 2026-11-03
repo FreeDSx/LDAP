@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Auth;
 
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use SensitiveParameter;
 
@@ -71,9 +72,8 @@ readonly class HashCostCeiling
     private const CRYPT_ALPHABET = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
     public function __construct(
-        private PasswordHashLimits $limits = new PasswordHashLimits(),
-        private PasswordHashScheme $scheme = PasswordHashScheme::Bcrypt,
-        private ?int $hashCost = null,
+        private PasswordHashLimits $limits,
+        private PasswordHashing $hashing,
     ) {}
 
     /**
@@ -176,49 +176,49 @@ readonly class HashCostCeiling
 
     private function bcryptCost(): int
     {
-        if ($this->scheme !== PasswordHashScheme::Bcrypt) {
+        if ($this->hashing->getScheme() !== PasswordHashScheme::Bcrypt) {
             return $this->limits->getBcryptCost();
         }
 
         return max(
             $this->limits->getBcryptCost(),
-            $this->hashCost ?? PASSWORD_BCRYPT_DEFAULT_COST,
+            $this->hashing->getBcryptCost(),
         );
     }
 
     private function argon2Memory(): int
     {
-        if ($this->scheme !== PasswordHashScheme::Argon2) {
+        if ($this->hashing->getScheme() !== PasswordHashScheme::Argon2) {
             return $this->limits->getArgon2Memory();
         }
 
         return max(
             $this->limits->getArgon2Memory(),
-            PASSWORD_ARGON2_DEFAULT_MEMORY_COST,
+            $this->hashing->getArgon2Memory(),
         );
     }
 
     private function argon2MemoryPasses(): int
     {
-        if ($this->scheme !== PasswordHashScheme::Argon2) {
+        if ($this->hashing->getScheme() !== PasswordHashScheme::Argon2) {
             return $this->limits->getArgon2MemoryPasses();
         }
 
         return max(
             $this->limits->getArgon2MemoryPasses(),
-            PASSWORD_ARGON2_DEFAULT_MEMORY_COST * PASSWORD_ARGON2_DEFAULT_TIME_COST,
+            $this->hashing->getArgon2Memory() * $this->hashing->getArgon2Passes(),
         );
     }
 
     private function argon2Threads(): int
     {
-        if ($this->scheme !== PasswordHashScheme::Argon2) {
+        if ($this->hashing->getScheme() !== PasswordHashScheme::Argon2) {
             return $this->limits->getArgon2Threads();
         }
 
         return max(
             $this->limits->getArgon2Threads(),
-            PASSWORD_ARGON2_DEFAULT_THREADS,
+            $this->hashing->getArgon2Threads(),
         );
     }
 

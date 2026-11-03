@@ -24,6 +24,8 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 use function microtime;
 use function min;
@@ -31,6 +33,8 @@ use function str_repeat;
 
 final class HistoryConstraintTest extends TestCase
 {
+    use ServerContainerTrait;
+
     /**
      * Timings are taken as a best-of, since scheduling noise can only ever add to a measurement.
      */
@@ -45,7 +49,10 @@ final class HistoryConstraintTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new HistoryConstraint(new PasswordHashService(hashCost: 4));
+        $this->subject = new HistoryConstraint($this->fromContainer(
+            PasswordHashService::class,
+            options: TestServerOptions::cheaplyHashed(),
+        ));
     }
 
     public function test_zero_depth_skips(): void

@@ -21,8 +21,9 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -124,6 +125,28 @@ final class PasswordHashLimitsTest extends TestCase
         $container->get(ServerProtocolFactoryInterface::class);
     }
 
+    public function test_the_server_verifies_its_own_hashes_when_its_hashing_asks_for_more_than_the_limits(): void
+    {
+        $hashService = $this->fromContainer(
+            PasswordHashService::class,
+            options: TestServerOptions::defaults()->setPasswordConfig(new PasswordConfig(
+                new PasswordHashLimits(
+                    argon2Memory: 8,
+                    argon2MemoryPasses: 8,
+                ),
+                hashing: PasswordHashing::argon2id(
+                    memoryKiB: 16,
+                    passes: 1,
+                ),
+            )),
+        );
+
+        self::assertTrue($hashService->verify(
+            self::PASSWORD,
+            $hashService->hash(self::PASSWORD),
+        ));
+    }
+
     /**
      * The user holds a cost 5 bcrypt hash, and the server hashes with SSHA so its own cost raises no bcrypt limit.
      */
@@ -169,7 +192,7 @@ final class PasswordHashLimitsTest extends TestCase
             ->setPasswordConfig(
                 (new PasswordConfig())
                     ->setHashLimits($limits)
-                    ->setHashScheme(PasswordHashScheme::Ssha),
+                    ->setHashing(PasswordHashing::ssha()),
             );
     }
 }

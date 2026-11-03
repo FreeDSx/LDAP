@@ -123,6 +123,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\ReplayWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -160,6 +161,9 @@ use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use Psr\Log\NullLogger;
+
+use function constant;
+use function defined;
 
 /**
  * Registers the local-directory services.
@@ -642,9 +646,31 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeServerProtocolFactory(Container $container): ServerProtocolFactory
     {
+        $this->refuseUnusablePasswordHashing($container);
         $this->refuseUnverifiableManagerPassword($container);
 
         return new ServerProtocolFactory($container->get(ConnectionHandlerBuilderInterface::class));
+    }
+
+    private function refuseUnusablePasswordHashing(Container $container): void
+    {
+        $hashing = $container->get(ServerOptions::class)
+            ->getPasswordConfig()
+            ->getHashing();
+
+        if ($hashing->getScheme() !== PasswordHashScheme::Argon2) {
+            return;
+        }
+        if (!defined('PASSWORD_ARGON2ID')) {
+            throw new RuntimeException(
+                'This PHP build cannot hash argon2id; add ext-sodium or libargon2, or configure bcrypt hashing.',
+            );
+        }
+        if (constant('PASSWORD_ARGON2_PROVIDER') !== 'sodium' || $hashing->getArgon2Threads() === 1) {
+            return;
+        }
+
+        throw new RuntimeException('This PHP build hashes argon2id with libsodium, which supports one thread only.');
     }
 
     /**

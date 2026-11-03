@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Config;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
@@ -31,9 +30,7 @@ final class PasswordConfig
 
     private ?Dn $defaultPolicyDn = null;
 
-    private PasswordHashScheme $hashScheme = PasswordHashScheme::Bcrypt;
-
-    private ?int $hashCost = null;
+    private PasswordHashing $hashing;
 
     private ?PasswordQualityCheckerInterface $qualityChecker = null;
 
@@ -46,8 +43,10 @@ final class PasswordConfig
         private PasswordHashLimits $hashLimits = new PasswordHashLimits(),
         private bool $allowPreHashedPasswords = false,
         private int $maxPasswordValues = 1,
+        ?PasswordHashing $hashing = null,
     ) {
         self::assertMaxPasswordValues($maxPasswordValues);
+        $this->hashing = $hashing ?? PasswordHashing::argon2id();
     }
 
     /**
@@ -81,34 +80,16 @@ final class PasswordConfig
     }
 
     /**
-     * Output scheme used by the password hasher when writing a new password.
+     * The scheme and work factor a new password is hashed with.
      */
-    public function getHashScheme(): PasswordHashScheme
+    public function getHashing(): PasswordHashing
     {
-        return $this->hashScheme;
+        return $this->hashing;
     }
 
-    public function setHashScheme(PasswordHashScheme $scheme): self
+    public function setHashing(PasswordHashing $hashing): self
     {
-        $this->hashScheme = $scheme;
-
-        return $this;
-    }
-
-    /**
-     * Work factor the hasher applies, or null for the default of the scheme in use.
-     */
-    public function getHashCost(): ?int
-    {
-        return $this->hashCost;
-    }
-
-    /**
-     * Worth raising as hardware gets faster, since a cost chosen at install time weakens as it ages.
-     */
-    public function setHashCost(?int $cost): self
-    {
-        $this->hashCost = $cost;
+        $this->hashing = $hashing;
 
         return $this;
     }
