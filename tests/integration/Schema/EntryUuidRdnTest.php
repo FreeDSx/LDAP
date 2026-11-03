@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 
@@ -32,6 +33,8 @@ use function unlink;
 
 final class EntryUuidRdnTest extends TestCase
 {
+    use RequiresOperatingSystemTrait;
+
     private const NAMED_DN = 'cn=named,dc=foo,dc=bar';
 
     private string $path;
@@ -44,6 +47,8 @@ final class EntryUuidRdnTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->requireUnix('Windows cannot delete the SQLite files the in-process server still holds open.');
+
         $this->path = TestWorker::path('entry-uuid-rdn.sqlite');
         $this->removeDatabase();
 
@@ -145,6 +150,11 @@ final class EntryUuidRdnTest extends TestCase
 
     private function removeDatabase(): void
     {
+        // Teardown still runs when setUp skipped before naming a database.
+        if (!isset($this->path)) {
+            return;
+        }
+
         foreach (['', '-wal', '-shm'] as $suffix) {
             if (file_exists($this->path . $suffix)) {
                 unlink($this->path . $suffix);
