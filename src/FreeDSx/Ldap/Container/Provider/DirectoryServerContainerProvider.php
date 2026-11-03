@@ -648,7 +648,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * Refuses a manager password under a scheme with no verification, which would leave the account unusable.
+     * Refuses a manager password that no bind could ever verify.
      */
     private function refuseUnverifiableManagerPassword(Container $container): void
     {

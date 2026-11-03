@@ -286,18 +286,27 @@ final class HashCostCeilingTest extends TestCase
 
     public function test_a_password_at_the_default_length_limit_is_admitted(): void
     {
-        self::assertTrue($this->subject->admitsPassword(str_repeat('a', 512)));
+        self::assertTrue($this->subject->admitsPassword(str_repeat(
+            'a',
+            512,
+        )));
     }
 
     public function test_a_password_over_the_default_length_limit_is_refused(): void
     {
-        self::assertFalse($this->subject->admitsPassword(str_repeat('a', 513)));
+        self::assertFalse($this->subject->admitsPassword(str_repeat(
+            'a',
+            513,
+        )));
     }
 
     public function test_a_password_over_a_lowered_length_limit_is_refused(): void
     {
         $subject = new HashCostCeiling(new PasswordHashLimits(maxPasswordLength: 64));
 
-        self::assertFalse($subject->admitsPassword(str_repeat('a', 65)));
+        self::assertFalse($subject->admitsPassword(str_repeat(
+            'a',
+            65,
+        )));
     }
 }

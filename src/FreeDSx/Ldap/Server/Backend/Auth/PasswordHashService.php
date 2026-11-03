@@ -155,15 +155,17 @@ readonly class PasswordHashService
     }
 
     /**
-     * Refuses a stored value under a scheme with no verification, or one asking for more work than the limits allow.
+     * Refuses a stored value a bind could never verify, by its scheme, its hash's work or its cleartext length.
      *
-     * @throws InvalidArgumentException naming the scheme
+     * @throws InvalidArgumentException
      */
     public function assertVerifiable(string $stored): void
     {
         $scheme = $this->schemeOf($stored);
 
         if ($scheme === null) {
+            $this->assertCleartextVerifiable($stored);
+
             return;
         }
         if ($this->verifierFor($scheme) === null) {
@@ -231,6 +233,20 @@ readonly class PasswordHashService
     ): void {
         // Bcrypt refuses a NUL byte.
         $this->hash(self::withoutNul($plain));
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    private function assertCleartextVerifiable(
+        #[SensitiveParameter]
+        string $stored,
+    ): void {
+        if ($this->isWithinMaxLength($stored)) {
+            return;
+        }
+
+        throw new InvalidArgumentException('A cleartext password is longer than the configured hash limits allow.');
     }
 
     /**

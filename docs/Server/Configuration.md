@@ -627,9 +627,10 @@ Password Modify requests.
 ------------------
 #### PasswordConfig:setHashLimits
 
-The most work a stored password hash may ask for. A hash over a limit is refused on write and never verifies; a bind
-that meets one logs `ldap.password.hash_over_limits`. The limits never fall below the configured hash scheme and cost;
-lowering either stops stronger stored hashes from verifying.
+The most work a stored password hash may ask for. A hash over a limit is refused on write and never verifies. Any
+password check that meets one logs `ldap.password.hash_over_limits`: a bind, an old password check, or the password
+history check. The limits never fall below the configured hash scheme and cost; lowering either stops stronger stored
+hashes from verifying.
 
 `maxPasswordLength` caps the bytes of a password the server verifies, since some schemes cost more the longer it is. A
 longer password fails to bind, and a cleartext `userPassword` or Password Modify new password over it is refused with

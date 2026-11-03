@@ -22,6 +22,12 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use PHPUnit\Framework\Attributes\DataProvider;
 
+use function base64_encode;
+use function crypt;
+use function password_hash;
+use function sha1;
+use function str_repeat;
+
 /**
  * Authentication against the backend.
  */
@@ -121,7 +127,6 @@ trait BindTestsTrait
             ),
         );
 
-        // The connection survives the refusal, as it does for an entry that exists.
         $this->authenticateUser();
     }
 
@@ -179,7 +184,10 @@ trait BindTestsTrait
 
     public function testAPasswordOverTheLengthLimitNeverAuthenticates(): void
     {
-        $password = str_repeat('a', 513);
+        $password = str_repeat(
+            'a',
+            513,
+        );
         $dn = $this->createUserWithPassword(
             'long-password-user',
             '{SHA}' . base64_encode(sha1(

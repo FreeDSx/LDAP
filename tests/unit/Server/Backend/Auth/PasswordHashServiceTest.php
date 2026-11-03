@@ -27,6 +27,10 @@ use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+use function crypt;
+use function password_hash;
+use function str_repeat;
+
 final class PasswordHashServiceTest extends TestCase
 {
     private PasswordHashService $subject;
@@ -536,7 +540,10 @@ final class PasswordHashServiceTest extends TestCase
 
     public function test_a_password_at_the_length_limit_verifies(): void
     {
-        $password = str_repeat('a', 512);
+        $password = str_repeat(
+            'a',
+            512,
+        );
 
         self::assertTrue($this->subject->verify(
             $password,
@@ -546,7 +553,10 @@ final class PasswordHashServiceTest extends TestCase
 
     public function test_a_password_over_the_length_limit_does_not_verify_even_against_itself(): void
     {
-        $password = str_repeat('a', 513);
+        $password = str_repeat(
+            'a',
+            513,
+        );
 
         self::assertFalse($this->subject->verify(
             $password,
@@ -556,7 +566,31 @@ final class PasswordHashServiceTest extends TestCase
 
     public function test_a_password_over_the_length_limit_is_not_within_it(): void
     {
-        self::assertFalse($this->subject->isWithinMaxLength(str_repeat('a', 513)));
+        self::assertFalse($this->subject->isWithinMaxLength(str_repeat(
+            'a',
+            513,
+        )));
+    }
+
+    public function test_a_cleartext_value_over_the_length_limit_is_refused_as_unverifiable(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('A cleartext password is longer than the configured hash limits allow.');
+
+        $this->subject->assertVerifiable(str_repeat(
+            'a',
+            513,
+        ));
+    }
+
+    public function test_a_cleartext_value_at_the_length_limit_is_verifiable(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertVerifiable(str_repeat(
+            'a',
+            512,
+        ));
     }
 
     public function test_a_password_holding_a_nul_byte_does_not_verify_against_a_hash_over_the_limits(): void
@@ -570,7 +604,10 @@ final class PasswordHashServiceTest extends TestCase
     public function test_a_password_holding_a_nul_byte_over_the_length_limit_does_not_verify(): void
     {
         self::assertFalse($this->subject->verify(
-            "\0" . str_repeat('a', 512),
+            "\0" . str_repeat(
+                'a',
+                512,
+            ),
             '{BCRYPT}' . password_hash(
                 'mypassword',
                 PASSWORD_BCRYPT,

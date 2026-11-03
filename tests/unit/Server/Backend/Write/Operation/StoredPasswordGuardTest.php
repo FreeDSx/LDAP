@@ -29,6 +29,8 @@ use FreeDSx\Ldap\Server\Token\ManagerToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\TestCase;
 
+use function str_repeat;
+
 final class StoredPasswordGuardTest extends TestCase
 {
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
@@ -160,7 +162,10 @@ final class StoredPasswordGuardTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         $this->subject->assertStorable(
-            $this->userWith(str_repeat('a', 512)),
+            $this->userWith(str_repeat(
+                'a',
+                512,
+            )),
             [],
             $this->contextFor(self::USER_DN),
         );
@@ -175,7 +180,10 @@ final class StoredPasswordGuardTest extends TestCase
         );
 
         $this->subject->assertStorable(
-            $this->userWith(str_repeat('a', 513)),
+            $this->userWith(str_repeat(
+                'a',
+                513,
+            )),
             [],
             WriteContext::system(
                 $this->tokenFor(self::ADMIN_DN),
@@ -187,7 +195,10 @@ final class StoredPasswordGuardTest extends TestCase
     public function test_a_cleartext_password_over_the_length_limit_the_entry_already_held_is_kept(): void
     {
         $this->expectNotToPerformAssertions();
-        $held = str_repeat('a', 513);
+        $held = str_repeat(
+            'a',
+            513,
+        );
 
         $this->subject->assertStorable(
             $this->userWith($held),
@@ -201,7 +212,10 @@ final class StoredPasswordGuardTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         $this->subject->assertStorable(
-            $this->userWith('{SSHA}' . str_repeat('a', 600)),
+            $this->userWith('{SSHA}' . str_repeat(
+                'a',
+                600,
+            )),
             [],
             $this->contextFor(self::ADMIN_DN),
         );

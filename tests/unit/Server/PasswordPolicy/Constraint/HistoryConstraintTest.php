@@ -25,8 +25,22 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use PHPUnit\Framework\TestCase;
 
+use function microtime;
+use function min;
+use function str_repeat;
+
 final class HistoryConstraintTest extends TestCase
 {
+    /**
+     * Timings are taken as a best-of, since scheduling noise can only ever add to a measurement.
+     */
+    private const TIMING_SAMPLES = 5;
+
+    /**
+     * A skipped comparison lands near zero rather than near parity, which leaves scheduling noise far below the bar.
+     */
+    private const MAX_SKIPPED_COST_RATIO = 0.1;
+
     private HistoryConstraint $subject;
 
     protected function setUp(): void
@@ -113,6 +127,56 @@ final class HistoryConstraintTest extends TestCase
 
         self::assertNotNull($outcome);
         self::assertTrue($outcome->denied);
+    }
+
+    public function test_a_new_password_over_the_length_limit_is_checked_without_hashing(): void
+    {
+        $history = [
+            'old1',
+            'old2',
+            'old3',
+        ];
+
+        $compared = $this->timeCheck($this->attempt(
+            inHistory: 5,
+            historyPlaintexts: $history,
+            newPassword: 'completely-different',
+        ));
+        $overLength = $this->timeCheck($this->attempt(
+            inHistory: 5,
+            historyPlaintexts: $history,
+            newPassword: str_repeat(
+                'a',
+                513,
+            ),
+        ));
+
+        self::assertLessThan(
+            $compared * self::MAX_SKIPPED_COST_RATIO,
+            $overLength,
+        );
+    }
+
+    /**
+     * Fastest of several checks of one attempt, in seconds.
+     */
+    private function timeCheck(PasswordChangeAttempt $attempt): float
+    {
+        $fastest = null;
+
+        for ($sample = 0; $sample < self::TIMING_SAMPLES; $sample++) {
+            $start = microtime(true);
+            $this->subject->check($attempt);
+            $elapsed = microtime(true) - $start;
+            $fastest = $fastest === null
+                ? $elapsed
+                : min(
+                    $fastest,
+                    $elapsed,
+                );
+        }
+
+        return (float) $fastest;
     }
 
     /**

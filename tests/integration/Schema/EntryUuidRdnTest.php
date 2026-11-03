@@ -107,7 +107,7 @@ final class EntryUuidRdnTest extends TestCase
     }
 
     /**
-     * No write can name an entry by its entryUUID any more, so the row is renamed directly to set the state up.
+     * Names the entry by its entryUUID in storage directly, a state no write can reach any more.
      */
     private function nameByItsEntryUuid(): string
     {
