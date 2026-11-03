@@ -35,6 +35,7 @@ LDAP Server Configuration
 * [Authentication](#authentication)
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
+    * [PasswordConfig:setHashScheme](#passwordconfigsethashscheme)
     * [PasswordConfig:setHashLimits](#passwordconfigsethashlimits)
     * [PasswordConfig:setAllowPreHashedPasswords](#passwordconfigsetallowprehashedpasswords)
     * [PasswordConfig:setMaxPasswordValues](#passwordconfigsetmaxpasswordvalues)
@@ -623,6 +624,24 @@ operations is your responsibility and this option has no effect on bind authenti
 Password Modify requests.
 
 **Default**: `null` (`DnBindNameResolver` is tried first; falls back to `AttributeSearchBindNameResolver`)
+
+------------------
+#### PasswordConfig:setHashScheme
+
+The scheme Password Modify hashes a new password with. Values already stored keep verifying under their own scheme.
+`{CRYPT}` and `{BCRYPT}` never match a password holding a NUL byte, and while bcrypt is the configured scheme, Password
+Modify refuses a new password holding one with `constraintViolation`.
+
+```php
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
+
+$options->setPasswordConfig(
+    (new PasswordConfig())->setHashScheme(PasswordHashScheme::Argon2),
+);
+```
+
+**Default**: `PasswordHashScheme::Bcrypt`
 
 ------------------
 #### PasswordConfig:setHashLimits
