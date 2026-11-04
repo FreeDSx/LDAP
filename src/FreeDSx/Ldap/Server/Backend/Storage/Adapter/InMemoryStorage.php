@@ -362,7 +362,7 @@ final class InMemoryStorage implements
         return array_values(array_filter(
             $values,
             static fn(string $value): bool => in_array(
-                Dn::normalizedOrNull($value),
+                Dn::normalized($value),
                 $held,
                 true,
             ),
@@ -432,10 +432,10 @@ final class InMemoryStorage implements
                 ?->get($attribute, true)
                 ?->getValues() ?? [];
 
-        return array_values(array_filter(array_map(
-            static fn(string $value): ?string => Dn::normalizedOrNull($value),
+        return array_values(array_map(
+            Dn::normalized(...),
             $values,
-        )));
+        ));
     }
 
     /**
@@ -451,12 +451,12 @@ final class InMemoryStorage implements
         $gone = [];
 
         foreach ($removed as $value) {
-            $gone[Dn::normalizedOrNull($value) ?? $value] = true;
+            $gone[Dn::normalized($value)] = true;
         }
 
         return array_values(array_filter(
             $held,
-            static fn(string $value): bool => !isset($gone[Dn::normalizedOrNull($value) ?? $value]),
+            static fn(string $value): bool => !isset($gone[Dn::normalized($value)]),
         ));
     }
 

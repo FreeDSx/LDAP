@@ -71,11 +71,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         $asked = [];
 
         foreach ($values as $value) {
-            $normalized = Dn::normalizedOrNull($value);
-
-            if ($normalized !== null) {
-                $asked[$normalized] = $value;
-            }
+            $asked[Dn::normalized($value)] = $value;
         }
 
         if ($asked === []) {

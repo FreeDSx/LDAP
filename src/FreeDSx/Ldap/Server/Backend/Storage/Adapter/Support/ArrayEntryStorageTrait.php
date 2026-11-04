@@ -233,11 +233,7 @@ trait ArrayEntryStorageTrait
 
         foreach ($entries as $entry) {
             foreach ($entry->get($linked, true)?->getValues() ?? [] as $value) {
-                $target = Dn::normalizedOrNull($value);
-
-                if ($target !== null) {
-                    $owners[$target][] = $entry->getDn()->toString();
-                }
+                $owners[Dn::normalized($value)][] = $entry->getDn()->toString();
             }
         }
 

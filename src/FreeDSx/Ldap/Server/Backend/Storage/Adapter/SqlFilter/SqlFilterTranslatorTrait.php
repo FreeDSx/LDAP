@@ -208,16 +208,6 @@ trait SqlFilterTranslatorTrait
         string $value,
         LinkDirection $direction = LinkDirection::Forward,
     ): SqlFilterResult {
-        $target = Dn::normalizedOrNull($value);
-
-        // An assertion that is not a DN names no entry, and no stored value can match it.
-        if ($target === null) {
-            return new SqlFilterResult(
-                '1 = 0',
-                [],
-                isExact: false,
-            );
-        }
         $alias = $direction === LinkDirection::Forward
             ? 't'
             : 'o';
@@ -225,7 +215,7 @@ trait SqlFilterTranslatorTrait
         return $this->linkedResult(
             $attribute,
             "$alias.lc_dn = ?",
-            [$target],
+            [Dn::normalized($value)],
             $direction,
         );
     }

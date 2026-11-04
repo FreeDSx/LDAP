@@ -259,6 +259,22 @@ class DnTest extends TestCase
         );
     }
 
+    public function test_normalized_is_the_canonical_form_of_a_dn_string(): void
+    {
+        self::assertSame(
+            (new Dn('CN=Alice, DC=Example,DC=Com'))->normalizedString(),
+            Dn::normalized('CN=Alice, DC=Example,DC=Com'),
+        );
+    }
+
+    public function test_normalized_lowercases_a_string_that_is_not_a_dn(): void
+    {
+        self::assertSame(
+            'not a dn',
+            Dn::normalized('Not A DN'),
+        );
+    }
+
     public function test_a_stored_dn_keeps_its_spelling_and_takes_the_stored_canonical_form(): void
     {
         $dn = Dn::fromStored(
