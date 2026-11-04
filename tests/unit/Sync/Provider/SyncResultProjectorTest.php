@@ -22,7 +22,9 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -35,9 +37,12 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class SyncResultProjectorTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     private AccessControlInterface&MockObject $accessControl;
@@ -49,6 +54,8 @@ final class SyncResultProjectorTest extends TestCase
     private bool $hidden = false;
 
     private bool $filterMatches = true;
+
+    private ?Entry $evaluated = null;
 
     private SyncResultProjector $subject;
 
@@ -63,13 +70,18 @@ final class SyncResultProjectorTest extends TestCase
             ->willReturnCallback(fn(TokenInterface $token, Entry $entry): bool => !$this->hidden);
         $this->filterEvaluator
             ->method('evaluate')
-            ->willReturnCallback(fn(): bool => $this->filterMatches);
+            ->willReturnCallback(function (Entry $entry): bool {
+                $this->evaluated = $entry;
+
+                return $this->filterMatches;
+            });
 
         $schema = SchemaResource::Core->load();
         $this->subject = new SyncResultProjector(
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
             schema: $schema,
+            linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
             linked: new LinkedAttributes($schema),
         );
     }
@@ -172,6 +184,37 @@ final class SyncResultProjectorTest extends TestCase
         self::assertSame(
             SyncStateControl::STATE_DELETE,
             $result->control->getState(),
+        );
+    }
+
+    public function test_a_fetched_entry_is_judged_with_the_back_links_the_filter_names(): void
+    {
+        $this->fromContainer(InMemoryStorage::class)->store(Entry::create(
+            'cn=staff,dc=example,dc=com',
+            [
+                'objectClass' => 'groupOfNames',
+                'cn' => 'staff',
+                'member' => 'cn=a,dc=example,dc=com',
+                'entryUUID' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            ],
+        ));
+
+        $this->subject->projectFetched(
+            $this->entry(
+                'cn=a,dc=example,dc=com',
+                self::UUID,
+            ),
+            $this->change(ChangeType::Modify),
+            (new SearchRequest(Filters::equal(
+                'memberOf',
+                'cn=staff,dc=example,dc=com',
+            )))->base('dc=example,dc=com'),
+            $this->token,
+        );
+
+        self::assertSame(
+            ['cn=staff,dc=example,dc=com'],
+            $this->evaluated?->get('memberOf')?->getValues(),
         );
     }
 
@@ -302,6 +345,7 @@ final class SyncResultProjectorTest extends TestCase
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
             schema: SchemaResource::Core->load(),
+            linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
             eventLogger: new EventLogger($logger, EventLogPolicy::default()),
         );
 

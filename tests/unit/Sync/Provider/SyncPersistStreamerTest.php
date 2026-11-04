@@ -41,6 +41,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\JournalLapsedException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
@@ -57,9 +58,12 @@ use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class SyncPersistStreamerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const ORIGIN = 'test-origin';
 
     private const ENTRY_DN = 'cn=new,dc=example,dc=com';
@@ -144,6 +148,7 @@ final class SyncPersistStreamerTest extends TestCase
                 accessControl: $accessControl,
                 filterEvaluator: $filterEvaluator,
                 schema: SchemaResource::Core->load(),
+                linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
             ),
             stream: new ChangeStream(
                 $this->journal,
@@ -358,6 +363,7 @@ final class SyncPersistStreamerTest extends TestCase
                 accessControl: $this->createMock(AccessControlInterface::class),
                 filterEvaluator: $this->createMock(FilterEvaluatorInterface::class),
                 schema: SchemaResource::Core->load(),
+                linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
             ),
             stream: new ChangeStream($journal),
             sleeper: new CallbackSleeper(),
