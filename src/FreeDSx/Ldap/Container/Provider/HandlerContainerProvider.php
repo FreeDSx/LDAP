@@ -190,6 +190,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             accessControl: $container->get(AccessControlInterface::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             schema: $options->getSchema(),
+            linkedLeaves: $container->get(LinkedLeafWitness::class),
             eventLogger: $context->eventLogger,
             linked: $container->get(LinkedAttributes::class),
         );

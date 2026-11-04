@@ -44,6 +44,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
@@ -61,9 +62,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ServerSyncHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const ORIGIN = 'test-origin';
 
     private const UUID_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -179,6 +183,7 @@ final class ServerSyncHandlerTest extends TestCase
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
             schema: SchemaResource::Core->load(),
+            linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
         );
         $this->persistStreamer = new SyncPersistStreamer(
             entries: $this->entries,
@@ -679,6 +684,7 @@ final class ServerSyncHandlerTest extends TestCase
                 accessControl: $this->accessControl,
                 filterEvaluator: $this->filterEvaluator,
                 schema: SchemaResource::Core->load(),
+                linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
             ),
         );
 

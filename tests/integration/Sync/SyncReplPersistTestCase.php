@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Sync;
 use Closure;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\LdapClient;
@@ -24,6 +25,7 @@ use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
@@ -308,6 +310,72 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         );
     }
 
+    public function testPersistDeliversAModifyForAnEntryThatStillMatchesAMemberOfFilter(): void
+    {
+        $member = 'cn=persist-member,dc=foo,dc=bar';
+        $group = 'cn=persist-group,dc=foo,dc=bar';
+        $result = null;
+        $wrote = false;
+
+        $this->onAnotherConnection(static function (LdapClient $w) use ($member, $group): void {
+            $w->create(Entry::fromArray(
+                $member,
+                [
+                    'cn' => 'persist-member',
+                    'sn' => 'Member',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $w->create(Entry::fromArray(
+                $group,
+                [
+                    'cn' => 'persist-group',
+                    'member' => $member,
+                    'objectClass' => 'groupOfNames',
+                ],
+            ));
+        });
+
+        $syncRepl = $this->boundSync(Filters::equal(
+            'memberOf',
+            $group,
+        ));
+
+        $syncRepl->listen(function (SyncEntryResult $entry, Session $session) use (&$result, &$wrote, $member): void {
+            if (!$session->isRefreshComplete()) {
+                if (!$wrote) {
+                    $wrote = true;
+                    $this->onAnotherConnection(fn(LdapClient $w) => $w->sendAndReceive(Operations::modify(
+                        $member,
+                        Change::replace(
+                            'description',
+                            'changed',
+                        ),
+                    )));
+                }
+
+                return;
+            }
+
+            $result = $entry;
+
+            throw new CancelRequestException();
+        });
+
+        self::assertInstanceOf(
+            SyncEntryResult::class,
+            $result,
+        );
+        self::assertTrue(
+            $result->isModify(),
+            'A change that leaves the entry in the group is delivered as a modify, not a delete.',
+        );
+        self::assertSame(
+            $member,
+            strtolower($result->getEntry()->getDn()->toString()),
+        );
+    }
+
     /**
      * RFC 4533 §3.4.2 asks for multiple delete entries to be coalesced into a syncIdSet.
      */
@@ -470,12 +538,12 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         }
     }
 
-    private function boundSync(): SyncRepl
+    private function boundSync(?FilterInterface $filter = null): SyncRepl
     {
         $client = $this->listenClient();
         $client->bind('cn=user,dc=foo,dc=bar', '12345');
 
-        $syncRepl = $client->syncRepl();
+        $syncRepl = $client->syncRepl($filter);
         $syncRepl->request()
             ->base('dc=foo,dc=bar')
             ->useSubtreeScope();

@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -58,6 +59,7 @@ final readonly class SyncResultProjector
         private AccessControlInterface $accessControl,
         private FilterEvaluatorInterface $filterEvaluator,
         private Schema $schema,
+        private LinkedLeafWitness $linkedLeaves,
         private EventLogger $eventLogger = new EventLogger(null),
         private LinkedAttributes $linked = new LinkedAttributes(new Schema()),
     ) {
@@ -100,8 +102,15 @@ final readonly class SyncResultProjector
             );
         }
 
+        $filter = $request->getFilter();
+        // A fetched entry carries no back-links, and the witness adds the ones the filter names.
+        $judged = $this->linkedLeaves->witness(
+            $entry,
+            $filter,
+        );
+
         // Still visible, so announcing leaks nothing and no pre-image is needed.
-        if (!$this->filterEvaluator->evaluate($entry, $request->getFilter())) {
+        if (!$this->filterEvaluator->evaluate($judged, $filter)) {
             return $this->deleteResult(
                 $change->dn,
                 $change->entryUuid,
