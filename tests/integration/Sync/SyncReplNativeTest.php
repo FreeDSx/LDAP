@@ -16,8 +16,10 @@ namespace Tests\Integration\FreeDSx\Ldap\Sync;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -251,6 +253,42 @@ final class SyncReplNativeTest extends ServerTestCase
         );
     }
 
+    public function testAnIncrementalPollReturnsTheBacklinksItSelectsOnAChangedEntry(): void
+    {
+        $member = $this->seedGroupMember('incr-selected');
+
+        $entries = $this->pollAfterAChangeTo(
+            $member,
+            'cn',
+            'memberOf',
+        );
+
+        self::assertSame(
+            [$member],
+            array_keys($entries),
+        );
+        self::assertSame(
+            ['cn=incr-selected-group,dc=foo,dc=bar'],
+            ($entries[$member] ?? null)?->get('memberOf')?->getValues(),
+        );
+    }
+
+    public function testAnIncrementalPollLeavesOutTheBacklinksItDoesNotSelect(): void
+    {
+        $member = $this->seedGroupMember('incr-unselected');
+
+        $entries = $this->pollAfterAChangeTo(
+            $member,
+            'cn',
+        );
+
+        self::assertSame(
+            [$member],
+            array_keys($entries),
+        );
+        self::assertNull(($entries[$member] ?? null)?->get('memberOf'));
+    }
+
     public function testASyncWithAMalformedBaseDnIsRefused(): void
     {
         $this->authenticateUser();
@@ -292,6 +330,72 @@ final class SyncReplNativeTest extends ServerTestCase
         });
 
         return $dns;
+    }
+
+    /**
+     * A new entry and a group naming it, returning the entry's DN.
+     */
+    private function seedGroupMember(string $name): string
+    {
+        $member = "cn={$name},ou=people,dc=foo,dc=bar";
+
+        $this->asAdmin(static function (LdapClient $admin) use ($name, $member): void {
+            $admin->create(Entry::fromArray(
+                $member,
+                [
+                    'cn' => $name,
+                    'sn' => 'Member',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                "cn={$name}-group,dc=foo,dc=bar",
+                [
+                    'cn' => "{$name}-group",
+                    'member' => $member,
+                    'objectClass' => 'groupOfNames',
+                ],
+            ));
+        });
+
+        return $member;
+    }
+
+    /**
+     * What a poll resumed from a cookie returns once the entry changes after it, both polls selecting the same.
+     *
+     * @return array<string, Entry>
+     */
+    private function pollAfterAChangeTo(
+        string $dn,
+        string ...$attributes,
+    ): array {
+        $cookie = null;
+        $initial = $this->syncRepl();
+        $initial->request()->select(...$attributes);
+        $initial->useCookieHandler(function (string $value) use (&$cookie): void {
+            $cookie = $value;
+        });
+        $initial->poll();
+
+        self::assertNotNull(
+            $cookie,
+            'The refresh phase must hand back a cookie for the next poll.',
+        );
+
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->sendAndReceive(Operations::modify(
+            $dn,
+            Change::replace(
+                'description',
+                'changed',
+            ),
+        )));
+
+        $incremental = $this->syncRepl();
+        $incremental->request()->select(...$attributes);
+        $incremental->useCookie($cookie);
+
+        return $this->collectEntries($incremental);
     }
 
     /**

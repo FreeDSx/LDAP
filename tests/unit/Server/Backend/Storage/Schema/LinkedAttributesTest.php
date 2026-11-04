@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Schema;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Schema;
@@ -167,6 +168,43 @@ final class LinkedAttributesTest extends TestCase
         self::assertSame(
             ['memberOf'],
             $this->subject->backlinks()->only(['memberof'])->reversing('member'),
+        );
+    }
+
+    public function test_a_selection_naming_a_backlink_selects_it_however_it_is_spelled(): void
+    {
+        self::assertSame(
+            ['memberof'],
+            $this->subject->backlinks()->selectedBy([
+                new Attribute('cn'),
+                new Attribute('MEMBEROF'),
+            ]),
+        );
+    }
+
+    public function test_every_operational_attribute_selects_every_backlink(): void
+    {
+        self::assertSame(
+            ['memberof'],
+            $this->subject->backlinks()->selectedBy([new Attribute(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL)]),
+        );
+    }
+
+    public function test_every_user_attribute_selects_no_backlink(): void
+    {
+        self::assertSame(
+            [],
+            $this->subject->backlinks()->selectedBy([new Attribute(SearchRequest::ATTRIBUTES_ALL_USER)]),
+        );
+    }
+
+    public function test_a_schema_declaring_no_backlink_selects_none(): void
+    {
+        self::assertSame(
+            [],
+            (new LinkedAttributes(new Schema()))
+                ->backlinks()
+                ->selectedBy([new Attribute(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL)]),
         );
     }
 

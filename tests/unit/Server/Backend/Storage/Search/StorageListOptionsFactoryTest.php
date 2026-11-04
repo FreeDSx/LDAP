@@ -106,6 +106,27 @@ final class StorageListOptionsFactoryTest extends TestCase
         self::assertFalse($this->subject->projectionFor($this->request)->withHasSubordinates);
     }
 
+    public function test_the_projection_reads_the_backlinks_the_request_selects(): void
+    {
+        $request = $this->request->setAttributes(
+            'cn',
+            'memberOf',
+        );
+
+        self::assertSame(
+            ['memberof'],
+            $this->subject->projectionFor($request)->backlinks,
+        );
+    }
+
+    public function test_the_projection_reads_no_backlink_the_request_leaves_out(): void
+    {
+        self::assertSame(
+            [],
+            $this->subject->projectionFor($this->request->setAttributes('cn'))->backlinks,
+        );
+    }
+
     public function test_the_scope_carries_the_base_depth_and_subentry_visibility(): void
     {
         $scope = $this->make(

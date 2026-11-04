@@ -218,6 +218,33 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
+    public function test_a_changed_entry_is_read_with_every_attribute_and_linked_value(): void
+    {
+        $projection = $this->subject->fetchProjectionFor($this->request());
+
+        self::assertNull($projection->attributes);
+        self::assertNull($projection->linkCap);
+    }
+
+    public function test_a_changed_entry_is_read_with_the_backlinks_the_request_selects(): void
+    {
+        self::assertSame(
+            ['memberof'],
+            $this->subject->fetchProjectionFor($this->request(
+                'cn',
+                'memberOf',
+            ))->backlinks,
+        );
+    }
+
+    public function test_a_changed_entry_is_read_without_the_backlinks_the_request_leaves_out(): void
+    {
+        self::assertSame(
+            [],
+            $this->subject->fetchProjectionFor($this->request('*'))->backlinks,
+        );
+    }
+
     public function test_a_fetched_entry_hidden_by_acl_without_a_pre_image_is_null(): void
     {
         $this->hidden = true;

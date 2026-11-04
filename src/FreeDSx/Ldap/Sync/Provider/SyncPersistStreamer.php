@@ -30,7 +30,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Generator;
@@ -263,10 +262,9 @@ final readonly class SyncPersistStreamer
         SearchRequest $request,
         TokenInterface $token,
     ): ?SyncResult {
-        // @todo A replica needs every value, sent as one message; offer ranged values to consumers that can complete them.
         $entry = $this->entries->findByUuid(
             $change->entryUuid,
-            EntryProjection::unbounded(),
+            $this->projector->fetchProjectionFor($request),
         );
 
         // Deleted since, and its own journaled delete announces that.

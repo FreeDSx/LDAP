@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 
+use function array_intersect;
 use function array_keys;
 use function array_map;
 use function array_unique;
@@ -89,6 +91,32 @@ final readonly class Backlinks
             Attribute::normalizeName(...),
             array_keys($this->read),
         );
+    }
+
+    /**
+     * The names a selection asks for, by name or through every operational attribute.
+     *
+     * @param array<Attribute> $attributes
+     *
+     * @return list<string>
+     */
+    public function selectedBy(array $attributes): array
+    {
+        if ($this->isEmpty()) {
+            return [];
+        }
+        $names = array_map(
+            static fn(Attribute $attribute): string => Attribute::normalizeName($attribute->getName()),
+            $attributes,
+        );
+        if (in_array(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL, $names, true)) {
+            return $this->names();
+        }
+
+        return array_values(array_intersect(
+            $this->names(),
+            $names,
+        ));
     }
 
     /**

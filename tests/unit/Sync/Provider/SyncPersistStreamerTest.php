@@ -49,6 +49,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Sync\Provider\SyncPersistStreamer;
@@ -99,6 +101,8 @@ final class SyncPersistStreamerTest extends TestCase
 
     private Closure $onFind;
 
+    private ?EntryProjection $readWith = null;
+
     protected function setUp(): void
     {
         $this->onSleep = static function (): void {};
@@ -127,7 +131,8 @@ final class SyncPersistStreamerTest extends TestCase
         $this->entries = $this->createMock(ReadEntryInterface::class);
         $this->entries
             ->method('findByUuid')
-            ->willReturnCallback(function (string $uuid): ?Entry {
+            ->willReturnCallback(function (string $uuid, EntryProjection $projection): ?Entry {
+                $this->readWith = $projection;
                 ($this->onFind)();
 
                 return $this->liveEntryHolding($uuid);
@@ -149,6 +154,7 @@ final class SyncPersistStreamerTest extends TestCase
                 filterEvaluator: $filterEvaluator,
                 schema: SchemaResource::Core->load(),
                 linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
+                linked: $this->fromContainer(LinkedAttributes::class),
             ),
             stream: new ChangeStream(
                 $this->journal,
@@ -402,6 +408,27 @@ final class SyncPersistStreamerTest extends TestCase
         self::assertSame(
             SyncStateControl::STATE_ADD,
             $results[0]->control->getState(),
+        );
+    }
+
+    public function test_a_changed_entry_is_read_with_the_backlinks_the_request_selects(): void
+    {
+        $this->liveEntries[self::ENTRY_DN] = $this->entry();
+        $this->append(ChangeType::Modify);
+
+        iterator_to_array($this->subject->projectSince(
+            0,
+            1,
+            $this->request()->setAttributes(
+                'cn',
+                'memberOf',
+            ),
+            $this->token,
+        ));
+
+        self::assertSame(
+            ['memberof'],
+            $this->readWith?->backlinks,
         );
     }
 
