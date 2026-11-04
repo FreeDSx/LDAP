@@ -11,6 +11,7 @@ Sync is off by default.
 
 * [Quick Start](#quick-start)
 * [How It Works](#how-it-works)
+* [Linked Attributes](#linked-attributes)
 * [Storage and Runner Requirements](#storage-and-runner-requirements)
 * [Access Control](#access-control)
 * [Poll vs Listen](#poll-vs-listen)
@@ -68,6 +69,16 @@ entry.
 
 A consumer presents a cookie, which is a marker of how far it has already read. The server then sends the changes that
 came after that point. The journal is the single source behind sync and change auditing.
+
+## Linked Attributes
+
+A change record covers only the entry written. Deleting or renaming an entry also changes the
+[linked attributes](Schema.md#linked-attributes) that name it, and a membership change also changes the member's
+`memberOf`. None of those other entries gets a change record.
+
+A FreeDSx replica applies the same rules in its own storage and stays in step. Any other consumer has to do the same, or
+run a full refresh. A consumer's filter should also not depend on a linked attribute or back-link, such as
+`(memberOf=cn=admins,dc=example,dc=com)`. An entry that joins or leaves the group is not reported to it.
 
 ## Storage and Runner Requirements
 

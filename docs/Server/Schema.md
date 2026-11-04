@@ -362,9 +362,9 @@ leave such a class without an attribute it requires, so the server refuses to st
 | Value order | The order the references were created in, which RFC 4511 leaves unconstrained. |
 | An option-bearing form such as `member;lang-en` | Not linked, and kept on the entry as an ordinary value. |
 
-Because a delete or rename never writes the referring entry, neither produces a change record. A replication consumer
-learns of the removed entry itself, but sees no modification of the groups that named it, and picks the change up on
-its next full refresh.
+Because a delete or rename never writes the referring entry, neither produces a change record for it. A sync consumer
+receives the deleted or renamed entry, but nothing for the entries that named it. It has to drop or follow those
+references in its own copy, as a FreeDSx replica does, or run a full refresh.
 
 ### How Many Values a Read Returns
 
@@ -407,6 +407,10 @@ The server refuses to start when a back-link reverses an attribute that is not i
 not declared `NO-USER-MODIFICATION`. Each would leave an attribute nothing can maintain.
 
 Membership is direct only. A back-link reports the entries that name this one, not the ones that name those in turn.
+
+Adding or removing a member, or renaming or deleting the group, changes the member's back-link without a change record
+for the member. A sync consumer that filters on or selects a back-link should derive it from the attribute it reverses,
+or run a full refresh.
 
 **Values are not filtered individually.** An identity that cannot see a group entry can still read that group's DN
 from a member's back-link. Withhold the attribute itself where that matters, with an attribute rule or a
