@@ -246,7 +246,7 @@ trait EntryReadTestsTrait
         string $value,
     ): string {
         if (in_array($name, self::READ_LINKED_TYPES, true)) {
-            return Dn::normalizedOrNull($value) ?? $value;
+            return Dn::normalized($value);
         }
         $syntax = self::READ_GENERATED_SYNTAX[$name] ?? null;
 

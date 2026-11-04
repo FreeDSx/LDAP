@@ -271,6 +271,6 @@ readonly class LinkedChangeReplay
 
     private static function keyOf(string $value): string
     {
-        return Dn::normalizedOrNull($value) ?? $value;
+        return Dn::normalized($value);
     }
 }

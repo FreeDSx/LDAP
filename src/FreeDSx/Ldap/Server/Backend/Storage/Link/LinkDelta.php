@@ -175,7 +175,7 @@ final readonly class LinkDelta
         $keyed = [];
 
         foreach ($values as $value) {
-            $keyed[(new Dn($value))->normalizedString()] = $value;
+            $keyed[Dn::normalized($value)] = $value;
         }
 
         return $keyed;

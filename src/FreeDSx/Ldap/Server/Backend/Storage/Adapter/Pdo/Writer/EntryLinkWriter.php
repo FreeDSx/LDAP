@@ -161,11 +161,7 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         $asked = [];
 
         foreach ($values as $value) {
-            $normalized = Dn::normalizedOrNull($value);
-
-            if ($normalized !== null) {
-                $asked[$normalized] = $value;
-            }
+            $asked[Dn::normalized($value)] = $value;
         }
 
         if ($asked === []) {
@@ -254,9 +250,7 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
             $unresolved = [];
 
             foreach ($delta->added($name) as $value) {
-                $normalized = Dn::normalizedOrNull($value);
-
-                if ($normalized === null || !isset($resolved[$normalized])) {
+                if (!isset($resolved[Dn::normalized($value)])) {
                     $unresolved[] = $value;
                 }
             }
@@ -282,11 +276,7 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
 
         foreach ($values as $attributeValues) {
             foreach ($attributeValues as $value) {
-                $normalized = Dn::normalizedOrNull($value);
-
-                if ($normalized !== null) {
-                    $wanted[$normalized] = true;
-                }
+                $wanted[Dn::normalized($value)] = true;
             }
         }
 
@@ -320,10 +310,7 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
 
         foreach ($values as $name => $attributeValues) {
             foreach ($attributeValues as $value) {
-                $normalized = Dn::normalizedOrNull($value);
-                $targetId = $normalized === null
-                    ? null
-                    : $resolved[$normalized] ?? null;
+                $targetId = $resolved[Dn::normalized($value)] ?? null;
 
                 if ($targetId === null) {
                     continue;
