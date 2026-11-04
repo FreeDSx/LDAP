@@ -230,6 +230,12 @@ final readonly class PasswordModifyService
         #[SensitiveParameter]
         string $newPassword,
     ): void {
+        if ($newPassword === '') {
+            throw new OperationException(
+                'The new password is empty.',
+                ResultCode::CONSTRAINT_VIOLATION,
+            );
+        }
         if (!$this->hashService->isWithinMaxLength($newPassword)) {
             throw new OperationException(
                 'The new password is longer than the configured hash limits allow.',

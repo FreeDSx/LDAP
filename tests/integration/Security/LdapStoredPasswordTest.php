@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
 use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -122,6 +123,34 @@ final class LdapStoredPasswordTest extends ServerTestCase
         $this->replacePassword($password);
 
         $this->assertBindsAsUser($password);
+    }
+
+    public function test_a_user_cannot_replace_their_password_with_an_empty_one(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->replacePassword('');
+    }
+
+    public function test_an_administrator_cannot_add_an_entry_holding_an_empty_password(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=empty-password,dc=foo,dc=bar',
+            [
+                'objectClass' => 'person',
+                'cn' => 'empty-password',
+                'sn' => 'empty-password',
+                'userPassword' => '',
+            ],
+        ));
     }
 
     public function test_a_second_password_value_is_refused(): void

@@ -151,6 +151,33 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $verifyClient->unbind();
     }
 
+    public function testAnEmptyNewPasswordIsRefused(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new PasswordModifyRequest(
+                null,
+                self::USER_PASSWORD,
+                '',
+            ));
+            $this->fail('An empty new password should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $this->bindResultCode(self::USER_PASSWORD),
+        );
+    }
+
     public function testANewPasswordHoldingANulByteBindsOnlyInFullUnderTheDefaultHashing(): void
     {
         $this->ldapClient()->bind(
