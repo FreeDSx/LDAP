@@ -36,7 +36,7 @@ use Generator;
 final readonly class PdoChangeJournal implements ChangeJournalInterface
 {
     /**
-     * Records per insert. Eleven placeholders each, inside the 999 bound SQLite builds before 3.32 compile in.
+     * Records per insert. Nine placeholders each, inside the 999 bound SQLite builds before 3.32 compile in.
      */
     private const RECORDS_PER_STATEMENT = 90;
 
@@ -187,7 +187,6 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
         foreach ($records as $record) {
             $change = $record->change;
-            $normDn = $change->dn->normalize();
 
             array_push(
                 $parameters,
@@ -196,8 +195,6 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
                 EpochMicroseconds::fromDateTime($record->createdAt),
                 $change->changeType->value,
                 $change->dn->toString(),
-                $normDn->toString(),
-                $normDn->getParent()?->toString() ?? '',
                 $change->entryUuid,
                 $change->authzId->toString(),
                 $change->previousDn?->toString(),

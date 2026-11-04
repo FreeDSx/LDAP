@@ -58,16 +58,12 @@ CREATE TABLE IF NOT EXISTS ldap_change_journal (
     created_at   BIGINT NOT NULL,
     change_type  VARCHAR(16) NOT NULL,
     dn           TEXT COLLATE utf8mb4_bin NOT NULL,
-    lc_dn        VARBINARY(3072) NOT NULL,
-    lc_parent_dn VARBINARY(3072) NOT NULL DEFAULT '',
     entry_uuid   VARCHAR(255) NOT NULL,
     authz_id     TEXT NOT NULL,
     previous_dn  TEXT COLLATE utf8mb4_bin,
     pre_image    LONGBLOB,
     PRIMARY KEY (seq),
-    INDEX idx_journal_created_at (created_at),
-    INDEX idx_journal_lc_dn (lc_dn),
-    INDEX idx_journal_lc_parent_dn (lc_parent_dn)
+    INDEX idx_journal_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ldap_change_journal_seq (

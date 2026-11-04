@@ -26,12 +26,12 @@ trait PdoJournalDialectTrait
     {
         $rows = SqlFilterUtility::markers(
             $count,
-            '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            '(?, ?, ?, ?, ?, ?, ?, ?, ?)',
         );
 
         return <<<SQL
             INSERT INTO ldap_change_journal
-                (seq, origin, created_at, change_type, dn, lc_dn, lc_parent_dn, entry_uuid, authz_id, previous_dn, pre_image)
+                (seq, origin, created_at, change_type, dn, entry_uuid, authz_id, previous_dn, pre_image)
             VALUES $rows
         SQL;
     }

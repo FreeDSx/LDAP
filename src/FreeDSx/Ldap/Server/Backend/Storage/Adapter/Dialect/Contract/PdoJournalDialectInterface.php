@@ -21,7 +21,8 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 interface PdoJournalDialectInterface
 {
     /**
-     * Inserts $count journal records. Parameters per record: [seq, origin, created_at, change_type, dn, lc_dn, lc_parent_dn, entry_uuid, authz_id, previous_dn, pre_image]
+     * Inserts $count journal records. Parameters per record: [seq, origin, created_at, change_type, dn, entry_uuid,
+     * authz_id, previous_dn, pre_image]
      */
     public function queryJournalInsert(int $count): string;
 
