@@ -75,6 +75,7 @@ final readonly class EventLogPolicy
             ServerEvent::PasswordPolicyMustChange,
             ServerEvent::PasswordPolicyGraceLogin,
             ServerEvent::PasswordPolicyChangeRejected,
+            ServerEvent::PasswordPolicyStateNotRecorded,
             ServerEvent::EntrySkipped,
             ServerEvent::BulkImportCompleted,
             ServerEvent::BulkImportFailed,

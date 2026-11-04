@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Ldif;
 
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -166,6 +167,41 @@ final class LdapSeedServerTest extends TestCase
         );
 
         self::assertNotNull($this->storage->find(new Dn('cn=bob,dc=example,dc=com')));
+    }
+
+    public function test_an_entry_naming_entry_uuid_without_a_value_is_seeded_with_a_generated_one(): void
+    {
+        $this->subject->seedEntries([
+            Entry::fromArray(
+                'dc=example,dc=com',
+                [
+                    'objectClass' => ['top', 'domain'],
+                    'dc' => 'example',
+                ],
+            ),
+            new Entry(
+                new Dn('cn=alice,dc=example,dc=com'),
+                new Attribute(
+                    'objectClass',
+                    'top',
+                    'person',
+                ),
+                new Attribute(
+                    'cn',
+                    'alice',
+                ),
+                new Attribute(
+                    'sn',
+                    'Anderson',
+                ),
+                new Attribute('entryUUID'),
+            ),
+        ]);
+
+        self::assertMatchesRegularExpression(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            (string) $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))?->getUuid(),
+        );
     }
 
     public function test_a_failure_rolls_the_whole_batch_back(): void

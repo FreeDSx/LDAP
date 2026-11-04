@@ -687,8 +687,9 @@ Whether any writer may store a pre-hashed `userPassword` value, one starting wit
 How many `userPassword` values an entry may hold, counting those under attribute options. A failed simple bind verifies
 each value it reads. An entry already over the limit keeps its values but cannot gain more. The core schema also caps
 each `userPassword` description at one value (`X-MAX-VALUES`), so raising this takes a schema override too. Under
-`Strict` or `Lenient` validation, that cap refuses every write to an entry over it, bind bookkeeping included, until
-its passwords are replaced.
+`Strict` or `Lenient` validation, that cap refuses every write to an entry over it until its passwords are replaced.
+A bind to such an entry is still answered by its password, but its password policy state is not recorded, and
+`ldap.password_policy.state_not_recorded` is logged naming the entry.
 
 **Default**: `1`
 

@@ -311,7 +311,8 @@ final readonly class OperationalAttributeGenerator
         string $attribute,
         string $value,
     ): void {
-        if ($entry->has($attribute)) {
+        // An attribute holding no values counts as missing.
+        if (($entry->get($attribute)?->getValues() ?? []) !== []) {
             return;
         }
 
