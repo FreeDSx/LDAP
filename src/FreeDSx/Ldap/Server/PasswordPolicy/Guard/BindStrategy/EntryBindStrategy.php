@@ -15,9 +15,13 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy;
 
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
@@ -36,6 +40,7 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
     public function __construct(
         private PasswordPolicyEngine $engine,
         private WriteHandlerInterface $writes,
+        private EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
     public function preBindOutcome(PasswordBindAttempt $attempt): PasswordPolicyOutcome
@@ -46,26 +51,37 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
         );
     }
 
+    /**
+     * A refused write leaves the bind answered by the decision already made, with the refusal logged.
+     */
     public function record(
         PasswordBindAttempt $attempt,
         callable $decide,
     ): RecordedOutcome {
         $recorded = null;
 
-        $this->writes->handle(
-            new ComputeUpdateCommand(
-                $attempt->dn,
-                function (Entry $entry) use ($decide, &$recorded): array {
-                    $recorded = $decide(UserPasswordState::fromEntry($entry));
+        try {
+            $this->writes->handle(
+                new ComputeUpdateCommand(
+                    $attempt->dn,
+                    function (Entry $entry) use ($decide, &$recorded): array {
+                        $recorded = $decide(UserPasswordState::fromEntry($entry));
 
-                    return $recorded->changes->changes;
-                },
-            ),
-            WriteContext::system(
-                new SystemToken(),
-                new ControlBag(),
-            ),
-        );
+                        return $recorded->changes->changes;
+                    },
+                ),
+                WriteContext::system(
+                    new SystemToken(),
+                    new ControlBag(),
+                ),
+            );
+        } catch (OperationException $e) {
+            $this->eventLogger->recordFailure(
+                ServerEvent::PasswordPolicyStateNotRecorded,
+                $e,
+                [EventContext::TARGET => [EventContext::DN => $attempt->dn->toString()]],
+            );
+        }
 
         return $recorded ?? new RecordedOutcome(
             PasswordPolicyOutcome::allow(),

@@ -598,6 +598,45 @@ final class OperationalAttributeGeneratorTest extends TestCase
         );
     }
 
+    public function test_apply_for_add_generates_an_entry_uuid_the_entry_names_without_a_value(): void
+    {
+        $this->entry->add(new Attribute('entryUUID'));
+
+        $this->subject->applyForAdd(
+            $this->entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertMatchesRegularExpression(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            $this->entry->get('entryUUID')?->getValues()[0] ?? '',
+        );
+    }
+
+    public function test_apply_for_bulk_load_generates_an_entry_uuid_the_entry_names_without_a_value(): void
+    {
+        $this->entry->add(new Attribute('entryUUID'));
+
+        $this->subject->applyForBulkLoad($this->entry);
+
+        self::assertCount(
+            1,
+            $this->entry->get('entryUUID')?->getValues() ?? [],
+        );
+    }
+
+    public function test_apply_for_bulk_load_stamps_a_create_timestamp_the_entry_names_without_a_value(): void
+    {
+        $this->entry->add(new Attribute('createTimestamp'));
+
+        $this->subject->applyForBulkLoad($this->entry);
+
+        self::assertMatchesRegularExpression(
+            '/^\d{14}Z$/',
+            $this->entry->get('createTimestamp')?->getValues()[0] ?? '',
+        );
+    }
+
     public function test_apply_for_bulk_load_fills_create_and_modify_timestamps_when_missing(): void
     {
         $this->subject->applyForBulkLoad($this->entry);

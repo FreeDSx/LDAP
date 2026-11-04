@@ -57,6 +57,7 @@ enum ServerEvent: string
     case PasswordPolicyMustChange       = 'ldap.password_policy.must_change';
     case PasswordPolicyGraceLogin       = 'ldap.password_policy.grace_login';
     case PasswordPolicyChangeRejected   = 'ldap.password_policy.change_rejected';
+    case PasswordPolicyStateNotRecorded = 'ldap.password_policy.state_not_recorded';
     case EntrySkipped                   = 'storage.import.entry_skipped';
     case BulkImportCompleted            = 'storage.import.completed';
     case BulkImportFailed               = 'storage.import.failed';
@@ -108,6 +109,7 @@ enum ServerEvent: string
             self::ClientNotifyFailed,
             self::MetricsSnapshotFailed,
             self::PasswordHashOverLimits,
+            self::PasswordPolicyStateNotRecorded,
             self::ConcurrencyLimited => LogLevel::WARNING,
             self::BindFailure,
             self::StartTlsFailed,
@@ -167,6 +169,7 @@ enum ServerEvent: string
             self::PasswordPolicyMustChange => 'The password was reset and must be changed before anything else.',
             self::PasswordPolicyGraceLogin => 'A bind used one of an expired password\'s grace logins.',
             self::PasswordPolicyChangeRejected => 'A password change was rejected by the password policy.',
+            self::PasswordPolicyStateNotRecorded => 'A bind\'s password policy state was not written to its entry.',
             self::EntrySkipped => 'Seeding left an entry that already exists untouched.',
             self::BulkImportCompleted => 'Seeding committed.',
             self::BulkImportFailed => 'Seeding failed and was rolled back.',

@@ -628,6 +628,60 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         self::assertFalse($token->mustChangePassword());
     }
 
+    public function test_an_entry_over_its_password_value_cap_still_binds_with_its_password(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->userHoldingTwoPasswords(),
+            new PasswordPolicy(lockout: new PasswordLockoutRules()),
+        );
+
+        $token = $authenticator->authenticate(
+            self::USER_DN,
+            self::PASSWORD,
+        );
+
+        self::assertSame(
+            self::USER_DN,
+            $token->getResolvedDn()->toString(),
+        );
+        $this->assertEventRecorded(ServerEvent::PasswordPolicyStateNotRecorded);
+    }
+
+    public function test_a_wrong_password_against_an_entry_over_its_password_value_cap_is_invalid_credentials(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->userHoldingTwoPasswords(),
+            new PasswordPolicy(lockout: new PasswordLockoutRules()),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $authenticator->authenticate(
+            self::USER_DN,
+            'wrong',
+        );
+    }
+
+    /**
+     * An entry the userPassword schema cap of one value would refuse today, as one stored before the cap could be.
+     */
+    private function userHoldingTwoPasswords(): Entry
+    {
+        return Entry::fromArray(
+            self::USER_DN,
+            [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => ['user'],
+                'sn' => ['User'],
+                'userPassword' => [
+                    self::PASSWORD,
+                    'another-password',
+                ],
+            ],
+        );
+    }
+
     /**
      * @param array<string, string|list<string>> $extra
      */
@@ -665,17 +719,19 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             clock: $this->clock,
             changeConstraints: new PasswordChangeConstraintChain([]),
         );
+        $eventLogger = new EventLogger(
+            $this->logger,
+            EventLogPolicy::all(),
+        );
         $guard = new PasswordPolicyBindGuard(
             $engine,
             new EntryBindStrategy(
                 $engine,
                 $container->get(WriteOperationDispatcher::class),
+                $eventLogger,
             ),
             $this->context,
-            new EventLogger(
-                $this->logger,
-                EventLogPolicy::all(),
-            ),
+            $eventLogger,
             $this->sleeper,
         );
 

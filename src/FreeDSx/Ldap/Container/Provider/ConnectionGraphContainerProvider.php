@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\EntryBindStrategy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\ReplicaBindStrategy;
@@ -86,8 +87,9 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
     private function makeBindStrategy(Container $container): PasswordPolicyBindStrategyInterface
     {
         $engine = $container->get(PasswordPolicyEngine::class);
+        $options = $container->get(ServerOptions::class);
 
-        if ($container->get(ServerOptions::class)->isReadOnly()) {
+        if ($options->isReadOnly()) {
             return new ReplicaBindStrategy(
                 $engine,
                 $container->get(ReplicaPasswordStateStoreInterface::class),
@@ -98,6 +100,10 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
         return new EntryBindStrategy(
             $engine,
             $container->get(WriteOperationDispatcher::class),
+            new EventLogger(
+                $options->getLogger(),
+                $options->getEventLogPolicy(),
+            ),
         );
     }
 
