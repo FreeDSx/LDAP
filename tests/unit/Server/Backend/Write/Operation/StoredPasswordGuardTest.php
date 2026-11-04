@@ -217,6 +217,56 @@ final class StoredPasswordGuardTest extends TestCase
         );
     }
 
+    public function test_an_empty_cleartext_password_from_a_user_is_refused(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('A cleartext "userPassword" value is empty.');
+
+        $this->subject->assertStorable(
+            $this->userWith(''),
+            [],
+            $this->contextFor(self::USER_DN),
+        );
+    }
+
+    public function test_an_empty_cleartext_password_from_an_administrator_is_refused(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->subject->assertStorable(
+            $this->userWith(''),
+            [],
+            $this->contextFor(self::ADMIN_DN),
+        );
+    }
+
+    public function test_an_empty_cleartext_password_from_a_system_write_is_storable(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertStorable(
+            $this->userWith(''),
+            [],
+            WriteContext::system(
+                $this->tokenFor(self::ADMIN_DN),
+                new ControlBag(),
+            ),
+        );
+    }
+
+    public function test_an_empty_cleartext_password_the_entry_already_held_is_kept(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertStorable(
+            $this->userWith(''),
+            [''],
+            $this->contextFor(self::USER_DN),
+        );
+    }
+
     public function test_a_pre_hashed_password_is_not_held_to_the_length_limit(): void
     {
         $this->expectNotToPerformAssertions();

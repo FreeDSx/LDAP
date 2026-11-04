@@ -122,6 +122,10 @@ readonly class StoredPasswordGuard
         WriteContext $context,
     ): void {
         if (!$this->hashService->isHashed($value)) {
+            $this->assertNotEmpty(
+                $value,
+                $context,
+            );
             $this->assertCleartextLength($value);
 
             return;
@@ -142,6 +146,29 @@ readonly class StoredPasswordGuard
         throw new OperationException(
             sprintf(
                 'A pre-hashed "%s" value is accepted from administrators only.',
+                AttributeTypeOid::NAME_USER_PASSWORD,
+            ),
+            ResultCode::CONSTRAINT_VIOLATION,
+        );
+    }
+
+    /**
+     * Refuses an empty value no bind could present, unless the server itself writes it.
+     *
+     * @throws OperationException
+     */
+    private function assertNotEmpty(
+        #[SensitiveParameter]
+        string $value,
+        WriteContext $context,
+    ): void {
+        if ($value !== '' || $context->isSystem()) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'A cleartext "%s" value is empty.',
                 AttributeTypeOid::NAME_USER_PASSWORD,
             ),
             ResultCode::CONSTRAINT_VIOLATION,

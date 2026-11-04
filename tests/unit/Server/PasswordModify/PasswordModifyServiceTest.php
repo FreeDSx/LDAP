@@ -338,6 +338,30 @@ final class PasswordModifyServiceTest extends TestCase
         );
     }
 
+    public function test_an_empty_new_password_is_refused_without_a_write(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn($this->userEntry);
+        $this->writeHandler
+            ->expects(self::never())
+            ->method('handle');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('The new password is empty.');
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                null,
+                '12345',
+                '',
+            ),
+            $this->userToken,
+            new ControlBag(),
+        );
+    }
+
     public function test_a_new_password_over_the_length_limit_is_refused_without_a_write(): void
     {
         $this->backend
