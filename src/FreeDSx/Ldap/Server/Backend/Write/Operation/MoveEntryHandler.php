@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -34,6 +36,7 @@ readonly class MoveEntryHandler
         private LockedEntryAccess $locked,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
+        private LinkedAttributes $linked,
         private ?SubtreeMoveRecorder $moveRecorder = null,
     ) {}
 
@@ -73,7 +76,14 @@ readonly class MoveEntryHandler
                     );
                 }
 
-                $this->storage->store($newEntry);
+                // Links follow the rename by entry, so only the values the RDN change adds or removes are written.
+                $this->storage->store(
+                    $newEntry,
+                    links: LinkDelta::between(
+                        $this->linked->valuesOf($current),
+                        $this->linked->valuesOf($newEntry),
+                    ),
+                );
                 $this->moveRecorder?->record(
                     $context,
                     $newEntry,

@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
@@ -31,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\ServerOptions;
@@ -49,6 +51,8 @@ final class MoveEntryHandlerTest extends TestCase
     private const UUID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
 
     private const NAMED_BY_UUID = 'entryUUID=' . self::UUID . ',dc=example,dc=com';
+
+    private const LINKED_RDN_DN = 'seeAlso=cn=Bob\,ou=People\,dc=example\,dc=com,dc=example,dc=com';
 
     protected function setUp(): void
     {
@@ -452,6 +456,61 @@ final class MoveEntryHandlerTest extends TestCase
         );
     }
 
+    public function test_a_rename_keeps_the_linked_values_its_rdn_does_not_name(): void
+    {
+        $this->linkedGraph(...[
+            ...$this->fixture(),
+            $this->linkingTo(
+                'cn=Carol,dc=example,dc=com',
+                self::ALICE,
+            ),
+        ]);
+
+        $this->rename(
+            'cn=Carol,dc=example,dc=com',
+            'cn=Caroline',
+        );
+
+        self::assertSame(
+            [self::ALICE],
+            $this->find('cn=Caroline,dc=example,dc=com')?->get('seeAlso')?->getValues(),
+        );
+    }
+
+    public function test_a_new_rdn_naming_a_linked_value_links_it(): void
+    {
+        $this->linkedGraph(...$this->fixture());
+
+        $this->rename(
+            self::ALICE,
+            'seeAlso=cn=Bob\,ou=People\,dc=example\,dc=com',
+            deleteOldRdn: false,
+        );
+
+        self::assertSame(
+            ['cn=Bob,ou=People,dc=example,dc=com'],
+            $this->find(self::LINKED_RDN_DN)?->get('seeAlso')?->getValues(),
+        );
+    }
+
+    public function test_dropping_an_rdn_that_named_a_linked_value_unlinks_it(): void
+    {
+        $this->linkedGraph(...[
+            ...$this->fixture(),
+            $this->linkingTo(
+                self::LINKED_RDN_DN,
+                'cn=Bob,ou=People,dc=example,dc=com',
+            ),
+        ]);
+
+        $this->rename(
+            self::LINKED_RDN_DN,
+            'cn=Carol',
+        );
+
+        self::assertNull($this->find('cn=Carol,dc=example,dc=com')?->get('seeAlso'));
+    }
+
     /**
      * Validation is opted into by the tests that assert on it, rather than applied to every fixture here.
      */
@@ -485,6 +544,29 @@ final class MoveEntryHandlerTest extends TestCase
             new Dn(self::NAMED_BY_UUID),
             new Attribute('objectClass', 'device'),
             new Attribute('entryUUID', self::UUID),
+        );
+    }
+
+    /**
+     * Storage keeping linked values the way the schema declares them, which the shared fixture's storage does not.
+     */
+    private function linkedGraph(Entry ...$entries): void
+    {
+        $this->writeGraph(new InMemoryStorage(
+            EntryFixture::allWithUuid(...$entries),
+            linkedAttributes: $this->fromContainer(LinkedAttributes::class),
+        ));
+    }
+
+    private function linkingTo(
+        string $dn,
+        string $target,
+    ): Entry {
+        return new Entry(
+            new Dn($dn),
+            new Attribute('objectClass', 'person'),
+            new Attribute('cn', 'Carol'),
+            new Attribute('seeAlso', $target),
         );
     }
 

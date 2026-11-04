@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Link;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 
+use function array_diff_key;
 use function array_keys;
 use function array_merge;
 use function array_values;
@@ -55,6 +57,45 @@ final readonly class LinkDelta
     public static function untouched(): self
     {
         return new self(untouched: true);
+    }
+
+    /**
+     * What turns one set of linked values into another, leaving the stored links untouched when nothing differs.
+     *
+     * @param array<string, list<string>> $before Values keyed by lowercased attribute name.
+     * @param array<string, list<string>> $after Values keyed the same way.
+     */
+    public static function between(
+        array $before,
+        array $after,
+    ): self {
+        $added = [];
+        $removed = [];
+
+        foreach (array_keys($before + $after) as $name) {
+            if (($before[$name] ?? []) === ($after[$name] ?? [])) {
+                continue;
+            }
+            $held = self::byTarget($before[$name] ?? []);
+            $wanted = self::byTarget($after[$name] ?? []);
+
+            $added[$name] = array_values(array_diff_key(
+                $wanted,
+                $held,
+            ));
+            $removed[$name] = array_values(array_diff_key(
+                $held,
+                $wanted,
+            ));
+        }
+        $delta = new self(
+            $added,
+            $removed,
+        );
+
+        return $delta->isEmpty()
+            ? self::untouched()
+            : $delta;
     }
 
     /**
@@ -117,6 +158,24 @@ final readonly class LinkDelta
             }
 
             $keyed[Attribute::normalizeName($name)] = array_values($attributeValues);
+        }
+
+        return $keyed;
+    }
+
+    /**
+     * Keyed by the entry each value names, so two spellings of one target compare equal.
+     *
+     * @param list<string> $values
+     *
+     * @return array<string, string>
+     */
+    private static function byTarget(array $values): array
+    {
+        $keyed = [];
+
+        foreach ($values as $value) {
+            $keyed[(new Dn($value))->normalizedString()] = $value;
         }
 
         return $keyed;

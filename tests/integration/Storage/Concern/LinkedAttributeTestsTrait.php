@@ -577,6 +577,46 @@ trait LinkedAttributeTestsTrait
         $this->ldapClient()->read($group, ['member;range=9-2']);
     }
 
+    public function testARenameWhoseNewRdnIsALinkedValueLinksIt(): void
+    {
+        $person = $this->seedPerson('link-rdn-new');
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->rename(
+            $person,
+            'seeAlso=cn=admin\,dc=foo\,dc=bar',
+            false,
+        ));
+
+        self::assertSame(
+            [self::LINKED_ADMIN],
+            $this->seeAlsoOf('seeAlso=cn=admin\,dc=foo\,dc=bar,dc=foo,dc=bar'),
+        );
+    }
+
+    public function testARenameDroppingAnRdnThatWasALinkedValueUnlinksIt(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'seeAlso=cn=user\,dc=foo\,dc=bar,dc=foo,dc=bar',
+                [
+                    'cn' => 'link-rdn-old',
+                    'objectClass' => 'person',
+                    'seeAlso' => self::LINKED_USER,
+                    'sn' => 'link-rdn-old',
+                ],
+            ));
+            $admin->rename(
+                'seeAlso=cn=user\,dc=foo\,dc=bar,dc=foo,dc=bar',
+                'cn=link-rdn-old',
+            );
+        });
+
+        self::assertSame(
+            [],
+            $this->seeAlsoOf('cn=link-rdn-old,dc=foo,dc=bar'),
+        );
+    }
+
     /**
      * @return list<string>
      */
@@ -646,6 +686,19 @@ trait LinkedAttributeTestsTrait
             $this->ldapClient()
                 ->read($dn, ['member'])
                 ?->get('member')
+                ?->getValues() ?? [],
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function seeAlsoOf(string $dn): array
+    {
+        return array_values(
+            $this->ldapClient()
+                ->read($dn, ['seeAlso'])
+                ?->get('seeAlso')
                 ?->getValues() ?? [],
         );
     }

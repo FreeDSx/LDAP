@@ -495,6 +495,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             locked: $container->get(LockedEntryAccess::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
+            linked: $container->get(LinkedAttributes::class),
             moveRecorder: new SubtreeMoveRecorder(
                 $recorder,
                 $container->get(SubtreeEnumerator::class),

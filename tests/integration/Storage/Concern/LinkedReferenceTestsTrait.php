@@ -91,6 +91,92 @@ trait LinkedReferenceTestsTrait
         );
     }
 
+    public function testRenamingAnEntryKeepsItsLinkIntoItsOwnSubtree(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'ou=link-moved-team,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => 'link-moved-team',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=lead,ou=link-moved-team,dc=foo,dc=bar',
+                [
+                    'cn' => 'lead',
+                    'objectClass' => 'person',
+                    'sn' => 'lead',
+                ],
+            ));
+            $admin->send(Operations::modify(
+                'ou=link-moved-team,dc=foo,dc=bar',
+                Change::add(
+                    'seeAlso',
+                    'cn=lead,ou=link-moved-team,dc=foo,dc=bar',
+                ),
+            ));
+            $admin->rename(
+                'ou=link-moved-team,dc=foo,dc=bar',
+                'ou=link-moved-crew',
+            );
+        });
+
+        self::assertSame(
+            ['cn=lead,ou=link-moved-crew,dc=foo,dc=bar'],
+            $this->seeAlsoOf('ou=link-moved-crew,dc=foo,dc=bar'),
+        );
+    }
+
+    public function testRenamingAnEntryKeepsItsLinkToItself(): void
+    {
+        $this->seedLinkedToItselfAndRenamed(
+            'link-self',
+            'cn=link-self-renamed',
+        );
+
+        self::assertSame(
+            ['cn=link-self-renamed,dc=foo,dc=bar'],
+            $this->seeAlsoOf('cn=link-self-renamed,dc=foo,dc=bar'),
+        );
+    }
+
+    public function testAnEntryAddedAtARenamedEntrysOldNameIsNotLinkedInItsPlace(): void
+    {
+        $this->seedLinkedToItselfAndRenamed(
+            'link-old-name',
+            'cn=link-new-name',
+        );
+
+        $this->seedPerson('link-old-name');
+
+        self::assertSame(
+            ['cn=link-new-name,dc=foo,dc=bar'],
+            $this->seeAlsoOf('cn=link-new-name,dc=foo,dc=bar'),
+        );
+    }
+
+    private function seedLinkedToItselfAndRenamed(
+        string $cn,
+        string $newRdn,
+    ): void {
+        $person = $this->seedPerson($cn);
+
+        $this->asAdmin(function (LdapClient $admin) use ($person, $newRdn): void {
+            $admin->send(Operations::modify(
+                $person,
+                Change::add(
+                    'seeAlso',
+                    $person,
+                ),
+            ));
+            $admin->rename(
+                $person,
+                $newRdn,
+            );
+        });
+    }
+
     private function modifyTimestampOf(string $dn): ?string
     {
         return $this->ldapClient()
