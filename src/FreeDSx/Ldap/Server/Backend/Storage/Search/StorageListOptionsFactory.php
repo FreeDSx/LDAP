@@ -34,10 +34,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
-use function array_intersect;
 use function array_keys;
 use function array_map;
-use function array_values;
 use function in_array;
 use function min;
 use function strtolower;
@@ -120,33 +118,10 @@ final readonly class StorageListOptionsFactory
             },
             withHasSubordinates: $this->wantsHasSubordinates($request),
             windows: $this->linkWindows($request),
-            backlinks: $this->backlinksWanted($request),
+            backlinks: $this->linked
+                ->backlinks()
+                ->selectedBy($request->getAttributes()),
         );
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function backlinksWanted(SearchRequest $request): array
-    {
-        $backlinks = $this->linked->backlinks();
-
-        if ($backlinks->isEmpty()) {
-            return [];
-        }
-        $names = array_map(
-            static fn(Attribute $attribute): string => Attribute::normalizeName($attribute->getName()),
-            $request->getAttributes(),
-        );
-
-        if (in_array(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL, $names, true)) {
-            return $backlinks->names();
-        }
-
-        return array_values(array_intersect(
-            $backlinks->names(),
-            $names,
-        ));
     }
 
     /**

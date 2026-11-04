@@ -284,7 +284,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         SearchResultState $state,
     ): Generator {
-        // @todo A replica needs every value, sent as one message; offer ranged values to consumers that can complete them.
+        // @todo A replica needs every value in one message; offer ranged values to consumers that can complete them.
         $result = $this->backend->search(
             $this->withSyncUuid($request),
             SubentryVisibility::All, // we need all entries in a sync

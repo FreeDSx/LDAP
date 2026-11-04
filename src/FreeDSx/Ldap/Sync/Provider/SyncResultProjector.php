@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Logging\EventContext;
@@ -67,6 +68,20 @@ final readonly class SyncResultProjector
     }
 
     /**
+     * What a changed entry is read with: every linked value, and the back-links the request selects.
+     */
+    public function fetchProjectionFor(SearchRequest $request): EntryProjection
+    {
+        // @todo A replica needs every value in one message; offer ranged values to consumers that can complete them.
+        return new EntryProjection(
+            linkCap: null,
+            backlinks: $this->linked
+                ->backlinks()
+                ->selectedBy($request->getAttributes()),
+        );
+    }
+
+    /**
      * A search result (already filter-matched by the backend) as an add, if the consumer may see it.
      */
     public function projectSearched(
@@ -103,7 +118,7 @@ final readonly class SyncResultProjector
         }
 
         $filter = $request->getFilter();
-        // A fetched entry carries no back-links, and the witness adds the ones the filter names.
+        // A fetched entry carries only the selected back-links, and the witness adds the ones the filter names.
         $judged = $this->linkedLeaves->witness(
             $entry,
             $filter,
