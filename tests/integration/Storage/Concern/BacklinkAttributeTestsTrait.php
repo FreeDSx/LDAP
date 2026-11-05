@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -478,6 +480,74 @@ trait BacklinkAttributeTestsTrait
                 'memberOf' => 'cn=anything,dc=foo,dc=bar',
             ],
         ));
+    }
+
+    public function testASortedSearchReadsBackEachEntrysOwnGroups(): void
+    {
+        $groupsOf = $this->seedScatteredMembers(
+            'backlink-sorted-c',
+            'backlink-sorted-a',
+            'backlink-sorted-b',
+        );
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(
+                Filters::or(
+                    Filters::equal(
+                        'cn',
+                        'backlink-sorted-a',
+                    ),
+                    Filters::equal(
+                        'cn',
+                        'backlink-sorted-b',
+                    ),
+                    Filters::equal(
+                        'cn',
+                        'backlink-sorted-c',
+                    ),
+                ),
+                'memberOf',
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::ascending('cn')),
+        );
+        $read = [];
+
+        foreach ($entries as $entry) {
+            $read[$entry->getDn()->toString()] = $entry->get('memberOf')?->getValues() ?? [];
+        }
+
+        self::assertSame(
+            [
+                'cn=backlink-sorted-a,dc=foo,dc=bar',
+                'cn=backlink-sorted-b,dc=foo,dc=bar',
+                'cn=backlink-sorted-c,dc=foo,dc=bar',
+            ],
+            array_keys($read),
+        );
+        self::assertEquals(
+            $groupsOf,
+            $read,
+        );
+    }
+
+    /**
+     * Members stored apart from one another, each with a group of its own, so a sort returns them with scattered ids.
+     *
+     * @return array<string, list<string>> Each member's DN, to its group.
+     */
+    private function seedScatteredMembers(string ...$names): array
+    {
+        $groupsOf = [];
+
+        foreach ($names as $name) {
+            [$member, $group] = $this->seedBacklinkPair($name);
+            $this->seedBacklinkMember("{$name}-apart");
+            $groupsOf[$member] = [$group];
+        }
+
+        return $groupsOf;
     }
 
     /**

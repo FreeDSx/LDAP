@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
+
 /**
  * Database-specific SQL for reading the table linked attribute values are kept in.
  *
@@ -21,24 +23,31 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 interface PdoLinkReadDialectInterface
 {
     /**
-     * Links of a contiguous span of owners with their targets' current DNs. Parameters: [first, last]
+     * Links of the owners the keys cover, with their targets' current DNs. Parameters: [the keys' parameters]
      */
-    public function queryLinksForRange(): string;
+    public function queryLinksFor(LinkKeys $owners): string;
 
     /**
-     * The same, at most limit rows. Parameters: [first, last, limit]
+     * The same, at most limit rows. Parameters: [the keys' parameters, limit]
      */
-    public function queryLinksForRangeUpTo(): string;
+    public function queryLinksForUpTo(LinkKeys $owners): string;
 
     /**
-     * The (owner_entry_id, attr_name_lower) pairs in a span holding more than cap links. Parameters: [first, last, cap]
+     * The (owner_entry_id, attr_name_lower) pairs the keys cover holding more than cap links.
+     *
+     * Parameters: [the keys' parameters, cap]
      */
-    public function queryOversizedLinks(): string;
+    public function queryOversizedLinks(LinkKeys $owners): string;
 
     /**
-     * A span's links apart from $count excluded pairs. Parameters: [first, last, then owner_entry_id, attr_name_lower per pair]
+     * The covered owners' links apart from $count excluded pairs.
+     *
+     * Parameters: [the keys' parameters, then owner_entry_id, attr_name_lower per pair]
      */
-    public function queryLinksForRangeExcept(int $count): string;
+    public function queryLinksForExcept(
+        LinkKeys $owners,
+        int $count,
+    ): string;
 
     /**
      * One owner's links for one attribute, at most limit rows. Parameters: [owner_entry_id, attr_name_lower, limit]

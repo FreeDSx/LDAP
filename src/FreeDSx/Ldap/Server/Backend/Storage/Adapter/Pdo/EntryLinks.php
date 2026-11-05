@@ -17,8 +17,9 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoBacklinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
@@ -31,8 +32,6 @@ use function array_keys;
 use function array_slice;
 use function count;
 use function is_array;
-use function max;
-use function min;
 
 /**
  * The values a linked attribute holds, kept as references to entries and resolved to their current DNs.
@@ -49,15 +48,15 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
     private const ENTRIES_PER_FETCH = 100;
 
     /**
-     * @param LinkSpanReader $forward Reads from the entry holding the values.
-     * @param LinkSpanReader $backward Reads from the entry they name.
+     * @param LinkReader $forward Reads from the entry holding the values.
+     * @param LinkReader $backward Reads from the entry they name.
      */
     public function __construct(
         private PdoLinkReadDialectInterface&PdoBacklinkReadDialectInterface $dialect,
         private PdoConnection $connection,
         private LinkedAttributes $declared,
-        private LinkSpanReader $forward,
-        private LinkSpanReader $backward,
+        private LinkReader $forward,
+        private LinkReader $backward,
     ) {}
 
     /**
@@ -147,9 +146,11 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         int $entryId,
         EntryProjection $projection,
     ): array {
-        $links = $this->forSpan(
-            $entryId,
-            $entryId,
+        $links = $this->forKeys(
+            LinkKeys::span(
+                $entryId,
+                $entryId,
+            ),
             $projection,
         )[$entryId] ?? [];
 
@@ -193,21 +194,19 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
     /**
      * @return array<int, array<string, list<string>>>
      */
-    private function forSpan(
-        int $first,
-        int $last,
+    private function forKeys(
+        LinkKeys $keys,
         EntryProjection $projection,
     ): array {
-        $links = $this->forward->forSpan(
-            $first,
-            $last,
+        $links = $this->forward->forKeys(
+            $keys,
             $projection->linkCap,
         );
         if ($projection->backlinks === []) {
             return $links;
         }
 
-        foreach ($this->backward->forSpan($first, $last, $projection->linkCap) as $entryId => $byName) {
+        foreach ($this->backward->forKeys($keys, $projection->linkCap) as $entryId => $byName) {
             foreach ($byName as $name => $values) {
                 $links[$entryId][$name] = $values;
             }
@@ -314,7 +313,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
     }
 
     /**
-     * Ids from a keyset walk are contiguous, so the chunk's span is the cheap predicate.
+     * A filter or a sort scatters a chunk's ids, so they are read by whichever keys cover them most cheaply.
      *
      * @param list<mixed> $chunk
      * @return array<int, array<string, list<string>>>
@@ -334,9 +333,8 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
 
         return $ids === []
             ? []
-            : $this->forSpan(
-                min($ids),
-                max($ids),
+            : $this->forKeys(
+                LinkKeys::covering($ids),
                 $projection,
             );
     }

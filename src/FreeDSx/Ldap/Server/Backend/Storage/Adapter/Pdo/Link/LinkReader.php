@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoBacklinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
@@ -31,11 +32,11 @@ use function iterator_to_array;
 use function sprintf;
 
 /**
- * Reads one direction of the link table for a contiguous span of entries.
+ * Reads one direction of the link table for the entries a set of keys covers.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class LinkSpanReader
+final readonly class LinkReader
 {
     use PdoColumnCastTrait;
 
@@ -43,7 +44,7 @@ final readonly class LinkSpanReader
 
     private string $spanUpTo;
 
-    private string $oversized;
+    private string $spanOversized;
 
     private string $attribute;
 
@@ -69,7 +70,6 @@ final readonly class LinkSpanReader
             $direction,
             $linked,
         );
-        $names = $this->backlinks->linkedNames();
 
         $this->attribute = $backward
             ? $dialect->queryBacklinksForAttribute()
@@ -78,16 +78,21 @@ final readonly class LinkSpanReader
             ? $dialect->queryBacklinksForAttributeFrom()
             : $dialect->queryLinksForAttributeFrom();
 
-        $idle = $backward && $names === [];
+        // Single entries and walks in key order read by a span, whose statements do not vary with the ids.
+        $span = LinkKeys::span(
+            0,
+            0,
+        );
+        $idle = $this->isIdle();
         $this->span = $idle
             ? ''
-            : ($backward ? $dialect->queryBacklinksForRange($names) : $dialect->queryLinksForRange());
+            : $this->built($span);
         $this->spanUpTo = $idle
             ? ''
-            : ($backward ? $dialect->queryBacklinksForRangeUpTo($names) : $dialect->queryLinksForRangeUpTo());
-        $this->oversized = $idle
+            : $this->builtUpTo($span);
+        $this->spanOversized = $idle
             ? ''
-            : ($backward ? $dialect->queryOversizedBacklinks($names) : $dialect->queryOversizedLinks());
+            : $this->builtOversized($span);
     }
 
     /**
@@ -100,13 +105,12 @@ final readonly class LinkSpanReader
     }
 
     /**
-     * Reads optimistically: a span holding no more links than the cap cannot hold an attribute over it.
+     * Reads optimistically: entries holding no more links between them than the cap cannot hold an attribute over it.
      *
      * @return array<int, array<string, list<string>>>
      */
-    public function forSpan(
-        int $first,
-        int $last,
+    public function forKeys(
+        LinkKeys $keys,
         ?int $cap,
     ): array {
         if ($this->isIdle()) {
@@ -116,21 +120,17 @@ final readonly class LinkSpanReader
         if ($cap === null) {
             return $this->grouped(
                 $this->rowsOf($this->connection->execute(
-                    $this->span,
-                    [
-                        $first,
-                        $last,
-                    ],
+                    $this->query($keys),
+                    $keys->params(),
                 )),
                 null,
             );
         }
         $rows = iterator_to_array(
             $this->rowsOf($this->connection->execute(
-                $this->spanUpTo,
+                $this->queryUpTo($keys),
                 [
-                    $first,
-                    $last,
+                    ...$keys->params(),
                     $cap + 1,
                 ],
             )),
@@ -140,8 +140,7 @@ final readonly class LinkSpanReader
         return $this->grouped(
             count($rows) > $cap
                 ? $this->cappedRows(
-                    $first,
-                    $last,
+                    $keys,
                     $cap,
                 )
                 : $rows,
@@ -181,36 +180,94 @@ final readonly class LinkSpanReader
         return $values;
     }
 
+    private function query(LinkKeys $keys): string
+    {
+        return $keys->isSpan()
+            ? $this->span
+            : $this->built($keys);
+    }
+
+    private function queryUpTo(LinkKeys $keys): string
+    {
+        return $keys->isSpan()
+            ? $this->spanUpTo
+            : $this->builtUpTo($keys);
+    }
+
+    private function queryOversized(LinkKeys $keys): string
+    {
+        return $keys->isSpan()
+            ? $this->spanOversized
+            : $this->builtOversized($keys);
+    }
+
+    private function built(LinkKeys $keys): string
+    {
+        return match ($this->direction) {
+            LinkDirection::Forward => $this->dialect->queryLinksFor($keys),
+            LinkDirection::Backward => $this->dialect->queryBacklinksFor(
+                $this->backlinks->linkedNames(),
+                $keys,
+            ),
+        };
+    }
+
+    private function builtUpTo(LinkKeys $keys): string
+    {
+        return match ($this->direction) {
+            LinkDirection::Forward => $this->dialect->queryLinksForUpTo($keys),
+            LinkDirection::Backward => $this->dialect->queryBacklinksForUpTo(
+                $this->backlinks->linkedNames(),
+                $keys,
+            ),
+        };
+    }
+
+    private function builtOversized(LinkKeys $keys): string
+    {
+        return match ($this->direction) {
+            LinkDirection::Forward => $this->dialect->queryOversizedLinks($keys),
+            LinkDirection::Backward => $this->dialect->queryOversizedBacklinks(
+                $this->backlinks->linkedNames(),
+                $keys,
+            ),
+        };
+    }
+
     /**
      * Varies with how many pairs are excluded.
      */
-    private function spanExcept(int $count): string
-    {
+    private function queryExcept(
+        LinkKeys $keys,
+        int $count,
+    ): string {
         return match ($this->direction) {
-            LinkDirection::Forward => $this->dialect->queryLinksForRangeExcept($count),
-            LinkDirection::Backward => $this->dialect->queryBacklinksForRangeExcept(
+            LinkDirection::Forward => $this->dialect->queryLinksForExcept(
+                $keys,
+                $count,
+            ),
+            LinkDirection::Backward => $this->dialect->queryBacklinksForExcept(
                 $this->backlinks->linkedNames(),
+                $keys,
                 $count,
             ),
         };
     }
 
     /**
-     * The span's links with each attribute over the cap read only as far as it.
+     * The covered entries' links with each attribute over the cap read only as far as it.
      *
      * @return Generator<int, array<array-key, mixed>>
      */
     private function cappedRows(
-        int $first,
-        int $last,
+        LinkKeys $keys,
         int $cap,
     ): Generator {
         $oversized = iterator_to_array(
             $this->rowsOf($this->connection->execute(
-                $this->oversized,
+                $this->queryOversized($keys),
                 [
-                    $first,
-                    $last,
+                    ...$keys->params(),
                     $cap,
                 ],
             )),
@@ -219,11 +276,13 @@ final readonly class LinkSpanReader
 
         yield from $this->rowsOf($this->connection->execute(
             $oversized === []
-                ? $this->span
-                : $this->spanExcept(count($oversized)),
+                ? $this->query($keys)
+                : $this->queryExcept(
+                    $keys,
+                    count($oversized),
+                ),
             $this->exceptParams(
-                $first,
-                $last,
+                $keys,
                 $oversized,
             ),
         ));
@@ -245,14 +304,10 @@ final readonly class LinkSpanReader
      * @return list<int|string>
      */
     private function exceptParams(
-        int $first,
-        int $last,
+        LinkKeys $keys,
         array $oversized,
     ): array {
-        $params = [
-            $first,
-            $last,
-        ];
+        $params = $keys->params();
 
         foreach ($oversized as $pair) {
             $params[] = $this->intColumn($pair['key_entry_id'] ?? null);

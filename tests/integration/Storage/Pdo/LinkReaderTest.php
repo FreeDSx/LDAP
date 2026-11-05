@@ -19,12 +19,13 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
@@ -34,7 +35,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
-final class LinkSpanReaderTest extends TestCase
+final class LinkReaderTest extends TestCase
 {
     private const BASE = 'dc=example,dc=com';
 
@@ -46,9 +47,11 @@ final class LinkSpanReaderTest extends TestCase
 
     private const SECOND_MEMBER = 'cn=bob,dc=example,dc=com';
 
-    private LinkSpanReader $backward;
+    private const CROWD = 'cn=crowd,dc=example,dc=com';
 
-    private LinkSpanReader $forward;
+    private LinkReader $backward;
+
+    private LinkReader $forward;
 
     private EntryWriter $storage;
 
@@ -72,13 +75,13 @@ final class LinkSpanReaderTest extends TestCase
             noUserModification: true,
             extensions: [AttributeType::EXTENSION_LINKED_BY => ['member']],
         )));
-        $this->backward = new LinkSpanReader(
+        $this->backward = new LinkReader(
             $dialect,
             $this->connection,
             LinkDirection::Backward,
             $linked,
         );
-        $this->forward = new LinkSpanReader(
+        $this->forward = new LinkReader(
             $dialect,
             $this->connection,
             LinkDirection::Forward,
@@ -95,7 +98,7 @@ final class LinkSpanReaderTest extends TestCase
                 'memberOf' => [self::GROUP],
                 'isMemberOf' => [self::GROUP],
             ],
-            $this->backward->forSpan(...$this->spanOf(self::MEMBER))[$this->entryIdOf(self::MEMBER)] ?? [],
+            $this->backward->forKeys(...$this->keysOf(self::MEMBER))[$this->entryIdOf(self::MEMBER)] ?? [],
         );
     }
 
@@ -103,7 +106,7 @@ final class LinkSpanReaderTest extends TestCase
     {
         self::assertSame(
             [],
-            $this->backward->forSpan(...$this->spanOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
+            $this->backward->forKeys(...$this->keysOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
         );
     }
 
@@ -114,7 +117,7 @@ final class LinkSpanReaderTest extends TestCase
                 'member' => [self::MEMBER],
                 'seeAlso' => [self::MEMBER],
             ],
-            $this->forward->forSpan(...$this->spanOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
+            $this->forward->forKeys(...$this->keysOf(self::GROUP))[$this->entryIdOf(self::GROUP)] ?? [],
         );
     }
 
@@ -150,32 +153,102 @@ final class LinkSpanReaderTest extends TestCase
         );
     }
 
+    public function test_scattered_keys_read_only_the_entries_they_cover(): void
+    {
+        $people = $this->seedCrowd(5);
+        $first = $this->entryIdOf(self::MEMBER);
+        $last = $this->entryIdOf($people[4]);
+
+        self::assertSame(
+            [
+                $first,
+                $last,
+            ],
+            array_keys($this->backward->forKeys(
+                LinkKeys::covering([$first, $last]),
+                1500,
+            )),
+        );
+    }
+
+    public function test_an_entry_over_the_cap_among_scattered_keys_is_ranged_while_the_rest_are_whole(): void
+    {
+        $people = $this->seedCrowd(5);
+        $first = $this->entryIdOf(self::MEMBER);
+        $last = $this->entryIdOf($people[4]);
+
+        $links = $this->backward->forKeys(
+            LinkKeys::covering([$first, $last]),
+            1,
+        );
+
+        self::assertEqualsCanonicalizing(
+            [
+                $first,
+                $last,
+            ],
+            array_keys($links),
+        );
+        self::assertSame(
+            [
+                'isMemberOf;range=0-0' => [self::GROUP],
+                'memberOf;range=0-0' => [self::GROUP],
+            ],
+            $this->byName($links[$first]),
+        );
+        self::assertSame(
+            [
+                'isMemberOf' => [self::CROWD],
+                'memberOf' => [self::CROWD],
+            ],
+            $this->byName($links[$last]),
+        );
+    }
+
     /**
      * @return array<string, list<string>>
      */
     private function cappedAtOne(
-        LinkSpanReader $reader,
+        LinkReader $reader,
         string $dn,
     ): array {
         $id = $this->entryIdOf($dn);
-        $links = $reader->forSpan(
-            $id,
-            $id,
+
+        return $this->byName($reader->forKeys(
+            LinkKeys::span(
+                $id,
+                $id,
+            ),
             1,
-        )[$id] ?? [];
+        )[$id] ?? []);
+    }
+
+    /**
+     * @param array<string, list<string>> $links
+     *
+     * @return array<string, list<string>>
+     */
+    private function byName(array $links): array
+    {
         ksort($links);
 
         return $links;
     }
 
     /**
-     * @return array{int, int, int}
+     * @return array{LinkKeys, int}
      */
-    private function spanOf(string $dn): array
+    private function keysOf(string $dn): array
     {
         $id = $this->entryIdOf($dn);
 
-        return [$id, $id, 1500];
+        return [
+            LinkKeys::span(
+                $id,
+                $id,
+            ),
+            1500,
+        ];
     }
 
     private function entryIdOf(string $dn): int
@@ -211,6 +284,41 @@ final class LinkSpanReaderTest extends TestCase
             new Attribute('member', self::MEMBER),
             new Attribute('seealso', self::MEMBER),
         )));
+    }
+
+    /**
+     * People stored after alice and named by the crowd group along with her.
+     *
+     * @return list<string>
+     */
+    private function seedCrowd(int $count): array
+    {
+        $people = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $people[] = "cn=person{$i},dc=example,dc=com";
+            $this->storage->store(EntryFixture::withUuid(new Entry(
+                new Dn($people[$i]),
+                new Attribute(
+                    'cn',
+                    "person{$i}",
+                ),
+            )));
+        }
+        $this->storage->store(EntryFixture::withUuid(new Entry(
+            new Dn(self::CROWD),
+            new Attribute(
+                'cn',
+                'crowd',
+            ),
+            new Attribute(
+                'member',
+                self::MEMBER,
+                ...$people,
+            ),
+        )));
+
+        return $people;
     }
 
     private function seedStaff(): void
