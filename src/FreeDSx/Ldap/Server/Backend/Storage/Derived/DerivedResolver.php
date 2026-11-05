@@ -46,12 +46,10 @@ final readonly class DerivedResolver
      * A copy carrying each of the derived types named, or the entry when none are.
      *
      * @param list<string> $names Canonical type names, as {@see requested()} gives them.
-     * @param ?Entry $subordinatesOf The entry whose children decide hasSubordinates, when it is not the one given.
      */
     public function inject(
         Entry $entry,
         array $names,
-        ?Entry $subordinatesOf = null,
     ): Entry {
         if ($names === []) {
             return $entry;
@@ -63,9 +61,7 @@ final readonly class DerivedResolver
                 $name,
                 $this->resolve(
                     $name,
-                    $name === AttributeTypeOid::NAME_HAS_SUBORDINATES
-                        ? $subordinatesOf ?? $entry
-                        : $entry,
+                    $entry,
                 ),
             );
         }

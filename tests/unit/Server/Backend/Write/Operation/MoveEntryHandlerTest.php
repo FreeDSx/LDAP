@@ -25,7 +25,9 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -33,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\ServerOptions;
@@ -53,6 +56,11 @@ final class MoveEntryHandlerTest extends TestCase
     private const NAMED_BY_UUID = 'entryUUID=' . self::UUID . ',dc=example,dc=com';
 
     private const LINKED_RDN_DN = 'seeAlso=cn=Bob\,ou=People\,dc=example\,dc=com,dc=example,dc=com';
+
+    /**
+     * @var list<string> Normalized DNs the pinned locator was asked to read.
+     */
+    private array $locatedDns = [];
 
     protected function setUp(): void
     {
@@ -244,6 +252,43 @@ final class MoveEntryHandlerTest extends TestCase
             ['Alicia'],
             $postRead->get('cn')?->getValues(),
         );
+    }
+
+    public function test_a_post_read_is_the_entry_as_stored_after_the_rename(): void
+    {
+        $this->readingBackAs($this->aliciaLinkingToHerself());
+        $context = $this->controlledContext(new PostReadControl('seeAlso'));
+
+        $this->moves()->handle(
+            $this->renameAliceToAlicia(),
+            $context,
+        );
+
+        self::assertSame(
+            ['cn=Alicia,dc=example,dc=com'],
+            $context->controlEvaluator()?->postReadEntry()?->get('seeAlso')?->getValues(),
+        );
+    }
+
+    public function test_a_rename_without_a_post_read_reads_nothing_back(): void
+    {
+        $this->readingBackAs($this->aliciaLinkingToHerself());
+        $context = $this->controlledContext(new PreReadControl('cn'));
+
+        $this->moves()->handle(
+            $this->renameAliceToAlicia(),
+            $context,
+        );
+
+        self::assertContains(
+            'cn=alice,dc=example,dc=com',
+            $this->locatedDns,
+        );
+        self::assertNotContains(
+            'cn=alicia,dc=example,dc=com',
+            $this->locatedDns,
+        );
+        self::assertNull($context->controlEvaluator()?->postReadEntry());
     }
 
     public function test_it_relocates_an_entry_that_has_children(): void
@@ -532,6 +577,53 @@ final class MoveEntryHandlerTest extends TestCase
                 null,
             ),
             $this->context(),
+        );
+    }
+
+    private function renameAliceToAlicia(): MoveCommand
+    {
+        return new MoveCommand(
+            new Dn(self::ALICE),
+            Rdn::create('cn=Alicia'),
+            true,
+            null,
+        );
+    }
+
+    /**
+     * Pins a locator answering the given entry's DN with it and every other read from the shared storage.
+     */
+    private function readingBackAs(Entry $stored): void
+    {
+        $reader = $this->createMock(ReadEntryInterface::class);
+        $reader
+            ->method('find')
+            ->willReturnCallback(function (Dn $dn, EntryProjection $projection) use ($stored): ?Entry {
+                $this->locatedDns[] = $dn->normalizedString();
+
+                return $dn->normalizedString() === $stored->getDn()->normalizedString()
+                    ? $stored
+                    : $this->storage->find(
+                        $dn,
+                        $projection,
+                    );
+            });
+        $reader
+            ->method('exists')
+            ->willReturnCallback(fn(Dn $dn): bool => $this->storage->exists($dn));
+
+        $this->writeGraph(
+            $this->storage,
+            sharedInstances: [EntryLocator::class => new EntryLocator($reader)],
+        );
+    }
+
+    private function aliciaLinkingToHerself(): Entry
+    {
+        return new Entry(
+            new Dn('cn=Alicia,dc=example,dc=com'),
+            new Attribute('cn', 'Alicia'),
+            new Attribute('seeAlso', 'cn=Alicia,dc=example,dc=com'),
         );
     }
 

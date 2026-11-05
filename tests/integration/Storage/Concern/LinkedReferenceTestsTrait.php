@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 
 /**
  * What only a backend keeping linked values as references to entries can answer.
@@ -153,6 +155,55 @@ trait LinkedReferenceTestsTrait
         self::assertSame(
             ['cn=link-new-name,dc=foo,dc=bar'],
             $this->seeAlsoOf('cn=link-new-name,dc=foo,dc=bar'),
+        );
+    }
+
+    public function testARenamesPostReadShowsItsLinksIntoItsOwnSubtreeAtTheirNewDns(): void
+    {
+        $team = 'ou=link-post-team,dc=foo,dc=bar';
+        $lead = 'cn=lead,' . $team;
+
+        $response = $this->asAdmin(function (LdapClient $admin) use ($team, $lead): LdapMessageResponse {
+            $admin->create(Entry::fromArray(
+                $team,
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => 'link-post-team',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                $lead,
+                [
+                    'cn' => 'lead',
+                    'objectClass' => 'person',
+                    'sn' => 'lead',
+                ],
+            ));
+            $admin->send(Operations::modify(
+                $team,
+                Change::add(
+                    'seeAlso',
+                    $team,
+                    $lead,
+                ),
+            ));
+
+            return $admin->sendAndReceive(
+                Operations::rename(
+                    $team,
+                    'ou=link-post-crew',
+                    true,
+                ),
+                Controls::postRead('seeAlso'),
+            );
+        });
+
+        self::assertEqualsCanonicalizing(
+            [
+                'ou=link-post-crew,dc=foo,dc=bar',
+                'cn=lead,ou=link-post-crew,dc=foo,dc=bar',
+            ],
+            $this->postReadOf($response)?->get('seeAlso')?->getValues(),
         );
     }
 
