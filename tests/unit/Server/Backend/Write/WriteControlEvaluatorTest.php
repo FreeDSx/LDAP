@@ -106,6 +106,16 @@ final class WriteControlEvaluatorTest extends TestCase
         );
     }
 
+    public function test_a_post_read_reads_the_result(): void
+    {
+        self::assertTrue($this->evaluatorFor(new PostReadControl('sn'))->readsResult());
+    }
+
+    public function test_only_a_post_read_reads_the_result(): void
+    {
+        self::assertFalse($this->evaluatorFor(new PreReadControl('sn'))->readsResult());
+    }
+
     public function test_an_addition_failing_the_assertion_answers_assertion_failed(): void
     {
         $this->expectException(OperationException::class);
@@ -199,12 +209,12 @@ final class WriteControlEvaluatorTest extends TestCase
         self::assertNull($subject->postReadEntry()?->get('entryDN'));
     }
 
-    public function test_a_post_read_counts_subordinates_on_the_entry_the_write_found(): void
+    public function test_a_post_read_counts_subordinates_on_the_entry_it_keeps(): void
     {
         $this->storage
             ->expects(self::once())
             ->method('hasChildren')
-            ->with(self::callback(static fn(Dn $dn): bool => $dn->toString() === 'cn=foo,dc=ex,dc=com'))
+            ->with(self::callback(static fn(Dn $dn): bool => $dn->toString() === 'cn=renamed,dc=ex,dc=com'))
             ->willReturn(true);
         $subject = $this->evaluatorFor(new PostReadControl('hasSubordinates'));
 

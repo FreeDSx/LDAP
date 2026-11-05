@@ -43,8 +43,6 @@ class WriteControlEvaluator
         Control::OID_POST_READ,
     ];
 
-    private ?Entry $target = null;
-
     private ?Entry $preReadEntry = null;
 
     private ?Entry $postReadEntry = null;
@@ -71,7 +69,6 @@ class WriteControlEvaluator
             $this->controls,
             $this->token,
         );
-        $this->target = $current;
         $this->preReadEntry = $this->keptFor(
             Control::OID_PRE_READ,
             $current,
@@ -94,7 +91,7 @@ class WriteControlEvaluator
     }
 
     /**
-     * Keeps the entry the write is about to store, for a Post-Read (RFC 4527 §3.2).
+     * Keeps the entry as the write stores it, for a Post-Read (RFC 4527 §3.2).
      */
     public function captureResult(Entry $result): void
     {
@@ -116,6 +113,14 @@ class WriteControlEvaluator
         }
 
         return false;
+    }
+
+    /**
+     * Whether a Post-Read asks for the entry the write stores.
+     */
+    public function readsResult(): bool
+    {
+        return $this->controls->get(Control::OID_POST_READ) instanceof ReadEntryControl;
     }
 
     public function preReadEntry(): ?Entry
@@ -145,14 +150,12 @@ class WriteControlEvaluator
             return $kept;
         }
 
-        // Subordinates are counted on the target, as a write only ever moves them along with it.
         return $this->derived->inject(
             $kept,
             $this->derived->requested(array_map(
                 static fn(string $name): Attribute => new Attribute($name),
                 $control->getAttributes(),
             )),
-            $this->target,
         );
     }
 }

@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -37,6 +40,7 @@ readonly class MoveEntryHandler
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
         private LinkedAttributes $linked,
+        private EntryLocator $locator,
         private ?SubtreeMoveRecorder $moveRecorder = null,
     ) {}
 
@@ -65,7 +69,6 @@ readonly class MoveEntryHandler
                     $normOld,
                     $context->isSystem(),
                 );
-                $context->controlEvaluator()?->captureResult($newEntry);
 
                 $normNew = $newEntry->getDn()->normalize();
                 // Re-keyed before the base is stored, so the upsert lands on the moved row rather than inserting a second.
@@ -84,6 +87,10 @@ readonly class MoveEntryHandler
                         $this->linked->valuesOf($newEntry),
                     ),
                 );
+                $this->capturePostRead(
+                    $newEntry->getDn(),
+                    $context,
+                );
                 $this->moveRecorder?->record(
                     $context,
                     $newEntry,
@@ -93,5 +100,26 @@ readonly class MoveEntryHandler
                 );
             },
         );
+    }
+
+    /**
+     * Keeps the entry as stored after the move for a Post-Read (RFC 4527 §3.2).
+     *
+     * @throws OperationException
+     */
+    private function capturePostRead(
+        Dn $dn,
+        WriteContext $context,
+    ): void {
+        $evaluator = $context->controlEvaluator();
+
+        if ($evaluator === null || !$evaluator->readsResult()) {
+            return;
+        }
+
+        $evaluator->captureResult($this->locator->findOrFail(
+            $dn,
+            new EntryProjection(linkCap: null),
+        ));
     }
 }
