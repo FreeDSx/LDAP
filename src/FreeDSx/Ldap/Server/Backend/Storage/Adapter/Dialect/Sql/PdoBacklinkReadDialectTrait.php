@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 
@@ -27,44 +28,57 @@ use function sprintf;
  */
 trait PdoBacklinkReadDialectTrait
 {
-    public function queryBacklinksForRange(array $names): string
-    {
+    public function queryBacklinksFor(
+        array $names,
+        LinkKeys $targets,
+    ): string {
         $named = $this->namedAttributes($names);
+        $covered = $targets->condition('l.target_entry_id');
 
         return <<<SQL
             SELECT l.target_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.owner_entry_id
-            WHERE l.target_entry_id BETWEEN ? AND ?
+            WHERE $covered
               AND l.attr_name_lower IN ($named)
             ORDER BY l.target_entry_id, l.attr_name_lower, l.owner_entry_id
         SQL;
     }
 
-    public function queryBacklinksForRangeUpTo(array $names): string
-    {
-        return $this->queryBacklinksForRange($names) . ' LIMIT ?';
+    public function queryBacklinksForUpTo(
+        array $names,
+        LinkKeys $targets,
+    ): string {
+        return $this->queryBacklinksFor(
+            $names,
+            $targets,
+        ) . ' LIMIT ?';
     }
 
-    public function queryOversizedBacklinks(array $names): string
-    {
+    public function queryOversizedBacklinks(
+        array $names,
+        LinkKeys $targets,
+    ): string {
         $named = $this->namedAttributes($names);
+        $covered = $targets->condition('target_entry_id');
 
         return <<<SQL
             SELECT target_entry_id AS key_entry_id, attr_name_lower
             FROM entry_attribute_links
-            WHERE target_entry_id BETWEEN ? AND ?
+            WHERE $covered
               AND attr_name_lower IN ($named)
             GROUP BY target_entry_id, attr_name_lower
             HAVING COUNT(*) > ?
         SQL;
     }
 
-    public function queryBacklinksForRangeExcept(
+    public function queryBacklinksForExcept(
         array $names,
+        LinkKeys $targets,
         int $count,
     ): string {
         $named = $this->namedAttributes($names);
+        $covered = $targets->condition('l.target_entry_id');
         $markers = SqlFilterUtility::markers(
             $count,
             '(?, ?)',
@@ -74,7 +88,7 @@ trait PdoBacklinkReadDialectTrait
             SELECT l.target_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.owner_entry_id
-            WHERE l.target_entry_id BETWEEN ? AND ?
+            WHERE $covered
               AND l.attr_name_lower IN ($named)
               AND (l.target_entry_id, l.attr_name_lower) NOT IN ($markers)
             ORDER BY l.target_entry_id, l.attr_name_lower, l.owner_entry_id

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
+
 /**
  * Database-specific SQL for reading the link table backwards
  *
@@ -21,41 +23,51 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 interface PdoBacklinkReadDialectInterface
 {
     /**
-     * Links naming a contiguous span of targets, with their owners' current DNs.
+     * Links naming the targets the keys cover, with their owners' current DNs.
      *
-     * Parameters: [first, last]
+     * Parameters: [the keys' parameters]
      *
      * @param list<string> $names Linked attribute names, pre-validated.
      */
-    public function queryBacklinksForRange(array $names): string;
+    public function queryBacklinksFor(
+        array $names,
+        LinkKeys $targets,
+    ): string;
 
     /**
      * The same, at most limit rows.
      *
-     * Parameters: [first, last, limit]
+     * Parameters: [the keys' parameters, limit]
      *
      * @param list<string> $names Linked attribute names, pre-validated.
      */
-    public function queryBacklinksForRangeUpTo(array $names): string;
-
-    /**
-     * The (target_entry_id, attr_name_lower) pairs in a span named by more than cap links.
-     *
-     * Parameters: [first, last, cap]
-     *
-     * @param list<string> $names Linked attribute names, pre-validated.
-     */
-    public function queryOversizedBacklinks(array $names): string;
-
-    /**
-     * A span's back-links apart from $count excluded pairs.
-     *
-     * Parameters: [first, last, then target_entry_id, attr_name_lower per pair]
-     *
-     * @param list<string> $names Linked attribute names, pre-validated.
-     */
-    public function queryBacklinksForRangeExcept(
+    public function queryBacklinksForUpTo(
         array $names,
+        LinkKeys $targets,
+    ): string;
+
+    /**
+     * The (target_entry_id, attr_name_lower) pairs the keys cover named by more than cap links.
+     *
+     * Parameters: [the keys' parameters, cap]
+     *
+     * @param list<string> $names Linked attribute names, pre-validated.
+     */
+    public function queryOversizedBacklinks(
+        array $names,
+        LinkKeys $targets,
+    ): string;
+
+    /**
+     * The covered targets' back-links apart from $count excluded pairs.
+     *
+     * Parameters: [the keys' parameters, then target_entry_id, attr_name_lower per pair]
+     *
+     * @param list<string> $names Linked attribute names, pre-validated.
+     */
+    public function queryBacklinksForExcept(
+        array $names,
+        LinkKeys $targets,
         int $count,
     ): string;
 

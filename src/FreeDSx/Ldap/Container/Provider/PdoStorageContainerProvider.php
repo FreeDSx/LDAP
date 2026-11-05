@@ -34,7 +34,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Error\PdoErrorFactory;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
@@ -344,13 +344,13 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $dialect,
             $connection,
             $linked,
-            new LinkSpanReader(
+            new LinkReader(
                 $dialect,
                 $connection,
                 LinkDirection::Forward,
                 $linked,
             ),
-            new LinkSpanReader(
+            new LinkReader(
                 $dialect,
                 $connection,
                 LinkDirection::Backward,

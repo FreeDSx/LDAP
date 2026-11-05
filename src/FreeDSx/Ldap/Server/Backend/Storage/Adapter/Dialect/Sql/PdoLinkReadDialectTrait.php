@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LinkKeys;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
 /**
@@ -22,35 +23,42 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
  */
 trait PdoLinkReadDialectTrait
 {
-    public function queryLinksForRange(): string
+    public function queryLinksFor(LinkKeys $owners): string
     {
+        $covered = $owners->condition('l.owner_entry_id');
+
         return <<<SQL
             SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
-            WHERE l.owner_entry_id BETWEEN ? AND ?
+            WHERE $covered
             ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id
         SQL;
     }
 
-    public function queryLinksForRangeUpTo(): string
+    public function queryLinksForUpTo(LinkKeys $owners): string
     {
-        return $this->queryLinksForRange() . ' LIMIT ?';
+        return $this->queryLinksFor($owners) . ' LIMIT ?';
     }
 
-    public function queryOversizedLinks(): string
+    public function queryOversizedLinks(LinkKeys $owners): string
     {
+        $covered = $owners->condition('owner_entry_id');
+
         return <<<SQL
             SELECT owner_entry_id AS key_entry_id, attr_name_lower
             FROM entry_attribute_links
-            WHERE owner_entry_id BETWEEN ? AND ?
+            WHERE $covered
             GROUP BY owner_entry_id, attr_name_lower
             HAVING COUNT(*) > ?
         SQL;
     }
 
-    public function queryLinksForRangeExcept(int $count): string
-    {
+    public function queryLinksForExcept(
+        LinkKeys $owners,
+        int $count,
+    ): string {
+        $covered = $owners->condition('l.owner_entry_id');
         $markers = SqlFilterUtility::markers(
             $count,
             '(?, ?)',
@@ -60,7 +68,7 @@ trait PdoLinkReadDialectTrait
             SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
-            WHERE l.owner_entry_id BETWEEN ? AND ?
+            WHERE $covered
               AND (l.owner_entry_id, l.attr_name_lower) NOT IN ($markers)
             ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id
         SQL;
