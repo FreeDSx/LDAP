@@ -1,0 +1,603 @@
+{
+    "requests": {
+        "envelope: not a sequence": {
+            "pdu": "040178",
+            "outcome": "ProtocolException(0) Expected an ASN1 sequence type, but got: FreeDSx\\Asn1\\Type\\OctetStringType"
+        },
+        "envelope: only a message ID": {
+            "pdu": "3003020101",
+            "outcome": "ProtocolException(0) Expected an ASN1 sequence with at least 2 elements, but it has 1"
+        },
+        "envelope: message ID not an integer": {
+            "pdu": "300b0401314a0664633d666f6f",
+            "outcome": "ProtocolException(0) Expected an LDAP message ID as an ASN.1 integer type. None received."
+        },
+        "envelope: message ID above maxInt": {
+            "pdu": "300f020500800000004a0664633d666f6f",
+            "outcome": "ProtocolException(0) The LDAP message ID is outside the range it is permitted to use."
+        },
+        "envelope: negative message ID": {
+            "pdu": "300b0201ff4a0664633d666f6f",
+            "outcome": "ProtocolException(0) The LDAP message ID is outside the range it is permitted to use."
+        },
+        "envelope: message ID 0": {
+            "pdu": "300b0201004a0664633d666f6f",
+            "outcome": "LdapMessageRequest DeleteRequest [] adcc2cb1a8be"
+        },
+        "envelope: unknown operation tag": {
+            "pdu": "30060201015e0178",
+            "outcome": "ProtocolException(0) The tag 30 for the LDAP operation is not supported."
+        },
+        "envelope: controls tag holding a primitive": {
+            "pdu": "300e0201014a0664633d666f6f800178",
+            "outcome": "MessageDecodeException(id=1, tag=10, result=2) The encoded sequence type is malformed."
+        },
+        "envelope: control without an OID": {
+            "pdu": "30120201014a0664633d666f6fa00530030101ff",
+            "outcome": "MessageDecodeException(id=1, tag=10, result=2) The control either is not a sequence or has no OID value attached."
+        },
+        "envelope: trailing component after the controls": {
+            "pdu": "30210201014a0664633d666f6fa00930070405312e322e339e09657874656e73696f6e",
+            "outcome": "LdapMessageRequest DeleteRequest [Control] 1f9831aede34"
+        },
+        "bind: simple": {
+            "pdu": "301f020101601a020103040d636e3d666f6f2c64633d6261728006736563726574",
+            "outcome": "LdapMessageRequest SimpleBindRequest [] 3b3a27951014"
+        },
+        "bind: anonymous": {
+            "pdu": "300c020101600702010304008000",
+            "outcome": "LdapMessageRequest AnonBindRequest [] 777b95821fe3"
+        },
+        "bind: unauthenticated (name, no password)": {
+            "pdu": "30190201016014020103040d636e3d666f6f2c64633d6261728000",
+            "outcome": "LdapMessageRequest AnonBindRequest [] d6564d7a3af3"
+        },
+        "bind: SASL with credentials": {
+            "pdu": "301d02010160180201030400a3110405504c41494e040800666f6f00626172",
+            "outcome": "LdapMessageRequest SaslBindRequest [] f818e4bb7e71"
+        },
+        "bind: SASL without credentials": {
+            "pdu": "301602010160110201030400a30a040845585445524e414c",
+            "outcome": "LdapMessageRequest SaslBindRequest [] 020702af22ab"
+        },
+        "bind: version not an integer": {
+            "pdu": "300c020101600704013304008000",
+            "outcome": "MessageDecodeException(id=1, tag=0, result=2) The bind request in malformed"
+        },
+        "bind: unknown authentication choice": {
+            "pdu": "300d02010160080201030400850178",
+            "outcome": "MessageDecodeException(id=1, tag=0, result=2) The auth choice tag 5 in the bind request is not supported."
+        },
+        "bind: SASL credentials padded with extra elements": {
+            "pdu": "301a02010160150201030400a30e0405504c41494e04017804000400",
+            "outcome": "LdapMessageRequest SaslBindRequest [] fa6a65bf047d"
+        },
+        "unbind": {
+            "pdu": "30050201014200",
+            "outcome": "LdapMessageRequest UnbindRequest [] b52d5877b7b9"
+        },
+        "unbind: not null": {
+            "pdu": "3006020101420178",
+            "outcome": "EncoderException(0) The encoded null type is malformed."
+        },
+        "search: equality filter and attributes": {
+            "pdu": "30380201016333040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a3090402636e0403666f6f30080402636e0402736e",
+            "outcome": "LdapMessageRequest SearchRequest [] 3b48aed5557b"
+        },
+        "search: seven components": {
+            "pdu": "3020020101631b040664633d666f6f0a01020a01000201000201000101008702636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The search request is malformed"
+        },
+        "search: size limit not an integer": {
+            "pdu": "3022020101631d040664633d666f6f0a01020a01000401300201000101008702636e3000",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The search request is malformed"
+        },
+        "search: scope out of range (decodes; refused later)": {
+            "pdu": "3022020101631d040664633d666f6f0a01090a01000201ff0201000101008702636e3000",
+            "outcome": "LdapMessageRequest SearchRequest [] 8628699358b5"
+        },
+        "search: trailing component": {
+            "pdu": "302d0201016328040664633d666f6f0a01020a01000201000201000101008702636e30009e09657874656e73696f6e",
+            "outcome": "LdapMessageRequest SearchRequest [] 0e9229333061"
+        },
+        "search: attribute not an octet string": {
+            "pdu": "30250201016320040664633d666f6f0a01020a01000201000201000101008702636e3003020101",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The search request is malformed."
+        },
+        "modify: add, delete and replace": {
+            "pdu": "305d0201016658040d636e3d666f6f2c64633d6261723047301a0a01003015040b6465736372697074696f6e3106040161040162300b0a010130060402736e3100301c0a0102301704046d61696c310f040d78406578616d706c652e636f6d",
+            "outcome": "LdapMessageRequest ModifyRequest [] 6046f37f552c"
+        },
+        "modify: change type not an enumerated": {
+            "pdu": "301f020101661a0406636e3d666f6f3010300e04013030090402636e3103040178",
+            "outcome": "MessageDecodeException(id=1, tag=6, result=2) The change for the modify request is malformed."
+        },
+        "add: entry": {
+            "pdu": "30490201016844040d636e3d666f6f2c64633d62617230333017040b6f626a656374436c61737331080406706572736f6e300b0402636e31050403666f6f300b0402736e31050403626172",
+            "outcome": "LdapMessageRequest AddRequest [] 4122d9c713a5"
+        },
+        "add: attribute with no values": {
+            "pdu": "301702010168120406636e3d666f6f300830060402636e3100",
+            "outcome": "MessageDecodeException(id=1, tag=8, result=2) No values for attribute type \"cn\"."
+        },
+        "delete": {
+            "pdu": "30120201014a0d636e3d666f6f2c64633d626172",
+            "outcome": "LdapMessageRequest DeleteRequest [] 59a865e3a27c"
+        },
+        "delete: constructed": {
+            "pdu": "300d0201016a080406636e3d666f6f",
+            "outcome": "LdapMessageRequest DeleteRequest [] 0686a78d8149"
+        },
+        "modify DN: rename and move": {
+            "pdu": "30310201016c2c040d636e3d666f6f2c64633d6261720406636e3d666f6f0101ff80106f753d70656f706c652c64633d626172",
+            "outcome": "LdapMessageRequest ModifyDnRequest [] 53ae746bdd4b"
+        },
+        "modify DN: rename only": {
+            "pdu": "301f0201016c1a040d636e3d666f6f2c64633d6261720406636e3d6e6577010100",
+            "outcome": "LdapMessageRequest ModifyDnRequest [] c93ff2033b42"
+        },
+        "modify DN: new RDN that is not an RDN": {
+            "pdu": "30230201016c1e040d636e3d666f6f2c64633d626172040a6e6f742d616e2d72646e0101ff",
+            "outcome": "MessageDecodeException(id=1, tag=12, result=34) The RDN \"not-an-rdn\" is invalid."
+        },
+        "modify DN: trailing component": {
+            "pdu": "302a0201016c25040d636e3d666f6f2c64633d6261720406636e3d6e65770101ff9e09657874656e73696f6e",
+            "outcome": "LdapMessageRequest ModifyDnRequest [] c7c36ee82e7c"
+        },
+        "compare": {
+            "pdu": "301f0201016e1a040d636e3d666f6f2c64633d62617230090402636e0403666f6f",
+            "outcome": "LdapMessageRequest CompareRequest [] 5a7fad773efc"
+        },
+        "compare: assertion not a sequence": {
+            "pdu": "30110201016e0c0406636e3d666f6f0402636e",
+            "outcome": "MessageDecodeException(id=1, tag=14, result=2) The attribute value assertion is malformed."
+        },
+        "abandon": {
+            "pdu": "3006020101500105",
+            "outcome": "LdapMessageRequest AbandonRequest [] 7bad9976e5c4"
+        },
+        "abandon: not an integer": {
+            "pdu": "3006020101500135",
+            "outcome": "LdapMessageRequest AbandonRequest [] 589f9411fb17"
+        },
+        "extended: who am I": {
+            "pdu": "301e02010177198017312e332e362e312e342e312e343230332e312e31312e33",
+            "outcome": "LdapMessageRequest ExtendedRequest [] 71ab9f84d561"
+        },
+        "extended: StartTLS": {
+            "pdu": "301d02010177188016312e332e362e312e342e312e313436362e3230303337",
+            "outcome": "LdapMessageRequest ExtendedRequest [] 8df178543550"
+        },
+        "extended: password modify (generic at decode)": {
+            "pdu": "3034020101772f8017312e332e362e312e342e312e343230332e312e31312e31811430128006636e3d666f6f81036f6c6482036e6577",
+            "outcome": "LdapMessageRequest ExtendedRequest [] a0a70551bcdb"
+        },
+        "extended: cancel": {
+            "pdu": "30190201017714800b312e332e362e312e312e3881053003020105",
+            "outcome": "LdapMessageRequest CancelRequest [] a4707be1d796"
+        },
+        "extended: cancel with a 9-byte message ID": {
+            "pdu": "3021020101771c800b312e332e362e312e312e38810d300b0209010000000000000000",
+            "outcome": "TypeError"
+        },
+        "extended: cancel with a value that is not BER": {
+            "pdu": "301b0201017716800b312e332e362e312e312e38810767617262616765",
+            "outcome": "MessageDecodeException(id=1, tag=23, result=2) The extended request is malformed."
+        },
+        "extended: forward password policy state": {
+            "pdu": "3073020101776e8017312e332e362e312e342e312e36363230372e312e312e3181533051042431313131313131312d323232322d333333332d343434342d3535353535353535353535353118041632303236303130323033303430352e3030303030305a800f32303236303130313030303030305a",
+            "outcome": "LdapMessageRequest ForwardPasswordPolicyStateRequest [] 7ed77c6deeaf"
+        },
+        "extended: forward password policy state with a bad UUID": {
+            "pdu": "3030020101772b8017312e332e362e312e342e312e36363230372e312e312e318110300e040a6e6f742d612d757569643000",
+            "outcome": "MessageDecodeException(id=1, tag=23, result=2) The password policy forward request is malformed."
+        },
+        "extended: no request name": {
+            "pdu": "30080201017703810178",
+            "outcome": "MessageDecodeException(id=1, tag=23, result=2) The extended request is malformed."
+        },
+        "response op sent to the server: searchResDone": {
+            "pdu": "300c02010165070a010004000400",
+            "outcome": "TypeError"
+        },
+        "response op sent to the server: bindResponse": {
+            "pdu": "300c02010161070a010004000400",
+            "outcome": "TypeError"
+        },
+        "response op sent to the server: intermediate sync info": {
+            "pdu": "302902010179248018312e332e362e312e342e312e343230332e312e392e312e3481088006636f6f6b6965",
+            "outcome": "TypeError"
+        },
+        "control: paging": {
+            "pdu": "304d020101631d040664633d666f6f0a01020a01000201000201000101008702636e3000a02930270416312e322e3834302e3131333535362e312e342e333139040d300b0201640406636f6f6b6965",
+            "outcome": "LdapMessageRequest SearchRequest [PagingControl] 083fe741189f"
+        },
+        "control: paging with an empty value": {
+            "pdu": "30540201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01c301a0416312e322e3834302e3131333535362e312e342e3331390400",
+            "outcome": "InvalidArgumentException(0) The data to decode cannot be empty."
+        },
+        "control: paging with an empty value, critical": {
+            "pdu": "30570201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01f301d0416312e322e3834302e3131333535362e312e342e3331390101ff0400",
+            "outcome": "InvalidArgumentException(0) The data to decode cannot be empty."
+        },
+        "control: paging with a 9-byte size": {
+            "pdu": "30630201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02b30290416312e322e3834302e3131333535362e312e342e333139040f300d02090100000000000000000400",
+            "outcome": "TypeError"
+        },
+        "control: paging value not a sequence": {
+            "pdu": "30570201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01f301d0416312e322e3834302e3131333535362e312e342e3331390403040178",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) A paged control value must be a sequence type with 2 children."
+        },
+        "control: paging value not BER": {
+            "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210416312e322e3834302e3131333535362e312e342e333139040767617262616765",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+        },
+        "control: sorting": {
+            "pdu": "305b020101631d040664633d666f6f0a01020a01000201000201000101008702636e3000a03730350416312e322e3834302e3131333535362e312e342e343733041b301930040402736e30110402636e8008322e352e31332e338101ff",
+            "outcome": "LdapMessageRequest SearchRequest [SortingControl] 811cd5ba1c41"
+        },
+        "control: sorting key without an attribute": {
+            "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210416312e322e3834302e3131333535362e312e342e3437330407300530030101ff",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The sorting control contains unexpected data."
+        },
+        "control: sync request": {
+            "pdu": "3055020101631d040664633d666f6f0a01020a01000201000201000101008702636e3000a031302f0418312e332e362e312e342e312e343230332e312e392e312e310101ff0410300e0a01030406636f6f6b69650101ff",
+            "outcome": "LdapMessageRequest SearchRequest [SyncRequestControl] 3eb3e04a54b6"
+        },
+        "control: sync request with extra elements": {
+            "pdu": "306b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea03330310418312e332e362e312e342e312e343230332e312e392e312e310101ff041230100a01010401630101ff04056578747261",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) Expected a sequence type with 2 or less values for a sync request control value."
+        },
+        "control: proxy authorization": {
+            "pdu": "3055020101631d040664633d666f6f0a01020a01000201000201000101008702636e3000a031302f0418322e31362e3834302e312e3131333733302e332e342e31380101ff0410646e3a636e3d666f6f2c64633d626172",
+            "outcome": "LdapMessageRequest SearchRequest [ProxyAuthorizationControl] 9421c804b1ac"
+        },
+        "control: proxy authorization with a malformed authzId": {
+            "pdu": "305e0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02630240418322e31362e3834302e312e3131333733302e332e342e31380101ff0405626f677573",
+            "outcome": "LdapMessageRequest SearchRequest [ProxyAuthorizationControl] 964b964b18d6"
+        },
+        "control: proxy authorization without a value": {
+            "pdu": "30570201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01f301d0418322e31362e3834302e312e3131333733302e332e342e31380101ff",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The proxied authorization control must have a value."
+        },
+        "control: assertion": {
+            "pdu": "30340201014a0d636e3d666f6f2c64633d626172a020301e040c312e332e362e312e312e31320101ff040ba3090402636e0403666f6f",
+            "outcome": "LdapMessageRequest DeleteRequest [AssertionControl] 290f02d26bab"
+        },
+        "control: pre-read": {
+            "pdu": "30320201014a0d636e3d666f6f2c64633d626172a01e301c040e312e332e362e312e312e31332e31040a30080402636e0402736e",
+            "outcome": "LdapMessageRequest DeleteRequest [PreReadControl] b85a93eb9b85"
+        },
+        "control: post-read": {
+            "pdu": "30410201016621040d636e3d666f6f2c64633d6261723010300e0a010230090402736e3103040178a0193017040e312e332e362e312e312e31332e320405300304012a",
+            "outcome": "LdapMessageRequest ModifyRequest [PostReadControl] 7a7fd91e0734"
+        },
+        "control: post-read attribute not an octet string": {
+            "pdu": "30510201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea0193017040e312e332e362e312e312e31332e3204053003020101",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) A read-entry attribute selection must contain octet string values."
+        },
+        "control: subentries": {
+            "pdu": "3047020101631d040664633d666f6f0a01020a01000201000201000101008702636e3000a02330210417312e332e362e312e342e312e343230332e312e31302e310101ff04030101ff",
+            "outcome": "LdapMessageRequest SearchRequest [SubentriesControl] 53ae3cac6d0d"
+        },
+        "control: subentries value not a boolean": {
+            "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210417312e332e362e312e342e312e343230332e312e31302e310101ff0403040178",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) Expected a boolean type for a subentries control value."
+        },
+        "control: password policy request (no value)": {
+            "pdu": "30550201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01d301b0419312e332e362e312e342e312e34322e322e32372e382e352e31",
+            "outcome": "LdapMessageRequest SearchRequest [Control] ae7a2c0acb48"
+        },
+        "control: manage DSA IT": {
+            "pdu": "30560201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01e301c0417322e31362e3834302e312e3131333733302e332e342e320101ff",
+            "outcome": "LdapMessageRequest SearchRequest [Control] 1dbc13dd02f2"
+        },
+        "control: VLV request": {
+            "pdu": "30600201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02830260417322e31362e3834302e312e3131333733302e332e342e390101ff0408300602010002010a",
+            "outcome": "LdapMessageRequest SearchRequest [Control] d9050f1462a4"
+        },
+        "control: DirSync request": {
+            "pdu": "30620201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02a30280416312e322e3834302e3131333535362e312e342e3834310101ff040b3009020100020203e80400",
+            "outcome": "LdapMessageRequest SearchRequest [DirSyncResponseControl] 517c772bd5d1"
+        },
+        "control: sort response in a request, malformed": {
+            "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210416312e322e3834302e3131333535362e312e342e343734040767617262616765",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+        },
+        "control: sort response in a request, malformed, critical": {
+            "pdu": "305e0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02630240416312e322e3834302e3131333535362e312e342e3437340101ff040767617262616765",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+        },
+        "control: sync state in a request, critical": {
+            "pdu": "30700201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea03830360418312e332e362e312e342e312e343230332e312e392e312e320101ff041730150a0101041011111111111111111111111111111111",
+            "outcome": "LdapMessageRequest SearchRequest [SyncStateControl] 911e9defb72f"
+        },
+        "control: sync state in a request, malformed": {
+            "pdu": "305d0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02530230418312e332e362e312e342e312e343230332e312e392e312e32040767617262616765",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+        },
+        "control: sync done in a request": {
+            "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210418312e332e362e312e342e312e343230332e312e392e312e3304053003040163",
+            "outcome": "LdapMessageRequest SearchRequest [SyncDoneControl] 0e55175b047c"
+        },
+        "control: VLV response in a request": {
+            "pdu": "30610201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02930270418322e31362e3834302e312e3131333733302e332e342e3130040b30090201010201020a0100",
+            "outcome": "LdapMessageRequest SearchRequest [VlvResponseControl] 54e6aac252ac"
+        },
+        "control: unknown OID with a value": {
+            "pdu": "304d0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01530130407312e322e332e340408616e797468696e67",
+            "outcome": "LdapMessageRequest SearchRequest [Control] e9d9998c7278"
+        },
+        "control: unknown OID with an empty value": {
+            "pdu": "30480201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea010300e0407312e322e332e340101ff0400",
+            "outcome": "LdapMessageRequest SearchRequest [Control] 6f3930570995"
+        },
+        "filter: and": {
+            "pdu": "30380201016333040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a00da3070402636e0401618702736e30040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] b869820ed4bc"
+        },
+        "filter: or": {
+            "pdu": "303d0201016338040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a112a3070402636e040161a3070402636e04016230040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 6d5bc8fad86d"
+        },
+        "filter: not": {
+            "pdu": "3034020101632f040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a209a3070402636e04016130040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 293ee35cfddb"
+        },
+        "filter: empty and": {
+            "pdu": "302b0201016326040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a00030040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 582c27049648"
+        },
+        "filter: empty or": {
+            "pdu": "302b0201016326040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a10030040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] aff6c7d2aa0c"
+        },
+        "filter: greater or equal": {
+            "pdu": "303b0201016336040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a51004097569644e756d626572040331303030040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] cb0eaa119737"
+        },
+        "filter: less or equal": {
+            "pdu": "303b0201016336040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a61004097569644e756d626572040331303030040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] d764daaef1b1"
+        },
+        "filter: approximate": {
+            "pdu": "3034020101632f040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a8090402636e0403666f6f30040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 879715ddc2b9"
+        },
+        "filter: present": {
+            "pdu": "302d0201016328040d64633d666f6f2c64633d6261720a01020a01000201000201000101008702636e30040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 0d10048b4aa8"
+        },
+        "filter: substring": {
+            "pdu": "303d0201016338040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a4120402636e300c80016181016d81016e82017a30040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 8cc743b32c58"
+        },
+        "filter: extensible with DN attributes": {
+            "pdu": "3041020101633c040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a9168108322e352e31332e328202636e8303666f6f8401ff30040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] 7a09c640f04f"
+        },
+        "filter: not with two filters": {
+            "pdu": "3033020101632e040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a2088702636e8702636e30040402636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The not filter is malformed"
+        },
+        "filter: substring with no parts": {
+            "pdu": "3031020101632c040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a4060402636e300030040402636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The substring filter is malformed."
+        },
+        "filter: substring with two initial parts": {
+            "pdu": "30370201016332040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a40c0402636e300680016180016230040402636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The substring filter is malformed."
+        },
+        "filter: extensible without a match value": {
+            "pdu": "302f020101632a040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a9048202636e30040402636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The matching rule filter is malformed."
+        },
+        "filter: unknown filter tag": {
+            "pdu": "302c0201016327040d64633d666f6f2c64633d6261720a01020a01000201000201000101008b017830040402636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The received filter \"11\" is not recognized."
+        },
+        "filter: equality padded with extra elements": {
+            "pdu": "3034020101632f040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a3090402636e040178040030040402636e",
+            "outcome": "LdapMessageRequest SearchRequest [] e7a9150b16fd"
+        },
+        "filter: equality value not an octet string": {
+            "pdu": "3032020101632d040d64633d666f6f2c64633d6261720a01020a0100020100020100010100a3070402636e02010130040402636e",
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The attribute value assertion is malformed."
+        }
+    },
+    "responses": {
+        "envelope: not a sequence": {
+            "pdu": "040178",
+            "outcome": "ProtocolException(0) Expected an ASN1 sequence type, but got: FreeDSx\\Asn1\\Type\\OctetStringType"
+        },
+        "envelope: unknown operation tag": {
+            "pdu": "30060201015e0178",
+            "outcome": "ProtocolException(0) The tag 30 for the LDAP operation is not supported."
+        },
+        "envelope: message ID 0 notice of disconnection": {
+            "pdu": "3031020100782c0a01340400040d7368757474696e6720646f776e8a16312e332e362e312e342e312e313436362e3230303336",
+            "outcome": "LdapMessageResponse ExtendedResponse [] f41bb13954e3"
+        },
+        "bind response": {
+            "pdu": "300c02010161070a010004000400",
+            "outcome": "LdapMessageResponse BindResponse [] 7441ac395c7f"
+        },
+        "bind response with SASL credentials": {
+            "pdu": "301702010161120a010e0400040087096368616c6c656e6765",
+            "outcome": "LdapMessageResponse BindResponse [] a5b981c9aaf7"
+        },
+        "search result entry": {
+            "pdu": "30490201016444040d636e3d666f6f2c64633d6261723033300b0402636e31050403666f6f302404066d656d626572311a040b636e3d612c64633d626172040b636e3d622c64633d626172",
+            "outcome": "LdapMessageResponse SearchResultEntry [] d392d8c6af2b"
+        },
+        "search result entry with a sync state control": {
+            "pdu": "3081880201016444040d636e3d666f6f2c64633d6261723033300b0402636e31050403666f6f302404066d656d626572311a040b636e3d612c64633d626172040b636e3d622c64633d626172a03d303b0418312e332e362e312e342e312e343230332e312e392e312e32041f301d0a01010410111111111111111111111111111111110406636f6f6b6965",
+            "outcome": "LdapMessageResponse SearchResultEntry [SyncStateControl] 0d0c6766ab87"
+        },
+        "search result entry DN not an octet string": {
+            "pdu": "300a02010164050201013000",
+            "outcome": "MessageDecodeException(id=1, tag=4, result=2) The search result entry is malformed."
+        },
+        "search result entry values not a set": {
+            "pdu": "301802010164130406636e3d666f6f300930070402636e040178",
+            "outcome": "LdapMessageResponse SearchResultEntry [] 1adcdb7acb4c"
+        },
+        "search result done": {
+            "pdu": "300c02010165070a010004000400",
+            "outcome": "LdapMessageResponse SearchResultDone [] f699a020ac29"
+        },
+        "search result done with a referral": {
+            "pdu": "302f020101652a0a010a04000400a321041f6c6461703a2f2f6f746865722e6578616d706c652e636f6d2f64633d626172",
+            "outcome": "LdapMessageResponse SearchResultDone [] df8b9808424c"
+        },
+        "search result done with only an unusable referral": {
+            "pdu": "301902010165140a010a04000400a30b04096e6f7420612075726c",
+            "outcome": "MessageDecodeException(id=1, tag=5, result=2) The LDAP result holds no usable referral URI."
+        },
+        "search result done code not an enumerated": {
+            "pdu": "300c020101650704013004000400",
+            "outcome": "MessageDecodeException(id=1, tag=5, result=2) The LDAP result is malformed."
+        },
+        "modify response": {
+            "pdu": "300c02010167070a010004000400",
+            "outcome": "LdapMessageResponse ModifyResponse [] fca75b13215f"
+        },
+        "add response": {
+            "pdu": "301802010169130a01440406636e3d666f6f0406657869737473",
+            "outcome": "LdapMessageResponse AddResponse [] c5274b448d6f"
+        },
+        "delete response": {
+            "pdu": "30120201016b0d0a0120040664633d6261720400",
+            "outcome": "LdapMessageResponse DeleteResponse [] be06973b421b"
+        },
+        "modify DN response": {
+            "pdu": "300c0201016d070a010004000400",
+            "outcome": "LdapMessageResponse ModifyDnResponse [] 081212fe806b"
+        },
+        "compare response": {
+            "pdu": "300c0201016f070a010604000400",
+            "outcome": "LdapMessageResponse CompareResponse [] b80e6c30b6d5"
+        },
+        "search result reference": {
+            "pdu": "3022020101731d041b6c6461703a2f2f612e6578616d706c652e636f6d2f64633d626172",
+            "outcome": "LdapMessageResponse SearchResultReference [] 19ec73151c48"
+        },
+        "search result reference with no usable URL": {
+            "pdu": "3010020101730b04096e6f7420612075726c",
+            "outcome": "MessageDecodeException(id=1, tag=19, result=2) The search result reference holds no usable URI."
+        },
+        "extended response with a name and value": {
+            "pdu": "301c02010178170a0100040004008a07312e322e332e348b0576616c7565",
+            "outcome": "LdapMessageResponse ExtendedResponse [] 8e34fcbc690e"
+        },
+        "extended response for password modify (generic at decode)": {
+            "pdu": "301b02010178160a0100040004008b0d300b800967656e657261746564",
+            "outcome": "LdapMessageResponse ExtendedResponse [] 0a894807cea6"
+        },
+        "intermediate response, other name": {
+            "pdu": "301502010179108007312e322e332e34810576616c7565",
+            "outcome": "LdapMessageResponse IntermediateResponse [] 8860fdc598d1"
+        },
+        "intermediate response: sync new cookie": {
+            "pdu": "302902010179248018312e332e362e312e342e312e343230332e312e392e312e3481088006636f6f6b6965",
+            "outcome": "LdapMessageResponse SyncNewCookie [] fa6c6f037fe6"
+        },
+        "intermediate response: sync refresh delete": {
+            "pdu": "302b02010179268018312e332e362e312e342e312e343230332e312e392e312e34810aa1080406636f6f6b6965",
+            "outcome": "LdapMessageResponse SyncRefreshDelete [] 3e87075dacba"
+        },
+        "intermediate response: sync refresh present": {
+            "pdu": "302e02010179298018312e332e362e312e342e312e343230332e312e392e312e34810da20b0406636f6f6b6965010100",
+            "outcome": "LdapMessageResponse SyncRefreshPresent [] 891d27ff4412"
+        },
+        "intermediate response: sync ID set": {
+            "pdu": "3054020101794f8018312e332e362e312e342e312e343230332e312e392e312e348133a3310406636f6f6b69650101ff3124041011111111111111111111111111111111041022222222222222222222222222222222",
+            "outcome": "LdapMessageResponse SyncIdSet [] 22b2150053fb"
+        },
+        "intermediate response: sync info with an unknown choice": {
+            "pdu": "3024020101791f8018312e332e362e312e342e312e343230332e312e392e312e348103870178",
+            "outcome": "MessageDecodeException(id=1, tag=25, result=2) The tag number 1 for a SyncInfoMessage was unexpected."
+        },
+        "response control: paging": {
+            "pdu": "303702010165070a010004000400a02930270416312e322e3834302e3131333535362e312e342e333139040d300b0201000406636f6f6b6965",
+            "outcome": "LdapMessageResponse SearchResultDone [PagingControl] 4bce69493630"
+        },
+        "response control: paging with a 9-byte size": {
+            "pdu": "303902010165070a010004000400a02b30290416312e322e3834302e3131333535362e312e342e333139040f300d02090100000000000000000400",
+            "outcome": "TypeError"
+        },
+        "response control: sort response": {
+            "pdu": "302f02010165070a010004000400a021301f0416312e322e3834302e3131333535362e312e342e343734040530030a0100",
+            "outcome": "LdapMessageResponse SearchResultDone [SortingResponseControl] b3a7fa35d47e"
+        },
+        "response control: sort response, malformed": {
+            "pdu": "303102010165070a010004000400a02330210416312e322e3834302e3131333535362e312e342e343734040767617262616765",
+            "outcome": "MessageDecodeException(id=1, tag=5, result=2) The expected byte length was 97, but received 5."
+        },
+        "response control: VLV response": {
+            "pdu": "303c02010165070a010004000400a02e302c0418322e31362e3834302e312e3131333733302e332e342e31300410300e02010102010a0a01000403637478",
+            "outcome": "LdapMessageResponse SearchResultDone [VlvResponseControl] f58200121096"
+        },
+        "response control: DirSync response": {
+            "pdu": "303a02010165070a010004000400a02c302a0416312e322e3834302e3131333535362e312e342e3834310410300e0201010201000406636f6f6b6965",
+            "outcome": "LdapMessageResponse SearchResultDone [DirSyncResponseControl] 426776bba343"
+        },
+        "response control: sync done": {
+            "pdu": "303902010165070a010004000400a02b30290418312e332e362e312e342e312e343230332e312e392e312e33040d300b0406636f6f6b69650101ff",
+            "outcome": "LdapMessageResponse SearchResultDone [SyncDoneControl] 27e48812af06"
+        },
+        "response control: password policy": {
+            "pdu": "303402010161070a010004000400a02630240419312e332e362e312e342e312e34322e322e32372e382e352e3104073005a003800164",
+            "outcome": "LdapMessageResponse BindResponse [PwdPolicyResponseControl] 511efca9bf1c"
+        },
+        "response control: password policy error": {
+            "pdu": "303202010161070a013104000400a02430220419312e332e362e312e342e312e34322e322e32372e382e352e3104053003810100",
+            "outcome": "LdapMessageResponse BindResponse [PwdPolicyResponseControl] 98dc278d6b04"
+        },
+        "response control: pre-read entry": {
+            "pdu": "30680201016b070a010004000400a05a3058040e312e332e362e312e312e31332e3104466444040d636e3d666f6f2c64633d6261723033300b0402636e31050403666f6f302404066d656d626572311a040b636e3d612c64633d626172040b636e3d622c64633d626172",
+            "outcome": "LdapMessageResponse DeleteResponse [PreReadResponseControl] 1643517ff538"
+        },
+        "response control: post-read entry": {
+            "pdu": "306802010167070a010004000400a05a3058040e312e332e362e312e312e31332e3204466444040d636e3d666f6f2c64633d6261723033300b0402636e31050403666f6f302404066d656d626572311a040b636e3d612c64633d626172040b636e3d622c64633d626172",
+            "outcome": "LdapMessageResponse ModifyResponse [PostReadResponseControl] 6be4665f0cfc"
+        },
+        "response control: subtree delete progress": {
+            "pdu": "30330201016b070a010004000400a02530230417312e332e362e312e342e312e36363230372e312e332e310408300602010a800105",
+            "outcome": "LdapMessageResponse DeleteResponse [SubtreeDeleteProgressControl] 9cafb6ea9f50"
+        },
+        "response control: unknown OID": {
+            "pdu": "302302010165070a010004000400a01530130407312e322e332e340408616e797468696e67",
+            "outcome": "LdapMessageResponse SearchResultDone [Control] fcd33407508f"
+        },
+        "request control in a response: sorting": {
+            "pdu": "303202010165070a010004000400a02430220416312e322e3834302e3131333535362e312e342e3437330408300630040402736e",
+            "outcome": "LdapMessageResponse SearchResultDone [SortingControl] c04f6e2cca84"
+        },
+        "request control in a response: sync request": {
+            "pdu": "303402010165070a010004000400a02630240418312e332e362e312e342e312e343230332e312e392e312e310101ff040530030a0101",
+            "outcome": "LdapMessageResponse SearchResultDone [SyncRequestControl] 283f6f3042c7"
+        },
+        "request control in a response: subentries": {
+            "pdu": "303102010165070a010004000400a02330210417312e332e362e312e342e312e343230332e312e31302e310101ff04030101ff",
+            "outcome": "LdapMessageResponse SearchResultDone [SubentriesControl] 87d2a012f567"
+        },
+        "request control in a response: assertion": {
+            "pdu": "302702010165070a010004000400a0193017040c312e332e362e312e312e31320101ff04048702636e",
+            "outcome": "LdapMessageResponse SearchResultDone [AssertionControl] f2e84e0448b3"
+        },
+        "request op sent to the client: delete": {
+            "pdu": "30120201014a0d636e3d666f6f2c64633d626172",
+            "outcome": "TypeError"
+        }
+    },
+    "built": {
+        "filter: 30 levels of nesting": "LdapMessageRequest SearchRequest [] 2d5b5ac2cdbc",
+        "filter: 31 levels of nesting": "MessageDecodeException(id=1, tag=3, result=53) The filter is nested more than 30 levels deep.",
+        "filter: 1,000 items": "LdapMessageRequest SearchRequest [] b9445e23401b",
+        "filter: 1,001 items": "MessageDecodeException(id=1, tag=3, result=11) The filter holds more than 1000 items.",
+        "filter: a substring counts once per part": "MessageDecodeException(id=1, tag=3, result=11) The filter holds more than 1000 items.",
+        "control: assertion has a budget of its own": "LdapMessageRequest SearchRequest [AssertionControl] 5f21db822834",
+        "control: assertion with 1,001 items": "MessageDecodeException(id=1, tag=3, result=11) The filter holds more than 1000 items."
+    }
+}
