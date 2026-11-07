@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\FreeDSx\Ldap\Protocol\ResponseSentAsRequest;
 use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentRequest;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Throwable;
@@ -890,6 +891,28 @@ final class LdapServerTest extends ServerTestCase
             $this->fail('The malformed request was answered.');
         } catch (UnsolicitedNotificationException $e) {
             $this->assertTrue($e->isNoticeOfDisconnection());
+        } finally {
+            $queue->close();
+        }
+    }
+
+    public function testAResponseSentToTheServerEndsTheSessionAsAProtocolError(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new ResponseSentAsRequest(new SearchResultDone(ResultCode::SUCCESS)),
+        ));
+
+        try {
+            $queue->getMessage();
+            $this->fail('The response sent to the server was answered.');
+        } catch (UnsolicitedNotificationException $e) {
+            $this->assertTrue($e->isNoticeOfDisconnection());
+            $this->assertSame(
+                [ResultCode::PROTOCOL_ERROR, 'The message could not be processed.'],
+                [$e->getCode(), $e->getMessage()],
+            );
         } finally {
             $queue->close();
         }

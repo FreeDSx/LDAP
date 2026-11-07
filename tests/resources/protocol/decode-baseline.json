@@ -198,15 +198,15 @@
         },
         "response op sent to the server: searchResDone": {
             "pdu": "300c02010165070a010004000400",
-            "outcome": "TypeError"
+            "outcome": "ProtocolException(0) The tag 5 for the LDAP operation is not supported."
         },
         "response op sent to the server: bindResponse": {
             "pdu": "300c02010161070a010004000400",
-            "outcome": "TypeError"
+            "outcome": "ProtocolException(0) The tag 1 for the LDAP operation is not supported."
         },
         "response op sent to the server: intermediate sync info": {
             "pdu": "302902010179248018312e332e362e312e342e312e343230332e312e392e312e3481088006636f6f6b6965",
-            "outcome": "TypeError"
+            "outcome": "ProtocolException(0) The tag 25 for the LDAP operation is not supported."
         },
         "control: paging": {
             "pdu": "304d020101631d040664633d666f6f0a01020a01000201000201000101008702636e3000a02930270416312e322e3834302e3131333535362e312e342e333139040d300b0201640406636f6f6b6965",
@@ -588,7 +588,7 @@
         },
         "request op sent to the client: delete": {
             "pdu": "30120201014a0d636e3d666f6f2c64633d626172",
-            "outcome": "TypeError"
+            "outcome": "ProtocolException(0) The tag 10 for the LDAP operation is not supported."
         }
     },
     "built": {

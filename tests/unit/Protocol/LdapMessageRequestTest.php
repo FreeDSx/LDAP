@@ -260,6 +260,30 @@ final class LdapMessageRequestTest extends TestCase
         }
     }
 
+    public function test_a_response_operation_is_refused_before_it_is_decoded(): void
+    {
+        try {
+            LdapMessageRequest::fromAsn1(Asn1::sequence(
+                Asn1::integer(3),
+                Asn1::application(5, Asn1::sequence(
+                    Asn1::enumerated(0),
+                    Asn1::octetString(''),
+                    Asn1::octetString(''),
+                )),
+            ));
+            self::fail('The response operation should have been refused.');
+        } catch (ProtocolException $e) {
+            self::assertNotInstanceOf(
+                MessageDecodeException::class,
+                $e,
+            );
+            self::assertSame(
+                'The tag 5 for the LDAP operation is not supported.',
+                $e->getMessage(),
+            );
+        }
+    }
+
     /**
      * @return SequenceType<mixed>
      */

@@ -28,8 +28,6 @@ use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Operation\Request;
-use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Socket\PduInterface;
 
 use function count;
@@ -76,35 +74,6 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
      * The upper bound every RFC 4511 INTEGER (0 .. maxInt) field shares.
      */
     public const MAX_INT = 2147483647;
-
-    /**
-     * Every protocolOp tag this implementation decodes, keyed by tag.
-     *
-     * @var array<int, class-string<ProtocolElementInterface>>
-     */
-    private const PROTOCOL_OPS = [
-        0 => Request\BindRequest::class,
-        1 => Response\BindResponse::class,
-        2 => Request\UnbindRequest::class,
-        3 => Request\SearchRequest::class,
-        4 => Response\SearchResultEntry::class,
-        5 => Response\SearchResultDone::class,
-        6 => Request\ModifyRequest::class,
-        7 => Response\ModifyResponse::class,
-        8 => Request\AddRequest::class,
-        9 => Response\AddResponse::class,
-        10 => Request\DeleteRequest::class,
-        11 => Response\DeleteResponse::class,
-        12 => Request\ModifyDnRequest::class,
-        13 => Response\ModifyDnResponse::class,
-        14 => Request\CompareRequest::class,
-        15 => Response\CompareResponse::class,
-        16 => Request\AbandonRequest::class,
-        19 => Response\SearchResultReference::class,
-        23 => Request\ExtendedRequest::class,
-        24 => Response\ExtendedResponse::class,
-        25 => Response\IntermediateResponse::class,
-    ];
 
     private ControlBag $controls;
 
@@ -199,10 +168,11 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         }
 
         $opTag = $opAsn1->getTagNumber();
+        $protocolOps = static::protocolOps();
 
         // Resolved before anything is decoded: an unrecognized operation ends the session (RFC 4511 4.1.1),
         // so it must not reach the answerable path below.
-        if (!is_int($opTag) || !isset(self::PROTOCOL_OPS[$opTag])) {
+        if (!is_int($opTag) || !isset($protocolOps[$opTag])) {
             throw new ProtocolException(sprintf(
                 'The tag %s for the LDAP operation is not supported.',
                 (string) $opTag,
@@ -212,7 +182,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         // Past this point the message can be answered by its ID, so a failure inside is reported as one that
         // names the message rather than one that ends the session.
         try {
-            $operation = self::PROTOCOL_OPS[$opTag]::fromAsn1($opAsn1);
+            $operation = $protocolOps[$opTag]::fromAsn1($opAsn1);
             $controls = self::controlsFromAsn1(
                 $type,
                 $count,
@@ -263,6 +233,13 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             default => Control\Control::fromAsn1($control),
         };
     }
+
+    /**
+     * The protocolOp tags this side of the protocol receives, each with the class it decodes into.
+     *
+     * @return array<int, class-string<ProtocolElementInterface>>
+     */
+    abstract protected static function protocolOps(): array;
 
     /**
      * @return AbstractType<mixed>

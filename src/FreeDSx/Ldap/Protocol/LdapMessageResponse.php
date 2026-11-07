@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 
 /**
@@ -31,6 +32,25 @@ use FreeDSx\Ldap\Operation\Response\ResponseInterface;
  */
 class LdapMessageResponse extends LdapMessage
 {
+    /**
+     * The protocolOp tags a server sends, keyed to the response each decodes into.
+     *
+     * @var array<int, class-string<ResponseInterface>>
+     */
+    private const PROTOCOL_OPS = [
+        1 => Response\BindResponse::class,
+        4 => Response\SearchResultEntry::class,
+        5 => Response\SearchResultDone::class,
+        7 => Response\ModifyResponse::class,
+        9 => Response\AddResponse::class,
+        11 => Response\DeleteResponse::class,
+        13 => Response\ModifyDnResponse::class,
+        15 => Response\CompareResponse::class,
+        19 => Response\SearchResultReference::class,
+        24 => Response\ExtendedResponse::class,
+        25 => Response\IntermediateResponse::class,
+    ];
+
     public function __construct(
         int $messageId,
         private ResponseInterface $response,
@@ -53,6 +73,11 @@ class LdapMessageResponse extends LdapMessage
     protected function getOperationAsn1(): AbstractType
     {
         return $this->response->toAsn1();
+    }
+
+    protected static function protocolOps(): array
+    {
+        return self::PROTOCOL_OPS;
     }
 
     protected static function controlFromAsn1(SequenceType $control): Control

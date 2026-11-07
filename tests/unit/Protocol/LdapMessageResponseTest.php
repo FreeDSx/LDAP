@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -120,6 +121,17 @@ class LdapMessageResponseTest extends TestCase
             PwdPolicyError::CHANGE_AFTER_RESET,
             $decoded->getError(),
         );
+    }
+
+    public function test_a_request_operation_is_refused_before_it_is_decoded(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The tag 10 for the LDAP operation is not supported.');
+
+        LdapMessageResponse::fromAsn1(Asn1::sequence(
+            Asn1::integer(3),
+            Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
+        ));
     }
 
     public function test_it_decodes_the_subtree_delete_progress_control_as_its_typed_class(): void
