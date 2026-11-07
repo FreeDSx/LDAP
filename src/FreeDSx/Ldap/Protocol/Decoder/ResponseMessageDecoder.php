@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace FreeDSx\Ldap\Protocol\Decoder;
+
+use Closure;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
+use FreeDSx\Ldap\Control\AssertionControl;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Control\ProxyAuthorizationControl;
+use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
+use FreeDSx\Ldap\Control\SubentriesControl;
+use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
+use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
+use FreeDSx\Ldap\Control\Sync\SyncStateControl;
+use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Operation\Response;
+use FreeDSx\Ldap\Operation\Response\ResponseInterface;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+
+/**
+ * Decodes each message a server sends into the response it carries and its controls.
+ *
+ * @internal
+ * @author Chad Sikorra <Chad.Sikorra@gmail.com>
+ */
+readonly class ResponseMessageDecoder
+{
+    public function __construct(
+        private MessageEnvelopeReader $envelopes,
+        private DecodeContextFactory $contexts,
+    ) {}
+
+    /**
+     * @param AbstractType<mixed> $pdu
+     * @throws ProtocolException when the envelope cannot be read, which ends the session.
+     * @throws MessageDecodeException when anything past the envelope fails, which names the message ID.
+     */
+    public function decode(AbstractType $pdu): LdapMessageResponse
+    {
+        $envelope = $this->envelopes->read($pdu);
+        // Resolved before anything is decoded, so an unrecognized operation ends the session (RFC 4511 4.1.1).
+        $operation = $this->operationFor($envelope);
+        $context = $this->contexts->create();
+
+        [$response, $controls] = $this->envelopes->answerable(
+            $envelope,
+            fn(): array => [
+                $operation($envelope->operation),
+                $this->envelopes->controlsOf(
+                    $envelope,
+                    $context,
+                    $this->control(...),
+                ),
+            ],
+        );
+
+        return new LdapMessageResponse(
+            $envelope->messageId,
+            $response,
+            ...$controls,
+        );
+    }
+
+    /**
+     * @return Closure(AbstractType<mixed>): ResponseInterface
+     * @throws ProtocolException
+     */
+    private function operationFor(MessageEnvelope $envelope): Closure
+    {
+        return match ($envelope->operationTag) {
+            1 => Response\BindResponse::fromAsn1(...),
+            4 => Response\SearchResultEntry::fromAsn1(...),
+            5 => Response\SearchResultDone::fromAsn1(...),
+            7 => Response\ModifyResponse::fromAsn1(...),
+            9 => Response\AddResponse::fromAsn1(...),
+            11 => Response\DeleteResponse::fromAsn1(...),
+            13 => Response\ModifyDnResponse::fromAsn1(...),
+            15 => Response\CompareResponse::fromAsn1(...),
+            19 => Response\SearchResultReference::fromAsn1(...),
+            24 => Response\ExtendedResponse::fromAsn1(...),
+            25 => Response\IntermediateResponse::fromAsn1(...),
+            default => throw $this->envelopes->unsupported($envelope->operationTag),
+        };
+    }
+
+    private function control(SequenceType $control): Control
+    {
+        return match ($control->getChild(0)?->getValue()) {
+            Control::OID_PWD_POLICY => PwdPolicyResponseControl::fromAsn1($control),
+            Control::OID_PRE_READ => PreReadResponseControl::fromAsn1($control),
+            Control::OID_POST_READ => PostReadResponseControl::fromAsn1($control),
+            Control::OID_SUBTREE_DELETE_PROGRESS => SubtreeDeleteProgressControl::fromAsn1($control),
+            Control::OID_PAGING => PagingControl::fromAsn1($control),
+            Control::OID_SORTING => SortingControl::fromAsn1($control),
+            Control::OID_SORTING_RESPONSE => SortingResponseControl::fromAsn1($control),
+            Control::OID_VLV_RESPONSE => VlvResponseControl::fromAsn1($control),
+            Control::OID_DIR_SYNC => DirSyncResponseControl::fromAsn1($control),
+            Control::OID_SYNC_STATE => SyncStateControl::fromAsn1($control),
+            Control::OID_SYNC_REQUEST => SyncRequestControl::fromAsn1($control),
+            Control::OID_SYNC_DONE => SyncDoneControl::fromAsn1($control),
+            Control::OID_PROXY_AUTHORIZATION => ProxyAuthorizationControl::fromAsn1($control),
+            Control::OID_ASSERTION => AssertionControl::fromAsn1($control),
+            Control::OID_SUBENTRIES => SubentriesControl::fromAsn1($control),
+            default => Control::fromAsn1($control),
+        };
+    }
+}

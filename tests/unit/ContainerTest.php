@@ -25,6 +25,8 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
@@ -365,6 +367,26 @@ class ContainerTest extends TestCase
         self::assertInstanceOf(
             ProxyProtocolFactory::class,
             $container->get(ServerProtocolFactoryInterface::class),
+        );
+    }
+
+    public function test_a_server_and_a_proxy_container_resolve_the_request_decoder(): void
+    {
+        self::assertInstanceOf(
+            RequestMessageDecoder::class,
+            $this->subject->get(RequestMessageDecoder::class),
+        );
+        self::assertInstanceOf(
+            RequestMessageDecoder::class,
+            Container::forProxy(new ProxyOptions(new ProxyServerOptions()))->get(RequestMessageDecoder::class),
+        );
+    }
+
+    public function test_a_client_container_resolves_the_response_decoder(): void
+    {
+        self::assertInstanceOf(
+            ResponseMessageDecoder::class,
+            Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class),
         );
     }
 

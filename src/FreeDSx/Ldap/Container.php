@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Provider\ClientContainerProvider;
 use FreeDSx\Ldap\Container\Provider\ConnectionGraphContainerProvider;
 use FreeDSx\Ldap\Container\Provider\ContainerProviderInterface;
+use FreeDSx\Ldap\Container\Provider\DecoderContainerProvider;
 use FreeDSx\Ldap\Container\Provider\DirectoryServerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\HandlerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\PasswordPolicyContainerProvider;
@@ -172,7 +173,7 @@ class Container
      */
     private function providers(): array
     {
-        $providers = [];
+        $providers = [new DecoderContainerProvider()];
 
         if (isset($this->instances[ClientOptions::class])) {
             $providers[] = new ClientContainerProvider();
