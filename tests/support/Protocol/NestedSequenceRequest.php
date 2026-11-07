@@ -15,7 +15,6 @@ namespace Tests\Support\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 
 /**
@@ -33,10 +32,5 @@ final readonly class NestedSequenceRequest implements RequestInterface
         }
 
         return $type;
-    }
-
-    public static function fromAsn1(AbstractType $type): never
-    {
-        throw new ProtocolException('A nested sequence request is only ever sent.');
     }
 }

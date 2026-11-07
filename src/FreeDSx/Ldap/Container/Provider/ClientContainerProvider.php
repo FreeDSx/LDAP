@@ -17,6 +17,7 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
@@ -54,7 +55,10 @@ final class ClientContainerProvider implements ContainerProviderInterface
 
     private function makeClientQueueInstantiator(Container $container): ClientQueueInstantiator
     {
-        return new ClientQueueInstantiator($container->get(SocketPool::class));
+        return new ClientQueueInstantiator(
+            $container->get(SocketPool::class),
+            $container->get(ResponseMessageDecoder::class),
+        );
     }
 
     private function makeSocketPool(Container $container): SocketPool

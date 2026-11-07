@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Authorization\DispatchAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
@@ -47,8 +48,10 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
 
     private readonly ServerListenerOptionsInterface $options;
 
-    public function __construct(private readonly ProxyOptions $proxyOptions)
-    {
+    public function __construct(
+        private readonly ProxyOptions $proxyOptions,
+        private readonly RequestMessageDecoder $messageDecoder,
+    ) {
         $this->options = $proxyOptions->getServerOptions();
     }
 
@@ -56,7 +59,10 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         Socket $socket,
         ConnectionContext $context = new ConnectionContext(),
     ): ServerProtocolHandler {
-        $queue = $this->makeServerQueue($socket);
+        $queue = $this->makeServerQueue(
+            $socket,
+            $this->messageDecoder,
+        );
         $eventLogger = $this->makeEventLogger($context);
         $upstream = new LdapClient($this->proxyOptions->getClientOptions());
         $serverAuthorization = new ServerAuthorization($this->options);

@@ -24,8 +24,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
-use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelopeReader;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -33,17 +31,17 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class RequestMessageDecoderTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private RequestMessageDecoder $subject;
 
     protected function setUp(): void
     {
-        $this->subject = new RequestMessageDecoder(
-            new MessageEnvelopeReader(),
-            new DecodeContextFactory(),
-        );
+        $this->subject = $this->fromContainer(RequestMessageDecoder::class);
     }
 
     public function testItDecodesTheRequestAndItsControls(): void

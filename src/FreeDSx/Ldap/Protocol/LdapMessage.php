@@ -15,20 +15,11 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\IntegerType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceOfType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Control;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
-use FreeDSx\Ldap\Exception\MessageDecodeException;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Socket\PduInterface;
 
 use function count;
 
@@ -68,7 +59,7 @@ use function count;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-abstract class LdapMessage implements ProtocolElementInterface, PduInterface
+abstract class LdapMessage implements ProtocolElementInterface
 {
     /**
      * The upper bound every RFC 4511 INTEGER (0 .. maxInt) field shares.
@@ -79,7 +70,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
     public function __construct(
         private readonly int $messageId,
-        Control\Control ...$controls,
+        Control ...$controls,
     ) {
         $this->controls = new ControlBag(...$controls);
     }
@@ -123,165 +114,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     * @throws RuntimeException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException(sprintf(
-                'Expected an ASN1 sequence type, but got: %s',
-                get_class($type),
-            ));
-        }
-        $count = count($type->getChildren());
-        if ($count < 2) {
-            throw new ProtocolException(sprintf(
-                'Expected an ASN1 sequence with at least 2 elements, but it has %s',
-                count($type->getChildren()),
-            ));
-        }
-
-        $messageId = $type->getChild(0);
-        if (!($messageId instanceof IntegerType)) {
-            throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
-        }
-
-        $messageIdValue = $messageId->getValue();
-        if (!is_int($messageIdValue)) {
-            throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
-        }
-
-        // A value outside the range MessageID constrains is not an encoding of that type, so it cannot be parsed
-        // as one. Answering it would mean echoing an ID no conformant peer can accept.
-        if ($messageIdValue < 0 || $messageIdValue > self::MAX_INT) {
-            throw new ProtocolException('The LDAP message ID is outside the range it is permitted to use.');
-        }
-        /** @var SequenceType|null $opAsn1 */
-        $opAsn1 = $type->getChild(1);
-        if ($opAsn1 === null) {
-            throw new ProtocolException('The LDAP message is malformed.');
-        }
-
-        $opTag = $opAsn1->getTagNumber();
-        $protocolOps = static::protocolOps();
-
-        // Resolved before anything is decoded: an unrecognized operation ends the session (RFC 4511 4.1.1),
-        // so it must not reach the answerable path below.
-        if (!is_int($opTag) || !isset($protocolOps[$opTag])) {
-            throw new ProtocolException(sprintf(
-                'The tag %s for the LDAP operation is not supported.',
-                (string) $opTag,
-            ));
-        }
-
-        // Past this point the message can be answered by its ID, so a failure inside is reported as one that
-        // names the message rather than one that ends the session.
-        try {
-            $operation = $protocolOps[$opTag]::fromAsn1($opAsn1);
-            $controls = self::controlsFromAsn1(
-                $type,
-                $count,
-            );
-        } catch (AnswerableExceptionInterface $e) {
-            throw new MessageDecodeException(
-                $messageIdValue,
-                $opTag,
-                $e->getDiagnostic(),
-                $e,
-                $e->getCode(),
-            );
-        } catch (ProtocolException|EncoderException $e) {
-            throw new MessageDecodeException(
-                $messageIdValue,
-                $opTag,
-                $e->getMessage(),
-                $e,
-            );
-        }
-
-        return new static(
-            $messageIdValue,
-            $operation,
-            ...$controls,
-        );
-    }
-
-    /**
-     * Subclasses override to honor direction-specific OIDs, e.g. controls whose request and response forms differ.
-     */
-    protected static function controlFromAsn1(SequenceType $control): Control\Control
-    {
-        return match ($control->getChild(0)?->getValue()) {
-            Control\Control::OID_PAGING => Control\PagingControl::fromAsn1($control),
-            Control\Control::OID_SORTING => Control\Sorting\SortingControl::fromAsn1($control),
-            Control\Control::OID_SORTING_RESPONSE => Control\Sorting\SortingResponseControl::fromAsn1($control),
-            Control\Control::OID_VLV_RESPONSE => Control\Vlv\VlvResponseControl::fromAsn1($control),
-            Control\Control::OID_DIR_SYNC => Control\Ad\DirSyncResponseControl::fromAsn1($control),
-            Control\Control::OID_SYNC_STATE => Control\Sync\SyncStateControl::fromAsn1($control),
-            Control\Control::OID_SYNC_REQUEST => Control\Sync\SyncRequestControl::fromAsn1($control),
-            Control\Control::OID_SYNC_DONE => Control\Sync\SyncDoneControl::fromAsn1($control),
-            Control\Control::OID_PROXY_AUTHORIZATION => Control\ProxyAuthorizationControl::fromAsn1($control),
-            Control\Control::OID_ASSERTION => Control\AssertionControl::fromAsn1($control),
-            Control\Control::OID_PRE_READ => Control\ReadEntry\PreReadControl::fromAsn1($control),
-            Control\Control::OID_POST_READ => Control\ReadEntry\PostReadControl::fromAsn1($control),
-            Control\Control::OID_SUBENTRIES => Control\SubentriesControl::fromAsn1($control),
-            default => Control\Control::fromAsn1($control),
-        };
-    }
-
-    /**
-     * The protocolOp tags this side of the protocol receives, each with the class it decodes into.
-     *
-     * @return array<int, class-string<ProtocolElementInterface>>
-     */
-    abstract protected static function protocolOps(): array;
-
-    /**
      * @return AbstractType<mixed>
      */
     abstract protected function getOperationAsn1(): AbstractType;
-
-    /**
-     * @param SequenceType<mixed> $type
-     *
-     * @return list<Control\Control>
-     *
-     * @throws ProtocolException
-     * @throws EncoderException
-     */
-    private static function controlsFromAsn1(
-        SequenceType $type,
-        int $count,
-    ): array {
-        $controls = [];
-
-        for ($i = 2; $i < $count; $i++) {
-            $child = $type->getChild($i);
-            if ($child === null || $child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC || $child->getTagNumber() !== 0) {
-                continue;
-            }
-            if (!$child instanceof IncompleteType) {
-                throw new ProtocolException('The ASN1 structure for the controls is malformed.');
-            }
-
-            $child = (new LdapEncoder())->complete(
-                $child,
-                AbstractType::TAG_TYPE_SEQUENCE,
-            );
-
-            foreach ($child->getChildren() as $control) {
-                if (!($control instanceof SequenceType && $control->getChild(0) !== null && $control->getChild(0) instanceof OctetStringType)) {
-                    throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
-                }
-                $controls[] = static::controlFromAsn1($control);
-            }
-        }
-
-        return $controls;
-    }
 }

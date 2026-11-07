@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -47,9 +48,12 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Protocol\Queue\Response\RecordingInterceptor;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ServerQueueTest extends TestCase
 {
+    use ServerContainerTrait;
+
     /**
      * Comfortably past the buffer cap, so an uncapped peek would read on every attempt.
      */
@@ -61,10 +65,13 @@ final class ServerQueueTest extends TestCase
 
     private EncoderInterface&MockObject $mockEncoder;
 
+    private RequestMessageDecoder $messageDecoder;
+
     protected function setUp(): void
     {
         $this->mockSocket = $this->createMock(Socket::class);
         $this->mockEncoder = $this->createMock(EncoderInterface::class);
+        $this->messageDecoder = $this->fromContainer(RequestMessageDecoder::class);
 
         $this->mockSocket
             ->method('read')
@@ -79,6 +86,7 @@ final class ServerQueueTest extends TestCase
 
         $this->subject = new ServerQueue(
             $this->mockSocket,
+            $this->messageDecoder,
             $this->mockEncoder,
         );
     }
@@ -264,6 +272,7 @@ final class ServerQueueTest extends TestCase
 
         $queue = new ServerQueue(
             $socket,
+            $this->messageDecoder,
             $encoder,
             metricsRecorder: $recorder,
         );
@@ -298,6 +307,7 @@ final class ServerQueueTest extends TestCase
 
         $queue = new ServerQueue(
             $socket,
+            $this->messageDecoder,
             $encoder,
             metricsRecorder: $recorder,
         );
@@ -359,7 +369,11 @@ final class ServerQueueTest extends TestCase
         $socket = $this->createMock(Socket::class);
         $socket->method('read')->willReturn(false);
 
-        $queue = new ServerQueue($socket, new LdapEncoder());
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            new LdapEncoder(),
+        );
 
         self::assertNull($queue->peekForCancelSignal(2));
     }
@@ -466,7 +480,11 @@ final class ServerQueueTest extends TestCase
             false,
         );
 
-        $queue = new ServerQueue($socket, $encoder);
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            $encoder,
+        );
 
         $buffered = $queue->peekForCancelSignal(2);
         $signal = $queue->peekForCancelSignal(2);
@@ -485,6 +503,7 @@ final class ServerQueueTest extends TestCase
 
         $queue = new ServerQueue(
             $socket,
+            $this->messageDecoder,
             new LdapEncoder(),
         );
 
@@ -502,6 +521,7 @@ final class ServerQueueTest extends TestCase
         );
         $queue = new ServerQueue(
             $socket,
+            $this->messageDecoder,
             $encoder,
         );
         $queue->peekForCancelSignal(2);
@@ -543,7 +563,11 @@ final class ServerQueueTest extends TestCase
             false,
         );
 
-        $queue = new ServerQueue($socket, $encoder);
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            $encoder,
+        );
 
         self::assertSame(
             1,
@@ -588,7 +612,11 @@ final class ServerQueueTest extends TestCase
             ),
         );
 
-        (new ServerQueue($socket, $encoder))->sendMessage($response);
+        (new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            $encoder,
+        ))->sendMessage($response);
 
         foreach ($writes as $write) {
             self::assertLessThanOrEqual(
@@ -620,7 +648,11 @@ final class ServerQueueTest extends TestCase
                 return $bytes;
             });
 
-        $queue = new ServerQueue($socket, $encoder);
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            $encoder,
+        );
 
         for ($attempt = 0; $attempt < self::FLOOD_ATTEMPTS; $attempt++) {
             self::assertNull($queue->peekForCancelSignal(2));
@@ -660,7 +692,11 @@ final class ServerQueueTest extends TestCase
             ->method('read')
             ->willReturn($bytes);
 
-        $queue = new ServerQueue($socket, $encoder);
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            $encoder,
+        );
 
         // Peek decodes and buffers the DeleteRequest into pendingMessages
         $queue->peekForCancelSignal(2);
@@ -723,7 +759,11 @@ final class ServerQueueTest extends TestCase
         $socket = $this->createMock(Socket::class);
         $socket->method('read')->willReturn(hex2bin('3084000000c8'));
 
-        $queue = new ServerQueue($socket, maxReceiveSize: 100);
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            maxReceiveSize: 100,
+        );
 
         $this->expectException(RequestSizeExceededException::class);
 
@@ -759,6 +799,7 @@ final class ServerQueueTest extends TestCase
         try {
             $read(new ServerQueue(
                 $socket,
+                $this->messageDecoder,
                 $encoder,
             ));
             self::fail('The deeply nested request should have been refused.');
@@ -780,7 +821,11 @@ final class ServerQueueTest extends TestCase
         $socket = $this->createMock(Socket::class);
         $socket->method('read')->willReturn($bytes);
 
-        $queue = new ServerQueue($socket, maxReceiveSize: 5_242_880);
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            maxReceiveSize: 5_242_880,
+        );
 
         self::assertSame(
             5,
@@ -799,6 +844,7 @@ final class ServerQueueTest extends TestCase
 
         $queue = new ServerQueue(
             $this->mockSocket,
+            $this->messageDecoder,
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -820,6 +866,7 @@ final class ServerQueueTest extends TestCase
 
         $queue = new ServerQueue(
             $this->mockSocket,
+            $this->messageDecoder,
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -844,6 +891,7 @@ final class ServerQueueTest extends TestCase
         $log = new CallLog();
         $queue = new ServerQueue(
             $this->mockSocket,
+            $this->messageDecoder,
             $this->mockEncoder,
             interceptors: [
                 new RecordingInterceptor($log, 'a'),
@@ -934,7 +982,10 @@ final class ServerQueueTest extends TestCase
         });
 
         # A null encoder builds a real LdapEncoder, so the real search-entry fast path runs.
-        (new ServerQueue($socket))->sendMessage($message);
+        (new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+        ))->sendMessage($message);
 
         return $written;
     }
@@ -947,6 +998,10 @@ final class ServerQueueTest extends TestCase
         $socket = $this->createMock(Socket::class);
         $socket->method('read')->willReturn($bytes);
 
-        return new ServerQueue($socket, $encoder);
+        return new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            $encoder,
+        );
     }
 }

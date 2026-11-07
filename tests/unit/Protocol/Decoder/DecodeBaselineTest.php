@@ -13,9 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder;
 
-use Closure;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
-use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelopeReader;
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -25,18 +24,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\DecodeBaseline;
 use Tests\Support\FreeDSx\Ldap\Protocol\DecodeOutcome;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class DecodeBaselineTest extends TestCase
 {
-    /**
-     * @var Closure(string): LdapMessageRequest
-     */
-    private Closure $decodeRequest;
-
-    /**
-     * @var Closure(string): LdapMessageResponse
-     */
-    private Closure $decodeResponse;
+    use ServerContainerTrait;
 
     private RequestMessageDecoder $requestDecoder;
 
@@ -44,20 +36,8 @@ final class DecodeBaselineTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->decodeRequest = static fn(string $pdu): LdapMessageRequest => LdapMessageRequest::fromAsn1(
-            (new LdapEncoder())->decode($pdu),
-        );
-        $this->decodeResponse = static fn(string $pdu): LdapMessageResponse => LdapMessageResponse::fromAsn1(
-            (new LdapEncoder())->decode($pdu),
-        );
-        $this->requestDecoder = new RequestMessageDecoder(
-            new MessageEnvelopeReader(),
-            new DecodeContextFactory(),
-        );
-        $this->responseDecoder = new ResponseMessageDecoder(
-            new MessageEnvelopeReader(),
-            new DecodeContextFactory(),
-        );
+        $this->requestDecoder = $this->fromContainer(RequestMessageDecoder::class);
+        $this->responseDecoder = Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class);
     }
 
     /**
@@ -84,7 +64,7 @@ final class DecodeBaselineTest extends TestCase
         self::assertSame(
             $outcome,
             DecodeOutcome::of(
-                $this->decodeRequest,
+                fn(string $pdu): LdapMessageRequest => $this->requestDecoder->decode((new LdapEncoder())->decode($pdu)),
                 $pdu,
             ),
         );
@@ -98,37 +78,9 @@ final class DecodeBaselineTest extends TestCase
         self::assertSame(
             $outcome,
             DecodeOutcome::of(
-                $this->decodeResponse,
-                $pdu,
-            ),
-        );
-    }
-
-    #[DataProvider('requests')]
-    public function testTheRequestDecoderDecodesEachRequestAsRecorded(
-        string $pdu,
-        string $outcome,
-    ): void {
-        self::assertSame(
-            $outcome,
-            DecodeOutcome::of(
-                fn(string $pdu): LdapMessageRequest => $this->requestDecoder->decode((new LdapEncoder())->decode($pdu)),
-                $pdu,
-            ),
-        );
-    }
-
-    #[DataProvider('responses')]
-    public function testTheResponseDecoderDecodesEachResponseAsRecorded(
-        string $pdu,
-        string $outcome,
-    ): void {
-        self::assertSame(
-            $outcome,
-            DecodeOutcome::of(
-                fn(string $pdu): LdapMessageResponse => $this->responseDecoder->decode((new LdapEncoder())->decode(
-                    $pdu,
-                )),
+                fn(string $pdu): LdapMessageResponse => $this->responseDecoder->decode(
+                    (new LdapEncoder())->decode($pdu),
+                ),
                 $pdu,
             ),
         );

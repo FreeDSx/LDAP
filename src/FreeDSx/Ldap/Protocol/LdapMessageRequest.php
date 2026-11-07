@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 
 /**
@@ -26,24 +25,6 @@ use FreeDSx\Ldap\Operation\Request\RequestInterface;
  */
 class LdapMessageRequest extends LdapMessage
 {
-    /**
-     * The protocolOp tags a client sends, keyed to the request each decodes into.
-     *
-     * @var array<int, class-string<RequestInterface>>
-     */
-    private const PROTOCOL_OPS = [
-        0 => Request\BindRequest::class,
-        2 => Request\UnbindRequest::class,
-        3 => Request\SearchRequest::class,
-        6 => Request\ModifyRequest::class,
-        8 => Request\AddRequest::class,
-        10 => Request\DeleteRequest::class,
-        12 => Request\ModifyDnRequest::class,
-        14 => Request\CompareRequest::class,
-        16 => Request\AbandonRequest::class,
-        23 => Request\ExtendedRequest::class,
-    ];
-
     public function __construct(
         int $messageId,
         private readonly RequestInterface $request,
@@ -66,10 +47,5 @@ class LdapMessageRequest extends LdapMessage
     protected function getOperationAsn1(): AbstractType
     {
         return $this->request->toAsn1();
-    }
-
-    protected static function protocolOps(): array
-    {
-        return self::PROTOCOL_OPS;
     }
 }

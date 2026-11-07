@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 
 /**
@@ -29,10 +28,5 @@ final readonly class TrailingComponentRequest implements RequestInterface
     public function toAsn1(): AbstractType
     {
         return self::withTrailingComponent($this->request->toAsn1());
-    }
-
-    public static function fromAsn1(AbstractType $type): never
-    {
-        throw new ProtocolException('A request with a trailing component is only ever sent.');
     }
 }

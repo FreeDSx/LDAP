@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Queue;
 
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketPool;
@@ -32,7 +35,10 @@ final class ClientQueueInstantiatorTest extends TestCase
         $this->mockPool = $this->createMock(SocketPool::class);
         $this->mockSocket = $this->createMock(Socket::class);
 
-        $this->subject = new ClientQueueInstantiator($this->mockPool);
+        $this->subject = new ClientQueueInstantiator(
+            $this->mockPool,
+            Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class),
+        );
     }
 
     public function test_it_should_return_false_if_not_instantiated_for_isConnectedAndInstantiated(): void

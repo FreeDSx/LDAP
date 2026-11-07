@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 
@@ -28,10 +27,5 @@ final readonly class ResponseSentAsRequest implements RequestInterface
     public function toAsn1(): AbstractType
     {
         return $this->response->toAsn1();
-    }
-
-    public static function fromAsn1(AbstractType $type): never
-    {
-        throw new ProtocolException('A response sent as a request is only ever sent.');
     }
 }

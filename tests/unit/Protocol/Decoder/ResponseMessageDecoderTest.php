@@ -15,6 +15,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
@@ -26,8 +28,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
-use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelopeReader;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -39,10 +39,7 @@ final class ResponseMessageDecoderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ResponseMessageDecoder(
-            new MessageEnvelopeReader(),
-            new DecodeContextFactory(),
-        );
+        $this->subject = Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class);
     }
 
     public function testItDecodesTheResponseAndItsControls(): void

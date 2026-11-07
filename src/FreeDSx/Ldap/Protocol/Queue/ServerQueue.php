@@ -15,17 +15,16 @@ namespace FreeDSx\Ldap\Protocol\Queue;
 
 use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -77,6 +76,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function __construct(
         Socket $socket,
+        private readonly RequestMessageDecoder $messageDecoder,
         ?EncoderInterface $encoder = null,
         int $maxReceiveSize = 0,
         array $interceptors = [],
@@ -267,9 +267,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     /**
      * {@inheritDoc}
      * @throws ProtocolException
-     * @throws EncoderException
-     * @throws PartialPduException
-     * @throws RuntimeException
+     * @throws MessageDecodeException
      */
     protected function constructMessage(Message $message, ?int $id = null): LdapMessageRequest
     {
@@ -279,7 +277,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
             throw new ProtocolException('The message received is invalid.');
         }
 
-        return LdapMessageRequest::fromAsn1($type);
+        return $this->messageDecoder->decode($type);
     }
 
     /**

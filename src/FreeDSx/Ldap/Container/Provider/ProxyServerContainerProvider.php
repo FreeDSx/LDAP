@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -48,7 +49,10 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
         $options = $container->get(ProxyOptions::class);
         self::assertUpstreamIsConfidentialIfRequired($options);
 
-        return new ProxyProtocolFactory($options);
+        return new ProxyProtocolFactory(
+            $options,
+            $container->get(RequestMessageDecoder::class),
+        );
     }
 
     private static function assertUpstreamIsConfidentialIfRequired(ProxyOptions $options): void

@@ -16,6 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Queue;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
@@ -24,6 +26,7 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -46,11 +49,14 @@ final class ClientQueueTest extends TestCase
 
     private EncoderInterface&MockObject $mockEncoder;
 
+    private ResponseMessageDecoder $messageDecoder;
+
     protected function setUp(): void
     {
         $this->mockPool = $this->createMock(SocketPool::class);
         $this->mockSocket = $this->createMock(Socket::class);
         $this->mockEncoder = $this->createMock(EncoderInterface::class);
+        $this->messageDecoder = Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class);
 
         $this->mockEncoder
             ->method('getLastPosition')
@@ -69,6 +75,7 @@ final class ClientQueueTest extends TestCase
 
         $this->subject = new ClientQueue(
             $this->mockPool,
+            $this->messageDecoder,
             $this->mockEncoder,
         );
     }
@@ -211,7 +218,7 @@ final class ClientQueueTest extends TestCase
         $bytes = $this->encodeSearchResultEntry(7);
 
         self::assertEquals(
-            LdapMessageResponse::fromAsn1((new LdapEncoder())->decode($bytes)),
+            $this->decodedThroughTheTypeGraph($bytes),
             $this->queueReceiving($bytes)->getMessage(),
         );
     }
@@ -224,7 +231,7 @@ final class ClientQueueTest extends TestCase
         );
 
         self::assertEquals(
-            LdapMessageResponse::fromAsn1((new LdapEncoder())->decode($bytes)),
+            $this->decodedThroughTheTypeGraph($bytes),
             $this->queueReceiving($bytes)->getMessage(),
         );
     }
@@ -238,7 +245,7 @@ final class ClientQueueTest extends TestCase
         );
 
         self::assertEquals(
-            LdapMessageResponse::fromAsn1((new LdapEncoder())->decode($bytes)),
+            $this->decodedThroughTheTypeGraph($bytes),
             $this->queueReceiving(
                 substr(
                     $bytes,
@@ -283,7 +290,7 @@ final class ClientQueueTest extends TestCase
         ));
 
         self::assertEquals(
-            LdapMessageResponse::fromAsn1((new LdapEncoder())->decode($bytes)),
+            $this->decodedThroughTheTypeGraph($bytes),
             $this->queueReceiving($bytes)->getMessage(),
         );
     }
@@ -363,6 +370,14 @@ final class ClientQueueTest extends TestCase
             ->method('connect')
             ->willReturn($socket);
 
-        return new ClientQueue($pool);
+        return new ClientQueue(
+            $pool,
+            $this->messageDecoder,
+        );
+    }
+
+    private function decodedThroughTheTypeGraph(string $bytes): LdapMessageResponse
+    {
+        return $this->messageDecoder->decode((new LdapEncoder())->decode($bytes));
     }
 }

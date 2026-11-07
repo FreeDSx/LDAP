@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Queue;
 
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Socket\SocketPool;
 
 /**
@@ -24,14 +25,20 @@ class ClientQueueInstantiator
 {
     private ?ClientQueue $clientQueue = null;
 
-    public function __construct(private readonly SocketPool $socketPool) {}
+    public function __construct(
+        private readonly SocketPool $socketPool,
+        private readonly ResponseMessageDecoder $messageDecoder,
+    ) {}
 
     public function make(): ClientQueue
     {
         if ($this->clientQueue) {
             return $this->clientQueue;
         }
-        $this->clientQueue = new ClientQueue($this->socketPool);
+        $this->clientQueue = new ClientQueue(
+            $this->socketPool,
+            $this->messageDecoder,
+        );
 
         return $this->clientQueue;
     }

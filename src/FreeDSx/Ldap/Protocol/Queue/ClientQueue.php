@@ -19,10 +19,11 @@ use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Helper\AttributeEntryDecoder;
 use FreeDSx\Asn1\Helper\AttributeEntryMessage;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -46,6 +47,7 @@ class ClientQueue extends LdapQueue
      */
     public function __construct(
         private readonly SocketPool $socketPool,
+        private readonly ResponseMessageDecoder $messageDecoder,
         ?EncoderInterface $encoder = null,
         private readonly AttributeEntryDecoder $entryDecoder = new AttributeEntryDecoder(),
     ) {
@@ -139,9 +141,7 @@ class ClientQueue extends LdapQueue
     /**
      * {@inheritDoc}
      * @throws ProtocolException
-     * @throws EncoderException
-     * @throws PartialPduException
-     * @throws RuntimeException
+     * @throws MessageDecodeException
      */
     protected function constructMessage(
         Message $message,
@@ -156,7 +156,7 @@ class ClientQueue extends LdapQueue
             throw new ProtocolException('The message received is invalid.');
         }
 
-        return LdapMessageResponse::fromAsn1($type);
+        return $this->messageDecoder->decode($type);
     }
 
     /**

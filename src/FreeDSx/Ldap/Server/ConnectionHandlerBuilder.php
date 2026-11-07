@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
@@ -140,6 +141,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
 
         $serverQueue = $this->makeServerQueue(
             $socket,
+            $this->container->get(RequestMessageDecoder::class),
             $interceptors,
             $metricsRecorder,
         );

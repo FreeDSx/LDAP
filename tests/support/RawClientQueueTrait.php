@@ -13,7 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
@@ -36,15 +39,18 @@ trait RawClientQueueTrait
         int $timeoutRead = 15,
         bool $validateSslCert = true,
     ): ClientQueue {
-        return new ClientQueue(new SocketPool(
-            (new SocketPoolOptions(
-                (new SocketOptions())
-                    ->setPort(TestWorker::port())
-                    ->setTimeoutConnect(1)
-                    ->setTimeoutRead($timeoutRead)
-                    ->setSslValidateCert($validateSslCert),
-            ))->setServers(['127.0.0.1']),
-        ));
+        return new ClientQueue(
+            new SocketPool(
+                (new SocketPoolOptions(
+                    (new SocketOptions())
+                        ->setPort(TestWorker::port())
+                        ->setTimeoutConnect(1)
+                        ->setTimeoutRead($timeoutRead)
+                        ->setSslValidateCert($validateSslCert),
+                ))->setServers(['127.0.0.1']),
+            ),
+            Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class),
+        );
     }
 
     /**

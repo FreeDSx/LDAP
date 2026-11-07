@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseInterceptor;
@@ -40,11 +41,13 @@ trait ServerConnectionScaffoldingTrait
      */
     private function makeServerQueue(
         Socket $socket,
+        RequestMessageDecoder $messageDecoder,
         array $interceptors = [],
         MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ): ServerQueue {
         return new ServerQueue(
             $socket,
+            $messageDecoder,
             maxReceiveSize: $this->serverOptions()->getNetworkConfig()->getMaxRequestSize(),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,

@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
- * Methods needed to transform an object to/from ASN1 representation.
+ * An object that encodes itself as ASN.1.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -29,13 +28,4 @@ interface ProtocolElementInterface
      * @return AbstractType<mixed>
      */
     public function toAsn1(): AbstractType;
-
-    /**
-     * @api
-     *
-     * @param AbstractType<mixed> $type
-     * @return mixed
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(AbstractType $type);
 }
