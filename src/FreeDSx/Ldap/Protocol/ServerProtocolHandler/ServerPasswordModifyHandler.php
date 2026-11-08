@@ -18,8 +18,11 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
@@ -28,6 +31,8 @@ use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyResult;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+
+use function is_string;
 
 /**
  * Adapts RFC 3062 Password Modify requests to {@see PasswordModifyService}: decode, delegate, build the response.
@@ -38,6 +43,8 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
 {
     public function __construct(
         private PasswordModifyService $service,
+        private PasswordModifyRequestDecoder $requestDecoder,
+        private DecodeContextFactory $contexts,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
@@ -109,11 +116,16 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
      */
     private function decodeRequest(LdapMessageRequest $message): PasswordModifyRequest
     {
-        /** @var ExtendedRequest $raw */
-        $raw = $message->getRequest();
+        $request = $message->getRequest();
+        if ($request instanceof PasswordModifyRequest) {
+            return $request;
+        }
 
         try {
-            return PasswordModifyRequest::fromAsn1($raw->toAsn1());
+            return $this->requestDecoder->decode(
+                $this->valueOf($request),
+                $this->contexts->create(),
+            );
         } catch (ProtocolException $e) {
             throw new OperationException(
                 $e->getMessage(),
@@ -121,6 +133,23 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
                 $e,
             );
         }
+    }
+
+    /**
+     * The value as the client sent it, which a request decoded from the wire always carries as a string.
+     *
+     * @throws ProtocolException
+     */
+    private function valueOf(RequestInterface $request): ?string
+    {
+        $value = $request instanceof ExtendedRequest
+            ? $request->getValue()
+            : null;
+        if ($value !== null && !is_string($value)) {
+            throw new ProtocolException('The password modify request is malformed.');
+        }
+
+        return $value;
     }
 
     /**

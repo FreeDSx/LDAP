@@ -14,18 +14,12 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class AddRequestTest extends TestCase
 {
-    use TrailingComponentTrait;
-
     private AddRequest $subject;
 
     protected function setUp(): void
@@ -78,78 +72,5 @@ final class AddRequestTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $add = new AddRequest(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']]));
-
-        self::assertEquals(
-            new AddRequest(Entry::create(
-                'cn=foo,dc=foo,dc=bar',
-                ['cn' => 'foo', 'sn' => ['foo', 'bar']],
-            )),
-            AddRequest::fromAsn1($add->toAsn1()),
-        );
-    }
-
-    public function test_it_ignores_trailing_components_it_does_not_recognize(): void
-    {
-        $asn1 = self::withTrailingComponent(Asn1::application(8, Asn1::sequence(
-            Asn1::octetString('cn=foo,dc=foo,dc=bar'),
-            Asn1::sequenceOf(
-                self::withTrailingComponent(Asn1::sequence(
-                    Asn1::octetString('cn'),
-                    Asn1::setOf(Asn1::octetString('foo')),
-                )),
-            ),
-        )));
-
-        self::assertEquals(
-            $this->subject,
-            AddRequest::fromAsn1($asn1),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_detect_a_malformed_asn1_request(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        $this->subject->fromAsn1($type);
-    }
-
-    /**
-     * @return array<array<AbstractType<mixed>>>
-     */
-    public static function malformedAsn1DataProvider()
-    {
-        return [
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::integer(2),
-            )],
-            [Asn1::octetString('foo')],
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::sequence(
-                    Asn1::sequence(
-                        Asn1::octetString('foo'),
-                        Asn1::sequence(),
-                    ),
-                ),
-            )],
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::sequence(
-                    Asn1::sequence(
-                        Asn1::octetString('foo'),
-                    ),
-                ),
-            )],
-        ];
     }
 }

@@ -34,7 +34,7 @@ use function is_int;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class SearchRequestDecoder
+readonly class SearchRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

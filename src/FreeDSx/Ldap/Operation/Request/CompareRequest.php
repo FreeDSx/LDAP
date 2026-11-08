@@ -14,13 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 
 /**
@@ -71,28 +67,6 @@ class CompareRequest implements RequestInterface, DnRequestInterface
         $this->filter = $filter;
 
         return $this;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws RuntimeException
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {
-            throw new ProtocolException('The compare request is malformed');
-        }
-        $dn = $type->getChild(0);
-        $ava = $type->getChild(1);
-
-        if (!$dn instanceof OctetStringType || $ava === null) {
-            throw new ProtocolException('The compare request is malformed.');
-        }
-
-        return new self($dn->getValue(), EqualityFilter::fromAsn1($ava));
     }
 
     public function toAsn1(): SequenceType

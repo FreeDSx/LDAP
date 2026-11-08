@@ -15,10 +15,6 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Sasl\Options\ChallengeOptionsInterface;
 use FreeDSx\Sasl\Options\SelectOptions;
 
@@ -73,32 +69,6 @@ class SaslBindRequest extends BindRequest
     public function getSelectOptions(): ?SelectOptions
     {
         return $this->selectOptions;
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @return SaslBindRequest
-     * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): SaslBindRequest
-    {
-        if ($type instanceof IncompleteType) {
-            $type = (new LdapEncoder())->complete(
-                $type,
-                AbstractType::TAG_TYPE_SEQUENCE,
-            );
-        }
-        $mechanism = $type->getChild(0);
-        if (!$mechanism instanceof OctetStringType) {
-            throw new ProtocolException('The SASL mechanism in the bind request is malformed.');
-        }
-        $credentials = $type->getChild(1);
-
-        return new SaslBindRequest(
-            $mechanism->getValue(),
-            $credentials instanceof OctetStringType ? $credentials->getValue() : null,
-        );
     }
 
     /**

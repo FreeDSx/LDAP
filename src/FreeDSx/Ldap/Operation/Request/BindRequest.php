@@ -15,11 +15,7 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\IntegerType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a base bind request. RFC 4511, 4.2
@@ -74,59 +70,6 @@ abstract class BindRequest implements RequestInterface
             Asn1::octetString($this->username),
             $this->getAsn1AuthChoice(),
         ));
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): BindRequest
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException('The bind request in malformed');
-        }
-        $version = $type->getChild(0);
-        $name = $type->getChild(1);
-        $auth = $type->getChild(2);
-
-        if ($version === null || $name === null || $auth === null) {
-            throw new ProtocolException('The bind request in malformed');
-        }
-        if (!($version instanceof IntegerType && $name instanceof OctetStringType)) {
-            throw new ProtocolException('The bind request in malformed');
-        }
-        $versionValue = $version->getValue();
-        if (!is_int($versionValue)) {
-            throw new ProtocolException('The bind request version is not an integer.');
-        }
-        $name = $name->getValue();
-
-        if ($auth->getTagNumber() === 3) {
-            return SaslBindRequest::fromAsn1($auth)
-                ->setVersion($versionValue);
-        }
-
-        if ($auth->getTagNumber() !== 0) {
-            throw new ProtocolException(sprintf(
-                'The auth choice tag %s in the bind request is not supported.',
-                $auth->getTagNumber(),
-            ));
-        }
-        if (!($auth instanceof IncompleteType || $auth instanceof OctetStringType)) {
-            throw new ProtocolException('The bind request auth choice is malformed.');
-        }
-        $authValue = $auth->getValue();
-
-        if ($authValue === '') {
-            return new AnonBindRequest($name, $versionValue);
-        }
-
-        return new SimpleBindRequest(
-            $name,
-            $authValue,
-            $versionValue,
-        );
     }
 
     /**

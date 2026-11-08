@@ -33,7 +33,7 @@ use function is_int;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ModifyRequestDecoder
+readonly class ModifyRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

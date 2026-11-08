@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use PHPUnit\Framework\TestCase;
 
@@ -38,24 +37,5 @@ final class AbandonRequestTest extends TestCase
     {
         $expected = Asn1::application(16, Asn1::integer(1));
         $this->assertEquals($expected, $this->subject->toAsn1());
-    }
-
-    public function testItShouldBeConstructedFromAsn1(): void
-    {
-        $result = AbandonRequest::fromAsn1(Asn1::application(16, Asn1::integer(1)));
-        $expected = new AbandonRequest(1);
-        $this->assertEquals($expected, $result);
-    }
-
-    public function testItShouldNotAllowNonIntegersFromAsn1(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        AbandonRequest::fromAsn1(
-            Asn1::application(
-                16,
-                Asn1::octetString('foo'),
-            ),
-        );
     }
 }

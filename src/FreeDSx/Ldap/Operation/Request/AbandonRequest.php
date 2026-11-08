@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IntegerType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * RFC 4511, 4.11.
@@ -43,25 +41,6 @@ class AbandonRequest implements RequestInterface
     public function getMessageId(): int
     {
         return $this->messageID;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        if (!$type instanceof IntegerType) {
-            throw new ProtocolException('The abandon request is malformed');
-        }
-
-        $messageId = $type->getValue();
-        if (!is_int($messageId)) {
-            throw new ProtocolException('The abandon request message ID is not an integer.');
-        }
-
-        return new self($messageId);
     }
 
     public function toAsn1(): IntegerType

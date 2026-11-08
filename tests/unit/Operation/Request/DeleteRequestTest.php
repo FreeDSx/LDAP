@@ -14,11 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DeleteRequestTest extends TestCase
@@ -51,43 +48,5 @@ final class DeleteRequestTest extends TestCase
             Asn1::application(10, Asn1::octetString('cn=foo,dc=foo,dc=bar')),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $this->subject = DeleteRequest::fromAsn1(Asn1::application(10, Asn1::octetString(
-            'dc=foo,dc=bar',
-        )));
-
-        self::assertEquals(
-            new Dn('dc=foo,dc=bar'),
-            $this->subject->getDn(),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_not_be_constructed_from_invalid_asn1(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        DeleteRequest::fromAsn1($type);
-    }
-
-    /**
-     * @return array<array<AbstractType<mixed>>>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        return [
-            [Asn1::application(11, Asn1::octetString(
-                'dc=foo,dc=bar',
-            ))],
-            [Asn1::application(11, Asn1::integer(
-                2,
-            ))],
-        ];
     }
 }

@@ -33,7 +33,7 @@ use function sprintf;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class AddRequestDecoder
+readonly class AddRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

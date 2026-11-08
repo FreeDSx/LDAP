@@ -14,18 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetOfType;
-use FreeDSx\Asn1\Type\SetType;
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\ProtocolException;
-
-use function count;
 
 /**
  * A Modify Request. RFC 4511, 4.6
@@ -92,34 +84,6 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
         return $this->dn;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        if (!($type instanceof SequenceType && count($type) >= 2)) {
-            throw new ProtocolException('The modify request is malformed');
-        }
-
-        $dn = $type->getChild(0);
-        $changes = $type->getChild(1);
-        if (!($dn instanceof OctetStringType && $changes instanceof SequenceType)) {
-            throw new ProtocolException('The modify request is malformed');
-        }
-
-        $changeList = [];
-        foreach ($changes->getChildren() as $change) {
-            $changeList[] = self::parseChange($change);
-        }
-
-        return new self(
-            $dn->getValue(),
-            ...$changeList,
-        );
-    }
-
     public function toAsn1(): SequenceType
     {
         $changes = Asn1::sequenceOf();
@@ -144,55 +108,5 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
             Asn1::octetString($this->dn->toString()),
             $changes,
         ));
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    private static function parseChange(AbstractType $type): Change
-    {
-        if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {
-            throw new ProtocolException('The change for the modify request is malformed.');
-        }
-
-        $operation = $type->getChild(0);
-        $modification = $type->getChild(1);
-        if (!($operation instanceof EnumeratedType && $modification instanceof SequenceType)) {
-            throw new ProtocolException('The change for the modify request is malformed.');
-        }
-
-        $modType = $operation->getValue();
-        if (!is_int($modType)) {
-            throw new ProtocolException('The change operation type is not an integer.');
-        }
-
-        return new Change($modType, self::parsePartialAttribute($modification));
-    }
-
-    /**
-     * @throws ProtocolException
-     */
-    private static function parsePartialAttribute(SequenceType $type): Attribute
-    {
-        if (count($type->getChildren()) < 2) {
-            throw new ProtocolException('The partial attribute for the modify request is malformed.');
-        }
-
-        $attrType = $type->getChild(0);
-        $attrVals = $type->getChild(1);
-        if (!($attrType instanceof OctetStringType && $attrVals instanceof SetType)) {
-            throw new ProtocolException('The partial attribute for the modify request is malformed.');
-        }
-
-        $values = [];
-        foreach ($attrVals->getChildren() as $attrVal) {
-            if (!$attrVal instanceof OctetStringType) {
-                throw new ProtocolException('The partial attribute for the modify request is malformed.');
-            }
-            $values[] = $attrVal->getValue();
-        }
-
-        return new Attribute($attrType->getValue(), ...$values);
     }
 }

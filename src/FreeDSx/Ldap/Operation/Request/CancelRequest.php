@@ -14,12 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-
-use function is_int;
 
 /**
  * RFC 3909. A request to cancel an operation.
@@ -60,26 +55,5 @@ class CancelRequest extends ExtendedRequest
         $this->requestValue = Asn1::sequence(Asn1::integer($this->messageId));
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $value = self::decodeEncodedValue($type);
-        if (!($value instanceof SequenceType && $value->getChild(0) instanceof IntegerType)) {
-            throw new ProtocolException('The cancel request value is malformed.');
-        }
-
-        $messageId = $value->getChild(0)->getValue();
-        if (!is_int($messageId)) {
-            throw new ProtocolException('The cancel request message ID is not an integer.');
-        }
-
-        return new static($messageId);
     }
 }

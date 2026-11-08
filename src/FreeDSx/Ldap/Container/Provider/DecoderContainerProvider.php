@@ -92,9 +92,22 @@ final class DecoderContainerProvider implements ContainerProviderInterface
 
     private function makeRequestMessageDecoder(Container $container): RequestMessageDecoder
     {
+        // Keyed by the protocolOp tag RFC 4511 4.2 to 4.12 assigns each request.
         return new RequestMessageDecoder(
             $container->get(MessageEnvelopeReader::class),
             $container->get(DecodeContextFactory::class),
+            [
+                0 => $container->get(BindRequestDecoder::class),
+                2 => $container->get(UnbindRequestDecoder::class),
+                3 => $container->get(SearchRequestDecoder::class),
+                6 => $container->get(ModifyRequestDecoder::class),
+                8 => $container->get(AddRequestDecoder::class),
+                10 => $container->get(DeleteRequestDecoder::class),
+                12 => $container->get(ModifyDnRequestDecoder::class),
+                14 => $container->get(CompareRequestDecoder::class),
+                16 => $container->get(AbandonRequestDecoder::class),
+                23 => $container->get(ExtendedRequestDecoder::class),
+            ],
         );
     }
 

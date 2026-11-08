@@ -29,7 +29,7 @@ use function count;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class CompareRequestDecoder
+readonly class CompareRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

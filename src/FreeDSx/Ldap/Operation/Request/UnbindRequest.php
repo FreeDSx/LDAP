@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\NullType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * A request to unbind. RFC 4511, 4.3
@@ -28,20 +26,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 class UnbindRequest implements RequestInterface
 {
     protected const APP_TAG = 2;
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        if (!$type instanceof NullType) {
-            throw new ProtocolException('The unbind request is invalid');
-        }
-
-        return new self();
-    }
 
     public function toAsn1(): NullType
     {

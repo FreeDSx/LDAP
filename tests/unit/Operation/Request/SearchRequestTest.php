@@ -14,23 +14,17 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Search\Result\ReferralResult;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class SearchRequestTest extends TestCase
 {
-    use TrailingComponentTrait;
-
     private SearchRequest $subject;
 
     protected function setUp(): void
@@ -239,76 +233,5 @@ final class SearchRequestTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $search = (new SearchRequest(new EqualityFilter('foo', 'bar'), 'cn'))
-            ->base('dc,=foo,dc=bar')
-            ->timeLimit(10)
-            ->sizeLimit(5)
-            ->useBaseScope()
-            ->setAttributesOnly(true)
-            ->setDereferenceAliases(2);
-
-        $this->subject = SearchRequest::fromAsn1($search->toAsn1());
-
-        self::assertEquals(
-            new Dn('dc,=foo,dc=bar'),
-            $this->subject->getBaseDn(),
-        );
-        self::assertSame(
-            5,
-            $this->subject->getSizeLimit(),
-        );
-        self::assertSame(
-            10,
-            $this->subject->getTimeLimit(),
-        );
-        self::assertSame(
-            SearchRequest::SCOPE_BASE_OBJECT,
-            $this->subject->getScope(),
-        );
-        self::assertTrue($this->subject->getAttributesOnly());
-        self::assertSame(
-            2,
-            $this->subject->getDereferenceAliases(),
-        );
-    }
-
-    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
-    {
-        $search = (new SearchRequest(new EqualityFilter('foo', 'bar'), 'cn'))->base('dc=foo,dc=bar');
-
-        self::assertEquals(
-            $search->toAsn1(),
-            SearchRequest::fromAsn1(self::withTrailingComponent($search->toAsn1()))->toAsn1(),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_not_be_constructed_from_invalid_asn1(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        SearchRequest::fromAsn1($type);
-    }
-
-    /**
-     * @return array<array<AbstractType<mixed>>>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        return [
-            [Asn1::set()],
-            [Asn1::sequence()],
-            [Asn1::sequence(
-                Asn1::integer(5),
-                Asn1::octetString('foo'),
-            )],
-        ];
     }
 }

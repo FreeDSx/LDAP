@@ -15,22 +15,11 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use DateTimeImmutable;
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetOfType;
-use FreeDSx\Asn1\Type\SetType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
-use FreeDSx\Ldap\Schema\Validation\Syntax\UuidSyntaxValidator;
-use Throwable;
 
 use function array_values;
-use function count;
-use function is_string;
 
 /**
  * FreeDSx-private extended op forwarding a replica's observed password-policy bind state to the primary.
@@ -105,94 +94,5 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
         $this->requestValue = $sequence;
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $request = self::decodeEncodedValue($type);
-        $childCount = $request instanceof SequenceType
-            ? count($request->getChildren())
-            : 0;
-        if (!($request instanceof SequenceType) || $childCount < 2 || $childCount > 3) {
-            throw new ProtocolException('The password policy forward request is malformed.');
-        }
-
-        $entryUuid = $request->getChild(0);
-        $failureTimes = $request->getChild(1);
-        if (!($entryUuid instanceof OctetStringType && $failureTimes instanceof SetType)) {
-            throw new ProtocolException('The password policy forward request is malformed.');
-        }
-        if (!(new UuidSyntaxValidator())->isValid($entryUuid->getValue())) {
-            throw new ProtocolException('The password policy forward request has an invalid entry UUID.');
-        }
-
-        return new static(
-            $entryUuid->getValue(),
-            self::parseFailureTimes($failureTimes),
-            self::parseLastSuccess($request->getChild(2)),
-        );
-    }
-
-    /**
-     * @return list<DateTimeImmutable>
-     * @throws ProtocolException
-     */
-    private static function parseFailureTimes(SetType $failureTimes): array
-    {
-        $values = [];
-
-        foreach ($failureTimes->getChildren() as $value) {
-            if (!$value instanceof OctetStringType) {
-                throw new ProtocolException('The password policy forward request is malformed.');
-            }
-
-            $values[] = self::parseTime($value->getValue());
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param AbstractType<mixed>|null $lastSuccess
-     * @throws EncoderException
-     * @throws ProtocolException
-     */
-    private static function parseLastSuccess(?AbstractType $lastSuccess): ?DateTimeImmutable
-    {
-        if ($lastSuccess === null) {
-            return null;
-        }
-        if ($lastSuccess->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC || $lastSuccess->getTagNumber() !== 0) {
-            throw new ProtocolException('The password policy forward request is malformed.');
-        }
-
-        $value = $lastSuccess instanceof IncompleteType
-            ? (new LdapEncoder())->complete($lastSuccess, AbstractType::TAG_TYPE_OCTET_STRING)
-            : $lastSuccess;
-
-        return self::parseTime($value->getValue());
-    }
-
-    /**
-     * @throws ProtocolException
-     */
-    private static function parseTime(mixed $value): DateTimeImmutable
-    {
-        if (!is_string($value)) {
-            throw new ProtocolException('The password policy forward request has an invalid time value.');
-        }
-
-        try {
-            return GeneralizedTime::parse($value);
-        } catch (Throwable) {
-            throw new ProtocolException('The password policy forward request has an invalid time value.');
-        }
     }
 }

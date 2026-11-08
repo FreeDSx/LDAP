@@ -27,7 +27,7 @@ use function is_int;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class AbandonRequestDecoder
+readonly class AbandonRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

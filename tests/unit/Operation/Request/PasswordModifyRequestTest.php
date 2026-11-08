@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PasswordModifyRequestTest extends TestCase
@@ -128,83 +126,6 @@ final class PasswordModifyRequestTest extends TestCase
                 Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence()))),
             )),
             $this->subject->toAsn1(),
-        );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $passwdMod = new PasswordModifyRequest('foo', 'bar', '12345');
-        $result = PasswordModifyRequest::fromAsn1($passwdMod->toAsn1());
-
-        self::assertEquals(
-            $passwdMod->setValue(null),
-            $result->setValue(null),
-        );
-
-        $passwdMod = new PasswordModifyRequest(null, 'bar', '12345');
-        $expected = PasswordModifyRequest::fromAsn1($passwdMod->toAsn1());
-        self::assertEquals(
-            $passwdMod->setValue(null),
-            $expected->setValue(null),
-        );
-
-        $passwdMod = new PasswordModifyRequest('foo', null, '12345');
-        $expected = PasswordModifyRequest::fromAsn1($passwdMod->toAsn1());
-        self::assertEquals(
-            $passwdMod->setValue(null),
-            $expected->setValue(null),
-        );
-    }
-
-    public function test_it_should_not_be_constructed_from_invalid_asn1(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        PasswordModifyRequest::fromAsn1(
-            (new ExtendedRequest('foo'))
-                ->setValue(Asn1::set())
-                ->toAsn1(),
-        );
-    }
-
-    #[DataProvider('undecodableValueProvider')]
-    public function test_it_refuses_a_value_it_cannot_decode(string $value): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        PasswordModifyRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY))
-                ->setValue($value)
-                ->toAsn1(),
-        );
-    }
-
-    /**
-     * @return iterable<string, array{string}>
-     */
-    public static function undecodableValueProvider(): iterable
-    {
-        yield 'a value that is not BER' => ["\x01\x02\x03"];
-        yield 'an empty value' => [''];
-    }
-
-    public function test_it_refuses_a_field_it_does_not_recognize(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        PasswordModifyRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY))
-                ->setValue(Asn1::sequence(
-                    Asn1::context(
-                        2,
-                        Asn1::octetString('newpass'),
-                    ),
-                    Asn1::context(
-                        3,
-                        Asn1::octetString('extension'),
-                    ),
-                ))
-                ->toAsn1(),
         );
     }
 }

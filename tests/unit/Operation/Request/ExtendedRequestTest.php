@@ -14,17 +14,11 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class ExtendedRequestTest extends TestCase
 {
-    use TrailingComponentTrait;
-
     private ExtendedRequest $subject;
 
     protected function setUp(): void
@@ -76,58 +70,5 @@ final class ExtendedRequestTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1_with_no_value(): void
-    {
-        $request = new ExtendedRequest('foo');
-
-        self::assertEquals(
-            $request,
-            ExtendedRequest::fromAsn1($request->toAsn1()),
-        );
-    }
-
-    public function test_it_should_be_constructed_from_asn1_with_a_value(): void
-    {
-        $request = new ExtendedRequest('foo', 'bar');
-
-        self::assertEquals(
-            $request,
-            ExtendedRequest::fromAsn1($request->toAsn1()),
-        );
-    }
-
-    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
-    {
-        $request = new ExtendedRequest('foo', 'bar');
-
-        self::assertEquals(
-            $request,
-            ExtendedRequest::fromAsn1(self::withTrailingComponent($request->toAsn1())),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_detect_invalid_asn1(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ExtendedRequest::fromAsn1($type);
-    }
-
-    /**
-     * @return array<array<AbstractType<mixed>>>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        return [
-            [Asn1::octetString('foo')],
-            [Asn1::sequence(Asn1::octetString('foo'))],
-            [Asn1::sequence()],
-        ];
     }
 }

@@ -14,19 +14,13 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class ModifyDnRequestTest extends TestCase
 {
-    use TrailingComponentTrait;
-
     private ModifyDnRequest $subject;
 
     protected function setUp(): void
@@ -112,82 +106,5 @@ final class ModifyDnRequestTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $req = new ModifyDnRequest(
-            'foo',
-            'cn=bar',
-            false,
-            'foobar',
-        );
-
-        self::assertEquals(
-            $req,
-            $req->fromAsn1($req->toAsn1()),
-        );
-
-        $req = new ModifyDnRequest(
-            'foo',
-            'cn=bar',
-            false,
-        );
-
-        self::assertEquals(
-            $req,
-            $req->fromAsn1($req->toAsn1()),
-        );
-    }
-
-    public function test_it_ignores_a_trailing_component_after_the_new_superior(): void
-    {
-        $req = new ModifyDnRequest(
-            'foo',
-            'cn=bar',
-            false,
-            'foobar',
-        );
-
-        self::assertEquals(
-            $req,
-            $req->fromAsn1(self::withTrailingComponent($req->toAsn1())),
-        );
-    }
-
-    public function test_it_does_not_mistake_a_trailing_component_for_a_new_superior(): void
-    {
-        $req = new ModifyDnRequest(
-            'foo',
-            'cn=bar',
-            false,
-        );
-
-        self::assertEquals(
-            $req,
-            $req->fromAsn1(self::withTrailingComponent($req->toAsn1())),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_not_be_constructed_from_invalid_asn1(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        $this->subject->fromAsn1($type);
-    }
-
-    /**
-     * @return array<array<AbstractType<mixed>>>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        return [
-            [Asn1::octetString('foo')],
-            [Asn1::sequence(Asn1::integer(1))],
-        ];
     }
 }

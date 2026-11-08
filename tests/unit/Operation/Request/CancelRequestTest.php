@@ -14,12 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class CancelRequestTest extends TestCase
@@ -59,51 +56,5 @@ final class CancelRequestTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        self::assertEquals(
-            new CancelRequest(2),
-            CancelRequest::fromAsn1((new CancelRequest(2))->toAsn1()),
-        );
-    }
-
-    public function test_a_message_id_wider_than_an_integer_is_refused_as_malformed(): void
-    {
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The cancel request message ID is not an integer.');
-
-        CancelRequest::fromAsn1((new ExtendedRequest(
-            ExtendedRequest::OID_CANCEL,
-            "\x30\x0b\x02\x09\x01" . str_repeat("\x00", 8),
-        ))->toAsn1());
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_detect_invalid_asn1_from_asn1(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        CancelRequest::fromAsn1($type);
-    }
-
-    /**
-     * @return array<array<AbstractType<mixed>>>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        $req = new ExtendedRequest('foo', Asn1::octetString('foo'));
-
-        return [
-            [$req->toAsn1()],
-            [$req->setValue(Asn1::sequence())->toAsn1()],
-            [$req->setValue(Asn1::sequence(Asn1::octetString('bar')))->toAsn1()],
-            [$req->setValue("\x01\x02\x03")->toAsn1()],
-            [$req->setValue('')->toAsn1()],
-        ];
     }
 }

@@ -14,18 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
-
-use function count;
 
 /**
  * A Modify DN Request. RFC 4511, 4.9
@@ -116,41 +108,6 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
         $this->newParentDn = $newParentDn;
 
         return $this;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        if (!($type instanceof SequenceType && count($type) >= 3)) {
-            throw new ProtocolException('The modify dn request is malformed');
-        }
-        $entry = $type->getChild(0);
-        $newRdn = $type->getChild(1);
-        $deleteOldRdn = $type->getChild(2);
-        $newSuperior = $type->getChild(3);
-
-        if (!($entry instanceof OctetStringType && $newRdn instanceof OctetStringType && $deleteOldRdn instanceof BooleanType)) {
-            throw new ProtocolException('The modify dn request is malformed');
-        }
-        // RFC 4511 4: a trailing component with any other tag is an extension to ignore, not a newSuperior.
-        if ($newSuperior !== null && !($newSuperior->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $newSuperior->getTagNumber() === 0)) {
-            $newSuperior = null;
-        }
-        $newSuperior = ($newSuperior instanceof IncompleteType)
-            ? (new LdapEncoder())->complete($newSuperior, AbstractType::TAG_TYPE_OCTET_STRING)
-            : $newSuperior;
-        $newSuperior = ($newSuperior !== null) ? $newSuperior->getValue() : null;
-
-        return new static(
-            $entry->getValue(),
-            $newRdn->getValue(),
-            $deleteOldRdn->getValue(),
-            $newSuperior,
-        );
     }
 
     public function toAsn1(): SequenceType

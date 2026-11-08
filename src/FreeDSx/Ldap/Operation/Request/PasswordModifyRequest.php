@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * RFC 3062. A password modify extended request.
@@ -32,8 +30,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PasswordModifyRequest extends ExtendedRequest
 {
-    private const MALFORMED = 'The password modify request is malformed.';
-
     public function __construct(
         private ?string $userIdentity = null,
         private ?string $oldPassword = null,
@@ -102,47 +98,5 @@ class PasswordModifyRequest extends ExtendedRequest
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $request = self::decodeEncodedValue($type);
-        if ($request === null) {
-            return new static();
-        }
-        if (!($request instanceof SequenceType)) {
-            throw new ProtocolException(self::MALFORMED);
-        }
-
-        $userIdentity = null;
-        $oldPasswd = null;
-        $newPasswd = null;
-        foreach ($request->getChildren() as $value) {
-            if ($value->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                throw new ProtocolException(self::MALFORMED);
-            }
-            if ($value->getTagNumber() === 0) {
-                $userIdentity = $value;
-            } elseif ($value->getTagNumber() === 1) {
-                $oldPasswd = $value;
-            } elseif ($value->getTagNumber() === 2) {
-                $newPasswd = $value;
-            } else {
-                // RFC 3062 3: a field the server does not recognize must leave the password unchanged.
-                throw new ProtocolException(self::MALFORMED);
-            }
-        }
-
-        return new static(
-            $userIdentity?->getValue(),
-            $oldPasswd?->getValue(),
-            $newPasswd?->getValue(),
-        );
     }
 }

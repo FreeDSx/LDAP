@@ -16,7 +16,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 use DateTimeImmutable;
 use DateTimeZone;
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -115,115 +114,6 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
                 )))),
             )),
             $request->toAsn1(),
-        );
-    }
-
-    public function test_it_round_trips_through_asn1(): void
-    {
-        $result = ForwardPasswordPolicyStateRequest::fromAsn1($this->subject->toAsn1());
-
-        self::assertEquals(
-            $this->subject->setValue(null),
-            $result->setValue(null),
-        );
-    }
-
-    public function test_it_round_trips_without_a_last_success(): void
-    {
-        $request = new ForwardPasswordPolicyStateRequest(
-            self::UUID,
-            [$this->time],
-        );
-
-        $result = ForwardPasswordPolicyStateRequest::fromAsn1($request->toAsn1());
-
-        self::assertNull($result->getLastSuccess());
-        self::assertEquals(
-            $request->setValue(null),
-            $result->setValue(null),
-        );
-    }
-
-    public function test_it_rejects_a_malformed_entry_uuid(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ForwardPasswordPolicyStateRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
-                ->setValue(Asn1::sequence(
-                    Asn1::octetString('not-a-uuid'),
-                    Asn1::setOf(),
-                ))
-                ->toAsn1(),
-        );
-    }
-
-    public function test_it_rejects_an_invalid_failure_time(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ForwardPasswordPolicyStateRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
-                ->setValue(Asn1::sequence(
-                    Asn1::octetString(self::UUID),
-                    Asn1::setOf(Asn1::octetString('not-a-time')),
-                ))
-                ->toAsn1(),
-        );
-    }
-
-    public function test_it_rejects_an_invalid_last_success(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ForwardPasswordPolicyStateRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
-                ->setValue(Asn1::sequence(
-                    Asn1::octetString(self::UUID),
-                    Asn1::setOf(),
-                    Asn1::context(0, Asn1::octetString('not-a-time')),
-                ))
-                ->toAsn1(),
-        );
-    }
-
-    public function test_it_rejects_too_few_children(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ForwardPasswordPolicyStateRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
-                ->setValue(Asn1::sequence(
-                    Asn1::octetString(self::UUID),
-                ))
-                ->toAsn1(),
-        );
-    }
-
-    public function test_it_rejects_too_many_children(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ForwardPasswordPolicyStateRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
-                ->setValue(Asn1::sequence(
-                    Asn1::octetString(self::UUID),
-                    Asn1::setOf(),
-                    Asn1::context(0, Asn1::octetString(GeneralizedTime::format($this->success))),
-                    Asn1::octetString('extra'),
-                ))
-                ->toAsn1(),
-        );
-    }
-
-    public function test_it_rejects_malformed_asn1(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        ForwardPasswordPolicyStateRequest::fromAsn1(
-            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
-                ->setValue(Asn1::set())
-                ->toAsn1(),
         );
     }
 }

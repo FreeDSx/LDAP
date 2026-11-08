@@ -13,75 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Sasl\Options\DigestMD5Options;
 use PHPUnit\Framework\TestCase;
 
 final class SaslBindRequestTest extends TestCase
 {
-    public function test_bind_request_returns_sasl_bind_request_from_asn1_with_mechanism_only(): void
-    {
-        $request = new SaslBindRequest('PLAIN');
-
-        /** @var SaslBindRequest $result */
-        $result = BindRequest::fromAsn1($request->toAsn1());
-
-        self::assertInstanceOf(SaslBindRequest::class, $result);
-        self::assertSame('PLAIN', $result->getMechanism());
-        self::assertNull($result->getCredentials());
-    }
-
-    public function test_bind_request_keeps_the_declared_version_for_a_sasl_bind(): void
-    {
-        $request = (new SaslBindRequest('PLAIN'))->setVersion(2);
-
-        $result = BindRequest::fromAsn1($request->toAsn1());
-
-        self::assertSame(
-            2,
-            $result->getVersion(),
-        );
-    }
-
-    public function test_bind_request_returns_sasl_bind_request_from_asn1_with_mechanism_and_credentials(): void
-    {
-        $request = new SaslBindRequest(
-            'PLAIN',
-            "\x00user\x00pass",
-        );
-
-        /** @var SaslBindRequest $result */
-        $result = BindRequest::fromAsn1($request->toAsn1());
-
-        self::assertInstanceOf(SaslBindRequest::class, $result);
-        self::assertSame(
-            'PLAIN',
-            $result->getMechanism(),
-        );
-        self::assertSame(
-            "\x00user\x00pass",
-            $result->getCredentials(),
-        );
-    }
-
-    public function test_sasl_bind_request_throws_a_protocol_exception_for_a_malformed_sasl_mechanism(): void
-    {
-        // Build just the SaslCredentials [3] context part with a non-OctetString as the mechanism.
-        $malformedAuth = Asn1::context(
-            tagNumber: 3,
-            type: Asn1::sequence(
-                Asn1::integer(99),  // mechanism must be an OctetString, not an integer
-            ),
-        );
-
-        self::expectException(ProtocolException::class);
-
-        SaslBindRequest::fromAsn1($malformedAuth);
-    }
-
     /**
      * RFC 4511 4.2.1 uses an empty mechanism to abort a negotiation, so a client has to be able to send one.
      */
@@ -111,19 +48,5 @@ final class SaslBindRequestTest extends TestCase
         $request = new SaslBindRequest('PLAIN', null, $options);
 
         self::assertSame($options, $request->getOptions());
-    }
-
-    public function test_bind_request_throws_for_an_unsupported_authentication_tag(): void
-    {
-        // Tag 1 and 2 are reserved in the AuthenticationChoice — only 0 (simple/anon) and 3 (SASL) are valid.
-        $request = Asn1::application(0, Asn1::sequence(
-            Asn1::integer(3),
-            Asn1::octetString(''),
-            Asn1::context(tagNumber: 1, type: Asn1::octetString('')),
-        ));
-
-        self::expectException(ProtocolException::class);
-
-        BindRequest::fromAsn1($request);
     }
 }

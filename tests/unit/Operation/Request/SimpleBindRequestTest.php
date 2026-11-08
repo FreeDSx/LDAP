@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\BindException;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -112,41 +110,6 @@ final class SimpleBindRequestTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $bind = new SimpleBindRequest('foo', 'bar');
-
-        self::assertEquals(
-            $bind,
-            SimpleBindRequest::fromAsn1($bind->toAsn1()),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_detect_invalid_asn1_from_asn1(AbstractType $type): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        SimpleBindRequest::fromAsn1($type);
-    }
-
-    /**
-     * @return array<array{0: AbstractType<mixed>}>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        return [
-            [Asn1::octetString('foo')],
-            [Asn1::sequence(
-                Asn1::octetString('foo'),
-                Asn1::integer(3),
-            )],
-        ];
     }
 
     /**

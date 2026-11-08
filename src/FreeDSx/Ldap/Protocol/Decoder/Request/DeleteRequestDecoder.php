@@ -27,7 +27,7 @@ use function sprintf;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class DeleteRequestDecoder
+readonly class DeleteRequestDecoder implements RequestDecoderInterface
 {
     private const APP_TAG = 10;
 

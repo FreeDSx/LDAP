@@ -32,7 +32,7 @@ use function is_string;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ModifyDnRequestDecoder
+readonly class ModifyDnRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

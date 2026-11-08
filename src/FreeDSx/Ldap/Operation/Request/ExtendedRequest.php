@@ -14,16 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\InvalidArgumentException as Asn1InvalidArgumentException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
-
-use function count;
-use function is_string;
 
 /**
  * An Extended Request. RFC 4511, 4.12
@@ -66,8 +60,6 @@ class ExtendedRequest implements RequestInterface
     public const OID_PPOLICY_STATE_FORWARD = '1.3.6.1.4.1.66207.1.1.1';
 
     protected const APP_TAG = 23;
-
-    private const MALFORMED = 'The extended request is malformed.';
 
     /**
      * @var null|string|AbstractType<mixed>|ProtocolElementInterface
@@ -142,87 +134,5 @@ class ExtendedRequest implements RequestInterface
             tagNumber: self::APP_TAG,
             type: $asn1,
         );
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        [$oid, $value] = self::parseAsn1ExtendedRequest($type);
-
-        return match ($oid) {
-            self::OID_CANCEL => CancelRequest::fromAsn1($type),
-            self::OID_PPOLICY_STATE_FORWARD => ForwardPasswordPolicyStateRequest::fromAsn1($type),
-            default => new static(
-                $oid,
-                $value,
-            ),
-        };
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @return AbstractType<mixed>|null
-     * @throws ProtocolException when the value is present but cannot be decoded.
-     */
-    protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
-    {
-        [1 => $value] = self::parseAsn1ExtendedRequest($type);
-        if ($value === null) {
-            return null;
-        }
-
-        try {
-            return (new LdapEncoder())->decode($value);
-        } catch (EncoderException|Asn1InvalidArgumentException $e) {
-            // RFC 4511 4.1.1 answers a request that cannot be parsed with protocolError.
-            throw new ProtocolException(
-                self::MALFORMED,
-                0,
-                $e,
-            );
-        }
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     * @return array{0: string, 1: null|string}
-     */
-    protected static function parseAsn1ExtendedRequest(AbstractType $type): array
-    {
-        if (!($type instanceof SequenceType && count($type) >= 1)) {
-            throw new ProtocolException(self::MALFORMED);
-        }
-        $oid = null;
-        $value = null;
-
-        foreach ($type->getChildren() as $child) {
-            if ($child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                continue;
-            }
-            if ($child->getTagNumber() === 0) {
-                $oid = $child;
-            } elseif ($child->getTagNumber() === 1) {
-                $value = $child;
-            }
-        }
-        if ($oid === null) {
-            throw new ProtocolException(self::MALFORMED);
-        }
-
-        $oidValue = $oid->getValue();
-        $rawValue = $value?->getValue();
-        if (!is_string($oidValue) || ($rawValue !== null && !is_string($rawValue))) {
-            throw new ProtocolException(self::MALFORMED);
-        }
-
-        return [
-            $oidValue,
-            $rawValue,
-        ];
     }
 }

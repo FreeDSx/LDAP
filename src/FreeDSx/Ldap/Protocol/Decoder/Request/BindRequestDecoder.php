@@ -35,7 +35,7 @@ use function sprintf;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class BindRequestDecoder
+readonly class BindRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

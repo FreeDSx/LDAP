@@ -13,9 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\NullType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use PHPUnit\Framework\TestCase;
 
@@ -31,20 +29,5 @@ final class UnbindRequestTest extends TestCase
                 ->setTagNumber(2),
             $subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        self::assertEquals(
-            new UnbindRequest(),
-            UnbindRequest::fromAsn1(Asn1::null()),
-        );
-    }
-
-    public function test_it_should_not_be_constructed_from_invalid_asn1(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        UnbindRequest::fromAsn1(Asn1::octetString('foo'));
     }
 }

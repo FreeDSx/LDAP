@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -87,6 +89,8 @@ final class ServerPasswordModifyHandlerTest extends TestCase
                     options: TestServerOptions::cheaplyHashed(),
                 ),
             ),
+            requestDecoder: $this->fromContainer(PasswordModifyRequestDecoder::class),
+            contexts: $this->fromContainer(DecodeContextFactory::class),
         );
     }
 

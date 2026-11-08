@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class UnbindRequestDecoder
+readonly class UnbindRequestDecoder implements RequestDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

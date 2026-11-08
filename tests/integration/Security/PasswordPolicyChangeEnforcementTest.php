@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\PasswordPolicyResponseInterceptor;
@@ -386,6 +388,8 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
                 ),
                 passwordPolicyContext: $this->context,
             ),
+            requestDecoder: $container->get(PasswordModifyRequestDecoder::class),
+            contexts: $container->get(DecodeContextFactory::class),
         );
     }
 
