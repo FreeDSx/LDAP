@@ -14,9 +14,13 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control\Vlv;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\EnumeratedType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class VlvResponseControlTest extends TestCase
@@ -78,5 +82,52 @@ class VlvResponseControlTest extends TestCase
                 ))),
             ))->setValue(null),
         );
+    }
+
+    #[DataProvider('wideFieldProvider')]
+    public function test_a_field_wider_than_an_integer_is_refused_as_malformed(
+        SequenceType $value,
+        string $message,
+    ): void {
+        $encoder = new LdapEncoder();
+
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage($message);
+
+        VlvResponseControl::fromAsn1(Asn1::sequence(
+            Asn1::octetString(Control::OID_VLV_RESPONSE),
+            Asn1::octetString($encoder->encode($value)),
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{SequenceType, string}>
+     */
+    public static function wideFieldProvider(): iterable
+    {
+        yield 'target position' => [
+            Asn1::sequence(
+                Asn1::integer('18446744073709551616'),
+                Asn1::integer(300),
+                Asn1::enumerated(0),
+            ),
+            'The VLV response target position is not an integer.',
+        ];
+        yield 'content count' => [
+            Asn1::sequence(
+                Asn1::integer(1),
+                Asn1::integer('18446744073709551616'),
+                Asn1::enumerated(0),
+            ),
+            'The VLV response content count is not an integer.',
+        ];
+        yield 'result' => [
+            Asn1::sequence(
+                Asn1::integer(1),
+                Asn1::integer(300),
+                new EnumeratedType('18446744073709551616'),
+            ),
+            'The VLV response result is not an integer.',
+        ];
     }
 }

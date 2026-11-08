@@ -134,7 +134,7 @@ class SyncRequestControl extends Control
             } elseif ($child instanceof BooleanType) {
                 $reloadHint = $child->getValue();
             } elseif ($child instanceof EnumeratedType) {
-                $mode = $child->getValue();
+                $mode = $child;
             }
         }
 
@@ -144,7 +144,10 @@ class SyncRequestControl extends Control
 
         return self::mergeControlData(
             new static(
-                $mode,
+                self::integerOf(
+                    $mode,
+                    'sync request control mode',
+                ),
                 $cookie,
                 $reloadHint,
             ),

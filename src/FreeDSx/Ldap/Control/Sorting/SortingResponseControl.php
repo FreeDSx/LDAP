@@ -92,7 +92,10 @@ class SortingResponseControl extends Control
         }
 
         $response = new static(
-            $result->getValue(),
+            parent::integerOf(
+                $result,
+                'server side sorting response result',
+            ),
             ($attribute !== null) ? $attribute->getValue() : null,
         );
 

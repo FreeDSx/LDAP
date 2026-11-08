@@ -79,7 +79,10 @@ class SubtreeDeleteProgressControl extends Control
 
         return parent::mergeControlData(
             new static(
-                $deleted->getValue(),
+                parent::integerOf(
+                    $deleted,
+                    'subtree delete progress deleted count',
+                ),
                 self::remainingIn($progress->getChild(1)),
             ),
             $type,

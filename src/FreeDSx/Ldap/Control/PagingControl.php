@@ -90,7 +90,10 @@ class PagingControl extends Control
             throw new ProtocolException('A paged control value sequence 1 must be an octet string type.');
         }
         $control = new static(
-            $count->getValue(),
+            self::integerOf(
+                $count,
+                'paged control size',
+            ),
             $cookie->getValue(),
         );
 

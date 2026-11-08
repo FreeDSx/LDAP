@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control\Sync;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
 
@@ -143,5 +145,21 @@ class SyncStateControlTest extends TestCase
             Control::OID_SYNC_STATE,
             $result->getTypeOid(),
         );
+    }
+
+    public function test_a_state_wider_than_an_integer_is_refused_as_malformed(): void
+    {
+        $encoder = new LdapEncoder();
+
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The sync state control state is not an integer.');
+
+        SyncStateControl::fromAsn1(Asn1::sequence(
+            Asn1::octetString(Control::OID_SYNC_STATE),
+            Asn1::octetString($encoder->encode(Asn1::sequence(
+                new EnumeratedType('18446744073709551616'),
+                Asn1::octetString('foo'),
+            ))),
+        ));
     }
 }

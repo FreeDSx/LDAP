@@ -222,7 +222,7 @@
         },
         "control: paging with a 9-byte size": {
             "pdu": "30630201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02b30290416312e322e3834302e3131333535362e312e342e333139040f300d02090100000000000000000400",
-            "outcome": "TypeError"
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The paged control size is not an integer."
         },
         "control: paging value not a sequence": {
             "pdu": "30570201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01f301d0416312e322e3834302e3131333535362e312e342e3331390403040178",
@@ -524,7 +524,7 @@
         },
         "response control: paging with a 9-byte size": {
             "pdu": "303902010165070a010004000400a02b30290416312e322e3834302e3131333535362e312e342e333139040f300d02090100000000000000000400",
-            "outcome": "TypeError"
+            "outcome": "MessageDecodeException(id=1, tag=5, result=2) The paged control size is not an integer."
         },
         "response control: sort response": {
             "pdu": "302f02010165070a010004000400a021301f0416312e322e3834302e3131333535362e312e342e343734040530030a0100",

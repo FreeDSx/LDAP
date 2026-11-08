@@ -94,8 +94,14 @@ class DirSyncResponseControl extends Control
         }
 
         $control = new static(
-            $more->getValue(),
-            $unused->getValue(),
+            self::integerOf(
+                $more,
+                'DirSyncResponse more results value',
+            ),
+            self::integerOf(
+                $unused,
+                'DirSyncResponse unused value',
+            ),
             $cookie->getValue(),
         );
 

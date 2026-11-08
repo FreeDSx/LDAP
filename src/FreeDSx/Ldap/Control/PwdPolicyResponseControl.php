@@ -149,15 +149,27 @@ class PwdPolicyResponseControl extends Control
                 ]);
                 foreach ($warnings->getChildren() as $warning) {
                     if ($warning->getTagNumber() === 0) {
-                        $timeBeforeExpiration = $warning->getValue();
+                        $timeBeforeExpiration = self::integerOf(
+                            $warning,
+                            'pwdPolicy control time before expiration',
+                        );
                         break;
                     } elseif ($warning->getTagNumber() === 1) {
-                        $graceAttemptsRemaining = $warning->getValue();
+                        $graceAttemptsRemaining = self::integerOf(
+                            $warning,
+                            'pwdPolicy control grace authentications remaining',
+                        );
                         break;
                     }
                 }
             } elseif ($child->getTagNumber() === 1) {
-                $error = $encoder->complete($child, AbstractType::TAG_TYPE_ENUMERATED)->getValue();
+                $error = self::integerOf(
+                    $encoder->complete(
+                        $child,
+                        AbstractType::TAG_TYPE_ENUMERATED,
+                    ),
+                    'pwdPolicy control error',
+                );
             }
         }
         $control = new static(

@@ -25,6 +25,9 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use Stringable;
 
+use function is_int;
+use function sprintf;
+
 /**
  * Represents a control. RFC 4511, 4.1.11
  *
@@ -227,6 +230,27 @@ class Control implements ProtocolElementInterface, Stringable
         }
 
         return (new LdapEncoder())->decode($value);
+    }
+
+    /**
+     * Gets a decoded integer field, refusing one wider than a native integer.
+     *
+     * @param AbstractType<mixed> $type
+     * @throws ProtocolException
+     */
+    protected static function integerOf(
+        AbstractType $type,
+        string $field,
+    ): int {
+        $value = $type->getValue();
+        if (!is_int($value)) {
+            throw new ProtocolException(sprintf(
+                'The %s is not an integer.',
+                $field,
+            ));
+        }
+
+        return $value;
     }
 
     /**

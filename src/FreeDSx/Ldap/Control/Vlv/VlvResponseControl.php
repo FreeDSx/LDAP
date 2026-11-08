@@ -103,9 +103,18 @@ class VlvResponseControl extends Control
         }
 
         $response = new static(
-            $offset->getValue(),
-            $count->getValue(),
-            $result->getValue(),
+            self::integerOf(
+                $offset,
+                'VLV response target position',
+            ),
+            self::integerOf(
+                $count,
+                'VLV response content count',
+            ),
+            self::integerOf(
+                $result,
+                'VLV response result',
+            ),
         );
         if ($contextId !== null) {
             $response->contextId = $contextId->getValue();

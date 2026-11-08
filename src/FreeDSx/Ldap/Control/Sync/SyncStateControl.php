@@ -202,7 +202,10 @@ class SyncStateControl extends Control
 
         return self::mergeControlData(
             new static(
-                $state->getValue(),
+                self::integerOf(
+                    $state,
+                    'sync state control state',
+                ),
                 $entryUuid->getValue(),
                 $cookie ? $cookie->getValue() : null,
             ),

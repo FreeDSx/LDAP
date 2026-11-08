@@ -104,6 +104,19 @@ final class SubtreeDeleteProgressControlTest extends TestCase
         ));
     }
 
+    public function test_a_deleted_count_wider_than_an_integer_is_refused_as_malformed(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The subtree delete progress deleted count is not an integer.');
+
+        SubtreeDeleteProgressControl::fromAsn1(Asn1::sequence(
+            Asn1::octetString(Control::OID_SUBTREE_DELETE_PROGRESS),
+            Asn1::octetString($this->encoder->encode(Asn1::sequence(
+                Asn1::integer('18446744073709551616'),
+            ))),
+        ));
+    }
+
     /**
      * @return AbstractType<mixed>
      */
