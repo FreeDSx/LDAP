@@ -150,17 +150,18 @@ readonly class MessageEnvelopeReader
                 throw new ProtocolException('The ASN1 structure for the controls is malformed.');
             }
 
-            $controls = [
-                ...$controls,
-                ...$this->decodeControls(
-                    $context->complete(
-                        $child,
-                        AbstractType::TAG_TYPE_SEQUENCE,
-                    ),
-                    $context,
-                    $decoder,
+            $decoded = $this->decodeControls(
+                $context->complete(
+                    $child,
+                    AbstractType::TAG_TYPE_SEQUENCE,
                 ),
-            ];
+                $context,
+                $decoder,
+            );
+            // Appended in place for performance.
+            foreach ($decoded as $control) {
+                $controls[] = $control;
+            }
         }
 
         return $controls;

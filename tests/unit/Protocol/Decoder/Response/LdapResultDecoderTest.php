@@ -103,6 +103,30 @@ final class LdapResultDecoderTest extends TestCase
         );
     }
 
+    public function testItDecodesTheReferralsOfEveryReferralsFieldInTheOrderSent(): void
+    {
+        self::assertEquals(
+            [
+                new LdapUrl('foo'),
+                new LdapUrl('bar'),
+                new LdapUrl('baz'),
+            ],
+            $this->subject->decode(
+                Asn1::sequence(
+                    Asn1::enumerated(0),
+                    Asn1::octetString('dc=foo,dc=bar'),
+                    Asn1::octetString('foo'),
+                    self::referralsField(
+                        'ldap://foo',
+                        'ldap://bar',
+                    ),
+                    self::referralsField('ldap://baz'),
+                ),
+                $this->context,
+            )->getReferrals(),
+        );
+    }
+
     public function testItRefusesReferralsWhenNoneCanBeUsed(): void
     {
         $this->expectException(ProtocolException::class);

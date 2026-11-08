@@ -226,6 +226,40 @@ final class MessageEnvelopeReaderTest extends TestCase
         );
     }
 
+    public function testItDecodesTheControlsOfEveryControlsBlockInTheOrderSent(): void
+    {
+        $envelope = $this->subject->read(self::received(Asn1::sequence(
+            Asn1::integer(1),
+            Asn1::application(
+                10,
+                Asn1::octetString('dc=foo,dc=bar'),
+            ),
+            Asn1::context(
+                0,
+                Asn1::sequenceOf(
+                    (new Control('1.2.3'))->toAsn1(),
+                    (new Control('4.5.6'))->toAsn1(),
+                ),
+            ),
+            Asn1::context(
+                0,
+                Asn1::sequenceOf((new Control('7.8.9'))->toAsn1()),
+            ),
+        )));
+
+        self::assertSame(
+            ['1.2.3', '4.5.6', '7.8.9'],
+            array_map(
+                static fn(Control $control): string => $control->getTypeOid(),
+                $this->subject->controlsOf(
+                    $envelope,
+                    $this->context,
+                    $this->controls,
+                ),
+            ),
+        );
+    }
+
     public function testItIgnoresAComponentAfterTheOperationThatIsNotTheControls(): void
     {
         $envelope = $this->subject->read(self::received(Asn1::sequence(

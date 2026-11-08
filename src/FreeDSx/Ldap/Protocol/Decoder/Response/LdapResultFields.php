@@ -111,13 +111,14 @@ readonly class LdapResultFields
                 throw new ProtocolException('The ASN1 structure for the referrals is malformed.');
             }
 
-            $referrals = [
-                ...$referrals,
-                ...self::urlsIn($context->complete(
-                    $child,
-                    AbstractType::TAG_TYPE_SEQUENCE,
-                )),
-            ];
+            $urls = self::urlsIn($context->complete(
+                $child,
+                AbstractType::TAG_TYPE_SEQUENCE,
+            ));
+            // Appended in place for performance.
+            foreach ($urls as $url) {
+                $referrals[] = $url;
+            }
             // The field is only sent when it holds a URI, so losing every one would hide the continuation.
             if ($referrals === []) {
                 throw new ProtocolException('The LDAP result holds no usable referral URI.');
