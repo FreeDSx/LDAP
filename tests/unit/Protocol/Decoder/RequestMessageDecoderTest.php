@@ -227,6 +227,20 @@ final class RequestMessageDecoderTest extends TestCase
         );
     }
 
+    public function testTheOperationIsDecodedBeforeItsControls(): void
+    {
+        $e = $this->decodeFailureOf(self::received(new LdapMessageRequest(
+            9,
+            Operations::search(self::filterNestedPastTheLimit())->base('dc=foo,dc=bar'),
+            new AssertionControl(self::filterPastTheItemLimit()),
+        )));
+
+        self::assertSame(
+            ResultCode::UNWILLING_TO_PERFORM,
+            $e->getResultCode(),
+        );
+    }
+
     public function testASearchFilterNestedTooDeeplyIsAnsweredAsUnwillingToPerform(): void
     {
         $e = $this->decodeFailureOf(self::received(new LdapMessageRequest(
