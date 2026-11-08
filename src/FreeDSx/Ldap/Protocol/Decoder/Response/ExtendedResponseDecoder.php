@@ -18,16 +18,18 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function is_string;
 
 /**
  * Decodes an extended response (RFC 4511 4.12) into its generic form, keeping the name and value it carries.
  *
+ * @implements OperationDecoderInterface<ExtendedResponse>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ExtendedResponseDecoder implements ResponseDecoderInterface
+readonly class ExtendedResponseDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

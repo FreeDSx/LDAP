@@ -57,7 +57,7 @@ readonly class AttributeValueAssertionDecoder implements FilterShapeDecoderInter
     }
 
     /**
-     * Decodes the assertion alone, which a compare request carries outside of any filter.
+     * Decodes the assertion alone.
      *
      * @param AbstractType<mixed> $type
      * @return T

@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function count;
 use function is_int;
@@ -31,10 +32,11 @@ use function is_int;
 /**
  * Decodes a search request (RFC 4511 4.5.1), leaving its fields' ranges to the handlers that act on them.
  *
+ * @implements OperationDecoderInterface<SearchRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class SearchRequestDecoder implements RequestDecoderInterface
+readonly class SearchRequestDecoder implements OperationDecoderInterface
 {
     public function __construct(private FilterDecoder $filters) {}
 

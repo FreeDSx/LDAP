@@ -32,14 +32,14 @@ use FreeDSx\Ldap\Protocol\RootDseLoader;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ClientProtocolHandlerFactory
+readonly class ClientProtocolHandlerFactory
 {
     public function __construct(
-        private readonly ClientOptions $clientOptions,
-        private readonly ClientQueueInstantiator $queueInstantiator,
-        private readonly RootDseLoader $rootDseLoader,
-        private readonly TypedExtendedResponseDecoder $extendedResponses,
-        private readonly DecodeContextFactory $contexts,
+        private ClientOptions $clientOptions,
+        private ClientQueueInstantiator $queueInstantiator,
+        private RootDseLoader $rootDseLoader,
+        private TypedExtendedResponseDecoder $extendedResponses,
+        private DecodeContextFactory $contexts,
     ) {}
 
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface

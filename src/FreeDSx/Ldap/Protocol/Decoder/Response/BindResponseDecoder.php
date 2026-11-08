@@ -18,16 +18,18 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function is_string;
 
 /**
  * Decodes a bind response (RFC 4511 4.2.2) and any SASL credentials it carries.
  *
+ * @implements OperationDecoderInterface<BindResponse>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class BindResponseDecoder implements ResponseDecoderInterface
+readonly class BindResponseDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type
@@ -58,7 +60,7 @@ readonly class BindResponseDecoder implements ResponseDecoderInterface
             if ($child->getTagNumber() !== 7 || $child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 continue;
             }
-            // A context tagged field is left as its raw bytes, so a value from the wire is always a string.
+            // A context tagged field is left as its raw bytes.
             $credentials = $child->getValue();
 
             return is_string($credentials)

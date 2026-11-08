@@ -26,9 +26,9 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class DecodeContext
+readonly class DecodeContext
 {
-    public function __construct(private readonly LdapEncoder $encoder) {}
+    public function __construct(private LdapEncoder $encoder) {}
 
     /**
      * @param array<int, array<int, int>> $tagMap

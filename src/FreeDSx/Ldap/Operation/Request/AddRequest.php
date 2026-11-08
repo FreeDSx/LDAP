@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetOfType;
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 
 /**

@@ -43,7 +43,7 @@ readonly class ControlFields
         $criticality = false;
         $value = null;
 
-        // RFC 4511 4.1.1 does not forbid criticality on a response control, so the value's position is not assumed.
+        // RFC 4511 4.1.1 does not forbid criticality on a response control.
         foreach ($control->getChildren() as $i => $child) {
             if ($child->getTagClass() !== AbstractType::TAG_CLASS_UNIVERSAL) {
                 continue;

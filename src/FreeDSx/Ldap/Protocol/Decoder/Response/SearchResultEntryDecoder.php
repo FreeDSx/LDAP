@@ -23,14 +23,16 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\FieldValueTrait;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 /**
  * Decodes a search result entry (RFC 4511 4.5.2), which a read-entry response control also carries.
  *
+ * @implements OperationDecoderInterface<SearchResultEntry>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class SearchResultEntryDecoder implements ResponseDecoderInterface
+readonly class SearchResultEntryDecoder implements OperationDecoderInterface
 {
     use FieldValueTrait;
 

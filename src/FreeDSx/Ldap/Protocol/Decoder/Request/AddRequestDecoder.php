@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function count;
 use function sprintf;
@@ -30,10 +31,11 @@ use function sprintf;
 /**
  * Decodes an add request (RFC 4511 4.7).
  *
+ * @implements OperationDecoderInterface<AddRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class AddRequestDecoder implements RequestDecoderInterface
+readonly class AddRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

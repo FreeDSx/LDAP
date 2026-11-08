@@ -18,16 +18,18 @@ use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function sprintf;
 
 /**
  * Decodes a delete request (RFC 4511 4.8).
  *
+ * @implements OperationDecoderInterface<DeleteRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class DeleteRequestDecoder implements RequestDecoderInterface
+readonly class DeleteRequestDecoder implements OperationDecoderInterface
 {
     private const APP_TAG = 10;
 

@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 
 /**
- * Decodes a proxied authorization control (RFC 4370), whose value is the authzId itself rather than BER.
+ * Decodes a proxied authorization control (RFC 4370).
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>

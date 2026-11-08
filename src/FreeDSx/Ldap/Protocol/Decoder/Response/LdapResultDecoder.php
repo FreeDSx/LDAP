@@ -18,15 +18,17 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 /**
  * Decodes a response that holds only an LDAPResult, such as a search done or a modify response.
  *
  * @template T of LdapResult
+ * @implements OperationDecoderInterface<T>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class LdapResultDecoder implements ResponseDecoderInterface
+readonly class LdapResultDecoder implements OperationDecoderInterface
 {
     /**
      * @param class-string<T> $resultClass the response to build.

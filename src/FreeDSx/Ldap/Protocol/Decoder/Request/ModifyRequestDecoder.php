@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function count;
 use function is_int;
@@ -30,10 +31,11 @@ use function is_int;
 /**
  * Decodes a modify request (RFC 4511 4.6).
  *
+ * @implements OperationDecoderInterface<ModifyRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ModifyRequestDecoder implements RequestDecoderInterface
+readonly class ModifyRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

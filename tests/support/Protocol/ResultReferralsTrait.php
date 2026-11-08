@@ -17,9 +17,6 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 
-/**
- * Builds the referral field of a received LDAPResult, left undecoded as a context tagged field arrives.
- */
 trait ResultReferralsTrait
 {
     private static function referralsField(string ...$urls): IncompleteType

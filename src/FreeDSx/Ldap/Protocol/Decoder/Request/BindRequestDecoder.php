@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function is_int;
 use function sprintf;
@@ -32,10 +33,11 @@ use function sprintf;
 /**
  * Decodes a bind request (RFC 4511 4.2) into its simple, anonymous, or SASL form.
  *
+ * @implements OperationDecoderInterface<BindRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class BindRequestDecoder implements RequestDecoderInterface
+readonly class BindRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

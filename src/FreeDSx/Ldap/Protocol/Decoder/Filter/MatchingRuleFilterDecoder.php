@@ -122,6 +122,7 @@ readonly class MatchingRuleFilterDecoder implements FilterShapeDecoderInterface
             throw new ProtocolException(self::MALFORMED);
         }
 
-        return $field !== null && $field->getValue();
+        return $field !== null
+            && $field->getValue();
     }
 }

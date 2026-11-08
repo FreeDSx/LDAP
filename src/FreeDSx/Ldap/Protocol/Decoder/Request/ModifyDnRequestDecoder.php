@@ -22,6 +22,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function count;
 use function is_string;
@@ -29,10 +30,11 @@ use function is_string;
 /**
  * Decodes a modify DN request (RFC 4511 4.9).
  *
+ * @implements OperationDecoderInterface<ModifyDnRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ModifyDnRequestDecoder implements RequestDecoderInterface
+readonly class ModifyDnRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

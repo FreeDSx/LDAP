@@ -18,14 +18,16 @@ use FreeDSx\Asn1\Type\NullType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 /**
  * Decodes an unbind request (RFC 4511 4.3).
  *
+ * @implements OperationDecoderInterface<UnbindRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class UnbindRequestDecoder implements RequestDecoderInterface
+readonly class UnbindRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

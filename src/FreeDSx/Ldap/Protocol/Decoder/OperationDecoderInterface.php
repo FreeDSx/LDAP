@@ -11,29 +11,30 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\Decoder\Response;
+namespace FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Operation\Response\ResponseInterface;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 
 /**
- * Decodes one kind of response from the operation a received message carries.
+ * Decodes one kind of request or response from the operation a received message carries.
  *
+ * @template-covariant T of ProtocolElementInterface
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface ResponseDecoderInterface
+interface OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type
+     * @return T
      * @throws ProtocolException
      * @throws EncoderException
      */
     public function decode(
         AbstractType $type,
         DecodeContext $context,
-    ): ResponseInterface;
+    ): ProtocolElementInterface;
 }

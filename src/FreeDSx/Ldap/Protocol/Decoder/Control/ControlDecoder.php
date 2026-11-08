@@ -36,6 +36,7 @@ readonly class ControlDecoder implements ControlDecoderInterface
     ): Control {
         $fields = ControlFields::of($control);
         $decoder = $this->decoders[$fields->oid] ?? null;
+
         if ($decoder !== null) {
             return $decoder->decode(
                 $control,

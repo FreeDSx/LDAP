@@ -30,7 +30,7 @@ use function strrchr;
 use function substr;
 
 /**
- * Describes what decoding one PDU produced, in a form stable enough to compare across changes to the decoders.
+ * Describes what decoding one PDU produced.
  */
 final class DecodeOutcome
 {
@@ -52,7 +52,6 @@ final class DecodeOutcome
                 $e->getMessage(),
             );
         } catch (Error $e) {
-            // An engine error names files and lines, which move with the code, so only its kind is recorded.
             return self::shortName($e::class);
         } catch (Throwable $e) {
             return sprintf(

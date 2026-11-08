@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\AttributeValueAssertionDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 
 use function count;
@@ -27,10 +28,11 @@ use function count;
 /**
  * Decodes a compare request (RFC 4511 4.10).
  *
+ * @implements OperationDecoderInterface<CompareRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class CompareRequestDecoder implements RequestDecoderInterface
+readonly class CompareRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AttributeValueAssertionDecoder<EqualityFilter> $assertions

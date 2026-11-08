@@ -19,6 +19,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function count;
 use function is_string;
@@ -26,10 +27,11 @@ use function is_string;
 /**
  * Decodes an extended request (RFC 4511 4.12), into its own type when one is decoded from its value.
  *
+ * @implements OperationDecoderInterface<ExtendedRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ExtendedRequestDecoder implements RequestDecoderInterface
+readonly class ExtendedRequestDecoder implements OperationDecoderInterface
 {
     public const MALFORMED = 'The extended request is malformed.';
 

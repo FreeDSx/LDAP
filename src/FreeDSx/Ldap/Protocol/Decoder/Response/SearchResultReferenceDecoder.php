@@ -20,14 +20,16 @@ use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\FieldValueTrait;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 /**
  * Decodes a search result reference (RFC 4511 4.5.3) and the URIs it continues the search at.
  *
+ * @implements OperationDecoderInterface<SearchResultReference>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class SearchResultReferenceDecoder implements ResponseDecoderInterface
+readonly class SearchResultReferenceDecoder implements OperationDecoderInterface
 {
     use FieldValueTrait;
 

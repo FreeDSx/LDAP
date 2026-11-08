@@ -20,16 +20,18 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function is_string;
 
 /**
  * Decodes an intermediate response (RFC 4511 4.13), handing a sync info message to its own decoder.
  *
+ * @implements OperationDecoderInterface<IntermediateResponse>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class IntermediateResponseDecoder implements ResponseDecoderInterface
+readonly class IntermediateResponseDecoder implements OperationDecoderInterface
 {
     public function __construct(private SyncInfoDecoder $syncInfo) {}
 

@@ -18,16 +18,18 @@ use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function is_int;
 
 /**
  * Decodes an abandon request (RFC 4511 4.11).
  *
+ * @implements OperationDecoderInterface<AbandonRequest>
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class AbandonRequestDecoder implements RequestDecoderInterface
+readonly class AbandonRequestDecoder implements OperationDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type
