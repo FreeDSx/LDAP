@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use Stringable;
 
 use function is_int;
+use function is_string;
 use function sprintf;
 
 /**
@@ -246,6 +247,27 @@ class Control implements ProtocolElementInterface, Stringable
         if (!is_int($value)) {
             throw new ProtocolException(sprintf(
                 'The %s is not an integer.',
+                $field,
+            ));
+        }
+
+        return $value;
+    }
+
+    /**
+     * Gets a decoded string field, refusing a value of any other type.
+     *
+     * @param AbstractType<mixed> $type
+     * @throws ProtocolException
+     */
+    protected static function stringOf(
+        AbstractType $type,
+        string $field,
+    ): string {
+        $value = $type->getValue();
+        if (!is_string($value)) {
+            throw new ProtocolException(sprintf(
+                'The %s is not a string.',
                 $field,
             ));
         }

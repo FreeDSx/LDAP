@@ -96,7 +96,10 @@ class SortingResponseControl extends Control
                 $result,
                 'server side sorting response result',
             ),
-            ($attribute !== null) ? $attribute->getValue() : null,
+            $attribute === null ? null : parent::stringOf(
+                $attribute,
+                'server side sorting response attribute',
+            ),
         );
 
         return parent::mergeControlData(
