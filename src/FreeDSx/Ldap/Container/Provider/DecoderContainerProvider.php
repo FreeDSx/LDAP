@@ -52,6 +52,14 @@ use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Request\SearchRequestDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Request\UnbindRequestDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\BindResponseDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\ExtendedResponseDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\IntermediateResponseDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\PasswordModifyResponseDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultEntryDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultReferenceDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\SyncInfoDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Schema\Validation\Syntax\UuidSyntaxValidator;
 
@@ -104,7 +112,31 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             SyncStateControlDecoder::class => static fn(): SyncStateControlDecoder => new SyncStateControlDecoder(),
             VlvResponseControlDecoder::class => static fn(): VlvResponseControlDecoder
                 => new VlvResponseControlDecoder(),
+            BindResponseDecoder::class => static fn(): BindResponseDecoder => new BindResponseDecoder(),
+            ExtendedResponseDecoder::class => static fn(): ExtendedResponseDecoder => new ExtendedResponseDecoder(),
+            IntermediateResponseDecoder::class => $this->makeIntermediateResponseDecoder(...),
+            SyncInfoDecoder::class => static fn(): SyncInfoDecoder => new SyncInfoDecoder(),
+            SearchResultEntryDecoder::class => static fn(): SearchResultEntryDecoder
+                => new SearchResultEntryDecoder(),
+            SearchResultReferenceDecoder::class => static fn(): SearchResultReferenceDecoder
+                => new SearchResultReferenceDecoder(),
+            PasswordModifyResponseDecoder::class => static fn(): PasswordModifyResponseDecoder
+                => new PasswordModifyResponseDecoder(),
+            TypedExtendedResponseDecoder::class => $this->makeTypedExtendedResponseDecoder(...),
         ];
+    }
+
+    private function makeIntermediateResponseDecoder(Container $container): IntermediateResponseDecoder
+    {
+        return new IntermediateResponseDecoder($container->get(SyncInfoDecoder::class));
+    }
+
+    private function makeTypedExtendedResponseDecoder(Container $container): TypedExtendedResponseDecoder
+    {
+        // Keyed by the OID of the request each typed response answers.
+        return new TypedExtendedResponseDecoder([
+            ExtendedRequest::OID_PWD_MODIFY => $container->get(PasswordModifyResponseDecoder::class),
+        ]);
     }
 
     private function makeExtendedRequestDecoder(Container $container): ExtendedRequestDecoder
