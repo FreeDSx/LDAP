@@ -3,6 +3,7 @@ Upgrading from 0.x to 1.0
 
 * [Client Changes](#client-changes)
     * [Client Options](#client-options)
+* [Decoding Protocol Elements](#decoding-protocol-elements)
 * [Server Changes](#server-changes)
     * [Server Options](#server-options)
     * [Constructing a Proxy Server](#constructing-a-proxy-server)
@@ -63,6 +64,18 @@ $ldap = new LdapClient(
         ->setBaseDn('dc=example,dc=local')
 );
 ```
+
+## Decoding Protocol Elements
+
+The client and server now decode received messages internally. The static `fromAsn1()` method is removed from
+`ProtocolElementInterface` and from every request, response, control and search filter class, along with the protected
+helpers it used, such as `Control::decodeEncodedValue()`. `toAsn1()` is unchanged.
+
+A control or extended response the library does not decode into its own class arrives as a generic `Control` or
+`ExtendedResponse`. Read its encoded value with `getValue()` and decode it with `freedsx/asn1`.
+
+`ExtendedResponseFactory` and `FilterFactory` are removed. A custom extended response class can no longer be registered
+for the client. A password modify response is still returned as a `PasswordModifyResponse`.
 
 # Server Changes
 
