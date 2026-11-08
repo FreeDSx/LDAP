@@ -15,6 +15,19 @@ namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\DirSyncResponseControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\PagingControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ProxyAuthorizationControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\PwdPolicyResponseControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SortingControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SortingResponseControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SubentriesControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SubtreeDeleteProgressControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SyncDoneControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SyncRequestControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SyncStateControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\VlvResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelopeReader;
 use FreeDSx\Ldap\Protocol\Decoder\Request\AbandonRequestDecoder;
@@ -62,6 +75,27 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             ForwardPasswordPolicyStateRequestDecoder::class => $this->makeForwardPasswordPolicyStateRequestDecoder(...),
             PasswordModifyRequestDecoder::class => static fn(): PasswordModifyRequestDecoder
                 => new PasswordModifyRequestDecoder(),
+            AssertionControlDecoder::class => static fn(): AssertionControlDecoder => new AssertionControlDecoder(),
+            DirSyncResponseControlDecoder::class => static fn(): DirSyncResponseControlDecoder
+                => new DirSyncResponseControlDecoder(),
+            PagingControlDecoder::class => static fn(): PagingControlDecoder => new PagingControlDecoder(),
+            ProxyAuthorizationControlDecoder::class => static fn(): ProxyAuthorizationControlDecoder
+                => new ProxyAuthorizationControlDecoder(),
+            PwdPolicyResponseControlDecoder::class => static fn(): PwdPolicyResponseControlDecoder
+                => new PwdPolicyResponseControlDecoder(),
+            SortingControlDecoder::class => static fn(): SortingControlDecoder => new SortingControlDecoder(),
+            SortingResponseControlDecoder::class => static fn(): SortingResponseControlDecoder
+                => new SortingResponseControlDecoder(),
+            SubentriesControlDecoder::class => static fn(): SubentriesControlDecoder
+                => new SubentriesControlDecoder(),
+            SubtreeDeleteProgressControlDecoder::class => static fn(): SubtreeDeleteProgressControlDecoder
+                => new SubtreeDeleteProgressControlDecoder(),
+            SyncDoneControlDecoder::class => static fn(): SyncDoneControlDecoder => new SyncDoneControlDecoder(),
+            SyncRequestControlDecoder::class => static fn(): SyncRequestControlDecoder
+                => new SyncRequestControlDecoder(),
+            SyncStateControlDecoder::class => static fn(): SyncStateControlDecoder => new SyncStateControlDecoder(),
+            VlvResponseControlDecoder::class => static fn(): VlvResponseControlDecoder
+                => new VlvResponseControlDecoder(),
         ];
     }
 

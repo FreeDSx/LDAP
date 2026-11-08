@@ -45,6 +45,23 @@ final class ProxyAuthorizationControl extends Control
     }
 
     /**
+     * Keeps a received authzId that is not a valid form, so it is refused when it is used rather than when decoded.
+     */
+    public static function unparsed(
+        string $rawAuthzId,
+        bool $criticality,
+    ): self {
+        $control = new self(
+            AuthzId::anonymous(),
+            $criticality,
+        );
+        $control->rawAuthzId = $rawAuthzId;
+        $control->authzId = null;
+
+        return $control;
+    }
+
+    /**
      * The authorization identity to assume; lazily parsed from the raw value when decoded from a request.
      *
      * @throws InvalidArgumentException when the raw wire value is not a valid authzId form (e.g. a malformed request)
@@ -105,14 +122,10 @@ final class ProxyAuthorizationControl extends Control
             );
         } catch (InvalidArgumentException) {
             // Preserve a malformed value so it surfaces as an authorization denial rather than a decode failure.
-            $control = new static(
-                AuthzId::anonymous(),
+            return self::unparsed(
+                $rawAuthzId,
                 $criticality,
             );
-            $control->rawAuthzId = $rawAuthzId;
-            $control->authzId = null;
-
-            return $control;
         }
     }
 }
