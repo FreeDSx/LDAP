@@ -14,10 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a subentries control. RFC 3672.
@@ -53,23 +50,5 @@ class SubentriesControl extends Control
         $this->controlValue = Asn1::boolean($this->isVisible);
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $isVisible = self::decodeEncodedValue($type);
-        if (!$isVisible instanceof BooleanType) {
-            throw new ProtocolException('Expected a boolean type for a subentries control value.');
-        }
-
-        return self::mergeControlData(
-            new static($isVisible->getValue()),
-            $type,
-        );
     }
 }

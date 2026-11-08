@@ -6,7 +6,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Control;
 
 use FreeDSx\Ldap\Control\AssertionControl;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\TestCase;
 
@@ -40,31 +39,5 @@ final class AssertionControlTest extends TestCase
             $filter,
             (new AssertionControl($filter))->getFilter(),
         );
-    }
-
-    public function test_it_round_trips_the_filter_through_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-        $control = new AssertionControl(
-            Filters::and(
-                Filters::equal('cn', 'foo'),
-                Filters::present('sn'),
-            ),
-            false,
-        );
-
-        $decoded = AssertionControl::fromAsn1(
-            $encoder->decode($encoder->encode($control->toAsn1())),
-        );
-
-        self::assertSame(
-            '(&(cn=foo)(sn=*))',
-            $decoded->getFilter()->toString(),
-        );
-        self::assertSame(
-            Control::OID_ASSERTION,
-            $decoded->getTypeOid(),
-        );
-        self::assertFalse($decoded->getCriticality());
     }
 }

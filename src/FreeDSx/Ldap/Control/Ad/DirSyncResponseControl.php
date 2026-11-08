@@ -14,14 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IntegerType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a DirSync Response. Defined in MS-ADTS 3.1.1.3.4.1.3. The control value response definition is:
@@ -65,50 +59,6 @@ class DirSyncResponseControl extends Control
     public function getCookie(): string
     {
         return $this->cookie;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $response = self::decodeEncodedValue($type);
-        if (!$response instanceof SequenceType) {
-            throw new ProtocolException('A DirSyncResponse control value must be a sequence type with 3 children.');
-        }
-        $more = $response->getChild(0);
-        $unused = $response->getChild(1);
-        $cookie = $response->getChild(2);
-        if (!$more instanceof IntegerType) {
-            throw new ProtocolException('A DirSyncResponse control value sequence 0 must be an integer type.');
-        }
-        if (!$unused instanceof IntegerType) {
-            throw new ProtocolException('A DirSyncResponse control value sequence 1 must be an integer type.');
-        }
-        if (!$cookie instanceof OctetStringType) {
-            throw new ProtocolException('A DirSyncResponse control value sequence 2 must be an octet string type.');
-        }
-
-        $control = new static(
-            self::integerOf(
-                $more,
-                'DirSyncResponse more results value',
-            ),
-            self::integerOf(
-                $unused,
-                'DirSyncResponse unused value',
-            ),
-            $cookie->getValue(),
-        );
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 
     public function toAsn1(): SequenceType

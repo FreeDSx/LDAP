@@ -14,12 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class DirSyncResponseControlTest extends TestCase
@@ -82,62 +79,5 @@ class DirSyncResponseControlTest extends TestCase
             ),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            (new DirSyncResponseControl(0)),
-            DirSyncResponseControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_DIR_SYNC),
-                Asn1::boolean(false),
-                Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::integer(0),
-                    Asn1::integer(0),
-                    Asn1::octetString(''),
-                ))),
-            ))->setValue(null),
-        );
-    }
-
-    #[DataProvider('wideFieldProvider')]
-    public function test_a_field_wider_than_an_integer_is_refused_as_malformed(
-        SequenceType $value,
-        string $message,
-    ): void {
-        $encoder = new LdapEncoder();
-
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage($message);
-
-        DirSyncResponseControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_DIR_SYNC),
-            Asn1::octetString($encoder->encode($value)),
-        ));
-    }
-
-    /**
-     * @return iterable<string, array{SequenceType, string}>
-     */
-    public static function wideFieldProvider(): iterable
-    {
-        yield 'more results' => [
-            Asn1::sequence(
-                Asn1::integer('18446744073709551616'),
-                Asn1::integer(0),
-                Asn1::octetString(''),
-            ),
-            'The DirSyncResponse more results value is not an integer.',
-        ];
-        yield 'unused' => [
-            Asn1::sequence(
-                Asn1::integer(0),
-                Asn1::integer('18446744073709551616'),
-                Asn1::octetString(''),
-            ),
-            'The DirSyncResponse unused value is not an integer.',
-        ];
     }
 }

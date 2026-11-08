@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
@@ -47,9 +49,12 @@ use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ServerDispatchHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private ServerDispatchHandler $subject;
 
     private ReadBackendInterface&MockObject $mockBackend;
@@ -81,6 +86,8 @@ final class ServerDispatchHandlerTest extends TestCase
                     new LinkedAttributes(new Schema()),
                     new Schema(),
                 ),
+                $this->fromContainer(AssertionControlDecoder::class),
+                $this->fromContainer(DecodeContextFactory::class),
             ),
             derived: new DerivedResolver($this->createMock(ReadEntryInterface::class)),
             readEntryControlHandler: new ReadEntryControlHandler(

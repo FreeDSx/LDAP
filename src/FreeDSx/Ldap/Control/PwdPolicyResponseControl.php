@@ -15,12 +15,8 @@ namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Represents a password policy response. draft-behera-ldap-password-policy-10
@@ -117,70 +113,5 @@ class PwdPolicyResponseControl extends Control
         $this->controlValue = $response;
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        /** @var SequenceType $response */
-        $response = self::decodeEncodedValue($type);
-
-        $error = null;
-        $timeBeforeExpiration = null;
-        $graceAttemptsRemaining = null;
-
-        $encoder = new LdapEncoder();
-        foreach ($response->getChildren() as $child) {
-            if (!$child instanceof IncompleteType) {
-                throw new ProtocolException('The ASN1 structure for the pwdPolicy control is malformed.');
-            }
-            if ($child->getTagNumber() === 0) {
-                $warnings = $encoder->complete($child, AbstractType::TAG_TYPE_SEQUENCE, [
-                    AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
-                        0 => AbstractType::TAG_TYPE_INTEGER,
-                        1 => AbstractType::TAG_TYPE_INTEGER,
-                    ],
-                ]);
-                foreach ($warnings->getChildren() as $warning) {
-                    if ($warning->getTagNumber() === 0) {
-                        $timeBeforeExpiration = self::integerOf(
-                            $warning,
-                            'pwdPolicy control time before expiration',
-                        );
-                        break;
-                    } elseif ($warning->getTagNumber() === 1) {
-                        $graceAttemptsRemaining = self::integerOf(
-                            $warning,
-                            'pwdPolicy control grace authentications remaining',
-                        );
-                        break;
-                    }
-                }
-            } elseif ($child->getTagNumber() === 1) {
-                $error = self::integerOf(
-                    $encoder->complete(
-                        $child,
-                        AbstractType::TAG_TYPE_ENUMERATED,
-                    ),
-                    'pwdPolicy control error',
-                );
-            }
-        }
-        $control = new static(
-            $timeBeforeExpiration,
-            $graceAttemptsRemaining,
-            $error,
-        );
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 }

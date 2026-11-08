@@ -83,21 +83,4 @@ class ExpectedEntryCountControlTest extends TestCase
             ),
         );
     }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new ExpectedEntryCountControl(min: 1, max: 50),
-            ExpectedEntryCountControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_EXPECTED_ENTRY_COUNT),
-                Asn1::boolean(true),
-                Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::integer(1),
-                    Asn1::integer(50),
-                ))),
-            ))->setValue(null),
-        );
-    }
 }

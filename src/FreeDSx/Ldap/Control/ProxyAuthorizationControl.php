@@ -13,10 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 
 /**
@@ -92,40 +90,5 @@ final class ProxyAuthorizationControl extends Control
         $this->controlValue = $this->rawAuthzId;
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException(sprintf(
-                'Expected a sequence type for a proxy authorization control, but received: %s',
-                get_class($type),
-            ));
-        }
-
-        [1 => $criticality, 2 => $rawAuthzId] = self::parseAsn1ControlValues($type);
-
-        // RFC 4370 3: the value is present even for an anonymous identity.
-        if ($rawAuthzId === null) {
-            throw new ProtocolException('The proxied authorization control must have a value.');
-        }
-
-        try {
-            return new static(
-                AuthzId::fromString($rawAuthzId),
-                $criticality,
-            );
-        } catch (InvalidArgumentException) {
-            // Preserve a malformed value so it surfaces as an authorization denial rather than a decode failure.
-            return self::unparsed(
-                $rawAuthzId,
-                $criticality,
-            );
-        }
     }
 }

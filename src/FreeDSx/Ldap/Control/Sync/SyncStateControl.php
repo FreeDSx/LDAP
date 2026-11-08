@@ -14,15 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Sync;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Server\Utility\Uuid;
-
-use function count;
 
 /**
  * Represents a syncStateValue control. RFC 4533.
@@ -175,41 +169,5 @@ class SyncStateControl extends Control
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritdoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $sync = self::decodeEncodedValue($type);
-        $count = count($sync->getChildren());
-        if (!($sync instanceof SequenceType && ($count === 3 || $count === 2))) {
-            throw new ProtocolException('Expected a sequence type with 2 or 3 values for a sync state control value.');
-        }
-        if (!(($state = $sync->getChild(0)) instanceof EnumeratedType)) {
-            throw new ProtocolException('Expected an enumerated type for the state control value.');
-        }
-        if (!(($entryUuid = $sync->getChild(1)) instanceof OctetStringType)) {
-            throw new ProtocolException('Expected an octet string type for the state control value.');
-        }
-        $cookie = $sync->getChild(2);
-        if ($cookie && !($cookie instanceof OctetStringType)) {
-            throw new ProtocolException('Expected an octet string type for the sync state cookie value.');
-        }
-
-        return self::mergeControlData(
-            new static(
-                self::integerOf(
-                    $state,
-                    'sync state control state',
-                ),
-                $entryUuid->getValue(),
-                $cookie ? $cookie->getValue() : null,
-            ),
-            $type,
-        );
     }
 }

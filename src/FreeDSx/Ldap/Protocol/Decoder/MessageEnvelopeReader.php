@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoderInterface;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 
 use function count;
@@ -122,9 +123,8 @@ readonly class MessageEnvelopeReader
     }
 
     /**
-     * Decodes each control the message carries, in order, with the decoder this side uses for one.
+     * Decodes each control the message carries, in order, with the control decoder this side uses.
      *
-     * @param Closure(SequenceType): Control $decode
      * @return list<Control>
      * @throws ProtocolException
      * @throws EncoderException
@@ -132,7 +132,7 @@ readonly class MessageEnvelopeReader
     public function controlsOf(
         MessageEnvelope $envelope,
         DecodeContext $context,
-        Closure $decode,
+        ControlDecoderInterface $decoder,
     ): array {
         $controls = [];
         $count = count($envelope->pdu->getChildren());
@@ -157,7 +157,8 @@ readonly class MessageEnvelopeReader
                         $child,
                         AbstractType::TAG_TYPE_SEQUENCE,
                     ),
-                    $decode,
+                    $context,
+                    $decoder,
                 ),
             ];
         }
@@ -190,20 +191,24 @@ readonly class MessageEnvelopeReader
 
     /**
      * @param AbstractType<mixed> $controls
-     * @param Closure(SequenceType): Control $decode
      * @return list<Control>
      * @throws ProtocolException
+     * @throws EncoderException
      */
     private function decodeControls(
         AbstractType $controls,
-        Closure $decode,
+        DecodeContext $context,
+        ControlDecoderInterface $decoder,
     ): array {
         $decoded = [];
         foreach ($controls->getChildren() as $control) {
             if (!($control instanceof SequenceType && $control->getChild(0) instanceof OctetStringType)) {
                 throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
             }
-            $decoded[] = $decode($control);
+            $decoded[] = $decoder->decode(
+                $control,
+                $context,
+            );
         }
 
         return $decoded;

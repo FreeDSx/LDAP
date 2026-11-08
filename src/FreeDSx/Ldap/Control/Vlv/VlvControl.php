@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Control\Vlv;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -142,15 +141,5 @@ class VlvControl extends Control
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        throw new RuntimeException('Control parsing not yet implemented.');
     }
 }

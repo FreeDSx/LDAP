@@ -14,12 +14,20 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\DirSyncResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\PagingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ProxyAuthorizationControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\PwdPolicyResponseControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SubentriesControlDecoder;
@@ -142,6 +150,7 @@ final class DecoderContainerProvider implements ContainerProviderInterface
                 16 => $container->get(AbandonRequestDecoder::class),
                 23 => $container->get(ExtendedRequestDecoder::class),
             ],
+            $this->makeRequestControlDecoder($container),
         );
     }
 
@@ -150,6 +159,47 @@ final class DecoderContainerProvider implements ContainerProviderInterface
         return new ResponseMessageDecoder(
             $container->get(MessageEnvelopeReader::class),
             $container->get(DecodeContextFactory::class),
+            $this->makeResponseControlDecoder($container),
         );
+    }
+
+    private function makeRequestControlDecoder(Container $container): ControlDecoder
+    {
+        return new ControlDecoder([
+            Control::OID_PAGING => $container->get(PagingControlDecoder::class),
+            Control::OID_SORTING => $container->get(SortingControlDecoder::class),
+            Control::OID_SORTING_RESPONSE => $container->get(SortingResponseControlDecoder::class),
+            Control::OID_VLV_RESPONSE => $container->get(VlvResponseControlDecoder::class),
+            Control::OID_DIR_SYNC => $container->get(DirSyncResponseControlDecoder::class),
+            Control::OID_SYNC_STATE => $container->get(SyncStateControlDecoder::class),
+            Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
+            Control::OID_SYNC_DONE => $container->get(SyncDoneControlDecoder::class),
+            Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
+            Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
+            Control::OID_PRE_READ => new ReadEntryControlDecoder(PreReadControl::class),
+            Control::OID_POST_READ => new ReadEntryControlDecoder(PostReadControl::class),
+            Control::OID_SUBENTRIES => $container->get(SubentriesControlDecoder::class),
+        ]);
+    }
+
+    private function makeResponseControlDecoder(Container $container): ControlDecoder
+    {
+        return new ControlDecoder([
+            Control::OID_PWD_POLICY => $container->get(PwdPolicyResponseControlDecoder::class),
+            Control::OID_PRE_READ => new ReadEntryResponseControlDecoder(PreReadResponseControl::class),
+            Control::OID_POST_READ => new ReadEntryResponseControlDecoder(PostReadResponseControl::class),
+            Control::OID_SUBTREE_DELETE_PROGRESS => $container->get(SubtreeDeleteProgressControlDecoder::class),
+            Control::OID_PAGING => $container->get(PagingControlDecoder::class),
+            Control::OID_SORTING => $container->get(SortingControlDecoder::class),
+            Control::OID_SORTING_RESPONSE => $container->get(SortingResponseControlDecoder::class),
+            Control::OID_VLV_RESPONSE => $container->get(VlvResponseControlDecoder::class),
+            Control::OID_DIR_SYNC => $container->get(DirSyncResponseControlDecoder::class),
+            Control::OID_SYNC_STATE => $container->get(SyncStateControlDecoder::class),
+            Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
+            Control::OID_SYNC_DONE => $container->get(SyncDoneControlDecoder::class),
+            Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
+            Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
+            Control::OID_SUBENTRIES => $container->get(SubentriesControlDecoder::class),
+        ]);
     }
 }

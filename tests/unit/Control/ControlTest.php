@@ -85,20 +85,4 @@ class ControlTest extends TestCase
             $this->subject->toAsn1(),
         );
     }
-
-    public function test_it_should_be_constructed_from_ASN1(): void
-    {
-        $result = Control::fromAsn1(Asn1::sequence(
-            Asn1::octetString('foobar'),
-            Asn1::boolean(true),
-        ));
-
-        self::assertSame(
-            'foobar',
-            $result->getTypeOid(),
-        );
-        self::assertTrue(
-            $result->getCriticality(),
-        );
-    }
 }

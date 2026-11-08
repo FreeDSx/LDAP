@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -46,6 +48,8 @@ final readonly class AssertionEvaluator
         private ReadBackendInterface $backend,
         private AccessControlInterface $accessControl,
         private LinkedLeafWitness $linkedLeaves,
+        private AssertionControlDecoder $assertionDecoder,
+        private DecodeContextFactory $contexts,
     ) {}
 
     /**
@@ -116,7 +120,10 @@ final readonly class AssertionEvaluator
         return match (true) {
             $control === null => null,
             $control instanceof AssertionControl => $control,
-            default => AssertionControl::fromAsn1($control->toAsn1()),
+            default => $this->assertionDecoder->decode(
+                $control->toAsn1(),
+                $this->contexts->create(),
+            ),
         };
     }
 }

@@ -14,13 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class PwdPolicyResponseControlTest extends TestCase
@@ -58,84 +54,6 @@ class PwdPolicyResponseControlTest extends TestCase
             2,
             $this->subject->getGraceAttemptsRemaining(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $result = PwdPolicyResponseControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_PWD_POLICY),
-            Asn1::boolean(false),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                Asn1::context(0, Asn1::sequence(Asn1::context(0, Asn1::integer(100)))),
-                Asn1::context(1, Asn1::enumerated(2)),
-            ))),
-        ));
-
-        self::assertSame(
-            100,
-            $result->getTimeBeforeExpiration(),
-        );
-        self::assertSame(
-            2,
-            $result->getError(),
-        );
-        self::assertSame(
-            Control::OID_PWD_POLICY,
-            $result->getTypeOid(),
-        );
-        self::assertFalse($result->getCriticality());
-    }
-
-    #[DataProvider('wideFieldProvider')]
-    public function test_a_field_wider_than_an_integer_is_refused_as_malformed(
-        SequenceType $value,
-        string $message,
-    ): void {
-        $encoder = new LdapEncoder();
-
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage($message);
-
-        PwdPolicyResponseControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_PWD_POLICY),
-            Asn1::octetString($encoder->encode($value)),
-        ));
-    }
-
-    /**
-     * @return iterable<string, array{SequenceType, string}>
-     */
-    public static function wideFieldProvider(): iterable
-    {
-        yield 'time before expiration' => [
-            Asn1::sequence(Asn1::context(
-                0,
-                Asn1::sequence(Asn1::context(
-                    0,
-                    Asn1::integer('18446744073709551616'),
-                )),
-            )),
-            'The pwdPolicy control time before expiration is not an integer.',
-        ];
-        yield 'grace authentications remaining' => [
-            Asn1::sequence(Asn1::context(
-                0,
-                Asn1::sequence(Asn1::context(
-                    1,
-                    Asn1::integer('18446744073709551616'),
-                )),
-            )),
-            'The pwdPolicy control grace authentications remaining is not an integer.',
-        ];
-        yield 'error' => [
-            Asn1::sequence(Asn1::context(
-                1,
-                new EnumeratedType('18446744073709551616'),
-            )),
-            'The pwdPolicy control error is not an integer.',
-        ];
     }
 
     public function test_it_should_generate_correct_asn1(): void

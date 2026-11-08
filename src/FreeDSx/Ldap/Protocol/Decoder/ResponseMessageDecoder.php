@@ -15,27 +15,11 @@ namespace FreeDSx\Ldap\Protocol\Decoder;
 
 use Closure;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
-use FreeDSx\Ldap\Control\AssertionControl;
-use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\PagingControl;
-use FreeDSx\Ldap\Control\ProxyAuthorizationControl;
-use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
-use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
-use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
-use FreeDSx\Ldap\Control\Sorting\SortingControl;
-use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
-use FreeDSx\Ldap\Control\SubentriesControl;
-use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
-use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
-use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
-use FreeDSx\Ldap\Control\Sync\SyncStateControl;
-use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoderInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 
 /**
@@ -49,6 +33,7 @@ readonly class ResponseMessageDecoder
     public function __construct(
         private MessageEnvelopeReader $envelopes,
         private DecodeContextFactory $contexts,
+        private ControlDecoderInterface $controls,
     ) {}
 
     /**
@@ -70,7 +55,7 @@ readonly class ResponseMessageDecoder
                 $this->envelopes->controlsOf(
                     $envelope,
                     $context,
-                    $this->control(...),
+                    $this->controls,
                 ),
             ],
         );
@@ -101,28 +86,6 @@ readonly class ResponseMessageDecoder
             24 => Response\ExtendedResponse::fromAsn1(...),
             25 => Response\IntermediateResponse::fromAsn1(...),
             default => throw $this->envelopes->unsupported($envelope->operationTag),
-        };
-    }
-
-    private function control(SequenceType $control): Control
-    {
-        return match ($control->getChild(0)?->getValue()) {
-            Control::OID_PWD_POLICY => PwdPolicyResponseControl::fromAsn1($control),
-            Control::OID_PRE_READ => PreReadResponseControl::fromAsn1($control),
-            Control::OID_POST_READ => PostReadResponseControl::fromAsn1($control),
-            Control::OID_SUBTREE_DELETE_PROGRESS => SubtreeDeleteProgressControl::fromAsn1($control),
-            Control::OID_PAGING => PagingControl::fromAsn1($control),
-            Control::OID_SORTING => SortingControl::fromAsn1($control),
-            Control::OID_SORTING_RESPONSE => SortingResponseControl::fromAsn1($control),
-            Control::OID_VLV_RESPONSE => VlvResponseControl::fromAsn1($control),
-            Control::OID_DIR_SYNC => DirSyncResponseControl::fromAsn1($control),
-            Control::OID_SYNC_STATE => SyncStateControl::fromAsn1($control),
-            Control::OID_SYNC_REQUEST => SyncRequestControl::fromAsn1($control),
-            Control::OID_SYNC_DONE => SyncDoneControl::fromAsn1($control),
-            Control::OID_PROXY_AUTHORIZATION => ProxyAuthorizationControl::fromAsn1($control),
-            Control::OID_ASSERTION => AssertionControl::fromAsn1($control),
-            Control::OID_SUBENTRIES => SubentriesControl::fromAsn1($control),
-            default => Control::fromAsn1($control),
         };
     }
 }

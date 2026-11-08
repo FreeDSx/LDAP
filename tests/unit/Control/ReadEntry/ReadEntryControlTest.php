@@ -7,7 +7,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Control\ReadEntry;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
 
 final class ReadEntryControlTest extends TestCase
@@ -38,40 +37,6 @@ final class ReadEntryControlTest extends TestCase
         self::assertSame(
             ['cn', 'sn'],
             (new PreReadControl('cn', 'sn'))->getAttributes(),
-        );
-    }
-
-    public function test_it_round_trips_the_attribute_selection(): void
-    {
-        $encoder = new LdapEncoder();
-        $control = new PostReadControl('cn', 'sn', 'mail');
-
-        $decoded = PostReadControl::fromAsn1(
-            $encoder->decode($encoder->encode($control->toAsn1())),
-        );
-
-        self::assertSame(
-            ['cn', 'sn', 'mail'],
-            $decoded->getAttributes(),
-        );
-        self::assertSame(
-            Control::OID_POST_READ,
-            $decoded->getTypeOid(),
-        );
-    }
-
-    public function test_it_round_trips_an_empty_attribute_selection(): void
-    {
-        $encoder = new LdapEncoder();
-        $control = new PreReadControl();
-
-        $decoded = PreReadControl::fromAsn1(
-            $encoder->decode($encoder->encode($control->toAsn1())),
-        );
-
-        self::assertSame(
-            [],
-            $decoded->getAttributes(),
         );
     }
 }

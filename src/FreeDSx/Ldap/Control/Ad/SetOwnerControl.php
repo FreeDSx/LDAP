@@ -14,13 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Implements the AD SetOwner control.
@@ -60,26 +55,5 @@ class SetOwnerControl extends Control
         $this->controlValue = Asn1::octetString($this->sid);
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $request = self::decodeEncodedValue($type);
-        if (!$request instanceof OctetStringType) {
-            throw new ProtocolException('A SetOwner control value must be an octet string type.');
-        }
-        $control = new static($request->getValue());
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 }

@@ -14,10 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
 
@@ -64,64 +62,5 @@ final class SubtreeDeleteProgressControlTest extends TestCase
                 12,
             ))->toAsn1(),
         );
-    }
-
-    public function test_it_decodes_the_deleted_count(): void
-    {
-        $control = SubtreeDeleteProgressControl::fromAsn1(
-            $this->decoded(new SubtreeDeleteProgressControl(25000)),
-        );
-
-        self::assertSame(
-            25000,
-            $control->getDeleted(),
-        );
-        self::assertNull($control->getRemaining());
-    }
-
-    public function test_it_decodes_the_remaining_count(): void
-    {
-        $control = SubtreeDeleteProgressControl::fromAsn1(
-            $this->decoded(new SubtreeDeleteProgressControl(
-                25000,
-                12,
-            )),
-        );
-
-        self::assertSame(
-            12,
-            $control->getRemaining(),
-        );
-    }
-
-    public function test_a_value_without_a_deleted_count_is_refused(): void
-    {
-        $this->expectException(ProtocolException::class);
-
-        SubtreeDeleteProgressControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SUBTREE_DELETE_PROGRESS),
-            Asn1::octetString($this->encoder->encode(Asn1::sequence(Asn1::octetString('25000')))),
-        ));
-    }
-
-    public function test_a_deleted_count_wider_than_an_integer_is_refused_as_malformed(): void
-    {
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The subtree delete progress deleted count is not an integer.');
-
-        SubtreeDeleteProgressControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SUBTREE_DELETE_PROGRESS),
-            Asn1::octetString($this->encoder->encode(Asn1::sequence(
-                Asn1::integer('18446744073709551616'),
-            ))),
-        ));
-    }
-
-    /**
-     * @return AbstractType<mixed>
-     */
-    private function decoded(SubtreeDeleteProgressControl $control): AbstractType
-    {
-        return $this->encoder->decode($this->encoder->encode($control->toAsn1()));
     }
 }

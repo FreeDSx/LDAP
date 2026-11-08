@@ -54,31 +54,4 @@ class ExtendedDnControlTest extends TestCase
             $this->subject->toAsn1(),
         );
     }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new ExtendedDnControl(),
-            ExtendedDnControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_EXTENDED_DN),
-                Asn1::boolean(false),
-                Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::integer(1),
-                ))),
-            ))->setValue(null),
-        );
-    }
-
-    public function test_it_should_be_constructed_from_asn1_when_the_empty_value_form_is_used(): void
-    {
-        self::assertEquals(
-            new ExtendedDnControl(),
-            ExtendedDnControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_EXTENDED_DN),
-                Asn1::boolean(false),
-            ))->setValue(null),
-        );
-    }
 }

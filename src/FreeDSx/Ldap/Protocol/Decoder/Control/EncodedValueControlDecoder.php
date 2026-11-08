@@ -32,7 +32,7 @@ use function sprintf;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-abstract readonly class EncodedValueControlDecoder
+abstract readonly class EncodedValueControlDecoder implements ControlDecoderInterface
 {
     /**
      * @return T

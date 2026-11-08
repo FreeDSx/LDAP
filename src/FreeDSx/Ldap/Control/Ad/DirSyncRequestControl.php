@@ -14,14 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IntegerType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a DirSync Request. Defined in MS-ADTS 3.1.1.3.4.1.3. The control value request definition is:
@@ -109,44 +103,6 @@ class DirSyncRequestControl extends Control
         $this->cookie = $cookie;
 
         return $this;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $request = self::decodeEncodedValue($type);
-        if (!$request instanceof SequenceType) {
-            throw new ProtocolException('A DirSyncRequest control value must be a sequence type with 3 children.');
-        }
-        $flags = $request->getChild(0);
-        $cookie = $request->getChild(2);
-        $maxBytes = $request->getChild(1);
-        if (!$flags instanceof IntegerType) {
-            throw new ProtocolException('A DirSyncRequest control value sequence 0 must be an integer type.');
-        }
-        if (!$maxBytes instanceof IntegerType) {
-            throw new ProtocolException('A DirSyncRequest control value sequence 1 must be an integer type.');
-        }
-        if (!$cookie instanceof OctetStringType) {
-            throw new ProtocolException('A DirSyncRequest control value sequence 2 must be an octet string type.');
-        }
-
-        $control = new static(
-            $flags->getValue(),
-            $cookie->getValue(),
-            $maxBytes->getValue(),
-        );
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 
     public function toAsn1(): SequenceType

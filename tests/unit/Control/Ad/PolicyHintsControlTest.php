@@ -55,20 +55,4 @@ class PolicyHintsControlTest extends TestCase
             ),
         );
     }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new PolicyHintsControl(),
-            PolicyHintsControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_POLICY_HINTS),
-                Asn1::boolean(true),
-                Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::integer(1),
-                ))),
-            ))->setValue(null),
-        );
-    }
 }

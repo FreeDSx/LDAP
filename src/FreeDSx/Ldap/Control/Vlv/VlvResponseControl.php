@@ -14,15 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Vlv;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a VLV Response. draft-ietf-ldapext-ldapv3-vlv-09
@@ -68,62 +62,6 @@ class VlvResponseControl extends Control
     public function getResult(): int
     {
         return $this->result;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $vlv = self::decodeEncodedValue($type);
-
-        if (!$vlv instanceof SequenceType) {
-            throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
-        }
-        $offset = $vlv->getChild(0);
-        $count = $vlv->getChild(1);
-        $result = $vlv->getChild(2);
-        $contextId = $vlv->getChild(3);
-
-        if (!$offset instanceof IntegerType) {
-            throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
-        }
-        if (!$count instanceof IntegerType) {
-            throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
-        }
-        if (!$result instanceof EnumeratedType) {
-            throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
-        }
-        if ($contextId !== null && !$contextId instanceof OctetStringType) {
-            throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
-        }
-
-        $response = new static(
-            self::integerOf(
-                $offset,
-                'VLV response target position',
-            ),
-            self::integerOf(
-                $count,
-                'VLV response content count',
-            ),
-            self::integerOf(
-                $result,
-                'VLV response result',
-            ),
-        );
-        if ($contextId !== null) {
-            $response->contextId = $contextId->getValue();
-        }
-
-        return parent::mergeControlData(
-            $response,
-            $type,
-        );
     }
 
     public function toAsn1(): SequenceType

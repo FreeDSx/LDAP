@@ -14,20 +14,11 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use Stringable;
-
-use function is_int;
-use function is_string;
-use function sprintf;
 
 /**
  * Represents a control. RFC 4511, 4.1.11
@@ -174,138 +165,5 @@ class Control implements ProtocolElementInterface, Stringable
         }
 
         return $asn1;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException(sprintf(
-                'Protocol encoding issue. Expected a sequence type but received: %s',
-                get_class($type),
-            ));
-        }
-
-        return new static(...self::parseAsn1ControlValues($type));
-    }
-
-    /**
-     * @template T of Control
-     * @phpstan-param T $control
-     * @param AbstractType<mixed> $type
-     * @phpstan-return T
-     * @throws ProtocolException
-     */
-    protected static function mergeControlData(
-        Control $control,
-        AbstractType $type,
-    ): Control {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException('The received control is malformed.');
-        }
-        [0 => $control->controlType, 1 => $control->criticality, 2 => $control->controlValue] = self::parseAsn1ControlValues($type);
-
-        return $control;
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @return AbstractType<mixed>
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    protected static function decodeEncodedValue(AbstractType $type): AbstractType
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException('The received control is malformed. Unable to get the encoded value.');
-        }
-
-        [2 => $value] = self::parseAsn1ControlValues($type);
-        if ($value === null) {
-            throw new ProtocolException('The received control is malformed. Unable to get the encoded value.');
-        }
-
-        return (new LdapEncoder())->decode($value);
-    }
-
-    /**
-     * Gets a decoded integer field, refusing one wider than a native integer.
-     *
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    protected static function integerOf(
-        AbstractType $type,
-        string $field,
-    ): int {
-        $value = $type->getValue();
-        if (!is_int($value)) {
-            throw new ProtocolException(sprintf(
-                'The %s is not an integer.',
-                $field,
-            ));
-        }
-
-        return $value;
-    }
-
-    /**
-     * Gets a decoded string field, refusing a value of any other type.
-     *
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    protected static function stringOf(
-        AbstractType $type,
-        string $field,
-    ): string {
-        $value = $type->getValue();
-        if (!is_string($value)) {
-            throw new ProtocolException(sprintf(
-                'The %s is not a string.',
-                $field,
-            ));
-        }
-
-        return $value;
-    }
-
-    /**
-     * @return array{0: string, 1: bool, 2: string|null}
-     */
-    protected static function parseAsn1ControlValues(SequenceType $type): array
-    {
-        $oid = null;
-        $criticality = false;
-        $value = null;
-
-        /*
-         * RFC 4511, 4.1.1. States responses should not have criticality set, but not that it must not be set. So do not
-         * assume the position of the octet string value. Accounts for the additional logic of the checks here.
-         */
-        foreach ($type->getChildren() as $i => $child) {
-            if ($child->getTagClass() !== AbstractType::TAG_CLASS_UNIVERSAL) {
-                continue;
-            }
-
-            if ($i === 0 && $child instanceof OctetStringType) {
-                $oid = $child->getValue();
-            } elseif ($child instanceof BooleanType) {
-                $criticality = $child->getValue();
-            } elseif ($child instanceof OctetStringType) {
-                $value = $child->getValue();
-            }
-        }
-
-        if ($oid === null) {
-            throw new ProtocolException('The received control is malformed. The control type OID is missing.');
-        }
-
-        return [$oid, $criticality, $value];
     }
 }

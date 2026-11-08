@@ -14,16 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * A Server Side Sorting request control value. RFC 2891.
@@ -72,70 +64,6 @@ class SortingControl extends Control
     public function getSortKeys(): array
     {
         return $this->sortKeys;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $response = self::decodeEncodedValue($type);
-        if (!$response instanceof SequenceType) {
-            throw new ProtocolException('The sorting control is malformed.');
-        }
-
-        $sortKeys = [];
-        foreach ($response->getChildren() as $sequence) {
-            if (!$sequence instanceof SequenceType) {
-                throw new ProtocolException('The sort key is malformed.');
-            }
-
-            $attrName = '';
-            $matchRule = null;
-            $useReverseOrder = false;
-
-            $encoder = new LdapEncoder();
-            foreach ($sequence->getChildren() as $keyItem) {
-                if ($keyItem instanceof OctetStringType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_UNIVERSAL) {
-                    $attrName = $keyItem->getValue();
-                } elseif ($keyItem instanceof IncompleteType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 0) {
-                    $matchRule = $keyItem->getValue();
-                } elseif ($keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 1) {
-                    if (!$keyItem instanceof IncompleteType) {
-                        throw new ProtocolException('The sorting control is malformed.');
-                    }
-                    $reverseFlag = $encoder->complete(
-                        type: $keyItem,
-                        tagType: AbstractType::TAG_TYPE_BOOLEAN,
-                    );
-                    if (!$reverseFlag instanceof BooleanType) {
-                        throw new ProtocolException('The sorting control reverseOrder flag is malformed.');
-                    }
-                    $useReverseOrder = $reverseFlag->getValue();
-                } else {
-                    throw new ProtocolException('The sorting control contains unexpected data.');
-                }
-            }
-            if ($attrName === '') {
-                throw new ProtocolException('The sort key is missing an attribute description.');
-            }
-
-            $sortKeys[] = new SortKey(
-                attribute: $attrName,
-                useReverseOrder: $useReverseOrder,
-                orderingRule: $matchRule,
-            );
-        }
-        $control = new static(...$sortKeys);
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 
     public function toAsn1(): SequenceType

@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCompareHandler;
@@ -39,9 +41,12 @@ use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ServerCompareHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private ServerCompareHandler $subject;
 
     private ReadBackendInterface&MockObject $mockBackend;
@@ -73,6 +78,8 @@ final class ServerCompareHandlerTest extends TestCase
                     new LinkedAttributes(new Schema()),
                     new Schema(),
                 ),
+                $this->fromContainer(AssertionControlDecoder::class),
+                $this->fromContainer(DecodeContextFactory::class),
             ),
             withheld: new WithheldAttributePolicy($this->mockAccessControl),
         );

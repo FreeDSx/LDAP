@@ -82,28 +82,4 @@ class SyncDoneControlTest extends TestCase
             $this->subject->toAsn1(),
         );
     }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $result = SyncDoneControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SYNC_DONE),
-            Asn1::boolean(true),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                Asn1::octetString('omnomnom'),
-                Asn1::boolean(false),
-            ))),
-        ));
-
-        self::assertFalse($result->getRefreshDeletes());
-        self::assertSame(
-            'omnomnom',
-            $result->getCookie(),
-        );
-        self::assertSame(
-            Control::OID_SYNC_DONE,
-            $result->getTypeOid(),
-        );
-    }
 }

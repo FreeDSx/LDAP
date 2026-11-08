@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
@@ -164,6 +166,8 @@ trait WriteHandlerTestTrait
                     $this->graph->get(ReadBackendInterface::class),
                     new RuleBasedAccessControl(AclRules::fromEmpty()),
                     $this->graph->get(LinkedLeafWitness::class),
+                    $this->graph->get(AssertionControlDecoder::class),
+                    $this->graph->get(DecodeContextFactory::class),
                 ),
                 $token,
                 $controlBag,

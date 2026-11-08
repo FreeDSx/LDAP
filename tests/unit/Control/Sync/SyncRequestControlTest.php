@@ -14,10 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control\Sync;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
 
@@ -92,50 +90,5 @@ class SyncRequestControlTest extends TestCase
             ),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $result = SyncRequestControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SYNC_REQUEST),
-            Asn1::boolean(true),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                Asn1::enumerated(1),
-                Asn1::octetString('omnomnom'),
-                Asn1::boolean(false),
-            ))),
-        ));
-
-
-        self::assertSame(
-            1,
-            $result->getMode(),
-        );
-        self::assertSame(
-            'omnomnom',
-            $result->getCookie(),
-        );
-        self::assertSame(
-            Control::OID_SYNC_REQUEST,
-            $result->getTypeOid(),
-        );
-        self::assertFalse($result->getReloadHint());
-    }
-
-    public function test_a_mode_wider_than_an_integer_is_refused_as_malformed(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The sync request control mode is not an integer.');
-
-        SyncRequestControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SYNC_REQUEST),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                new EnumeratedType('18446744073709551616'),
-            ))),
-        ));
     }
 }

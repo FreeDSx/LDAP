@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class ProxyAuthorizationControlDecoder
+readonly class ProxyAuthorizationControlDecoder implements ControlDecoderInterface
 {
     /**
      * @throws ProtocolException

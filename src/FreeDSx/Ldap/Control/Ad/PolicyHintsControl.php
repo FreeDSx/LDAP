@@ -14,13 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Implements the AD PolicyHints control.
@@ -61,30 +56,5 @@ class PolicyHintsControl extends Control
         $this->controlValue = Asn1::sequence(Asn1::integer($this->isEnabled ? 1 : 0));
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $request = self::decodeEncodedValue($type);
-        if (!$request instanceof SequenceType) {
-            throw new ProtocolException('A PolicyHints control value must be a sequence type.');
-        }
-        $isEnabled = $request->getChild(0);
-        if (!$isEnabled instanceof IntegerType) {
-            throw new ProtocolException('A PolicyHints control value sequence 0 must be an integer type.');
-        }
-        $control = new static((bool) $isEnabled->getValue());
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 }

@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
@@ -65,6 +67,8 @@ final class AssertionMiddlewareTest extends TestCase
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty()),
             $this->fromContainer(LinkedLeafWitness::class),
+            $this->fromContainer(AssertionControlDecoder::class),
+            $this->fromContainer(DecodeContextFactory::class),
         ));
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }

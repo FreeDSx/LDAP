@@ -14,14 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Sync;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
-
-use function count;
 
 /**
  * Represents a syncStateValue control. RFC 4533.
@@ -72,38 +66,5 @@ class SyncDoneControl extends Control
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritdoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $sync = self::decodeEncodedValue($type);
-        if (!$sync instanceof SequenceType || count($sync->getChildren()) > 2) {
-            throw new ProtocolException(
-                'Expected a sequence type with 2 or less values for a sync done control value.',
-            );
-        }
-
-        $cookie = null;
-        $refreshDeletes = false;
-        foreach ($sync->getChildren() as $child) {
-            if ($child instanceof OctetStringType) {
-                $cookie = $child->getValue();
-            } elseif ($child instanceof BooleanType) {
-                $refreshDeletes = $child->getValue();
-            }
-        }
-
-        return self::mergeControlData(
-            new static(
-                $cookie,
-                $refreshDeletes,
-            ),
-            $type,
-        );
     }
 }

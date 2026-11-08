@@ -16,7 +16,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Control;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
 
@@ -76,44 +75,5 @@ class PagingControlTest extends TestCase
             ),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $result = PagingControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_PAGING),
-            Asn1::boolean(false),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                Asn1::integer(1),
-                Asn1::octetString('foobar'),
-            ))),
-        ));
-
-        self::assertSame(
-            1,
-            $result->getSize(),
-        );
-        self::assertSame(
-            'foobar',
-            $result->getCookie(),
-        );
-    }
-
-    public function test_a_size_wider_than_an_integer_is_refused_as_malformed(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The paged control size is not an integer.');
-
-        PagingControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_PAGING),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                Asn1::integer('18446744073709551616'),
-                Asn1::octetString(''),
-            ))),
-        ));
     }
 }

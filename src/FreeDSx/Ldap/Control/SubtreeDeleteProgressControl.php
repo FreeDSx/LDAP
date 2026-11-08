@@ -14,14 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * How far a subtree delete got in one request, sent when it stops before the base and has to be resubmitted.
@@ -59,36 +52,6 @@ class SubtreeDeleteProgressControl extends Control
         return $this->remaining;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $progress = parent::decodeEncodedValue($type);
-        if (!$progress instanceof SequenceType) {
-            throw new ProtocolException('The subtree delete progress control is malformed.');
-        }
-        $deleted = $progress->getChild(0);
-        if (!$deleted instanceof IntegerType) {
-            throw new ProtocolException('The subtree delete progress control is malformed.');
-        }
-
-        return parent::mergeControlData(
-            new static(
-                parent::integerOf(
-                    $deleted,
-                    'subtree delete progress deleted count',
-                ),
-                self::remainingIn($progress->getChild(1)),
-            ),
-            $type,
-        );
-    }
-
     public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(Asn1::integer($this->deleted));
@@ -100,29 +63,5 @@ class SubtreeDeleteProgressControl extends Control
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * @param AbstractType<mixed>|null $remaining
-     *
-     * @throws EncoderException
-     */
-    private static function remainingIn(?AbstractType $remaining): ?int
-    {
-        if ($remaining === null) {
-            return null;
-        }
-        if (!$remaining instanceof IncompleteType || $remaining->getTagNumber() !== 0) {
-            throw new ProtocolException('The subtree delete progress control is malformed.');
-        }
-
-        $value = (new LdapEncoder())->complete(
-            $remaining,
-            AbstractType::TAG_TYPE_INTEGER,
-        )->getValue();
-
-        return is_int($value)
-            ? $value
-            : null;
     }
 }

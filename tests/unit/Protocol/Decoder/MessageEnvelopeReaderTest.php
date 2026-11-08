@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelope;
 use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelopeReader;
@@ -39,10 +40,13 @@ final class MessageEnvelopeReaderTest extends TestCase
 
     private DecodeContext $context;
 
+    private ControlDecoder $controls;
+
     protected function setUp(): void
     {
         $this->subject = new MessageEnvelopeReader();
         $this->context = new DecodeContext(new LdapEncoder());
+        $this->controls = new ControlDecoder([]);
     }
 
     public function testItReadsTheMessageIdAndTheOperation(): void
@@ -216,7 +220,7 @@ final class MessageEnvelopeReaderTest extends TestCase
                 $this->subject->controlsOf(
                     $envelope,
                     $this->context,
-                    Control::fromAsn1(...),
+                    $this->controls,
                 ),
             ),
         );
@@ -241,7 +245,7 @@ final class MessageEnvelopeReaderTest extends TestCase
             $this->subject->controlsOf(
                 $envelope,
                 $this->context,
-                Control::fromAsn1(...),
+                $this->controls,
             ),
         );
     }
@@ -264,7 +268,7 @@ final class MessageEnvelopeReaderTest extends TestCase
                 ),
             )),
             $this->context,
-            Control::fromAsn1(...),
+            $this->controls,
         );
     }
 
@@ -286,7 +290,7 @@ final class MessageEnvelopeReaderTest extends TestCase
                 ),
             ))),
             $this->context,
-            Control::fromAsn1(...),
+            $this->controls,
         );
     }
 

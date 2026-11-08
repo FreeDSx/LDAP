@@ -14,12 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\ReadEntry;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceOfType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Shared Pre-Read / Post-Read request control. RFC 4527.
@@ -58,33 +55,6 @@ abstract class ReadEntryControl extends Control
         $this->controlValue = SequenceOfType::fromChildren($attributes);
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $selection = self::decodeEncodedValue($type);
-
-        if (!$selection instanceof SequenceType) {
-            throw new ProtocolException('A read-entry control value must be a sequence of attribute names.');
-        }
-
-        $attributes = [];
-        foreach ($selection->getChildren() as $child) {
-            if (!$child instanceof OctetStringType) {
-                throw new ProtocolException('A read-entry attribute selection must contain octet string values.');
-            }
-            $attributes[] = $child->getValue();
-        }
-
-        return self::mergeControlData(
-            new static(...$attributes),
-            $type,
-        );
     }
 
     /**

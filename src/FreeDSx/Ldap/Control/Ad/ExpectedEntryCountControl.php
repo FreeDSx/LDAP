@@ -14,13 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents an Expected Entry Count control. Defined in MS-ADTS 3.1.1.3.4.1.33. The control value request definition
@@ -72,38 +67,6 @@ class ExpectedEntryCountControl extends Control
         return $this;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $request = self::decodeEncodedValue($type);
-        if (!$request instanceof SequenceType) {
-            throw new ProtocolException('An ExpectedEntryCount control value must be a sequence type.');
-        }
-        $min = $request->getChild(0);
-        $max = $request->getChild(1);
-        if (!$min instanceof IntegerType) {
-            throw new ProtocolException('An ExpectedEntryCount control value sequence 0 must be an integer type.');
-        }
-        if (!$max instanceof IntegerType) {
-            throw new ProtocolException('An ExpectedEntryCount control value sequence 1 must be an integer type.');
-        }
-        $control = new static(
-            $min->getValue(),
-            $max->getValue(),
-        );
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
-    }
-
     public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(
@@ -112,22 +75,5 @@ class ExpectedEntryCountControl extends Control
         );
 
         return parent::toAsn1();
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    protected static function validate(AbstractType $type): void
-    {
-        if (!($type instanceof SequenceType && count($type) === 2)) {
-            throw new ProtocolException('An ExpectedEntryCount control value must be a sequence type with 2 children.');
-        }
-        if (!$type->getChild(0) instanceof IntegerType) {
-            throw new ProtocolException('An ExpectedEntryCount control value sequence 0 must be an integer type.');
-        }
-        if (!$type->getChild(1) instanceof IntegerType) {
-            throw new ProtocolException('An ExpectedEntryCount control value sequence 1 must be an integer type.');
-        }
     }
 }

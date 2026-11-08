@@ -14,23 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
-use FreeDSx\Ldap\Control\AssertionControl;
-use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\PagingControl;
-use FreeDSx\Ldap\Control\ProxyAuthorizationControl;
-use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
-use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
-use FreeDSx\Ldap\Control\Sorting\SortingControl;
-use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
-use FreeDSx\Ldap\Control\SubentriesControl;
-use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
-use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
-use FreeDSx\Ldap\Control\Sync\SyncStateControl;
-use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoderInterface;
 use FreeDSx\Ldap\Protocol\Decoder\Request\RequestDecoderInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 
@@ -49,6 +35,7 @@ readonly class RequestMessageDecoder
         private MessageEnvelopeReader $envelopes,
         private DecodeContextFactory $contexts,
         private array $operations,
+        private ControlDecoderInterface $controls,
     ) {}
 
     /**
@@ -74,7 +61,7 @@ readonly class RequestMessageDecoder
                 $this->envelopes->controlsOf(
                     $envelope,
                     $context,
-                    $this->control(...),
+                    $this->controls,
                 ),
             ],
         );
@@ -84,25 +71,5 @@ readonly class RequestMessageDecoder
             $request,
             ...$controls,
         );
-    }
-
-    private function control(SequenceType $control): Control
-    {
-        return match ($control->getChild(0)?->getValue()) {
-            Control::OID_PAGING => PagingControl::fromAsn1($control),
-            Control::OID_SORTING => SortingControl::fromAsn1($control),
-            Control::OID_SORTING_RESPONSE => SortingResponseControl::fromAsn1($control),
-            Control::OID_VLV_RESPONSE => VlvResponseControl::fromAsn1($control),
-            Control::OID_DIR_SYNC => DirSyncResponseControl::fromAsn1($control),
-            Control::OID_SYNC_STATE => SyncStateControl::fromAsn1($control),
-            Control::OID_SYNC_REQUEST => SyncRequestControl::fromAsn1($control),
-            Control::OID_SYNC_DONE => SyncDoneControl::fromAsn1($control),
-            Control::OID_PROXY_AUTHORIZATION => ProxyAuthorizationControl::fromAsn1($control),
-            Control::OID_ASSERTION => AssertionControl::fromAsn1($control),
-            Control::OID_PRE_READ => PreReadControl::fromAsn1($control),
-            Control::OID_POST_READ => PostReadControl::fromAsn1($control),
-            Control::OID_SUBENTRIES => SubentriesControl::fromAsn1($control),
-            default => Control::fromAsn1($control),
-        };
     }
 }

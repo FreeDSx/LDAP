@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Control\ReadEntry;
 
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
@@ -45,22 +44,6 @@ abstract class ReadEntryResponseControl extends Control
         $this->controlValue = new SearchResultEntry($this->entry);
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $entry = SearchResultEntry::fromAsn1(self::decodeEncodedValue($type))
-            ->getEntry();
-
-        return self::mergeControlData(
-            new static($entry),
-            $type,
-        );
     }
 
     /**

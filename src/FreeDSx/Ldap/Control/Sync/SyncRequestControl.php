@@ -14,15 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Sync;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
-
-use function count;
 
 /**
  * Represents a syncRequestValue control. RFC 4533.
@@ -109,49 +102,5 @@ class SyncRequestControl extends Control
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritdoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $sync = self::decodeEncodedValue($type);
-        if (!$sync instanceof SequenceType || count($sync->getChildren()) > 3) {
-            throw new ProtocolException(
-                'Expected a sequence type with 2 or less values for a sync request control value.',
-            );
-        }
-
-        $cookie = null;
-        $mode = null;
-        $reloadHint = false;
-        foreach ($sync->getChildren() as $child) {
-            if ($child instanceof OctetStringType) {
-                $cookie = $child->getValue();
-            } elseif ($child instanceof BooleanType) {
-                $reloadHint = $child->getValue();
-            } elseif ($child instanceof EnumeratedType) {
-                $mode = $child;
-            }
-        }
-
-        if ($mode === null) {
-            throw new ProtocolException('Expected an enumerated type for the sync request mode.');
-        }
-
-        return self::mergeControlData(
-            new static(
-                self::integerOf(
-                    $mode,
-                    'sync request control mode',
-                ),
-                $cookie,
-                $reloadHint,
-            ),
-            $type,
-        );
     }
 }

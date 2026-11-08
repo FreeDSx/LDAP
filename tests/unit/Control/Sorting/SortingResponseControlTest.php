@@ -14,13 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class SortingResponseControlTest extends TestCase
@@ -49,71 +45,6 @@ class SortingResponseControlTest extends TestCase
             'cn',
             $this->subject->getAttribute(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new SortingResponseControl(0, 'cn'),
-            SortingResponseControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_SORTING_RESPONSE),
-                Asn1::boolean(false),
-                Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::enumerated(0),
-                    Asn1::octetString('cn'),
-                ))),
-            ))->setValue(null),
-        );
-    }
-
-    public function test_a_result_wider_than_an_integer_is_refused_as_malformed(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The server side sorting response result is not an integer.');
-
-        SortingResponseControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SORTING_RESPONSE),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                new EnumeratedType('18446744073709551616'),
-            ))),
-        ));
-    }
-
-    #[DataProvider('nonStringAttributeProvider')]
-    public function test_an_attribute_that_is_not_a_string_is_refused_as_malformed(SequenceType $value): void
-    {
-        $encoder = new LdapEncoder();
-
-        $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The server side sorting response attribute is not a string.');
-
-        SortingResponseControl::fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SORTING_RESPONSE),
-            Asn1::octetString($encoder->encode($value)),
-        ));
-    }
-
-    /**
-     * @return iterable<string, array{SequenceType}>
-     */
-    public static function nonStringAttributeProvider(): iterable
-    {
-        yield 'an integer' => [Asn1::sequence(
-            Asn1::enumerated(0),
-            Asn1::integer(1),
-        )];
-        yield 'a boolean' => [Asn1::sequence(
-            Asn1::enumerated(0),
-            Asn1::boolean(true),
-        )];
-        yield 'a sequence' => [Asn1::sequence(
-            Asn1::enumerated(0),
-            Asn1::sequence(),
-        )];
     }
 
     public function test_it_should_generate_correct_asn1(): void

@@ -14,13 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IntegerType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a paged results control request value. RFC 2696.
@@ -66,41 +60,6 @@ class PagingControl extends Control
         $this->size = $size;
 
         return $this;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $paging = self::decodeEncodedValue($type);
-        if (!$paging instanceof SequenceType) {
-            throw new ProtocolException('A paged control value must be a sequence type with 2 children.');
-        }
-        $count = $paging->getChild(0);
-        $cookie = $paging->getChild(1);
-        if (!$count instanceof IntegerType) {
-            throw new ProtocolException('A paged control value sequence 0 must be an integer type.');
-        }
-        if (!$cookie instanceof OctetStringType) {
-            throw new ProtocolException('A paged control value sequence 1 must be an octet string type.');
-        }
-        $control = new static(
-            self::integerOf(
-                $count,
-                'paged control size',
-            ),
-            $cookie->getValue(),
-        );
-
-        return self::mergeControlData(
-            $control,
-            $type,
-        );
     }
 
     public function toAsn1(): SequenceType

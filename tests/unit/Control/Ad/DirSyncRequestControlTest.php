@@ -98,22 +98,4 @@ class DirSyncRequestControlTest extends \PHPUnit\Framework\TestCase
             ),
         );
     }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new DirSyncRequestControl(),
-            DirSyncRequestControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_DIR_SYNC),
-                Asn1::boolean(true),
-                Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::integer(-0x80000000),
-                    Asn1::integer(2147483647),
-                    Asn1::octetString(''),
-                ))),
-            ))->setValue(null),
-        );
-    }
 }

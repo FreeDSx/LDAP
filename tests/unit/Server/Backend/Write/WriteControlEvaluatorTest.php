@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
@@ -55,6 +57,8 @@ final class WriteControlEvaluatorTest extends TestCase
             $this->createMock(ReadBackendInterface::class),
             new RuleBasedAccessControl(AclRules::fromEmpty()),
             $this->fromContainer(LinkedLeafWitness::class),
+            $this->fromContainer(AssertionControlDecoder::class),
+            $this->fromContainer(DecodeContextFactory::class),
         );
         $this->entry = Entry::fromArray(
             'cn=foo,dc=ex,dc=com',

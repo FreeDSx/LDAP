@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Authorization;
 
-use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\ProxyAuthorizationControl;
@@ -236,13 +235,12 @@ final class ProxiedAuthorizationResolverTest extends TestCase
     {
         $this->grantProxyCapability();
 
-        // A malformed authzId form can only originate from the wire, so build it via fromAsn1.
+        // A malformed authzId form only arrives from the wire, where the decoder keeps it unparsed.
         $this->assertDeniesWith(
-            ProxyAuthorizationControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_PROXY_AUTHORIZATION),
-                Asn1::boolean(true),
-                Asn1::octetString('mail:alice@example.com'),
-            )),
+            ProxyAuthorizationControl::unparsed(
+                'mail:alice@example.com',
+                true,
+            ),
             'mail:alice@example.com',
         );
     }

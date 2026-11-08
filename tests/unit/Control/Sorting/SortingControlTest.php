@@ -17,7 +17,6 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
 
@@ -100,61 +99,5 @@ class SortingControlTest extends TestCase
             ),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new SortingControl(
-                new SortKey('foo'),
-                new SortKey('bar'),
-                new SortKey('foobar', true, 'bleh'),
-            ),
-            SortingControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_SORTING),
-                Asn1::boolean(false),
-                Asn1::octetString($encoder->encode(Asn1::sequenceOf(
-                    Asn1::sequence(Asn1::octetString('foo')),
-                    Asn1::sequence(Asn1::octetString('bar')),
-                    Asn1::sequence(
-                        Asn1::octetString('foobar'),
-                        Asn1::context(0, Asn1::octetString('bleh')),
-                        Asn1::context(1, Asn1::boolean(true)),
-                    ),
-                ))),
-            ))->setValue(null),
-        );
-    }
-
-    public function test_it_should_throw_an_error_parsing_sorting_keys_with_no_attribute(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::expectException(ProtocolException::class);
-
-        $this->subject->fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SORTING),
-            Asn1::boolean(false),
-            Asn1::octetString($encoder->encode(Asn1::sequenceOf(
-                Asn1::sequence(Asn1::octetString('')),
-            ))),
-        ));
-    }
-
-    public function test_it_should_throw_an_error_parsing_sorting_keys_with_unexpected_values(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::expectException(ProtocolException::class);
-
-        $this->subject->fromAsn1(Asn1::sequence(
-            Asn1::octetString(Control::OID_SORTING),
-            Asn1::boolean(false),
-            Asn1::octetString($encoder->encode(Asn1::sequenceOf(
-                Asn1::sequence(Asn1::octetString('foo'), Asn1::enumerated(1)),
-            ))),
-        ));
     }
 }

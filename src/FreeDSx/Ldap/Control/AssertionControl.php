@@ -13,9 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 
 /**
@@ -56,20 +54,5 @@ class AssertionControl extends Control
         $this->controlValue = $this->filter;
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $filter = FilterFactory::get(self::decodeEncodedValue($type));
-
-        return self::mergeControlData(
-            new static($filter),
-            $type,
-        );
     }
 }

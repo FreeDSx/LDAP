@@ -59,18 +59,4 @@ class SetOwnerControlTest extends TestCase
             ),
         );
     }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new SetOwnerControl('foo'),
-            SetOwnerControl::fromAsn1(Asn1::sequence(
-                Asn1::octetString(Control::OID_SET_OWNER),
-                Asn1::boolean(true),
-                Asn1::octetString($encoder->encode(Asn1::octetString('foo'))),
-            ))->setValue(null),
-        );
-    }
 }

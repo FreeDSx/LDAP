@@ -14,13 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * A Server Side Sorting response control value. RFC 2891.
@@ -70,42 +65,6 @@ class SortingResponseControl extends Control
     public function getAttribute(): ?string
     {
         return $this->attribute;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $sorting = parent::decodeEncodedValue($type);
-        if (!$sorting instanceof SequenceType) {
-            throw new ProtocolException('The server side sorting response is malformed.');
-        }
-        $result = $sorting->getChild(0);
-        $attribute = $sorting->getChild(1);
-        if (!$result instanceof EnumeratedType) {
-            throw new ProtocolException('The server side sorting response is malformed.');
-        }
-
-        $response = new static(
-            parent::integerOf(
-                $result,
-                'server side sorting response result',
-            ),
-            $attribute === null ? null : parent::stringOf(
-                $attribute,
-                'server side sorting response attribute',
-            ),
-        );
-
-        return parent::mergeControlData(
-            $response,
-            $type,
-        );
     }
 
     public function toAsn1(): SequenceType
