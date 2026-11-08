@@ -298,31 +298,31 @@
         },
         "control: DirSync request": {
             "pdu": "30620201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02a30280416312e322e3834302e3131333535362e312e342e3834310101ff040b3009020100020203e80400",
-            "outcome": "LdapMessageRequest SearchRequest [DirSyncResponseControl] 517c772bd5d1"
+            "outcome": "LdapMessageRequest SearchRequest [Control] 517c772bd5d1"
         },
         "control: sort response in a request, malformed": {
             "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210416312e322e3834302e3131333535362e312e342e343734040767617262616765",
-            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+            "outcome": "LdapMessageRequest SearchRequest [Control] a5f7dea948c3"
         },
         "control: sort response in a request, malformed, critical": {
             "pdu": "305e0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02630240416312e322e3834302e3131333535362e312e342e3437340101ff040767617262616765",
-            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+            "outcome": "LdapMessageRequest SearchRequest [Control] b12228b65a37"
         },
         "control: sync state in a request, critical": {
             "pdu": "30700201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea03830360418312e332e362e312e342e312e343230332e312e392e312e320101ff041730150a0101041011111111111111111111111111111111",
-            "outcome": "LdapMessageRequest SearchRequest [SyncStateControl] 911e9defb72f"
+            "outcome": "LdapMessageRequest SearchRequest [Control] 911e9defb72f"
         },
         "control: sync state in a request, malformed": {
             "pdu": "305d0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02530230418312e332e362e312e342e312e343230332e312e392e312e32040767617262616765",
-            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The expected byte length was 97, but received 5."
+            "outcome": "LdapMessageRequest SearchRequest [Control] 93224290f59b"
         },
         "control: sync done in a request": {
             "pdu": "305b0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02330210418312e332e362e312e342e312e343230332e312e392e312e3304053003040163",
-            "outcome": "LdapMessageRequest SearchRequest [SyncDoneControl] 0e55175b047c"
+            "outcome": "LdapMessageRequest SearchRequest [Control] 0e55175b047c"
         },
         "control: VLV response in a request": {
             "pdu": "30610201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02930270418322e31362e3834302e312e3131333733302e332e342e3130040b30090201010201020a0100",
-            "outcome": "LdapMessageRequest SearchRequest [VlvResponseControl] 54e6aac252ac"
+            "outcome": "LdapMessageRequest SearchRequest [Control] 54e6aac252ac"
         },
         "control: unknown OID with a value": {
             "pdu": "304d0201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01530130407312e322e332e340408616e797468696e67",
@@ -572,19 +572,19 @@
         },
         "request control in a response: sorting": {
             "pdu": "303202010165070a010004000400a02430220416312e322e3834302e3131333535362e312e342e3437330408300630040402736e",
-            "outcome": "LdapMessageResponse SearchResultDone [SortingControl] c04f6e2cca84"
+            "outcome": "LdapMessageResponse SearchResultDone [Control] c04f6e2cca84"
         },
         "request control in a response: sync request": {
             "pdu": "303402010165070a010004000400a02630240418312e332e362e312e342e312e343230332e312e392e312e310101ff040530030a0101",
-            "outcome": "LdapMessageResponse SearchResultDone [SyncRequestControl] 283f6f3042c7"
+            "outcome": "LdapMessageResponse SearchResultDone [Control] 283f6f3042c7"
         },
         "request control in a response: subentries": {
             "pdu": "303102010165070a010004000400a02330210417312e332e362e312e342e312e343230332e312e31302e310101ff04030101ff",
-            "outcome": "LdapMessageResponse SearchResultDone [SubentriesControl] 87d2a012f567"
+            "outcome": "LdapMessageResponse SearchResultDone [Control] 87d2a012f567"
         },
         "request control in a response: assertion": {
             "pdu": "302702010165070a010004000400a0193017040c312e332e362e312e312e31320101ff04048702636e",
-            "outcome": "LdapMessageResponse SearchResultDone [AssertionControl] f2e84e0448b3"
+            "outcome": "LdapMessageResponse SearchResultDone [Control] f2e84e0448b3"
         },
         "request op sent to the client: delete": {
             "pdu": "30120201014a0d636e3d666f6f2c64633d626172",

@@ -163,17 +163,15 @@ final class DecoderContainerProvider implements ContainerProviderInterface
         );
     }
 
+    /**
+     * Only the controls a client sends are typed, so any other OID is held to RFC 4511 4.1.11 criticality.
+     */
     private function makeRequestControlDecoder(Container $container): ControlDecoder
     {
         return new ControlDecoder([
             Control::OID_PAGING => $container->get(PagingControlDecoder::class),
             Control::OID_SORTING => $container->get(SortingControlDecoder::class),
-            Control::OID_SORTING_RESPONSE => $container->get(SortingResponseControlDecoder::class),
-            Control::OID_VLV_RESPONSE => $container->get(VlvResponseControlDecoder::class),
-            Control::OID_DIR_SYNC => $container->get(DirSyncResponseControlDecoder::class),
-            Control::OID_SYNC_STATE => $container->get(SyncStateControlDecoder::class),
             Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
-            Control::OID_SYNC_DONE => $container->get(SyncDoneControlDecoder::class),
             Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
             Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
             Control::OID_PRE_READ => new ReadEntryControlDecoder(PreReadControl::class),
@@ -182,24 +180,22 @@ final class DecoderContainerProvider implements ContainerProviderInterface
         ]);
     }
 
+    /**
+     * Only the controls a server returns are typed.
+     */
     private function makeResponseControlDecoder(Container $container): ControlDecoder
     {
         return new ControlDecoder([
-            Control::OID_PWD_POLICY => $container->get(PwdPolicyResponseControlDecoder::class),
-            Control::OID_PRE_READ => new ReadEntryResponseControlDecoder(PreReadResponseControl::class),
-            Control::OID_POST_READ => new ReadEntryResponseControlDecoder(PostReadResponseControl::class),
-            Control::OID_SUBTREE_DELETE_PROGRESS => $container->get(SubtreeDeleteProgressControlDecoder::class),
             Control::OID_PAGING => $container->get(PagingControlDecoder::class),
-            Control::OID_SORTING => $container->get(SortingControlDecoder::class),
             Control::OID_SORTING_RESPONSE => $container->get(SortingResponseControlDecoder::class),
             Control::OID_VLV_RESPONSE => $container->get(VlvResponseControlDecoder::class),
             Control::OID_DIR_SYNC => $container->get(DirSyncResponseControlDecoder::class),
             Control::OID_SYNC_STATE => $container->get(SyncStateControlDecoder::class),
-            Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
             Control::OID_SYNC_DONE => $container->get(SyncDoneControlDecoder::class),
-            Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
-            Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
-            Control::OID_SUBENTRIES => $container->get(SubentriesControlDecoder::class),
+            Control::OID_PWD_POLICY => $container->get(PwdPolicyResponseControlDecoder::class),
+            Control::OID_PRE_READ => new ReadEntryResponseControlDecoder(PreReadResponseControl::class),
+            Control::OID_POST_READ => new ReadEntryResponseControlDecoder(PostReadResponseControl::class),
+            Control::OID_SUBTREE_DELETE_PROGRESS => $container->get(SubtreeDeleteProgressControlDecoder::class),
         ]);
     }
 }

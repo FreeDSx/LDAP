@@ -15,10 +15,16 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
 use FreeDSx\Ldap\Control\AssertionControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
+use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
+use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
+use FreeDSx\Ldap\Control\Sync\SyncStateControl;
+use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -30,6 +36,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -78,6 +85,46 @@ final class RequestMessageDecoderTest extends TestCase
 
         self::assertTrue($message->controls()->has(Control::OID_PWD_POLICY));
         self::assertNull($message->controls()->getByClass(PwdPolicyResponseControl::class));
+    }
+
+    #[DataProvider('controlsOnlyAServerSends')]
+    public function testItLeavesAControlOnlyAServerSendsGeneric(Control $control): void
+    {
+        $message = $this->subject->decode(self::received(new LdapMessageRequest(
+            2,
+            new DeleteRequest('dc=foo,dc=bar'),
+            $control,
+        )));
+
+        self::assertSame(
+            Control::class,
+            get_debug_type($message->controls()->get($control->getTypeOid())),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Control}>
+     */
+    public static function controlsOnlyAServerSends(): iterable
+    {
+        yield 'sort response' => [new SortingResponseControl(0)];
+        yield 'sort response with a malformed value' => [new Control(
+            Control::OID_SORTING_RESPONSE,
+            true,
+            'garbage',
+        )];
+        yield 'VLV response' => [new VlvResponseControl(
+            1,
+            10,
+            0,
+        )];
+        yield 'DirSync response' => [new DirSyncResponseControl(0)];
+        yield 'sync state' => [new SyncStateControl(
+            SyncStateControl::STATE_ADD,
+            str_repeat("\x11", 16),
+        )];
+        yield 'sync done' => [new SyncDoneControl('cookie')];
+        yield 'subtree delete progress' => [new SubtreeDeleteProgressControl(1)];
     }
 
     public function testAResponseOperationIsRefusedBeforeItIsDecoded(): void

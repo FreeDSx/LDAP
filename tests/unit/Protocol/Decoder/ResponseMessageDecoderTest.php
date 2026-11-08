@@ -17,20 +17,29 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Control\AssertionControl;
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ProxyAuthorizationControl;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Control\SubentriesControl;
 use FreeDSx\Ldap\Control\SubtreeDeleteProgressControl;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ResponseMessageDecoderTest extends TestCase
@@ -109,6 +118,33 @@ final class ResponseMessageDecoderTest extends TestCase
             25000,
             $message->controls()->getByClass(SubtreeDeleteProgressControl::class)?->getDeleted(),
         );
+    }
+
+    #[DataProvider('controlsOnlyAClientSends')]
+    public function testItLeavesAControlOnlyAClientSendsGeneric(Control $control): void
+    {
+        $message = $this->subject->decode(self::received(new LdapMessageResponse(
+            4,
+            new DeleteResponse(0),
+            $control,
+        )));
+
+        self::assertSame(
+            Control::class,
+            get_debug_type($message->controls()->get($control->getTypeOid())),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Control}>
+     */
+    public static function controlsOnlyAClientSends(): iterable
+    {
+        yield 'sorting' => [new SortingControl(new SortKey('sn'))];
+        yield 'sync request' => [new SyncRequestControl()];
+        yield 'subentries' => [new SubentriesControl()];
+        yield 'assertion' => [new AssertionControl(Filters::present('cn'))];
+        yield 'proxied authorization' => [new ProxyAuthorizationControl(AuthzId::anonymous())];
     }
 
     public function testARequestOperationIsRefusedBeforeItIsDecoded(): void

@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
@@ -183,6 +184,61 @@ trait ControlValidationTestsTrait
             Control::OID_SYNC_REQUEST,
             false,
             $encoder->encode(Asn1::sequence(new EnumeratedType('18446744073709551616'))),
+        )];
+    }
+
+    #[DataProvider('controlsOnlyAServerSends')]
+    public function testANonCriticalControlOnlyAServerSendsIsIgnored(Control $control): void
+    {
+        $this->authenticateUser();
+
+        self::assertCount(
+            8,
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                $control->setCriticality(false),
+            ),
+        );
+    }
+
+    #[DataProvider('controlsOnlyAServerSends')]
+    public function testACriticalControlOnlyAServerSendsIsRefusedAsUnavailable(Control $control): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                $control->setCriticality(true),
+            );
+            self::fail('The critical control should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * RFC 4511 4.1.11 holds a control the server does not take in a request to its criticality, whatever its value.
+     *
+     * @return iterable<string, array{Control}>
+     */
+    public static function controlsOnlyAServerSends(): iterable
+    {
+        yield 'a sort response with a malformed value' => [new Control(
+            Control::OID_SORTING_RESPONSE,
+            false,
+            'garbage',
+        )];
+        yield 'a sync state' => [new SyncStateControl(
+            SyncStateControl::STATE_ADD,
+            str_repeat("\x11", 16),
         )];
     }
 }
