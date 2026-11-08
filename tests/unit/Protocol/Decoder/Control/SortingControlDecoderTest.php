@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Control;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
@@ -75,6 +76,25 @@ final class SortingControlDecoderTest extends TestCase
                 ),
                 $this->context,
             )->setValue(null),
+        );
+    }
+
+    public function testItRefusesAReverseOrderFlagThatIsNotABoolean(): void
+    {
+        $this->expectException(EncoderException::class);
+
+        $this->subject->decode(
+            self::encodedControl(
+                Control::OID_SORTING,
+                Asn1::sequenceOf(Asn1::sequence(
+                    Asn1::octetString('cn'),
+                    Asn1::context(
+                        1,
+                        Asn1::octetString('ab'),
+                    ),
+                )),
+            ),
+            $this->context,
         );
     }
 
