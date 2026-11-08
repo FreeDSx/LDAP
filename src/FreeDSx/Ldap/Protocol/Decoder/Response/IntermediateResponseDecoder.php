@@ -29,7 +29,7 @@ use function is_string;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class IntermediateResponseDecoder
+readonly class IntermediateResponseDecoder implements ResponseDecoderInterface
 {
     public function __construct(private SyncInfoDecoder $syncInfo) {}
 

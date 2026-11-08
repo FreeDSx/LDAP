@@ -20,6 +20,12 @@ use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Response\AddResponse;
+use FreeDSx\Ldap\Operation\Response\CompareResponse;
+use FreeDSx\Ldap\Operation\Response\DeleteResponse;
+use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
+use FreeDSx\Ldap\Operation\Response\ModifyResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\DirSyncResponseControlDecoder;
@@ -55,6 +61,7 @@ use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\BindResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\ExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\IntermediateResponseDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Response\LdapResultDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\PasswordModifyResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultEntryDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultReferenceDecoder;
@@ -188,9 +195,23 @@ final class DecoderContainerProvider implements ContainerProviderInterface
 
     private function makeResponseMessageDecoder(Container $container): ResponseMessageDecoder
     {
+        // Keyed by the protocolOp tag RFC 4511 4.2 to 4.13 assigns each response.
         return new ResponseMessageDecoder(
             $container->get(MessageEnvelopeReader::class),
             $container->get(DecodeContextFactory::class),
+            [
+                1 => $container->get(BindResponseDecoder::class),
+                4 => $container->get(SearchResultEntryDecoder::class),
+                5 => new LdapResultDecoder(SearchResultDone::class),
+                7 => new LdapResultDecoder(ModifyResponse::class),
+                9 => new LdapResultDecoder(AddResponse::class),
+                11 => new LdapResultDecoder(DeleteResponse::class),
+                13 => new LdapResultDecoder(ModifyDnResponse::class),
+                15 => new LdapResultDecoder(CompareResponse::class),
+                19 => $container->get(SearchResultReferenceDecoder::class),
+                24 => $container->get(ExtendedResponseDecoder::class),
+                25 => $container->get(IntermediateResponseDecoder::class),
+            ],
             $this->makeResponseControlDecoder($container),
         );
     }
@@ -225,8 +246,14 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             Control::OID_SYNC_STATE => $container->get(SyncStateControlDecoder::class),
             Control::OID_SYNC_DONE => $container->get(SyncDoneControlDecoder::class),
             Control::OID_PWD_POLICY => $container->get(PwdPolicyResponseControlDecoder::class),
-            Control::OID_PRE_READ => new ReadEntryResponseControlDecoder(PreReadResponseControl::class),
-            Control::OID_POST_READ => new ReadEntryResponseControlDecoder(PostReadResponseControl::class),
+            Control::OID_PRE_READ => new ReadEntryResponseControlDecoder(
+                PreReadResponseControl::class,
+                $container->get(SearchResultEntryDecoder::class),
+            ),
+            Control::OID_POST_READ => new ReadEntryResponseControlDecoder(
+                PostReadResponseControl::class,
+                $container->get(SearchResultEntryDecoder::class),
+            ),
             Control::OID_SUBTREE_DELETE_PROGRESS => $container->get(SubtreeDeleteProgressControlDecoder::class),
         ]);
     }

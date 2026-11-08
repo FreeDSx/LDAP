@@ -14,11 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response\SyncInfo;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SyncInfoMessage;
 
 /**
@@ -41,27 +37,5 @@ class SyncNewCookie extends SyncInfoMessage
         ));
 
         return parent::toAsn1();
-    }
-
-    /**
-     *{@inheritdoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): IntermediateResponse
-    {
-        $cookie = self::decodeEncodedValue(
-            $type,
-            [
-                AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
-                    self::VALUE_TAG => AbstractType::TAG_TYPE_OCTET_STRING,
-                ],
-            ],
-        );
-        if (!$cookie instanceof OctetStringType) {
-            throw new ProtocolException('The syncCookie must be an octet string.');
-        }
-
-        return new self($cookie->getValue());
     }
 }

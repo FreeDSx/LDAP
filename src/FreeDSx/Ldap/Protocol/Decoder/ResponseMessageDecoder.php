@@ -13,13 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Decoder;
 
-use Closure;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Operation\Response;
-use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoderInterface;
+use FreeDSx\Ldap\Protocol\Decoder\Response\ResponseDecoderInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 
 /**
@@ -30,9 +28,13 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
  */
 readonly class ResponseMessageDecoder
 {
+    /**
+     * @param array<int, ResponseDecoderInterface> $operations the decoder of each response, keyed by protocolOp tag.
+     */
     public function __construct(
         private MessageEnvelopeReader $envelopes,
         private DecodeContextFactory $contexts,
+        private array $operations,
         private ControlDecoderInterface $controls,
     ) {}
 
@@ -45,13 +47,17 @@ readonly class ResponseMessageDecoder
     {
         $envelope = $this->envelopes->read($pdu);
         // Resolved before anything is decoded, so an unrecognized operation ends the session (RFC 4511 4.1.1).
-        $operation = $this->operationFor($envelope);
+        $operation = $this->operations[$envelope->operationTag]
+            ?? throw $this->envelopes->unsupported($envelope->operationTag);
         $context = $this->contexts->create();
 
         [$response, $controls] = $this->envelopes->answerable(
             $envelope,
             fn(): array => [
-                $operation($envelope->operation),
+                $operation->decode(
+                    $envelope->operation,
+                    $context,
+                ),
                 $this->envelopes->controlsOf(
                     $envelope,
                     $context,
@@ -65,27 +71,5 @@ readonly class ResponseMessageDecoder
             $response,
             ...$controls,
         );
-    }
-
-    /**
-     * @return Closure(AbstractType<mixed>): ResponseInterface
-     * @throws ProtocolException
-     */
-    private function operationFor(MessageEnvelope $envelope): Closure
-    {
-        return match ($envelope->operationTag) {
-            1 => Response\BindResponse::fromAsn1(...),
-            4 => Response\SearchResultEntry::fromAsn1(...),
-            5 => Response\SearchResultDone::fromAsn1(...),
-            7 => Response\ModifyResponse::fromAsn1(...),
-            9 => Response\AddResponse::fromAsn1(...),
-            11 => Response\DeleteResponse::fromAsn1(...),
-            13 => Response\ModifyDnResponse::fromAsn1(...),
-            15 => Response\CompareResponse::fromAsn1(...),
-            19 => Response\SearchResultReference::fromAsn1(...),
-            24 => Response\ExtendedResponse::fromAsn1(...),
-            25 => Response\IntermediateResponse::fromAsn1(...),
-            default => throw $this->envelopes->unsupported($envelope->operationTag),
-        };
     }
 }

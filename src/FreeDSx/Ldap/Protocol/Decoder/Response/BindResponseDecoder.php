@@ -27,7 +27,7 @@ use function is_string;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class BindResponseDecoder
+readonly class BindResponseDecoder implements ResponseDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type

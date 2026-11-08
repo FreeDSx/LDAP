@@ -14,17 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response\SyncInfo;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetOfType;
-use FreeDSx\Asn1\Type\SetType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SyncInfoMessage;
-
-use function count;
 
 /**
  * Represents a Sync Info Message syncIdSet choice. RFC 4533.
@@ -103,67 +95,5 @@ class SyncIdSet extends SyncInfoMessage
         $this->setResponseValueToEncode($asn1);
 
         return parent::toAsn1();
-    }
-
-    /**
-     *{@inheritdoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): IntermediateResponse
-    {
-        $responseName = self::decodeResponseName($type);
-        if ($responseName !== self::OID_SYNC_INFO) {
-            throw new ProtocolException(sprintf(
-                'The response name should be "%s", but was "%s".',
-                self::OID_SYNC_INFO,
-                $responseName,
-            ));
-        }
-
-        $responseValue = self::decodeEncodedValue(
-            $type,
-            [
-                AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
-                    self::VALUE_TAG => AbstractType::TAG_TYPE_SEQUENCE,
-                ],
-            ],
-        );
-        if (!$responseValue instanceof SequenceType || count($type->getChildren()) >= 3) {
-            throw new ProtocolException(
-                'Expected a sequence type with 2 or less children for a refreshPresent.',
-            );
-        }
-
-        $cookie = null;
-        $refreshDeletes = false;
-        $entryUuids = null;
-        foreach ($responseValue->getChildren() as $child) {
-            if ($child instanceof OctetStringType) {
-                $cookie = $child->getValue();
-            } elseif ($child instanceof BooleanType) {
-                $refreshDeletes = $child->getValue();
-            } elseif ($child instanceof SetType) {
-                $entryUuids = [];
-                foreach ($child->getChildren() as $entryUuid) {
-                    if (!$entryUuid instanceof OctetStringType) {
-                        throw new ProtocolException('The entryUuid needs to be an octet string type.');
-                    }
-                    $entryUuids[] = $entryUuid->getValue();
-                }
-            } else {
-                throw new ProtocolException('Unexpected value in the syncIdSet response.');
-            }
-        }
-
-        if ($entryUuids === null) {
-            throw new ProtocolException('Expected a set of entryUuids, but received none.');
-        }
-
-        return new self(
-            $entryUuids,
-            $refreshDeletes,
-            $cookie,
-        );
     }
 }

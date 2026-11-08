@@ -83,20 +83,6 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        return new static(
-            self::createLdapResult($type),
-            ...self::parseExtendedResponse($type),
-        );
-    }
-
-    /**
      * @throws ProtocolException
      * @throws EncoderException
      */

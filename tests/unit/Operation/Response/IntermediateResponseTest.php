@@ -37,23 +37,6 @@ final class IntermediateResponseTest extends TestCase
         );
     }
 
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $this->subject = IntermediateResponse::fromAsn1(Asn1::application(25, Asn1::sequence(
-            Asn1::context(0, Asn1::octetString('foo')),
-            Asn1::context(1, Asn1::octetString('bar')),
-        )));
-
-        self::assertSame(
-            'foo',
-            $this->subject->getName(),
-        );
-        self::assertSame(
-            'bar',
-            $this->subject->getValue(),
-        );
-    }
-
     public function test_it_should_generate_correct_asn1(): void
     {
         self::assertEquals(

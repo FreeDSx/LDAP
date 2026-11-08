@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class LdapResultDecoder
+readonly class LdapResultDecoder implements ResponseDecoderInterface
 {
     /**
      * @param class-string<T> $resultClass the response to build.

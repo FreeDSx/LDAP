@@ -27,7 +27,7 @@ use FreeDSx\Ldap\Protocol\Decoder\FieldValueTrait;
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class SearchResultReferenceDecoder
+readonly class SearchResultReferenceDecoder implements ResponseDecoderInterface
 {
     use FieldValueTrait;
 

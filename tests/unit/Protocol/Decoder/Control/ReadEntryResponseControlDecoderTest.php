@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultEntryDecoder;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -37,7 +38,10 @@ final class ReadEntryResponseControlDecoderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ReadEntryResponseControlDecoder(PostReadResponseControl::class);
+        $this->subject = new ReadEntryResponseControlDecoder(
+            PostReadResponseControl::class,
+            $this->fromContainer(SearchResultEntryDecoder::class),
+        );
         $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
     }
 
@@ -69,7 +73,10 @@ final class ReadEntryResponseControlDecoderTest extends TestCase
     {
         self::assertInstanceOf(
             PreReadResponseControl::class,
-            (new ReadEntryResponseControlDecoder(PreReadResponseControl::class))->decode(
+            (new ReadEntryResponseControlDecoder(
+                PreReadResponseControl::class,
+                $this->fromContainer(SearchResultEntryDecoder::class),
+            ))->decode(
                 (new PreReadResponseControl(Entry::fromArray('cn=foo,dc=ex,dc=com')))->toAsn1(),
                 $this->context,
             ),

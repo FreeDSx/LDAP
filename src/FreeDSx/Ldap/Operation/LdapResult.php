@@ -164,24 +164,6 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        [$resultCode, $dn, $diagnosticMessage, $referrals] = self::parseResultData($type);
-
-        return new static(
-            $resultCode,
-            $dn,
-            $diagnosticMessage,
-            ...$referrals,
-        );
-    }
-
-    /**
      * @param AbstractType<mixed> $type
      * @return array{0: int, 1: string, 2: string, 3: LdapUrl[]}
      * @throws ProtocolException

@@ -14,11 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 
 /**
@@ -49,33 +45,6 @@ class SearchResultReference implements ResponseInterface
     public function getReferrals(): array
     {
         return $this->referrals;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        $referrals = [];
-
-        foreach ($type->getChildren() as $referral) {
-            if (!$referral instanceof OctetStringType) {
-                throw new ProtocolException('The search result reference is malformed.');
-            }
-            try {
-                $referrals[] = LdapUrl::parse($referral->getValue());
-            } catch (UrlParseException) {
-                # RFC 4511 4.1.10 makes the URIs alternatives, so an unusable one is ignored.
-            }
-        }
-
-        if ($referrals === []) {
-            throw new ProtocolException('The search result reference holds no usable URI.');
-        }
-
-        return new self(...$referrals);
     }
 
     public function toAsn1(): SequenceType

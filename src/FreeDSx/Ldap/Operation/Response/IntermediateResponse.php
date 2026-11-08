@@ -16,10 +16,7 @@ namespace FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
-
-use function is_string;
 
 /**
  * RFC 4511, 4.13.
@@ -65,44 +62,6 @@ class IntermediateResponse implements ResponseInterface
         return $this->responseValue;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): IntermediateResponse
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException('The intermediate response is malformed');
-        }
-
-        $name = null;
-        $value = null;
-        foreach ($type->getChildren() as $child) {
-            if ($child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                continue;
-            }
-            $childValue = $child->getValue();
-            if ($childValue !== null && !is_string($childValue)) {
-                continue;
-            }
-            if ($child->getTagNumber() === 0) {
-                $name = $childValue;
-            } elseif ($child->getTagNumber() === 1) {
-                $value = $childValue;
-            }
-        }
-
-        if ($name === self::OID_SYNC_INFO) {
-            return SyncInfoMessage::fromAsn1($type);
-        }
-
-        return new self(
-            $name,
-            $value,
-        );
-    }
-
     public function toAsn1(): SequenceType
     {
         $response = Asn1::sequence();
@@ -137,79 +96,5 @@ class IntermediateResponse implements ResponseInterface
     protected function setResponseValueToEncode(AbstractType $valueToEncode): void
     {
         $this->responseValueToEncode = $valueToEncode;
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @param array<int, array<int, int>> $tagMap
-     * @return AbstractType<mixed>
-     * @throws ProtocolException
-     */
-    protected static function decodeEncodedValue(
-        AbstractType $type,
-        array $tagMap = [],
-    ): AbstractType {
-        $responseValue = $type->getChild(1);
-
-        if ($responseValue === null || self::isNotValidResponseValue($responseValue)) {
-            throw new ProtocolException(
-                'The intermediate response either contains no value or is not an octet string.',
-            );
-        }
-
-        $rawValue = $responseValue->getValue();
-        if (!is_string($rawValue)) {
-            throw new ProtocolException(
-                'The intermediate response either contains no value or is not an octet string.',
-            );
-        }
-
-        return (new LdapEncoder())
-            ->decode(
-                $rawValue,
-                $tagMap,
-            );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     */
-    protected static function decodeResponseName(AbstractType $type): string
-    {
-        $responseName = $type->getChild(0);
-
-        if ($responseName === null || self::isNotValidResponseName($responseName)) {
-            throw new ProtocolException(
-                'Expected a responseName value with a tag of 0 and a context specific class type.',
-            );
-        }
-
-        $rawValue = $responseName->getValue();
-        if (!is_string($rawValue)) {
-            throw new ProtocolException(
-                'Expected a responseName value with a tag of 0 and a context specific class type.',
-            );
-        }
-
-        return $rawValue;
-    }
-
-    /**
-     * @param AbstractType<mixed> $responseName
-     */
-    private static function isNotValidResponseName(AbstractType $responseName): bool
-    {
-        return $responseName->getTagNumber() !== 0
-            || $responseName->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC;
-    }
-
-    /**
-     * @param AbstractType<mixed> $responseValue
-     */
-    private static function isNotValidResponseValue(AbstractType $responseValue): bool
-    {
-        return $responseValue->getTagNumber() !== 1
-            || $responseValue->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC;
     }
 }

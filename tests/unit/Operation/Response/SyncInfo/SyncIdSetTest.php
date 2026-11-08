@@ -61,55 +61,6 @@ final class SyncIdSetTest extends TestCase
         );
     }
 
-    public function test_it_should_be_constructed_from_ASN1(): void
-    {
-        $encoder = new LdapEncoder();
-
-        self::assertEquals(
-            new SyncIdSet(
-                ['foo', 'bar'],
-                false,
-                'omnomnom',
-            ),
-            SyncIdSet::fromAsn1(Asn1::application(25, Asn1::sequence(
-                Asn1::context(0, Asn1::octetString(IntermediateResponse::OID_SYNC_INFO)),
-                Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::context(3, Asn1::sequence(
-                    Asn1::octetString('omnomnom'),
-                    Asn1::boolean(false),
-                    Asn1::setOf(Asn1::octetString('foo'), Asn1::octetString('bar')),
-                ))))),
-            ))),
-        );
-    }
-
-    public function test_it_should_be_constructed_through_the_intermediate_response_factory_methd(): void
-    {
-        $encoder = new LdapEncoder();
-
-        $result = IntermediateResponse::fromAsn1(Asn1::application(25, Asn1::sequence(
-            Asn1::context(0, Asn1::octetString(IntermediateResponse::OID_SYNC_INFO)),
-            Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::context(3, Asn1::sequence(
-                Asn1::octetString('omnomnom'),
-                Asn1::boolean(false),
-                Asn1::setOf(Asn1::octetString('foo'), Asn1::octetString('bar')),
-            ))))),
-        )));
-
-        self::assertInstanceOf(
-            SyncIdSet::class,
-            $result,
-        );
-        self::assertSame(
-            'omnomnom',
-            $result->getCookie(),
-        );
-        self::assertFalse($result->getRefreshDeletes());
-        self::assertSame(
-            ['foo', 'bar'],
-            $result->getEntryUuids(),
-        );
-    }
-
     public function test_it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();

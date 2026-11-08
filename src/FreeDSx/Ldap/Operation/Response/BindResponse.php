@@ -14,8 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -66,34 +64,5 @@ class BindResponse extends LdapResult
         }
 
         return $response;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        [$resultCode, $dn, $diag, $ref] = self::parseResultData($type);
-        $saslCreds = null;
-
-        foreach ($type->getChildren() as $child) {
-            if ($child->getTagNumber() === 7 && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                $saslCreds = $child->getValue();
-                break;
-            }
-        }
-
-        return new static(
-            new LdapResult(
-                $resultCode,
-                $dn,
-                $diag,
-                ...$ref,
-            ),
-            $saslCreds,
-        );
     }
 }

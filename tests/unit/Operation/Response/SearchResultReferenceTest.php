@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use PHPUnit\Framework\TestCase;
@@ -42,22 +41,6 @@ final class SearchResultReferenceTest extends TestCase
         );
     }
 
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $this->subject = SearchResultReference::fromAsn1(Asn1::application(19, Asn1::sequence(
-            Asn1::octetString('ldap://foo'),
-            Asn1::octetString('ldap://bar'),
-        )));
-
-        self::assertEquals(
-            [
-                new LdapUrl('foo'),
-                new LdapUrl('bar'),
-            ],
-            $this->subject->getReferrals(),
-        );
-    }
-
     public function test_it_should_generate_correct_asn1(): void
     {
         self::assertEquals(
@@ -67,27 +50,5 @@ final class SearchResultReferenceTest extends TestCase
             )),
             $this->subject->toAsn1(),
         );
-    }
-
-    public function test_it_should_ignore_an_unparsable_referral_when_another_can_be_used(): void
-    {
-        $this->subject = SearchResultReference::fromAsn1(Asn1::application(19, Asn1::sequence(
-            Asn1::octetString('ldap://foo/'),
-            Asn1::octetString('?bar'),
-        )));
-
-        self::assertEquals(
-            [new LdapUrl('foo')],
-            $this->subject->getReferrals(),
-        );
-    }
-
-    public function test_it_should_throw_a_protocol_exception_if_no_referral_can_be_parsed(): void
-    {
-        self::expectException(ProtocolException::class);
-
-        SearchResultReference::fromAsn1(Asn1::application(19, Asn1::sequence(
-            Asn1::octetString('?bar'),
-        )));
     }
 }

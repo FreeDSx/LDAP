@@ -15,8 +15,8 @@ namespace FreeDSx\Ldap\Protocol\Decoder\Control;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\ReadEntry\ReadEntryResponseControl;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultEntryDecoder;
 
 /**
  * Decodes a pre-read or post-read response control and the entry it carries (RFC 4527 3.1 and 3.2).
@@ -30,12 +30,18 @@ readonly class ReadEntryResponseControlDecoder extends EncodedValueControlDecode
     /**
      * @param class-string<ReadEntryResponseControl> $controlClass the pre-read or post-read response control to build.
      */
-    public function __construct(private string $controlClass) {}
+    public function __construct(
+        private string $controlClass,
+        private SearchResultEntryDecoder $entries,
+    ) {}
 
     protected function decodeValue(
         AbstractType $value,
         DecodeContext $context,
     ): ReadEntryResponseControl {
-        return new $this->controlClass(SearchResultEntry::fromAsn1($value)->getEntry());
+        return new $this->controlClass($this->entries->decode(
+            $value,
+            $context,
+        )->getEntry());
     }
 }

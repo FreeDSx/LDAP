@@ -15,15 +15,11 @@ namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Helper\AttributeEntryMessage;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetOfType;
-use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * A search result entry. RFC 4511, 4.5.2.
@@ -46,51 +42,6 @@ class SearchResultEntry implements ResponseInterface
     public function getEntry(): Entry
     {
         return $this->entry;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        $attributes = [];
-        $dn = $type->getChild(0);
-        if (!$dn instanceof OctetStringType) {
-            throw new ProtocolException('The search result entry is malformed.');
-        }
-
-        $partialAttributes = $type->getChild(1);
-        if ($partialAttributes !== null) {
-            foreach ($partialAttributes->getChildren() as $partialAttribute) {
-                $values = [];
-                $attrValues = $partialAttribute->getChild(1);
-                if ($attrValues instanceof SetType || $attrValues instanceof SequenceType) {
-                    foreach ($attrValues->getChildren() as $attrValue) {
-                        if (!$attrValue instanceof OctetStringType) {
-                            throw new ProtocolException('The search result entry is malformed.');
-                        }
-                        $values[] = $attrValue->getValue();
-                    }
-                }
-
-                $attrName = $partialAttribute->getChild(0);
-                if (!$attrName instanceof OctetStringType) {
-                    throw new ProtocolException('The search result entry is malformed.');
-                }
-
-                $attributes[] = Attribute::fromArray(
-                    $attrName->getValue(),
-                    $values,
-                );
-            }
-        }
-
-        return new self(Entry::raw(
-            new Dn($dn->getValue()),
-            $attributes,
-        ));
     }
 
     /**
