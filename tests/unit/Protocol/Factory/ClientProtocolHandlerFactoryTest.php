@@ -36,15 +36,20 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSearchHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientStartTlsHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ClientProtocolHandlerFactoryTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private ClientProtocolHandlerFactory $subject;
 
     private ClientQueue&MockObject $mockQueue;
@@ -70,6 +75,8 @@ final class ClientProtocolHandlerFactoryTest extends TestCase
             new ClientOptions(),
             $this->mockQueueInstantiator,
             $this->mockRootDseLoader,
+            $this->fromContainer(TypedExtendedResponseDecoder::class),
+            $this->fromContainer(DecodeContextFactory::class),
         );
     }
 

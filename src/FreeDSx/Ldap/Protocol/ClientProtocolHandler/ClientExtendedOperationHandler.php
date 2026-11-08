@@ -19,7 +19,9 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
-use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
@@ -32,21 +34,20 @@ use FreeDSx\Socket\Exception\ConnectionException;
  */
 class ClientExtendedOperationHandler extends ClientBasicHandler
 {
-    private ExtendedResponseFactory $extendedResponseFactory;
-
     public function __construct(
         ClientQueue $queue,
-        ?ExtendedResponseFactory $extendedResponseFactory = null,
+        private readonly TypedExtendedResponseDecoder $extendedResponses,
+        private readonly DecodeContextFactory $contexts,
     ) {
-        $this->extendedResponseFactory = $extendedResponseFactory ?? new ExtendedResponseFactory();
-
         parent::__construct($queue);
     }
 
     /**
-     * Re-decodes the extended response into its concrete subclass when the OID is registered.
+     * Decodes the extended response into its typed form when the request it answers has one.
      *
      * @throws OperationException
+     * @throws ProtocolException
+     * @throws EncoderException
      */
     public function handleResponse(
         LdapMessageRequest $messageTo,
@@ -55,7 +56,7 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
         /** @var ExtendedRequest $request */
         $request = $messageTo->getRequest();
 
-        if (!$this->extendedResponseFactory->has($request->getName())) {
+        if (!$this->extendedResponses->has($request->getName())) {
             return parent::handleResponse(
                 $messageTo,
                 $messageFrom,
@@ -64,7 +65,7 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
 
         return parent::handleResponse(
             $messageTo,
-            $this->redecodeResponse(
+            $this->typedResponse(
                 $messageFrom,
                 $request->getName(),
             ),
@@ -85,28 +86,38 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
 
         /** @var ExtendedRequest $request */
         $request = $message->getRequest();
-        if (!$this->extendedResponseFactory->has($request->getName())) {
+        if (!$this->extendedResponses->has($request->getName())) {
             return $messageFrom;
         }
         if ($messageFrom === null) {
             throw new OperationException('Expected an LDAP message response, but none was received.');
         }
 
-        return $this->redecodeResponse(
+        return $this->typedResponse(
             $messageFrom,
             $request->getName(),
         );
     }
 
-    private function redecodeResponse(
+    /**
+     * @throws ProtocolException
+     * @throws EncoderException
+     */
+    private function typedResponse(
         LdapMessageResponse $message,
-        string $oid,
+        string $requestOid,
     ): LdapMessageResponse {
+        $response = $message->getResponse();
+        if (!$response instanceof ExtendedResponse) {
+            throw new ProtocolException('Expected an extended response to the extended request.');
+        }
+
         return new LdapMessageResponse(
             $message->getMessageId(),
-            $this->extendedResponseFactory->get(
-                $message->getResponse()->toAsn1(),
-                $oid,
+            $this->extendedResponses->decode(
+                $response,
+                $requestOid,
+                $this->contexts->create(),
             ),
             ...$message->controls()->toArray(),
         );

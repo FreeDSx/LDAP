@@ -14,18 +14,11 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\EnumeratedType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
 
 use function array_map;
@@ -161,73 +154,5 @@ class LdapResult implements ResponseInterface
             tagNumber: $this->tagNumber,
             type: $result,
         );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @return array{0: int, 1: string, 2: string, 3: LdapUrl[]}
-     * @throws ProtocolException
-     * @throws EncoderException
-     */
-    protected static function parseResultData(AbstractType $type): array
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException('The LDAP result is malformed.');
-        }
-        $referrals = [];
-
-        # Somewhat ugly minor optimization. Though it's probably less likely for most setups to get referrals.
-        # So only try to iterate them if we possibly have them.
-        $count = count($type->getChildren());
-        if ($count > 3) {
-            for ($i = 3; $i < $count; $i++) {
-                $child = $type->getChild($i);
-                if ($child !== null && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
-                    if (!$child instanceof IncompleteType) {
-                        throw new ProtocolException('The ASN1 structure for the referrals is malformed.');
-                    }
-                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
-                    foreach ($child->getChildren() as $ldapUrl) {
-                        if (!$ldapUrl instanceof OctetStringType) {
-                            throw new ProtocolException('The ASN1 structure for a referral is malformed.');
-                        }
-
-                        try {
-                            $referrals[] = LdapUrl::parse($ldapUrl->getValue());
-                        } catch (UrlParseException) {
-                            # RFC 4511 4.1.10 makes the URIs alternatives, so an unusable one is ignored.
-                        }
-                    }
-
-                    # The field is only sent when it holds a URI, so losing every one would hide the continuation.
-                    if ($referrals === []) {
-                        throw new ProtocolException('The LDAP result holds no usable referral URI.');
-                    }
-                }
-            }
-        }
-
-        $result = $type->getChild(0);
-        $dn = $type->getChild(1);
-        $diagnostic = $type->getChild(2);
-        if (
-            !$result instanceof EnumeratedType
-            || !$dn instanceof OctetStringType
-            || !$diagnostic instanceof OctetStringType
-        ) {
-            throw new ProtocolException('The LDAP result is malformed.');
-        }
-
-        $resultCode = $result->getValue();
-        if (!is_int($resultCode)) {
-            throw new ProtocolException('The LDAP result code is malformed.');
-        }
-
-        return [
-            $resultCode,
-            $dn->getValue(),
-            $diagnostic->getValue(),
-            $referrals,
-        ];
     }
 }

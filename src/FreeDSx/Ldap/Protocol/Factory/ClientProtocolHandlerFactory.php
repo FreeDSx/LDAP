@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
@@ -36,6 +38,8 @@ class ClientProtocolHandlerFactory
         private readonly ClientOptions $clientOptions,
         private readonly ClientQueueInstantiator $queueInstantiator,
         private readonly RootDseLoader $rootDseLoader,
+        private readonly TypedExtendedResponseDecoder $extendedResponses,
+        private readonly DecodeContextFactory $contexts,
     ) {}
 
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
@@ -88,7 +92,11 @@ class ClientProtocolHandlerFactory
         } elseif ($request instanceof Request\ExtendedRequest && $request->getName() === Request\ExtendedRequest::OID_START_TLS) {
             return new ClientProtocolHandler\ClientStartTlsHandler($this->queue());
         } elseif ($response instanceof Response\ExtendedResponse) {
-            return new ClientProtocolHandler\ClientExtendedOperationHandler($this->queue());
+            return new ClientProtocolHandler\ClientExtendedOperationHandler(
+                $this->queue(),
+                $this->extendedResponses,
+                $this->contexts,
+            );
         } else {
             return new ClientProtocolHandler\ClientBasicHandler($this->queue());
         }

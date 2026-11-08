@@ -14,11 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
-use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 
 /**
@@ -58,33 +54,5 @@ class PasswordModifyResponse extends ExtendedResponse
         }
 
         return parent::toAsn1();
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws PartialPduException
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $result = self::createLdapResult($type);
-        $generatedPassword = null;
-
-        $pwdResponse = self::decodeEncodedValue($type);
-        if ($pwdResponse instanceof SequenceType) {
-            foreach ($pwdResponse->getChildren() as $child) {
-                if ($child->getTagNumber() === 0) {
-                    $generatedPassword = $child->getValue();
-                }
-            }
-        }
-
-        return new static(
-            $result,
-            $generatedPassword,
-        );
     }
 }

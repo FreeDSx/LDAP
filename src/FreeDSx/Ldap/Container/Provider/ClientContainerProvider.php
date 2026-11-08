@@ -17,6 +17,8 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
@@ -89,6 +91,8 @@ final class ClientContainerProvider implements ContainerProviderInterface
             clientOptions: $container->get(ClientOptions::class),
             queueInstantiator: $container->get(ClientQueueInstantiator::class),
             rootDseLoader: $container->get(RootDseLoader::class),
+            extendedResponses: $container->get(TypedExtendedResponseDecoder::class),
+            contexts: $container->get(DecodeContextFactory::class),
         );
     }
 

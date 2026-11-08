@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -111,64 +110,5 @@ class ExtendedResponse extends LdapResult
         }
 
         return $asn1;
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     * @throws EncoderException
-     */
-    protected static function createLdapResult(AbstractType $type): LdapResult
-    {
-        [$resultCode, $dn, $diagnosticMessage, $referrals] = self::parseResultData($type);
-
-        return new LdapResult(
-            $resultCode,
-            $dn,
-            $diagnosticMessage,
-            ...$referrals,
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @return AbstractType<mixed>|null
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws PartialPduException
-     */
-    protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException('The received control is malformed. Unable to get the encoded value.');
-        }
-        [1 => $value] = self::parseExtendedResponse($type);
-
-        return $value === null
-            ? null
-            : (new LdapEncoder())->decode($value);
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     * @return array{0: ?string, 1: ?string}
-     */
-    private static function parseExtendedResponse(AbstractType $type): array
-    {
-        $info = [0 => null, 1 => null];
-
-        foreach ($type->getChildren() as $child) {
-            $tagNumber = $child->getTagNumber();
-            if ($tagNumber !== 10 && $tagNumber !== 11) {
-                continue;
-            }
-            $value = $child->getValue();
-            if ($value !== null && !is_string($value)) {
-                continue;
-            }
-            $info[$tagNumber === 10 ? 0 : 1] = $value;
-        }
-
-        return $info;
     }
 }

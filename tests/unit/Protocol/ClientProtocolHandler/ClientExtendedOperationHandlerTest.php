@@ -13,96 +13,127 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientExtendedOperationHandler;
-use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ClientExtendedOperationHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private ClientExtendedOperationHandler $subject;
 
     private ClientQueue&MockObject $mockQueue;
 
-    private ExtendedResponseFactory&MockObject $mockResponseFactory;
-
     protected function setUp(): void
     {
         $this->mockQueue = $this->createMock(ClientQueue::class);
-        $this->mockResponseFactory = $this->createMock(ExtendedResponseFactory::class);
 
         $this->subject = new ClientExtendedOperationHandler(
             $this->mockQueue,
-            $this->mockResponseFactory,
+            $this->fromContainer(TypedExtendedResponseDecoder::class),
+            $this->fromContainer(DecodeContextFactory::class),
         );
     }
 
-    public function test_it_should_handle_a_response(): void
+    public function test_it_should_handle_a_response_with_no_typed_form(): void
     {
-        $this->mockResponseFactory
-            ->method('has')
-            ->willReturn(false);
-
-        $this->mockResponseFactory
-            ->expects($this->never())
-            ->method('get');
-
-        $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), 'bar', 'foo'));
+        $response = new LdapMessageResponse(
+            1,
+            new ExtendedResponse(
+                new LdapResult(0),
+                'bar',
+                'foo',
+            ),
+        );
 
         self::assertSame(
             $response,
             $this->subject->handleResponse(
-                new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar')),
+                new LdapMessageRequest(
+                    1,
+                    new ExtendedRequest(
+                        'foo',
+                        'bar',
+                    ),
+                ),
                 $response,
             ),
         );
     }
 
-    public function test_it_should_redecode_the_response_when_there_is_a_mapped_class(): void
+    public function test_it_should_decode_the_typed_response_for_the_request_it_answers(): void
     {
-        $extendedResponse = new PasswordModifyResponse(new LdapResult(0));
-
-        $this->mockResponseFactory
-            ->method('has')
-            ->willReturn(true);
-        $this->mockResponseFactory
-            ->expects($this->once())
-            ->method('get')
-            ->willReturn($extendedResponse);
-
         $result = $this->subject->handleResponse(
-            new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar')),
-            new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), 'bar')),
-        );
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY),
+            ),
+            new LdapMessageResponse(
+                1,
+                self::passwordModifyResponse(new LdapResult(0)),
+            ),
+        )?->getResponse();
 
         self::assertInstanceOf(
             PasswordModifyResponse::class,
-            $result?->getResponse(),
+            $result,
+        );
+        self::assertSame(
+            'bleep-blorp',
+            $result->getGeneratedPassword(),
         );
     }
 
-    public function test_it_should_handle_an_extended_response_that_has_a_mapped_class(): void
+    public function test_it_should_decode_a_typed_response_that_carries_a_referral(): void
     {
-        $extendedResponse = new PasswordModifyResponse(new LdapResult(0));
+        $result = $this->subject->handleResponse(
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY),
+            ),
+            new LdapMessageResponse(
+                1,
+                self::passwordModifyResponse(new LdapResult(
+                    0,
+                    '',
+                    '',
+                    new LdapUrl('foo'),
+                )),
+            ),
+        )?->getResponse();
 
-        $this->mockResponseFactory
-            ->method('has')
-            ->willReturn(true);
-        $this->mockResponseFactory
-            ->expects($this->once())
-            ->method('get')
-            ->willReturn($extendedResponse);
+        self::assertInstanceOf(
+            PasswordModifyResponse::class,
+            $result,
+        );
+        self::assertEquals(
+            [new LdapUrl('foo')],
+            $result->getReferrals(),
+        );
+    }
 
-        $request = new ExtendedRequest('foo', 'bar');
-        $extendedRequest = new LdapMessageRequest(1, $request);
-        $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), 'bar'));
+    public function test_it_should_handle_an_extended_request_that_has_a_typed_response(): void
+    {
+        $extendedRequest = new LdapMessageRequest(
+            1,
+            new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY),
+        );
 
         $this->mockQueue
             ->expects($this->once())
@@ -110,11 +141,44 @@ final class ClientExtendedOperationHandlerTest extends TestCase
             ->with($this->equalTo($extendedRequest));
         $this->mockQueue
             ->method('getMessage')
-            ->willReturn($response);
+            ->willReturn(new LdapMessageResponse(
+                1,
+                self::passwordModifyResponse(new LdapResult(0)),
+            ));
 
         self::assertInstanceOf(
             PasswordModifyResponse::class,
             $this->subject->handleRequest($extendedRequest)?->getResponse(),
+        );
+    }
+
+    public function test_it_should_refuse_a_response_that_is_not_an_extended_response(): void
+    {
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new DeleteResponse(0),
+            ));
+
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('Expected an extended response to the extended request.');
+
+        $this->subject->handleRequest(new LdapMessageRequest(
+            1,
+            new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY),
+        ));
+    }
+
+    private static function passwordModifyResponse(LdapResult $result): ExtendedResponse
+    {
+        return new ExtendedResponse(
+            $result,
+            null,
+            (new LdapEncoder())->encode(Asn1::sequence(Asn1::context(
+                0,
+                Asn1::octetString('bleep-blorp'),
+            ))),
         );
     }
 }
