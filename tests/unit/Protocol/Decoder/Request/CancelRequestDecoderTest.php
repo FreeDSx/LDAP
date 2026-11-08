@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\CancelRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -49,6 +50,7 @@ final class CancelRequestDecoderTest extends TestCase
         );
     }
 
+    #[RequiresPhpExtension('gmp')]
     public function testItRefusesAMessageIdWiderThanAnInteger(): void
     {
         $this->expectException(ProtocolException::class);

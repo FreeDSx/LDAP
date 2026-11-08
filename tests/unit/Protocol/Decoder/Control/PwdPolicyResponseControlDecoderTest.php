@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\PwdPolicyResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -147,6 +148,7 @@ final class PwdPolicyResponseControlDecoderTest extends TestCase
     }
 
     #[DataProvider('wideFields')]
+    #[RequiresPhpExtension('gmp')]
     public function testItRefusesAFieldWiderThanAnInteger(
         SequenceType $value,
         string $message,

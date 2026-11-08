@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\SubtreeDeleteProgressControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -71,6 +72,7 @@ final class SubtreeDeleteProgressControlDecoderTest extends TestCase
         );
     }
 
+    #[RequiresPhpExtension('gmp')]
     public function testItReadsARemainingCountWiderThanAnIntegerAsAbsent(): void
     {
         self::assertNull($this->subject->decode(
@@ -88,6 +90,7 @@ final class SubtreeDeleteProgressControlDecoderTest extends TestCase
         )->getRemaining());
     }
 
+    #[RequiresPhpExtension('gmp')]
     public function testItRefusesADeletedCountWiderThanAnInteger(): void
     {
         $this->expectException(ProtocolException::class);

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\PagingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -99,6 +100,7 @@ final class PagingControlDecoderTest extends TestCase
         );
     }
 
+    #[RequiresPhpExtension('gmp')]
     public function testItRefusesASizeWiderThanAnInteger(): void
     {
         $this->expectException(ProtocolException::class);

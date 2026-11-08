@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\SyncStateControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -81,6 +82,7 @@ final class SyncStateControlDecoderTest extends TestCase
         )->getCookie());
     }
 
+    #[RequiresPhpExtension('gmp')]
     public function testItRefusesAStateWiderThanAnInteger(): void
     {
         $this->expectException(ProtocolException::class);

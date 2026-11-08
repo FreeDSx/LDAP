@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
-use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
@@ -26,7 +24,6 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\Attributes\DataProvider;
 
@@ -165,8 +162,6 @@ trait ControlValidationTestsTrait
      */
     public static function malformedControlProvider(): iterable
     {
-        $encoder = new LdapEncoder();
-
         yield 'a paging value that is not a paging control' => [new Control(
             Control::OID_PAGING,
             false,
@@ -182,18 +177,16 @@ trait ControlValidationTestsTrait
             true,
             '',
         )];
+        // Raw BER for 2^64, as encoding an integer this wide needs the GMP extension.
         yield 'a paging size wider than an integer' => [new Control(
             Control::OID_PAGING,
             false,
-            $encoder->encode(Asn1::sequence(
-                Asn1::integer('18446744073709551616'),
-                Asn1::octetString(''),
-            )),
+            "\x30\x0d\x02\x09\x01" . str_repeat("\x00", 8) . "\x04\x00",
         )];
         yield 'a sync request mode wider than an integer' => [new Control(
             Control::OID_SYNC_REQUEST,
             false,
-            $encoder->encode(Asn1::sequence(new EnumeratedType('18446744073709551616'))),
+            "\x30\x0b\x0a\x09\x01" . str_repeat("\x00", 8),
         )];
     }
 

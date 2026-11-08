@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\SyncRequestControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -79,6 +80,7 @@ final class SyncRequestControlDecoderTest extends TestCase
         )->getCriticality());
     }
 
+    #[RequiresPhpExtension('gmp')]
     public function testItRefusesAModeWiderThanAnInteger(): void
     {
         $this->expectException(ProtocolException::class);
