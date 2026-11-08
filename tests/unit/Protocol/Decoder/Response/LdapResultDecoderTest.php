@@ -181,6 +181,21 @@ final class LdapResultDecoderTest extends TestCase
         );
     }
 
+    public function testItRefusesAResultCodeWiderThanAnInteger(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The LDAP result code is malformed.');
+
+        $this->subject->decode(
+            Asn1::sequence(
+                new EnumeratedType('18446744073709551616'),
+                Asn1::octetString(''),
+                Asn1::octetString(''),
+            ),
+            $this->context,
+        );
+    }
+
     /**
      * @param AbstractType<mixed> $type
      */
@@ -204,11 +219,6 @@ final class LdapResultDecoderTest extends TestCase
         yield 'not a sequence' => [Asn1::octetString('foo')];
         yield 'a result code that is not enumerated' => [Asn1::sequence(
             Asn1::octetString('0'),
-            Asn1::octetString(''),
-            Asn1::octetString(''),
-        )];
-        yield 'a result code wider than an integer' => [Asn1::sequence(
-            new EnumeratedType('18446744073709551616'),
             Asn1::octetString(''),
             Asn1::octetString(''),
         )];

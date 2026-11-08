@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Decoder\Response;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -37,6 +38,8 @@ readonly class LdapResultFields
     use FieldValueTrait;
 
     private const MALFORMED = 'The LDAP result is malformed.';
+
+    private const MALFORMED_RESULT_CODE = 'The LDAP result code is malformed.';
 
     /**
      * @param list<LdapUrl> $referrals
@@ -64,20 +67,26 @@ readonly class LdapResultFields
             $type,
             $context,
         );
+        $resultCode = $type->getChild(0);
+        if (!$resultCode instanceof EnumeratedType) {
+            throw new ProtocolException(self::MALFORMED);
+        }
+        $dn = self::stringOf(
+            $type->getChild(1),
+            self::MALFORMED,
+        );
+        $diagnosticMessage = self::stringOf(
+            $type->getChild(2),
+            self::MALFORMED,
+        );
 
         return new self(
             self::enumeratedOf(
-                $type->getChild(0),
-                self::MALFORMED,
+                $resultCode,
+                self::MALFORMED_RESULT_CODE,
             ),
-            self::stringOf(
-                $type->getChild(1),
-                self::MALFORMED,
-            ),
-            self::stringOf(
-                $type->getChild(2),
-                self::MALFORMED,
-            ),
+            $dn,
+            $diagnosticMessage,
             $referrals,
         );
     }
