@@ -50,7 +50,7 @@ readonly class SearchResultReferenceDecoder implements OperationDecoderInterface
             try {
                 $referrals[] = LdapUrl::parse($url);
             } catch (UrlParseException) {
-                // RFC 4511 4.1.10 makes the URIs alternatives, so an unusable one is ignored.
+                // RFC 4511 4.1.10 makes the URIs alternatives to one another.
             }
         }
 

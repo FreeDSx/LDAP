@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -30,24 +32,22 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ClientExtendedOperationHandlerTest extends TestCase
 {
-    use ServerContainerTrait;
-
     private ClientExtendedOperationHandler $subject;
 
     private ClientQueue&MockObject $mockQueue;
 
     protected function setUp(): void
     {
+        $container = Container::forClient(new ClientOptions());
         $this->mockQueue = $this->createMock(ClientQueue::class);
 
         $this->subject = new ClientExtendedOperationHandler(
             $this->mockQueue,
-            $this->fromContainer(TypedExtendedResponseDecoder::class),
-            $this->fromContainer(DecodeContextFactory::class),
+            $container->get(TypedExtendedResponseDecoder::class),
+            $container->get(DecodeContextFactory::class),
         );
     }
 

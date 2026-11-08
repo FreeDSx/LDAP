@@ -43,7 +43,7 @@ final class ProxyAuthorizationControl extends Control
     }
 
     /**
-     * Keeps a received authzId that is not a valid form, so it is refused when it is used rather than when decoded.
+     * Keeps a received authzId that is not a valid form, to be refused when it is used rather than when decoded.
      */
     public static function unparsed(
         string $rawAuthzId,

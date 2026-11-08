@@ -50,7 +50,7 @@ abstract readonly class MessageDecoder
     public function decode(AbstractType $pdu): LdapMessage
     {
         $envelope = $this->envelopes->read($pdu);
-        // Resolved before anything is decoded, so an unrecognized operation ends the session (RFC 4511 4.1.1).
+        // An unrecognized operation ends the session before anything is decoded (RFC 4511 4.1.1).
         $decoder = $this->operations[$envelope->operationTag]
             ?? throw $this->envelopes->unsupported($envelope->operationTag);
         $context = $this->contexts->create();

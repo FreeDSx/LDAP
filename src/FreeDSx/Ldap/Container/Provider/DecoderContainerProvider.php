@@ -268,7 +268,7 @@ final class DecoderContainerProvider implements ContainerProviderInterface
     }
 
     /**
-     * Only the controls a client sends are typed, so any other OID is held to RFC 4511 4.1.11 criticality.
+     * Types only the controls a client sends, holding any other OID to RFC 4511 4.1.11 criticality.
      */
     private function makeRequestControlDecoder(Container $container): ControlDecoder
     {

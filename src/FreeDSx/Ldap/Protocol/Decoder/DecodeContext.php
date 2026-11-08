@@ -58,7 +58,7 @@ readonly class DecodeContext
         string $bytes,
         array $tagMap = [],
     ): AbstractType {
-        // An empty value is malformed like any other, so it is answered rather than ending the session.
+        // An empty value is answered as malformed rather than ending the session.
         if ($bytes === '') {
             throw new ProtocolException('The data to decode cannot be empty.');
         }

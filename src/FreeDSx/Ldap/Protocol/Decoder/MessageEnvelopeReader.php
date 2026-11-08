@@ -91,7 +91,7 @@ readonly class MessageEnvelopeReader
     }
 
     /**
-     * Runs the decoding past the envelope, so any failure in it names the message and the operation it belongs to.
+     * Runs the decoding past the envelope, with any failure in it naming the message and operation it belongs to.
      *
      * @template T
      * @param Closure(): T $decode

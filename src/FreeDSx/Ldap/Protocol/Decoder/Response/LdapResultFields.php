@@ -128,7 +128,7 @@ readonly class LdapResultFields
             foreach ($urls as $url) {
                 $referrals[] = $url;
             }
-            // The field is only sent when it holds a URI, so losing every one would hide the continuation.
+            // The field is only sent when it holds a URI.
             if ($referrals === []) {
                 throw new ProtocolException('The LDAP result holds no usable referral URI.');
             }
@@ -154,7 +154,7 @@ readonly class LdapResultFields
             try {
                 $urls[] = LdapUrl::parse($url);
             } catch (UrlParseException) {
-                // RFC 4511 4.1.10 makes the URIs alternatives, so an unusable one is ignored.
+                // RFC 4511 4.1.10 makes the URIs alternatives to one another.
             }
         }
 

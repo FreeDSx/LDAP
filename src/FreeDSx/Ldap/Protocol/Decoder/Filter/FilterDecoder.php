@@ -50,7 +50,7 @@ readonly class FilterDecoder
     public function __construct(private array $decoders) {}
 
     /**
-     * Each call decodes a filter of its own, so its depth and items count from zero.
+     * Each call decodes a filter of its own, with its depth and items counted from zero.
      *
      * @param AbstractType<mixed> $type
      * @throws FilterDepthExceededException

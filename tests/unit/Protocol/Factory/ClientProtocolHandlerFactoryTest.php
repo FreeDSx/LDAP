@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -44,12 +45,9 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ClientProtocolHandlerFactoryTest extends TestCase
 {
-    use ServerContainerTrait;
-
     private ClientProtocolHandlerFactory $subject;
 
     private ClientQueue&MockObject $mockQueue;
@@ -62,6 +60,8 @@ final class ClientProtocolHandlerFactoryTest extends TestCase
 
     protected function setUp(): void
     {
+        $options = new ClientOptions();
+        $container = Container::forClient($options);
         $this->mockQueue = $this->createMock(ClientQueue::class);
         $this->mockRootDseLoader = $this->createMock(RootDseLoader::class);
         $this->mockQueueInstantiator = $this->createMock(ClientQueueInstantiator::class);
@@ -72,11 +72,11 @@ final class ClientProtocolHandlerFactoryTest extends TestCase
             ->willReturn($this->mockQueue);
 
         $this->subject = new ClientProtocolHandlerFactory(
-            new ClientOptions(),
+            $options,
             $this->mockQueueInstantiator,
             $this->mockRootDseLoader,
-            $this->fromContainer(TypedExtendedResponseDecoder::class),
-            $this->fromContainer(DecodeContextFactory::class),
+            $container->get(TypedExtendedResponseDecoder::class),
+            $container->get(DecodeContextFactory::class),
         );
     }
 

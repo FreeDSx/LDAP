@@ -48,7 +48,10 @@ readonly class PwdPolicyResponseControlDecoder extends EncodedValueControlDecode
                 throw new ProtocolException('The ASN1 structure for the pwdPolicy control is malformed.');
             }
             if ($child->getTagNumber() === 0) {
-                $warnings = $this->warning($child, $context) + $warnings;
+                $warnings = $this->warning(
+                    $child,
+                    $context,
+                ) + $warnings;
             } elseif ($child->getTagNumber() === 1) {
                 $error = $this->integerOf(
                     $context->complete(

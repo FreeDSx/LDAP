@@ -63,7 +63,7 @@ readonly class SearchRequestDecoder implements OperationDecoderInterface
         if ($filter === null) {
             throw new ProtocolException('The search request is malformed.');
         }
-        // Decoded before the other fields are checked, so a filter past a limit is answered by that limit.
+        // A filter past a limit is answered by that limit even when another field is malformed.
         $filter = $this->filters->decode(
             $filter,
             $context,

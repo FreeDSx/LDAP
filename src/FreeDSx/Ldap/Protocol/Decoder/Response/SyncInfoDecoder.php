@@ -60,8 +60,7 @@ readonly class SyncInfoDecoder
         AbstractType $type,
         DecodeContext $context,
     ): SyncInfoMessage {
-        $value = $type->getChild(1);
-        if ($value === null) {
+        if ($type->getChild(1) === null) {
             throw new ProtocolException('The SyncInfoMessage must have a value.');
         }
 
@@ -94,7 +93,7 @@ readonly class SyncInfoDecoder
             ),
             default => throw new ProtocolException(sprintf(
                 'The tag number %s for a SyncInfoMessage was unexpected.',
-                $value->getTagNumber(),
+                $choice->getTagNumber(),
             )),
         };
     }

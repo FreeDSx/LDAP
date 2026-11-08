@@ -49,7 +49,7 @@ readonly class MatchingRuleFilterDecoder implements FilterShapeDecoderInterface
         AbstractType $type,
         FilterDecodeRun $run,
     ): MatchingRuleFilter {
-        // The children are context tagged primitives, so their universal types must be supplied to decode them.
+        // The children are context tagged primitives whose universal types must be supplied to decode them.
         if ($type instanceof IncompleteType) {
             $type = $run->context->complete(
                 $type,

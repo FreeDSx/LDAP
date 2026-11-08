@@ -111,7 +111,7 @@ final class SyncInfoDecoderTest extends TestCase
     public function testItRefusesAFormItDoesNotRecognize(): void
     {
         $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The tag number 1 for a SyncInfoMessage was unexpected.');
+        $this->expectExceptionMessage('The tag number 4 for a SyncInfoMessage was unexpected.');
 
         $this->subject->decode(
             self::message(Asn1::context(
