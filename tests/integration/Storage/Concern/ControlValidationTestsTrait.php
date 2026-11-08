@@ -172,6 +172,16 @@ trait ControlValidationTestsTrait
             false,
             'not-a-paging-control',
         )];
+        yield 'an empty paging value' => [new Control(
+            Control::OID_PAGING,
+            false,
+            '',
+        )];
+        yield 'an empty paging value on a critical control' => [new Control(
+            Control::OID_PAGING,
+            true,
+            '',
+        )];
         yield 'a paging size wider than an integer' => [new Control(
             Control::OID_PAGING,
             false,

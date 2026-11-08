@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Decoder\Request;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\InvalidArgumentException as Asn1InvalidArgumentException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -51,7 +50,7 @@ abstract readonly class ExtendedRequestValueDecoder
 
         try {
             return $context->decode($value);
-        } catch (EncoderException|Asn1InvalidArgumentException $e) {
+        } catch (EncoderException|ProtocolException $e) {
             // RFC 4511 4.1.1 answers a request that cannot be parsed with protocolError.
             throw new ProtocolException(
                 ExtendedRequestDecoder::MALFORMED,

@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Exception\InvalidArgumentException as Asn1InvalidArgumentException;
 use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
@@ -52,12 +52,17 @@ class DecodeContext
      * @return AbstractType<mixed>
      * @throws EncoderException
      * @throws PartialPduException
-     * @throws Asn1InvalidArgumentException when the bytes are empty.
+     * @throws ProtocolException when the bytes are empty.
      */
     public function decode(
         string $bytes,
         array $tagMap = [],
     ): AbstractType {
+        // An empty value is malformed like any other, so it is answered rather than ending the session.
+        if ($bytes === '') {
+            throw new ProtocolException('The data to decode cannot be empty.');
+        }
+
         return $this->encoder->decode(
             $bytes,
             $tagMap,

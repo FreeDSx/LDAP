@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
@@ -64,5 +65,13 @@ final class DecodeContextTest extends TestCase
                 Asn1::boolean(true),
             ))),
         );
+    }
+
+    public function testItRefusesEmptyBytesAsMalformed(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The data to decode cannot be empty.');
+
+        $this->subject->decode('');
     }
 }

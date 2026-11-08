@@ -214,11 +214,11 @@
         },
         "control: paging with an empty value": {
             "pdu": "30540201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01c301a0416312e322e3834302e3131333535362e312e342e3331390400",
-            "outcome": "InvalidArgumentException(0) The data to decode cannot be empty."
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The data to decode cannot be empty."
         },
         "control: paging with an empty value, critical": {
             "pdu": "30570201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea01f301d0416312e322e3834302e3131333535362e312e342e3331390101ff0400",
-            "outcome": "InvalidArgumentException(0) The data to decode cannot be empty."
+            "outcome": "MessageDecodeException(id=1, tag=3, result=2) The data to decode cannot be empty."
         },
         "control: paging with a 9-byte size": {
             "pdu": "30630201016331040d64633d666f6f2c64633d6261720a01020a0100020100020100010100870b6f626a656374436c61737330040402636ea02b30290416312e322e3834302e3131333535362e312e342e333139040f300d02090100000000000000000400",
