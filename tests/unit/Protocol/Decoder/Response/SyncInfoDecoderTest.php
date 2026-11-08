@@ -88,6 +88,26 @@ final class SyncInfoDecoderTest extends TestCase
         );
     }
 
+    public function testItRefusesAnEmptyValueAsMalformed(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The data to decode cannot be empty.');
+
+        $this->subject->decode(
+            Asn1::sequence(
+                Asn1::context(
+                    0,
+                    Asn1::octetString(IntermediateResponse::OID_SYNC_INFO),
+                ),
+                Asn1::context(
+                    1,
+                    Asn1::octetString(''),
+                ),
+            ),
+            $this->context,
+        );
+    }
+
     public function testItRefusesAFormItDoesNotRecognize(): void
     {
         $this->expectException(ProtocolException::class);

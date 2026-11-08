@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -89,5 +90,20 @@ final class PasswordModifyResponseDecoderTest extends TestCase
             new ExtendedResponse(new LdapResult(0)),
             $this->context,
         )->getGeneratedPassword());
+    }
+
+    public function testItRefusesAnEmptyValueAsMalformed(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The data to decode cannot be empty.');
+
+        $this->subject->decode(
+            new ExtendedResponse(
+                new LdapResult(0),
+                null,
+                '',
+            ),
+            $this->context,
+        );
     }
 }
