@@ -178,7 +178,7 @@
         },
         "extended: cancel with a 9-byte message ID": {
             "pdu": "3021020101771c800b312e332e362e312e312e38810d300b0209010000000000000000",
-            "outcome": "TypeError"
+            "outcome": "MessageDecodeException(id=1, tag=23, result=2) The cancel request message ID is not an integer."
         },
         "extended: cancel with a value that is not BER": {
             "pdu": "301b0201017716800b312e332e362e312e312e38810767617262616765",

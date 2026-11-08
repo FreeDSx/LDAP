@@ -69,6 +69,17 @@ final class CancelRequestTest extends TestCase
         );
     }
 
+    public function test_a_message_id_wider_than_an_integer_is_refused_as_malformed(): void
+    {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('The cancel request message ID is not an integer.');
+
+        CancelRequest::fromAsn1((new ExtendedRequest(
+            ExtendedRequest::OID_CANCEL,
+            "\x30\x0b\x02\x09\x01" . str_repeat("\x00", 8),
+        ))->toAsn1());
+    }
+
     /**
      * @param AbstractType<mixed> $type
      */

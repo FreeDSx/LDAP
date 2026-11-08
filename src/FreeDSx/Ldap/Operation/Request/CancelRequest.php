@@ -19,6 +19,8 @@ use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
+use function is_int;
+
 /**
  * RFC 3909. A request to cancel an operation.
  *
@@ -73,6 +75,11 @@ class CancelRequest extends ExtendedRequest
             throw new ProtocolException('The cancel request value is malformed.');
         }
 
-        return new static($value->getChild(0)->getValue());
+        $messageId = $value->getChild(0)->getValue();
+        if (!is_int($messageId)) {
+            throw new ProtocolException('The cancel request message ID is not an integer.');
+        }
+
+        return new static($messageId);
     }
 }

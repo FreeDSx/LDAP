@@ -111,6 +111,7 @@ final class LdapCancelServerTest extends ServerTestCase
     {
         yield 'a value that is not BER' => ["\x01\x02\x03"];
         yield 'an empty value' => [''];
+        yield 'a message ID wider than an integer' => ["\x30\x0b\x02\x09\x01" . str_repeat("\x00", 8)];
     }
 
     public function testACancelReadWithTheFinalMessageOfASearchIsAnswered(): void
