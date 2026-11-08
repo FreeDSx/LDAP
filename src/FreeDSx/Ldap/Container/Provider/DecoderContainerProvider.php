@@ -43,6 +43,13 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\SyncRequestControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SyncStateControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\VlvResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\AttributeValueAssertionDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterSetDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\MatchingRuleFilterDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\NotFilterDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\PresentFilterDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\SubstringFilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\MessageEnvelopeReader;
 use FreeDSx\Ldap\Protocol\Decoder\Request\AbandonRequestDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Request\AddRequestDecoder;
@@ -69,6 +76,12 @@ use FreeDSx\Ldap\Protocol\Decoder\Response\SyncInfoDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Schema\Validation\Syntax\UuidSyntaxValidator;
+use FreeDSx\Ldap\Search\Filter\AndFilter;
+use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
+use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
+use FreeDSx\Ldap\Search\Filter\OrFilter;
 
 /**
  * Registers the decoders that turn received messages into requests and responses.
@@ -130,7 +143,30 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             PasswordModifyResponseDecoder::class => static fn(): PasswordModifyResponseDecoder
                 => new PasswordModifyResponseDecoder(),
             TypedExtendedResponseDecoder::class => $this->makeTypedExtendedResponseDecoder(...),
+            FilterDecoder::class => $this->makeFilterDecoder(...),
+            NotFilterDecoder::class => static fn(): NotFilterDecoder => new NotFilterDecoder(),
+            PresentFilterDecoder::class => static fn(): PresentFilterDecoder => new PresentFilterDecoder(),
+            SubstringFilterDecoder::class => static fn(): SubstringFilterDecoder => new SubstringFilterDecoder(),
+            MatchingRuleFilterDecoder::class => static fn(): MatchingRuleFilterDecoder
+                => new MatchingRuleFilterDecoder(),
         ];
+    }
+
+    private function makeFilterDecoder(Container $container): FilterDecoder
+    {
+        // Keyed by the tag RFC 4511 4.5.1 gives each kind of filter in the Filter CHOICE.
+        return new FilterDecoder([
+            0 => new FilterSetDecoder(AndFilter::class),
+            1 => new FilterSetDecoder(OrFilter::class),
+            2 => $container->get(NotFilterDecoder::class),
+            3 => new AttributeValueAssertionDecoder(EqualityFilter::class),
+            4 => $container->get(SubstringFilterDecoder::class),
+            5 => new AttributeValueAssertionDecoder(GreaterThanOrEqualFilter::class),
+            6 => new AttributeValueAssertionDecoder(LessThanOrEqualFilter::class),
+            7 => $container->get(PresentFilterDecoder::class),
+            8 => new AttributeValueAssertionDecoder(ApproximateFilter::class),
+            9 => $container->get(MatchingRuleFilterDecoder::class),
+        ]);
     }
 
     private function makeIntermediateResponseDecoder(Container $container): IntermediateResponseDecoder
