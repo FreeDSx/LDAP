@@ -14,12 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
 
 /**
@@ -55,25 +50,5 @@ class PresentFilter implements FilterInterface, FilterAttributeInterface, String
             . self::FILTER_EQUAL
             . '*'
             . self::PAREN_RIGHT;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws ProtocolException
-     * @throws EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $type = $type instanceof IncompleteType
-            ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING)
-            : $type;
-
-        if (!$type instanceof OctetStringType) {
-            throw new ProtocolException('The present filter is malformed');
-        }
-
-        return new static($type->getValue());
     }
 }

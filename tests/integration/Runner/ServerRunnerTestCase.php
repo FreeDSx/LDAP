@@ -22,7 +22,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
@@ -106,7 +106,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 
         try {
             $this->ldapClient()->search(
-                Operations::search(self::filterNestedWithin(FilterFactory::MAX_NESTING_DEPTH + 1))->base('dc=foo,dc=bar'),
+                Operations::search(self::filterNestedWithin(FilterDecoder::MAX_NESTING_DEPTH + 1))->base('dc=foo,dc=bar'),
             );
             self::fail('The deeply nested filter should have been refused.');
         } catch (OperationException $e) {
@@ -117,7 +117,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         $entries = $this->ldapClient()->search(
-            Operations::search(self::filterNestedWithin(FilterFactory::MAX_NESTING_DEPTH))->base('dc=foo,dc=bar'),
+            Operations::search(self::filterNestedWithin(FilterDecoder::MAX_NESTING_DEPTH))->base('dc=foo,dc=bar'),
         );
         self::assertGreaterThan(
             0,
@@ -136,7 +136,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
             'cn=user,dc=foo,dc=bar',
             'cn',
             'user',
-            Controls::assertion(self::filterNestedWithin(FilterFactory::MAX_NESTING_DEPTH + 1)),
+            Controls::assertion(self::filterNestedWithin(FilterDecoder::MAX_NESTING_DEPTH + 1)),
         );
     }
 
@@ -146,7 +146,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 
         try {
             $this->ldapClient()->search(
-                Operations::search(self::filterOfItems(FilterFactory::MAX_ITEMS + 1))->base('dc=foo,dc=bar'),
+                Operations::search(self::filterOfItems(FilterDecoder::MAX_ITEMS + 1))->base('dc=foo,dc=bar'),
             );
             self::fail('The wide filter should have been refused.');
         } catch (OperationException $e) {
@@ -157,7 +157,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         $entries = $this->ldapClient()->search(
-            Operations::search(self::filterOfItems(FilterFactory::MAX_ITEMS))->base('dc=foo,dc=bar'),
+            Operations::search(self::filterOfItems(FilterDecoder::MAX_ITEMS))->base('dc=foo,dc=bar'),
         );
         self::assertGreaterThan(
             0,
@@ -179,7 +179,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
                     static fn(): FilterInterface => Filters::and(),
                     range(
                         1,
-                        FilterFactory::MAX_ITEMS,
+                        FilterDecoder::MAX_ITEMS,
                     ),
                 ),
             ))->base('dc=foo,dc=bar'),
@@ -197,7 +197,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
             'cn=user,dc=foo,dc=bar',
             'cn',
             'user',
-            Controls::assertion(self::filterOfItems(FilterFactory::MAX_ITEMS + 1)),
+            Controls::assertion(self::filterOfItems(FilterDecoder::MAX_ITEMS + 1)),
         );
     }
 

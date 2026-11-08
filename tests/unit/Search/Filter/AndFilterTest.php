@@ -14,13 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
-use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Search\Filters;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AndFilterTest extends TestCase
@@ -123,27 +118,6 @@ final class AndFilterTest extends TestCase
         );
     }
 
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $and = new AndFilter(new EqualityFilter('foo', 'bar'), new SubstringFilter('bar', 'foo'));
-
-        self::assertEquals(
-            $and,
-            AndFilter::fromAsn1($and->toAsn1()),
-        );
-    }
-
-    /**
-     * @param AbstractType<mixed> $type
-     */
-    #[DataProvider('malformedAsn1DataProvider')]
-    public function test_it_should_not_be_constructed_from_invalid_asn1(AbstractType $type): void
-    {
-        self::expectException(ProtocolException::class);
-
-        AndFilter::fromAsn1($type);
-    }
-
     public function test_it_should_get_the_string_filter_representation(): void
     {
         self::assertSame(
@@ -176,16 +150,5 @@ final class AndFilterTest extends TestCase
             2,
             $this->subject,
         );
-    }
-
-    /**
-     * @return array<array{AbstractType<mixed>}>
-     */
-    public static function malformedAsn1DataProvider(): array
-    {
-        return [
-            [Asn1::octetString('foo')],
-            [Asn1::sequence()],
-        ];
     }
 }

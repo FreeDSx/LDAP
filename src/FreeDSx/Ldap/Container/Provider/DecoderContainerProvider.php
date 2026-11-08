@@ -100,18 +100,18 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             AbandonRequestDecoder::class => static fn(): AbandonRequestDecoder => new AbandonRequestDecoder(),
             AddRequestDecoder::class => static fn(): AddRequestDecoder => new AddRequestDecoder(),
             BindRequestDecoder::class => static fn(): BindRequestDecoder => new BindRequestDecoder(),
-            CompareRequestDecoder::class => static fn(): CompareRequestDecoder => new CompareRequestDecoder(),
+            CompareRequestDecoder::class => $this->makeCompareRequestDecoder(...),
             DeleteRequestDecoder::class => static fn(): DeleteRequestDecoder => new DeleteRequestDecoder(),
             ModifyDnRequestDecoder::class => static fn(): ModifyDnRequestDecoder => new ModifyDnRequestDecoder(),
             ModifyRequestDecoder::class => static fn(): ModifyRequestDecoder => new ModifyRequestDecoder(),
-            SearchRequestDecoder::class => static fn(): SearchRequestDecoder => new SearchRequestDecoder(),
+            SearchRequestDecoder::class => $this->makeSearchRequestDecoder(...),
             UnbindRequestDecoder::class => static fn(): UnbindRequestDecoder => new UnbindRequestDecoder(),
             ExtendedRequestDecoder::class => $this->makeExtendedRequestDecoder(...),
             CancelRequestDecoder::class => static fn(): CancelRequestDecoder => new CancelRequestDecoder(),
             ForwardPasswordPolicyStateRequestDecoder::class => $this->makeForwardPasswordPolicyStateRequestDecoder(...),
             PasswordModifyRequestDecoder::class => static fn(): PasswordModifyRequestDecoder
                 => new PasswordModifyRequestDecoder(),
-            AssertionControlDecoder::class => static fn(): AssertionControlDecoder => new AssertionControlDecoder(),
+            AssertionControlDecoder::class => $this->makeAssertionControlDecoder(...),
             DirSyncResponseControlDecoder::class => static fn(): DirSyncResponseControlDecoder
                 => new DirSyncResponseControlDecoder(),
             PagingControlDecoder::class => static fn(): PagingControlDecoder => new PagingControlDecoder(),
@@ -167,6 +167,21 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             8 => new AttributeValueAssertionDecoder(ApproximateFilter::class),
             9 => $container->get(MatchingRuleFilterDecoder::class),
         ]);
+    }
+
+    private function makeSearchRequestDecoder(Container $container): SearchRequestDecoder
+    {
+        return new SearchRequestDecoder($container->get(FilterDecoder::class));
+    }
+
+    private function makeCompareRequestDecoder(): CompareRequestDecoder
+    {
+        return new CompareRequestDecoder(new AttributeValueAssertionDecoder(EqualityFilter::class));
+    }
+
+    private function makeAssertionControlDecoder(Container $container): AssertionControlDecoder
+    {
+        return new AssertionControlDecoder($container->get(FilterDecoder::class));
     }
 
     private function makeIntermediateResponseDecoder(Container $container): IntermediateResponseDecoder

@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\TestCase;
@@ -52,16 +51,6 @@ final class NotFilterTest extends TestCase
                 Filters::equal('foo', 'bar')->toAsn1(),
             )),
             $this->subject->toAsn1(),
-        );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        self::assertEquals(
-            new NotFilter(new EqualityFilter('foo', 'bar')),
-            NotFilter::fromAsn1(
-                (new NotFilter(Filters::equal('foo', 'bar')))->toAsn1(),
-            ),
         );
     }
 

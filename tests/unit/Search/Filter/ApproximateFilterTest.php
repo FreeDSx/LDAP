@@ -56,14 +56,6 @@ final class ApproximateFilterTest extends TestCase
         );
     }
 
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        self::assertEquals(
-            new ApproximateFilter('foo', 'bar'),
-            ApproximateFilter::fromAsn1((new ApproximateFilter('foo', 'bar'))->toAsn1()),
-        );
-    }
-
     public function test_it_should_get_the_string_filter_representation(): void
     {
         self::assertSame(

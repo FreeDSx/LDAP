@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 
 use function count;
 use function is_int;
@@ -36,6 +36,8 @@ use function is_int;
  */
 readonly class SearchRequestDecoder implements RequestDecoderInterface
 {
+    public function __construct(private FilterDecoder $filters) {}
+
     /**
      * @param AbstractType<mixed> $type
      * @throws ProtocolException
@@ -60,7 +62,10 @@ readonly class SearchRequestDecoder implements RequestDecoderInterface
             throw new ProtocolException('The search request is malformed.');
         }
         // Decoded before the other fields are checked, so a filter past a limit is answered by that limit.
-        $filter = FilterFactory::get($filter);
+        $filter = $this->filters->decode(
+            $filter,
+            $context,
+        );
 
         if (
             !($baseDn instanceof OctetStringType

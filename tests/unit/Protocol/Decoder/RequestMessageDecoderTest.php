@@ -30,8 +30,8 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
-use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -308,7 +308,7 @@ final class RequestMessageDecoderTest extends TestCase
     private static function filterNestedPastTheLimit(): FilterInterface
     {
         $filter = Filters::present('cn');
-        for ($i = 0; $i <= FilterFactory::MAX_NESTING_DEPTH; $i++) {
+        for ($i = 0; $i <= FilterDecoder::MAX_NESTING_DEPTH; $i++) {
             $filter = Filters::not($filter);
         }
 
@@ -321,7 +321,7 @@ final class RequestMessageDecoderTest extends TestCase
             static fn(int $i): FilterInterface => Filters::present("a{$i}"),
             range(
                 0,
-                FilterFactory::MAX_ITEMS,
+                FilterDecoder::MAX_ITEMS,
             ),
         ));
     }

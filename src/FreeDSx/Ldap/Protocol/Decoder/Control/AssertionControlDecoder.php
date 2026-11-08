@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Protocol\Decoder\Control;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\AssertionControl;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 
 /**
  * Decodes an assertion control (RFC 4528) and the filter it carries.
@@ -27,10 +27,15 @@ use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
  */
 readonly class AssertionControlDecoder extends EncodedValueControlDecoder
 {
+    public function __construct(private FilterDecoder $filters) {}
+
     protected function decodeValue(
         AbstractType $value,
         DecodeContext $context,
     ): AssertionControl {
-        return new AssertionControl(FilterFactory::get($value));
+        return new AssertionControl($this->filters->decode(
+            $value,
+            $context,
+        ));
     }
 }

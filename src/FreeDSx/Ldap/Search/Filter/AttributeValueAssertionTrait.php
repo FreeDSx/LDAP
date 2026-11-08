@@ -14,15 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Common methods for filters using attribute value assertions.
@@ -81,32 +74,5 @@ trait AttributeValueAssertionTrait
             . self::FILTER_TYPE
             . Attribute::escape($this->value)
             . self::PAREN_RIGHT;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     * @throws RuntimeException
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(AbstractType $type): static
-    {
-        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
-        if (!($type instanceof SequenceType && count($type) >= 2)) {
-            throw new ProtocolException('The attribute value assertion is malformed.');
-        }
-
-        $attribute = $type->getChild(0);
-        $value = $type->getChild(1);
-        if (!($attribute instanceof OctetStringType && $value instanceof OctetStringType)) {
-            throw new ProtocolException('The attribute value assertion is malformed.');
-        }
-
-        return new static(
-            $attribute->getValue(),
-            $value->getValue(),
-        );
     }
 }

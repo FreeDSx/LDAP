@@ -17,12 +17,9 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class SubstringFilterTest extends TestCase
 {
-    use TrailingComponentTrait;
-
     private SubstringFilter $subject;
 
     protected function setUp(): void
@@ -125,70 +122,6 @@ final class SubstringFilterTest extends TestCase
         $this->subject->setContains();
 
         $this->subject->toAsn1();
-    }
-
-    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
-    {
-        self::assertEquals(
-            $this->subject,
-            SubstringFilter::fromAsn1(self::withTrailingComponent($this->subject->toAsn1())),
-        );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        $substring = new SubstringFilter(
-            'foo',
-            'foo',
-            'bar',
-            'foobar',
-            'wee',
-        );
-        self::assertEquals(
-            $substring,
-            SubstringFilter::fromAsn1($substring->toAsn1()),
-        );
-
-        $substring = new SubstringFilter(
-            'foo',
-            'foo',
-            'bar',
-        );
-        self::assertEquals(
-            $substring,
-            SubstringFilter::fromAsn1($substring->toAsn1()),
-        );
-
-        $substring = new SubstringFilter(
-            'foo',
-            'foo',
-        );
-        self::assertEquals(
-            $substring,
-            SubstringFilter::fromAsn1($substring->toAsn1()),
-        );
-
-        $substring = new SubstringFilter(
-            'foo',
-            null,
-            'foo',
-        );
-        self::assertEquals(
-            $substring,
-            SubstringFilter::fromAsn1($substring->toAsn1()),
-        );
-
-        $substring = new SubstringFilter(
-            'foo',
-            null,
-            null,
-            'foo',
-            'bar',
-        );
-        self::assertEquals(
-            $substring,
-            SubstringFilter::fromAsn1($substring->toAsn1()),
-        );
     }
 
     public function test_it_should_get_the_string_filter_representation(): void

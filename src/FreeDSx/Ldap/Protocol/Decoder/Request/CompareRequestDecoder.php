@@ -19,6 +19,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+use FreeDSx\Ldap\Protocol\Decoder\Filter\AttributeValueAssertionDecoder;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 
 use function count;
@@ -31,6 +32,11 @@ use function count;
  */
 readonly class CompareRequestDecoder implements RequestDecoderInterface
 {
+    /**
+     * @param AttributeValueAssertionDecoder<EqualityFilter> $assertions
+     */
+    public function __construct(private AttributeValueAssertionDecoder $assertions) {}
+
     /**
      * @param AbstractType<mixed> $type
      * @throws ProtocolException
@@ -51,7 +57,10 @@ readonly class CompareRequestDecoder implements RequestDecoderInterface
 
         return new CompareRequest(
             $dn->getValue(),
-            EqualityFilter::fromAsn1($ava),
+            $this->assertions->decodeAssertion(
+                $ava,
+                $context,
+            ),
         );
     }
 }

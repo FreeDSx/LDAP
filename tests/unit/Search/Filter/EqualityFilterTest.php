@@ -18,12 +18,9 @@ use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 
 final class EqualityFilterTest extends TestCase
 {
-    use TrailingComponentTrait;
-
     private EqualityFilter $subject;
 
     protected function setUp(): void
@@ -65,22 +62,6 @@ final class EqualityFilterTest extends TestCase
                 Asn1::octetString('bar'),
             )),
             $this->subject->toAsn1(),
-        );
-    }
-
-    public function test_it_should_be_constructed_from_asn1(): void
-    {
-        self::assertEquals(
-            new EqualityFilter('foo', 'bar'),
-            EqualityFilter::fromAsn1((new EqualityFilter('foo', 'bar'))->toAsn1()),
-        );
-    }
-
-    public function test_it_ignores_a_trailing_component_it_does_not_recognize(): void
-    {
-        self::assertEquals(
-            $this->subject,
-            EqualityFilter::fromAsn1(self::withTrailingComponent($this->subject->toAsn1())),
         );
     }
 

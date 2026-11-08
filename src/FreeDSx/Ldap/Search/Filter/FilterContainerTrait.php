@@ -15,17 +15,7 @@ namespace FreeDSx\Ldap\Search\Filter;
 
 use ArrayIterator;
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetOfType;
-use FreeDSx\Asn1\Type\SetType;
-use FreeDSx\Ldap\Exception\FilterDepthExceededException;
-use FreeDSx\Ldap\Exception\FilterTooWideException;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
-use FreeDSx\Ldap\Protocol\Factory\FilterItemTally;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Traversable;
 
 /**
@@ -137,46 +127,5 @@ trait FilterContainerTrait
     public function count(): int
     {
         return count($this->filters);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @api
-     *
-     * @param AbstractType<mixed> $type
-     * @param int $depth How many AND, OR, or NOT filters enclose this one.
-     * @param FilterItemTally $tally The items counted so far across the whole received filter.
-     * @throws EncoderException
-     * @throws FilterDepthExceededException
-     * @throws FilterTooWideException
-     * @throws ProtocolException
-     */
-    public static function fromAsn1(
-        AbstractType $type,
-        int $depth = 0,
-        FilterItemTally $tally = new FilterItemTally(),
-    ): self {
-        if ($type instanceof IncompleteType) {
-            $type = (new LdapEncoder())->complete(
-                type: $type,
-                tagType: AbstractType::TAG_TYPE_SET,
-            );
-        }
-
-        if (!$type instanceof SetType) {
-            throw new ProtocolException('The filter is malformed');
-        }
-
-        $filters = [];
-        foreach ($type->getChildren() as $child) {
-            $filters[] = FilterFactory::get(
-                $child,
-                $depth + 1,
-                $tally,
-            );
-        }
-
-        return new self(...$filters);
     }
 }

@@ -14,15 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
 
 /**
@@ -187,85 +181,5 @@ class SubstringFilter implements FilterInterface, FilterAttributeInterface, Stri
         }
 
         return $filter . $value . self::PAREN_RIGHT;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        $encoder = new LdapEncoder();
-        $type = $type instanceof IncompleteType ? $encoder->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
-        if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {
-            throw new ProtocolException('The substring type is malformed');
-        }
-
-        $attrType = $type->getChild(0);
-        $substrings = $type->getChild(1);
-        if (!($attrType instanceof OctetStringType && $substrings instanceof SequenceType && count($substrings) > 0)) {
-            throw new ProtocolException('The substring filter is malformed.');
-        }
-        [$startsWith, $endsWith, $contains] = self::parseSubstrings($substrings);
-
-        return new self(
-            $attrType->getValue(),
-            $startsWith,
-            $endsWith,
-            ...$contains,
-        );
-    }
-
-    /**
-     * @return array{0: string|null, 1: string|null, 2: string[]}
-     * @throws ProtocolException
-     */
-    private static function parseSubstrings(SequenceType $substrings): array
-    {
-        /** @var OctetStringType|null $startsWith */
-        $startsWith = null;
-        /** @var OctetStringType|null $endsWith */
-        $endsWith = null;
-        /** @var  string[] $contains */
-        $contains = [];
-
-        foreach ($substrings->getChildren() as $substring) {
-            if ($substring->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                throw new ProtocolException('The substring filter is malformed.');
-            }
-            # Starts With and Ends With can occur only once each. Contains can occur multiple times.
-            if ($substring->getTagNumber() === 0) {
-                if ($startsWith !== null) {
-                    throw new ProtocolException('The substring filter is malformed.');
-                } else {
-                    $startsWith = $substring;
-                }
-            } elseif ($substring->getTagNumber() === 1) {
-                $value = $substring->getValue();
-                if (!is_string($value)) {
-                    $value = '';
-                }
-                $contains[] = $value;
-            } elseif ($substring->getTagNumber() === 2) {
-                if ($endsWith !== null) {
-                    throw new ProtocolException('The substring filter is malformed.');
-                } else {
-                    $endsWith = $substring;
-                }
-            } else {
-                throw new ProtocolException('The substring filter is malformed.');
-            }
-        }
-
-        $startsWith = $startsWith?->getValue();
-        $endsWith = $endsWith?->getValue();
-
-        return [
-            is_string($startsWith) ? $startsWith : null,
-            is_string($endsWith) ? $endsWith : null,
-            $contains,
-        ];
     }
 }

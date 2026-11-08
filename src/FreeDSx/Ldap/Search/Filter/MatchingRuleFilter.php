@@ -14,16 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\IncompleteType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\FilterParseException;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
 
 /**
@@ -42,18 +35,6 @@ use Stringable;
 class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, Stringable
 {
     protected const CHOICE_TAG = 9;
-
-    /**
-     * The universal type behind each context tag of the assertion, needed to decode them from BER.
-     */
-    private const CHILD_TAG_MAP = [
-        AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
-            1 => AbstractType::TAG_TYPE_OCTET_STRING,
-            2 => AbstractType::TAG_TYPE_OCTET_STRING,
-            3 => AbstractType::TAG_TYPE_OCTET_STRING,
-            4 => AbstractType::TAG_TYPE_BOOLEAN,
-        ],
-    ];
 
     private ?string $matchingRule;
 
@@ -181,68 +162,6 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
             . self::FILTER_EXT
             . Attribute::escape($this->value)
             . self::PAREN_RIGHT;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param AbstractType<mixed> $type
-     * @throws EncoderException
-     */
-    public static function fromAsn1(AbstractType $type): self
-    {
-        // The children are context tagged primitives, so their universal types must be supplied to decode them.
-        $type = $type instanceof IncompleteType
-            ? (new LdapEncoder())->complete(
-                $type,
-                AbstractType::TAG_TYPE_SEQUENCE,
-                self::CHILD_TAG_MAP,
-            )
-            : $type;
-        if (!($type instanceof SequenceType && count($type) >= 1)) {
-            throw new ProtocolException('The matching rule filter is malformed');
-        }
-        $matchingRule = null;
-        $matchingType = null;
-        $matchValue = null;
-        $useDnAttr = null;
-
-        foreach ($type->getChildren() as $child) {
-            if ($child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                continue;
-            }
-            if ($child->getTagNumber() === 1) {
-                $matchingRule = $child;
-            } elseif ($child->getTagNumber() === 2) {
-                $matchingType = $child;
-            } elseif ($child->getTagNumber() === 3) {
-                $matchValue = $child;
-            } elseif ($child->getTagNumber() === 4) {
-                $useDnAttr = $child;
-            }
-        }
-        if (!$matchValue instanceof OctetStringType) {
-            throw new ProtocolException('The matching rule filter is malformed.');
-        }
-        if ($matchingRule !== null && !$matchingRule instanceof OctetStringType) {
-            throw new ProtocolException('The matching rule filter is malformed.');
-        }
-        if ($matchingType !== null && !$matchingType instanceof OctetStringType) {
-            throw new ProtocolException('The matching rule filter is malformed.');
-        }
-        if ($useDnAttr !== null && !$useDnAttr instanceof BooleanType) {
-            throw new ProtocolException('The matching rule filter is malformed.');
-        }
-        $matchingRule = ($matchingRule !== null) ? $matchingRule->getValue() : null;
-        $matchingType = ($matchingType !== null) ? $matchingType->getValue() : null;
-        $useDnAttr = $useDnAttr !== null && $useDnAttr->getValue();
-
-        return new self(
-            $matchingRule,
-            $matchingType,
-            $matchValue->getValue(),
-            $useDnAttr,
-        );
     }
 
     /**
