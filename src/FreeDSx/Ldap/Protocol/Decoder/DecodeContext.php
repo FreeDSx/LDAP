@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\InvalidArgumentException as Asn1InvalidArgumentException;
 use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
@@ -51,6 +52,7 @@ class DecodeContext
      * @return AbstractType<mixed>
      * @throws EncoderException
      * @throws PartialPduException
+     * @throws Asn1InvalidArgumentException when the bytes are empty.
      */
     public function decode(
         string $bytes,
