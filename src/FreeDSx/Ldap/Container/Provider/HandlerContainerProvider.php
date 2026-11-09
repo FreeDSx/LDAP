@@ -133,6 +133,9 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         HandlerContext $context,
     ): ServerPasswordModifyHandler {
         $policyComponentFactory = $container->get(PasswordPolicyComponentFactory::class);
+        $maxElements = $container->get(ServerOptions::class)
+            ->getNetworkConfig()
+            ->getMaxRequestElements();
 
         return new ServerPasswordModifyHandler(
             service: new PasswordModifyService(
@@ -147,6 +150,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 passwordPolicyContext: $context->passwordPolicyContext,
             ),
             requestDecoder: $container->get(PasswordModifyRequestDecoder::class),
+            elementBudget: $maxElements === 0 ? null : $maxElements,
         );
     }
 

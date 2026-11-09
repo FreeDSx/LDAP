@@ -47,4 +47,17 @@ final class RequestLimitsTest extends TestCase
             (new RequestLimits())->encoderOptions(),
         );
     }
+
+    public function testItLeavesTheNestedPartsWhatTheMainDecodeDidNotUse(): void
+    {
+        self::assertSame(
+            30,
+            $this->subject->elementsLeftAfter(20),
+        );
+    }
+
+    public function testItSetsNoLimitOnTheNestedPartsWhenElementsAreUnlimited(): void
+    {
+        self::assertNull((new RequestLimits())->elementsLeftAfter(20));
+    }
 }

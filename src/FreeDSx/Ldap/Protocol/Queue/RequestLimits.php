@@ -42,4 +42,16 @@ readonly class RequestLimits
             maxElements: $this->maxElements,
         );
     }
+
+    /**
+     * The elements a request's nested parts may still hold after its main decode, or null when there is no limit.
+     */
+    public function elementsLeftAfter(int $elementCount): ?int
+    {
+        if ($this->maxElements === 0) {
+            return null;
+        }
+
+        return $this->maxElements - $elementCount;
+    }
 }

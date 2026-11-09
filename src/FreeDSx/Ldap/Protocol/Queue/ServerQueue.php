@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Queue;
 
-use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
@@ -72,20 +71,23 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     private array $deferredMessages = [];
 
+    private readonly LdapEncoder $ldapEncoder;
+
     /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
      */
     public function __construct(
         Socket $socket,
         private readonly RequestMessageDecoder $messageDecoder,
-        ?EncoderInterface $encoder = null,
-        RequestLimits $limits = new RequestLimits(),
+        ?LdapEncoder $encoder = null,
+        private readonly RequestLimits $limits = new RequestLimits(),
         array $interceptors = [],
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ) {
+        $this->ldapEncoder = $encoder ?? new LdapEncoder($limits->encoderOptions());
         parent::__construct(
             $socket,
-            $encoder ?? new LdapEncoder($limits->encoderOptions()),
+            $this->ldapEncoder,
         );
         $this->interceptors = $interceptors;
     }
@@ -277,7 +279,11 @@ class ServerQueue extends LdapQueue implements ConnectionControl
             throw new ProtocolException('The message received is invalid.');
         }
 
-        return $this->messageDecoder->decode($type);
+        // The encoder still holds the count from decoding this message, which always runs right before it is built.
+        return $this->messageDecoder->decode(
+            $type,
+            $this->limits->elementsLeftAfter($this->ldapEncoder->getLastElementCount()),
+        );
     }
 
     /**
