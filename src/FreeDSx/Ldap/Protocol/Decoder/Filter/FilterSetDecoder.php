@@ -41,7 +41,7 @@ readonly class FilterSetDecoder implements FilterShapeDecoderInterface
         FilterDecodeRun $run,
     ): FilterContainerInterface {
         if ($type instanceof IncompleteType) {
-            $type = $run->context->complete(
+            $type = $run->completeWithinItems(
                 $type,
                 AbstractType::TAG_TYPE_SET,
             );

@@ -14,17 +14,23 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Filter;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\PduElementsException;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecodeRun;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Protocol\ReceivedAsn1Trait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class FilterDecodeRunTest extends TestCase
 {
+    use ReceivedAsn1Trait;
     use ServerContainerTrait;
 
     private FilterDecodeRun $subject;
@@ -96,6 +102,78 @@ final class FilterDecodeRunTest extends TestCase
         $this->expectException(FilterTooWideException::class);
 
         $this->subject->countItem(Filters::present('cn'));
+    }
+
+    public function testItCompletesAFilterWhoseElementsFitTheItemsLeft(): void
+    {
+        $this->countEqualities(FilterDecoder::MAX_ITEMS - 2);
+
+        self::assertCount(
+            2,
+            $this->subject->completeWithinItems(
+                self::incomplete(Filters::or(
+                    Filters::present('cn'),
+                    Filters::present('sn'),
+                )),
+                AbstractType::TAG_TYPE_SET,
+            )->getChildren(),
+        );
+    }
+
+    public function testItRefusesAFilterWhoseElementsOutnumberTheItemsLeftBeforeBuildingThem(): void
+    {
+        $this->countEqualities(FilterDecoder::MAX_ITEMS - 2);
+
+        try {
+            $this->subject->completeWithinItems(
+                self::incomplete(Filters::or(
+                    Filters::present('cn'),
+                    Filters::present('sn'),
+                    Filters::present('uid'),
+                )),
+                AbstractType::TAG_TYPE_SET,
+            );
+            self::fail('The filter should have been refused.');
+        } catch (FilterTooWideException $e) {
+            self::assertSame(
+                'The filter holds more than 1000 items.',
+                $e->getMessage(),
+            );
+            self::assertInstanceOf(
+                PduElementsException::class,
+                $e->getPrevious(),
+            );
+        }
+    }
+
+    public function testItLeavesRoomForTheElementsThatAreNotItems(): void
+    {
+        $this->countEqualities(FilterDecoder::MAX_ITEMS - 3);
+
+        self::assertCount(
+            2,
+            $this->subject->completeWithinItems(
+                self::incomplete(Filters::substring(
+                    'cn',
+                    'a',
+                    'z',
+                    'm',
+                )),
+                AbstractType::TAG_TYPE_SEQUENCE,
+                otherElements: 2,
+            )->getChildren(),
+        );
+    }
+
+    private static function incomplete(FilterInterface $filter): IncompleteType
+    {
+        $type = self::received($filter->toAsn1());
+        self::assertInstanceOf(
+            IncompleteType::class,
+            $type,
+        );
+
+        return $type;
     }
 
     private function countEqualities(int $count): void

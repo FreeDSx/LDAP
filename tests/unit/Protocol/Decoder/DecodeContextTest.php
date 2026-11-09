@@ -138,11 +138,62 @@ final class DecodeContextTest extends TestCase
         }
     }
 
+    public function testItCompletesATypeHoldingExactlyTheElementsAskedFor(): void
+    {
+        self::assertCount(
+            2,
+            $this->subject->complete(
+                self::incompleteSequence(),
+                AbstractType::TAG_TYPE_SEQUENCE,
+                atMost: 2,
+            )->getChildren(),
+        );
+    }
+
+    public function testATypeHoldingMoreThanTheElementsAskedForIsRefusedWithTheEncoderException(): void
+    {
+        $this->expectException(PduElementsException::class);
+
+        $this->subject->complete(
+            self::incompleteSequence(),
+            AbstractType::TAG_TYPE_SEQUENCE,
+            atMost: 1,
+        );
+    }
+
+    public function testTheBudgetIsAnsweredWhenItRunsOutBeforeTheElementsAskedFor(): void
+    {
+        $this->subject->decode(self::sequenceOf(2));
+
+        $this->expectException(AdminLimitExceededException::class);
+
+        $this->subject->complete(
+            self::incompleteSequence(),
+            AbstractType::TAG_TYPE_SEQUENCE,
+            atMost: 2,
+        );
+    }
+
     public function testWithoutABudgetItDecodesAnyNumberOfElements(): void
     {
         self::assertCount(
             1_000,
             (new DecodeContext())->decode(self::sequenceOf(1_000))->getChildren(),
+        );
+    }
+
+    public function testWithoutABudgetTheElementsAskedForCapOnlyTheirOwnCall(): void
+    {
+        $context = new DecodeContext();
+        $context->complete(
+            self::incompleteSequence(),
+            AbstractType::TAG_TYPE_SEQUENCE,
+            atMost: 2,
+        );
+
+        self::assertCount(
+            1_000,
+            $context->decode(self::sequenceOf(1_000))->getChildren(),
         );
     }
 

@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Decoder\Filter;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PduElementsException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\FilterDepthExceededException;
 use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -74,6 +77,31 @@ class FilterDecodeRun
     }
 
     /**
+     * Completes a filter of elements worth at least one item each, refusing it once they outnumber the items left.
+     *
+     * @param int $otherElements the elements the filter holds that are not worth an item.
+     * @return AbstractType<mixed>
+     * @throws FilterTooWideException
+     * @throws AdminLimitExceededException
+     * @throws EncoderException
+     */
+    public function completeWithinItems(
+        IncompleteType $type,
+        int $tagType,
+        int $otherElements = 0,
+    ): AbstractType {
+        try {
+            return $this->context->complete(
+                $type,
+                $tagType,
+                atMost: FilterDecoder::MAX_ITEMS - $this->items + $otherElements,
+            );
+        } catch (PduElementsException $e) {
+            throw $this->tooWide($e);
+        }
+    }
+
+    /**
      * Counts an item, refusing the filter at the first item past the limit; a substring counts once per part.
      *
      * @throws FilterTooWideException
@@ -85,11 +113,19 @@ class FilterDecodeRun
             : 1;
 
         if ($this->items > FilterDecoder::MAX_ITEMS) {
-            throw new FilterTooWideException(sprintf(
+            throw $this->tooWide();
+        }
+    }
+
+    private function tooWide(?PduElementsException $previous = null): FilterTooWideException
+    {
+        return new FilterTooWideException(
+            sprintf(
                 'The filter holds more than %d items.',
                 FilterDecoder::MAX_ITEMS,
-            ));
-        }
+            ),
+            $previous,
+        );
     }
 
     private static function partsOf(SubstringFilter $item): int

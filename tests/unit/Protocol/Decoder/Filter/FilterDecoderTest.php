@@ -283,6 +283,23 @@ final class FilterDecoderTest extends TestCase
         );
     }
 
+    public function testItDecodesASubstringItemWhosePartsFillTheLastItemsLeft(): void
+    {
+        $filter = Filters::or(...[
+            ...self::equalities(FilterDecoder::MAX_ITEMS - 2),
+            Filters::substring(
+                'cn',
+                'a',
+                'z',
+            ),
+        ]);
+
+        self::assertEquals(
+            $filter,
+            $this->decode($filter),
+        );
+    }
+
     private function decode(FilterInterface $filter): FilterInterface
     {
         return $this->subject->decode(
