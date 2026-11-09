@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -24,6 +25,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
@@ -31,7 +33,10 @@ use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\NestedSequenceRequest;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
+use function array_fill;
+use function array_map;
 use function extension_loaded;
+use function range;
 
 /**
  * Behavior that runs against every server runner.
@@ -225,6 +230,70 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         self::assertTrue($this->bindsUser($this->buildClient('tcp')));
     }
 
+    public function testARequestOfMoreElementsThanTheLimitEndsTheSessionWithAProtocolError(): void
+    {
+        $queue = $this->boundRawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            2,
+            Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                ...array_fill(
+                    0,
+                    25_000,
+                    Change::replace(
+                        'description',
+                        'x',
+                    ),
+                ),
+            ),
+        ));
+
+        try {
+            $queue->getMessage();
+            self::fail('The connection ended without a notice of disconnection.');
+        } catch (UnsolicitedNotificationException $e) {
+            self::assertTrue($e->isNoticeOfDisconnection());
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        } finally {
+            $queue->close();
+        }
+
+        self::assertTrue($this->bindsUser($this->buildClient('tcp')));
+    }
+
+    public function testARequestWithinTheElementLimitIsAnswered(): void
+    {
+        $queue = $this->boundRawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            2,
+            Operations::search(
+                Filters::present('objectClass'),
+                ...array_map(
+                    static fn(int $i): string => "attr{$i}",
+                    range(
+                        1,
+                        50_000,
+                    ),
+                ),
+            )->base('dc=foo,dc=bar')->useBaseScope(),
+        ));
+
+        try {
+            self::assertSame(
+                [2 => ResultCode::SUCCESS],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     public function testTheConnectionLimitHoldsAcrossTheWholeServer(): void
     {
         $this->createServerProcess(
@@ -379,6 +448,21 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         return true;
+    }
+
+    private function boundRawQueue(): ClientQueue
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ),
+        ));
+        $queue->getMessage(1);
+
+        return $queue;
     }
 
     private static function filterNestedWithin(int $depth): FilterInterface

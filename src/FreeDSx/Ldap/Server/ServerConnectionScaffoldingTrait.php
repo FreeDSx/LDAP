@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
+use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
@@ -45,10 +46,15 @@ trait ServerConnectionScaffoldingTrait
         array $interceptors = [],
         MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ): ServerQueue {
+        $networkConfig = $this->serverOptions()->getNetworkConfig();
+
         return new ServerQueue(
             $socket,
             $messageDecoder,
-            maxReceiveSize: $this->serverOptions()->getNetworkConfig()->getMaxRequestSize(),
+            limits: new RequestLimits(
+                maxSize: $networkConfig->getMaxRequestSize(),
+                maxElements: $networkConfig->getMaxRequestElements(),
+            ),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,
         );

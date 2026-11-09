@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Config;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\TlsVersion;
 use PHPUnit\Framework\TestCase;
@@ -88,6 +89,32 @@ final class NetworkConfigTest extends TestCase
             1_048_576,
             $this->subject->getMaxRequestSize(),
         );
+    }
+
+    public function test_max_request_elements_defaults_to_one_hundred_thousand(): void
+    {
+        self::assertSame(
+            100_000,
+            $this->subject->getMaxRequestElements(),
+        );
+    }
+
+    public function test_it_can_set_max_request_elements(): void
+    {
+        $this->subject->setMaxRequestElements(0);
+
+        self::assertSame(
+            0,
+            $this->subject->getMaxRequestElements(),
+        );
+    }
+
+    public function test_it_refuses_a_negative_max_request_elements(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The request element limit cannot be negative, but received -1.');
+
+        $this->subject->setMaxRequestElements(-1);
     }
 
     public function test_shutdown_timeout_defaults_to_fifteen_seconds(): void

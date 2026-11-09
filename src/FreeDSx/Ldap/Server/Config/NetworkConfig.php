@@ -13,7 +13,10 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Config;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\TlsVersion;
+
+use function sprintf;
 
 /**
  * The listener socket and TLS settings a server binds and accepts connections with.
@@ -51,6 +54,11 @@ final class NetworkConfig
      * The largest incoming request PDU accepted, in bytes (2.5 MiB); 0 disables the limit.
      */
     private int $maxRequestSize = 2_621_440;
+
+    /**
+     * The most ASN.1 elements an incoming request may hold; 0 disables the limit.
+     */
+    private int $maxRequestElements = 100_000;
 
     /**
      * The maximum number of concurrent connections the server will accept; zero means no limit.
@@ -201,6 +209,25 @@ final class NetworkConfig
         return $this;
     }
 
+    public function getMaxRequestElements(): int
+    {
+        return $this->maxRequestElements;
+    }
+
+    /**
+     * @throws InvalidArgumentException when the limit is negative
+     */
+    public function setMaxRequestElements(int $maxRequestElements): self
+    {
+        self::assertNotNegative(
+            $maxRequestElements,
+            'The request element limit',
+        );
+        $this->maxRequestElements = $maxRequestElements;
+
+        return $this;
+    }
+
     public function getMaxConnections(): int
     {
         return $this->maxConnections;
@@ -331,5 +358,23 @@ final class NetworkConfig
         $this->sslCaCert = $sslCaCert;
 
         return $this;
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    private static function assertNotNegative(
+        int $limit,
+        string $name,
+    ): void {
+        if ($limit >= 0) {
+            return;
+        }
+
+        throw new InvalidArgumentException(sprintf(
+            '%s cannot be negative, but received %d.',
+            $name,
+            $limit,
+        ));
     }
 }
