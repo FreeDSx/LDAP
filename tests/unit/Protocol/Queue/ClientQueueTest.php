@@ -32,8 +32,6 @@ use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
-use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketPool;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -158,59 +156,6 @@ final class ClientQueueTest extends TestCase
         self::expectException(ProtocolException::class);
 
         $this->subject->getMessage(2);
-    }
-
-    public function test_it_should_set_a_message_wrapper_and_use_it_when_sending_messages(): void
-    {
-        $mockWrapper = $this->createMock(MessageWrapperInterface::class);
-
-        $this->mockEncoder
-            ->method('encode')
-            ->willReturn('foo');
-        $this->mockSocket
-            ->expects($this->once())
-            ->method('write');
-
-        $mockWrapper
-            ->expects($this->atLeastOnce())
-            ->method('wrap')
-            ->with('foo')
-            ->willReturn('bar');
-
-        $this->subject->setMessageWrapper($mockWrapper);
-        $this->subject->sendMessage(new LdapMessageRequest(
-            1,
-            Operations::whoami(),
-        ));
-    }
-
-    public function test_it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(): void
-    {
-        $asn1 = Asn1::sequence(
-            Asn1::integer(3),
-            Asn1::application(11, Asn1::sequence(
-                Asn1::enumerated(0),
-                Asn1::octetString('dc=foo,dc=bar'),
-                Asn1::octetString(''),
-            )),
-            Asn1::context(0, (new IncompleteType((new LdapEncoder())->encode((new Control('foo'))->toAsn1())))->setIsConstructed(true)),
-        );
-
-        $this->mockEncoder
-            ->method('decode')
-            ->with('bar')
-            ->willReturn($asn1);
-
-        $mockWrapper = $this->createMock(MessageWrapperInterface::class);
-        $mockWrapper
-            ->expects($this->once())
-            ->method('unwrap')
-            ->with('foo')
-            ->willReturn(new Buffer('bar', 3));
-
-        $this->subject->setMessageWrapper($mockWrapper);
-
-        $this->subject->getMessage();
     }
 
     public function test_it_should_decode_a_search_result_entry_identically_to_the_type_graph(): void

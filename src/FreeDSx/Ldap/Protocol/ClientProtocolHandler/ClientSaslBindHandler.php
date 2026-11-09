@@ -25,12 +25,12 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\Mechanism\MechanismInterface;
 use FreeDSx\Sasl\Mechanism\MechanismName;
+use FreeDSx\Sasl\Options\DigestMD5Options;
 use FreeDSx\Sasl\Sasl;
 use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\SaslInterface;
@@ -66,6 +66,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
     {
         /** @var SaslBindRequest $request */
         $request = $message->getRequest();
+        $this->refuseSecurityLayer($request);
         $this->controls = $message->controls()->toArray();
 
         # If we are selecting a mechanism from the RootDSE, we must check for a downgrade afterwards.
@@ -97,15 +98,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
                 $request,
                 $this->queue,
                 $saslResponse,
-                $mech,
                 $challenge,
-            );
-        } else {
-            # A client-first mechanism that completes in a single round (e.g. EXTERNAL): no challenge loop.
-            $this->activateSecurityLayer(
-                $context,
-                $saslResponse,
-                $mech,
             );
         }
 
@@ -172,7 +165,6 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         SaslBindRequest $request,
         ClientQueue $queue,
         BindResponse $saslResponse,
-        MechanismInterface $mech,
         ChallengeInterface $challenge,
     ): LdapMessageResponse {
         do {
@@ -199,37 +191,30 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         } while (!$this->isChallengeComplete($context, $saslResponse));
 
         if (!$context->isComplete()) {
-            $context = $challenge->challenge(
+            // The server's final message is still verified, such as the DIGEST-MD5 rspauth.
+            $challenge->challenge(
                 $saslResponse->getSaslCredentials(),
                 $request->getOptions(),
             );
         }
 
-        $this->activateSecurityLayer(
-            $context,
-            $saslResponse,
-            $mech,
-        );
-
         return $response;
     }
 
     /**
-     * Installs the negotiated SASL security layer (integrity/privacy) once the bind has succeeded.
+     * Refuses a DIGEST-MD5 bind that asks for an integrity or privacy layer, which is not supported.
+     *
+     * @throws BindException
      */
-    private function activateSecurityLayer(
-        SaslContext $context,
-        BindResponse $saslResponse,
-        MechanismInterface $mech,
-    ): void {
-        if ($saslResponse->getResultCode() !== ResultCode::SUCCESS || !$context->hasSecurityLayer()) {
+    private function refuseSecurityLayer(SaslBindRequest $request): void
+    {
+        $options = $request->getOptions();
+        if (!$options instanceof DigestMD5Options) {
             return;
         }
-
-        $this->queue->setMessageWrapper(new SaslMessageWrapper(
-            $mech->securityLayer(),
-            $context,
-        ));
+        if ($options->isUseIntegrity() || $options->isUsePrivacy()) {
+            throw new BindException('The SASL integrity and privacy layers are not supported. Use TLS instead.');
+        }
     }
 
     private function sendRequestGetResponse(

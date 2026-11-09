@@ -27,10 +27,8 @@ use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
-use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
-use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\Tls\Certificate;
@@ -48,8 +46,6 @@ class LdapQueue extends Asn1MessageQueue
     private const BUFFER_SIZE = 8192;
 
     private int $id = 0;
-
-    private ?MessageWrapperInterface $messageWrapper = null;
 
     private readonly AttributeEntryEncoder $entryEncoder;
 
@@ -125,28 +121,9 @@ class LdapQueue extends Asn1MessageQueue
         return $this->id;
     }
 
-    public function setMessageWrapper(?MessageWrapperInterface $messageWrapper): static
-    {
-        $this->messageWrapper = $messageWrapper;
-
-        return $this;
-    }
-
     public function isConnected(): bool
     {
         return $this->socket->isConnected();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected function unwrap(string $bytes): Buffer
-    {
-        if ($this->messageWrapper === null) {
-            return parent::unwrap($bytes);
-        }
-
-        return $this->messageWrapper->unwrap($bytes);
     }
 
     /**
@@ -192,7 +169,7 @@ class LdapQueue extends Asn1MessageQueue
         foreach ($messages as $message) {
             $encoded = $this->encodeMessage($message);
             $this->onMessageEncoded($encoded);
-            $buffer .= $this->wrapEncoded($encoded);
+            $buffer .= $encoded;
             $buffer = $this->flushFilledChunks($buffer);
         }
 
@@ -271,13 +248,6 @@ class LdapQueue extends Asn1MessageQueue
         }
 
         return  $message;
-    }
-
-    private function wrapEncoded(string $encoded): string
-    {
-        return $this->messageWrapper !== null
-            ? $this->messageWrapper->wrap($encoded)
-            : $encoded;
     }
 
     private function flushFilledChunks(string $buffer): string
