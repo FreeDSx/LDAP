@@ -27,9 +27,10 @@ use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Mechanism\MechanismInterface;
 use FreeDSx\Sasl\Mechanism\MechanismName;
+use FreeDSx\Sasl\Options\DigestMD5Options;
 use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\SaslInterface;
-use FreeDSx\Sasl\Security\SecurityLayerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -226,55 +227,32 @@ final class ClientSaslBindHandlerTest extends TestCase
         );
     }
 
-    public function test_it_should_set_the_set_the_security_layer_on_the_queue_if_one_was_negotiated(): void
+    #[DataProvider('securityLayerOptions')]
+    public function test_it_refuses_a_digest_md5_bind_that_asks_for_a_security_layer(DigestMD5Options $options): void
     {
-        $saslBind = Operations::bindSasl(null, MechanismName::DIGEST_MD5);
-        $messageRequest = new LdapMessageRequest(1, $saslBind);
-
         $this->mockQueue
-            ->method('getMessage')
-            ->willReturnOnConsecutiveCalls(
-                $this->saslChallenge,
-                $this->saslComplete,
-            );
+            ->expects(self::never())
+            ->method('sendMessage');
 
-        $this->mockSasl
-            ->method('get')
-            ->willReturn($this->mockMech);
-        $this->mockMech
-            ->method('getName')
-            ->willReturn(MechanismName::DIGEST_MD5);
-        $this->mockMech
-            ->method('challenge')
-            ->willReturn($this->mockChallenge);
+        $this->expectException(BindException::class);
+        $this->expectExceptionMessage('The SASL integrity and privacy layers are not supported. Use TLS instead.');
 
-        $completedContext = new SaslContext();
-        $completedContext->setResponse('foo');
-        $completedContext->setHasSecurityLayer(true);
-        $completedContext->setIsAuthenticated(true);
-        $completedContext->setIsComplete(true);
+        $this->subject->handleRequest(new LdapMessageRequest(
+            1,
+            Operations::bindSasl(
+                $options,
+                MechanismName::DIGEST_MD5,
+            ),
+        ));
+    }
 
-        $this->mockChallenge
-            ->method('challenge')
-            ->willReturnOnConsecutiveCalls(
-                (new SaslContext())->setResponse('foo'),
-                $completedContext,
-            );
-
-        $mockSecurityLayer = $this->createMock(SecurityLayerInterface::class);
-        $this->mockMech
-            ->method('securityLayer')
-            ->willReturn($mockSecurityLayer);
-
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('setMessageWrapper')
-            ->willReturnSelf();
-
-        self::assertSame(
-            $this->saslComplete,
-            $this->subject->handleRequest($messageRequest),
-        );
+    /**
+     * @return iterable<string, array{DigestMD5Options}>
+     */
+    public static function securityLayerOptions(): iterable
+    {
+        yield 'integrity' => [(new DigestMD5Options())->setUseIntegrity(true)];
+        yield 'privacy' => [(new DigestMD5Options())->setUsePrivacy(true)];
     }
 
     public function test_it_sends_the_initial_response_and_completes_in_a_single_round(): void

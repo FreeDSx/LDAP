@@ -36,11 +36,9 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
-use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Socket\Exception\ConnectionException;
-use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -317,51 +315,6 @@ final class ServerQueueTest extends TestCase
             42,
             $recorder->snapshot()->traffic->bytesReceived,
         );
-    }
-
-    public function test_it_should_set_a_message_wrapper_and_use_it_when_sending_messages(): void
-    {
-        $this->mockEncoder
-            ->method('encode')
-            ->willReturn('foo');
-        $this->mockSocket
-            ->expects($this->once())
-            ->method('write');
-
-        $mockWrapper = $this->createMock(MessageWrapperInterface::class);
-        $mockWrapper->method('wrap')
-            ->with('foo')
-            ->willReturn('bar');
-
-        $this->subject->setMessageWrapper($mockWrapper);
-        $this->subject->sendMessage(new LdapMessageResponse(
-            1,
-            new DeleteResponse(0),
-        ));
-    }
-
-    public function test_it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(): void
-    {
-        $asn1 = Asn1::sequence(
-            Asn1::integer(1),
-            Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
-            new IncompleteType((new LdapEncoder())->encode(Asn1::context(0, Asn1::sequenceOf((new Control('foo'))->toAsn1())))),
-        );
-
-        $this->mockEncoder
-            ->expects($this->once())
-            ->method('decode')
-            ->willReturn($asn1);
-
-        $mockWrapper = $this->createMock(MessageWrapperInterface::class);
-        $mockWrapper
-            ->expects($this->once())
-            ->method('unwrap')
-            ->willReturn(new Buffer('bar', 3));
-
-        $this->subject->setMessageWrapper($mockWrapper);
-
-        $this->subject->getMessage();
     }
 
     public function test_peek_returns_null_when_no_socket_data(): void

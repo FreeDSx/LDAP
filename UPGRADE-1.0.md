@@ -33,6 +33,9 @@ $client->bindSasl($options, MechanismName::DIGEST_MD5);
 $client->bindSasl($options); // auto-select (null)
 ```
 
+The DIGEST-MD5 integrity and privacy security layers are removed. A bind using `setUseIntegrity(true)` or
+`setUsePrivacy(true)` is refused with a `BindException`. Use TLS to protect the connection instead.
+
 ### Client Options
 
 When instantiating the `LdapClient`, options are now an options object instead of an associative array.

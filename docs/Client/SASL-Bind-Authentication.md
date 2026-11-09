@@ -48,8 +48,7 @@ $ldap = new LdapClient(
 $ldap->bindSasl(
     (new DigestMD5Options)
         ->setUsername('user')
-        ->setPassword('12345')
-        ->setUseIntegrity(true),
+        ->setPassword('12345'),
     MechanismName::DIGEST_MD5,
 );
 ```
@@ -104,8 +103,8 @@ $ldap->bindSasl(
 );
 ```
 
-Use `setUseIntegrity(true)` to negotiate an integrity security layer, or `setHost()` to override the host in
-the DIGEST-MD5 digest-uri.
+Use `setHost()` to override the host in the DIGEST-MD5 digest-uri. The integrity and privacy security layers are not
+supported, so a bind that asks for one is refused. Use TLS to protect the connection instead.
 
 ### SCRAM
 
@@ -134,7 +133,6 @@ $ldap->bindSasl(
 | `CramMD5Options`  | `setPassword()`      | `CRAM-MD5`                  | The password.                                          |
 | `DigestMD5Options`| `setUsername()`      | `DIGEST-MD5`                | The username.                                          |
 | `DigestMD5Options`| `setPassword()`      | `DIGEST-MD5`                | The password.                                          |
-| `DigestMD5Options`| `setUseIntegrity()`  | `DIGEST-MD5`                | Negotiate an integrity security layer (`bool`).        |
 | `DigestMD5Options`| `setHost()`          | `DIGEST-MD5`                | Override the host in the digest-uri.                   |
 | `ScramOptions`    | `setUsername()`      | `SCRAM-*`                   | The username.                                          |
 | `ScramOptions`    | `setPassword()`      | `SCRAM-*`                   | The password.                                          |
