@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -41,9 +42,13 @@ use function is_string;
  */
 readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInterface
 {
+    /**
+     * @param int|null $elementBudget the elements a request value may hold, or null for no limit.
+     */
     public function __construct(
         private PasswordModifyService $service,
         private PasswordModifyRequestDecoder $requestDecoder,
+        private ?int $elementBudget = null,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
@@ -123,12 +128,18 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
         try {
             return $this->requestDecoder->decode(
                 $this->valueOf($request),
-                new DecodeContext(),
+                new DecodeContext($this->elementBudget),
             );
         } catch (ProtocolException $e) {
             throw new OperationException(
                 $e->getMessage(),
                 ResultCode::PROTOCOL_ERROR,
+                $e,
+            );
+        } catch (AdminLimitExceededException $e) {
+            throw new OperationException(
+                $e->getDiagnostic(),
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
                 $e,
             );
         }

@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
@@ -20,10 +23,14 @@ use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -294,6 +301,45 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
     }
 
+    public function testASortControlPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredPastTheElementLimit(
+            self::baseSearch(),
+            Controls::sort(...array_fill(
+                0,
+                60_000,
+                new SortKey('cn'),
+            )),
+        );
+    }
+
+    public function testAControlsListPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredPastTheElementLimit(
+            self::baseSearch(),
+            ...array_fill(
+                0,
+                60_000,
+                new Control('1.2.3.4'),
+            ),
+        );
+    }
+
+    public function testAPasswordModifyValuePastTheElementLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredPastTheElementLimit(new ExtendedRequest(
+            ExtendedRequest::OID_PWD_MODIFY,
+            (new LdapEncoder())->encode(Asn1::sequence(...array_fill(
+                0,
+                120_000,
+                Asn1::context(
+                    2,
+                    Asn1::octetString('x'),
+                ),
+            ))),
+        ));
+    }
+
     public function testTheConnectionLimitHoldsAcrossTheWholeServer(): void
     {
         $this->createServerProcess(
@@ -463,6 +509,49 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         $queue->getMessage(1);
 
         return $queue;
+    }
+
+    private function assertAnsweredPastTheElementLimit(
+        RequestInterface $request,
+        Control ...$controls,
+    ): void {
+        $queue = $this->boundRawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                $request,
+                ...$controls,
+            ));
+            self::assertSame(
+                [2 => ResultCode::ADMIN_LIMIT_EXCEEDED],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                ),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                3,
+                self::baseSearch(),
+            ));
+            self::assertSame(
+                [3 => ResultCode::SUCCESS],
+                $this->resultCodesFor(
+                    $queue,
+                    3,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    private static function baseSearch(): SearchRequest
+    {
+        return Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useBaseScope();
     }
 
     private static function filterNestedWithin(int $depth): FilterInterface

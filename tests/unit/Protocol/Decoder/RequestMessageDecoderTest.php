@@ -295,13 +295,56 @@ final class RequestMessageDecoderTest extends TestCase
         );
     }
 
+    public function testAnOperationPastTheElementBudgetIsAnsweredAsAnAdministrativeLimit(): void
+    {
+        $e = $this->decodeFailureOf(
+            self::received(new LdapMessageRequest(
+                9,
+                Operations::search(Filters::and(
+                    Filters::present('cn'),
+                    Filters::present('sn'),
+                ))->base('dc=foo,dc=bar'),
+            )),
+            0,
+        );
+
+        self::assertSame(
+            [9, 3, ResultCode::ADMIN_LIMIT_EXCEEDED],
+            [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
+        );
+    }
+
+    public function testControlsPastTheElementBudgetAreAnsweredAsAnAdministrativeLimit(): void
+    {
+        $e = $this->decodeFailureOf(
+            self::received(new LdapMessageRequest(
+                6,
+                new DeleteRequest('dc=foo,dc=bar'),
+                new Control('1.2.3'),
+                new Control('1.2.4'),
+                new Control('1.2.5'),
+            )),
+            5,
+        );
+
+        self::assertSame(
+            [6, 10, ResultCode::ADMIN_LIMIT_EXCEEDED],
+            [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
+        );
+    }
+
     /**
      * @param AbstractType<mixed> $pdu
      */
-    private function decodeFailureOf(AbstractType $pdu): MessageDecodeException
-    {
+    private function decodeFailureOf(
+        AbstractType $pdu,
+        ?int $elementBudget = null,
+    ): MessageDecodeException {
         try {
-            $this->subject->decode($pdu);
+            $this->subject->decode(
+                $pdu,
+                $elementBudget,
+            );
         } catch (MessageDecodeException $e) {
             return $e;
         }

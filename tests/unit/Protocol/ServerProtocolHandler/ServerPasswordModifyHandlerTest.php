@@ -52,6 +52,8 @@ final class ServerPasswordModifyHandlerTest extends TestCase
 {
     use ServerContainerTrait;
 
+    private const ELEMENT_BUDGET = 10;
+
     private ReadBackendInterface&MockObject $mockBackend;
 
     private WriteHandlerInterface&MockObject $mockWriteHandler;
@@ -89,6 +91,7 @@ final class ServerPasswordModifyHandlerTest extends TestCase
                 ),
             ),
             requestDecoder: $this->fromContainer(PasswordModifyRequestDecoder::class),
+            elementBudget: self::ELEMENT_BUDGET,
         );
     }
 
@@ -221,6 +224,36 @@ final class ServerPasswordModifyHandlerTest extends TestCase
         yield 'an empty value' => [
             '',
         ];
+    }
+
+    public function test_a_value_past_the_element_budget_is_answered_with_admin_limit_exceeded(): void
+    {
+        $this->mockWriteHandler
+            ->expects(self::never())
+            ->method('handle');
+
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(
+                    ExtendedRequest::OID_PWD_MODIFY,
+                    (new LdapEncoder())->encode(Asn1::sequence(...array_fill(
+                        0,
+                        self::ELEMENT_BUDGET + 1,
+                        Asn1::context(
+                            2,
+                            Asn1::octetString('newpass'),
+                        ),
+                    ))),
+                ),
+            ),
+            $this->userToken,
+        );
+
+        self::assertSame(
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $this->singleResponse($stream->messages)->getResultCode(),
+        );
     }
 
     #[DataProvider('singleFieldProvider')]

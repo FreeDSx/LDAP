@@ -42,17 +42,20 @@ abstract readonly class MessageDecoder
 
     /**
      * @param AbstractType<mixed> $pdu
+     * @param int|null $elementBudget the elements the nested parts may hold, or null for no limit.
      * @return TMessage
      * @throws ProtocolException when the envelope cannot be read, which ends the session.
      * @throws MessageDecodeException when anything past the envelope fails, which names the message ID.
      */
-    public function decode(AbstractType $pdu): LdapMessage
-    {
+    public function decode(
+        AbstractType $pdu,
+        ?int $elementBudget = null,
+    ): LdapMessage {
         $envelope = $this->envelopes->read($pdu);
         // An unrecognized operation ends the session before anything is decoded (RFC 4511 4.1.1).
         $decoder = $this->operations[$envelope->operationTag]
             ?? throw $this->envelopes->unsupported($envelope->operationTag);
-        $context = new DecodeContext();
+        $context = new DecodeContext($elementBudget);
 
         [$operation, $controls] = $this->envelopes->answerable(
             $envelope,

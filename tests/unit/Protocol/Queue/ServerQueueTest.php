@@ -15,11 +15,12 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Queue;
 
 use Closure;
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Exception\PduDepthException;
 use FreeDSx\Asn1\Exception\PduElementsException;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
@@ -30,10 +31,12 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
@@ -63,14 +66,14 @@ final class ServerQueueTest extends TestCase
 
     private Socket&MockObject $mockSocket;
 
-    private EncoderInterface&MockObject $mockEncoder;
+    private LdapEncoder&MockObject $mockEncoder;
 
     private RequestMessageDecoder $messageDecoder;
 
     protected function setUp(): void
     {
         $this->mockSocket = $this->createMock(Socket::class);
-        $this->mockEncoder = $this->createMock(EncoderInterface::class);
+        $this->mockEncoder = $this->createMock(LdapEncoder::class);
         $this->messageDecoder = $this->fromContainer(RequestMessageDecoder::class);
 
         $this->mockSocket
@@ -266,7 +269,7 @@ final class ServerQueueTest extends TestCase
     public function test_it_records_bytes_sent_for_each_outgoing_message(): void
     {
         $recorder = new InMemoryMetricsRecorder();
-        $encoder = $this->createMock(EncoderInterface::class);
+        $encoder = $this->createMock(LdapEncoder::class);
         $encoder->method('encode')->willReturn('abcdef');
         $socket = $this->createMock(Socket::class);
 
@@ -290,7 +293,7 @@ final class ServerQueueTest extends TestCase
     public function test_it_records_bytes_received_for_each_decoded_request(): void
     {
         $recorder = new InMemoryMetricsRecorder();
-        $encoder = $this->createMock(EncoderInterface::class);
+        $encoder = $this->createMock(LdapEncoder::class);
         $encoder->method('getLastPosition')->willReturn(42);
         $encoder->expects($this->once())
             ->method('decode')
@@ -766,6 +769,43 @@ final class ServerQueueTest extends TestCase
         );
     }
 
+    public function test_it_should_answer_a_request_whose_nested_parts_run_past_what_the_main_decode_left(): void
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn(self::encodedSortRequest());
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            limits: new RequestLimits(maxElements: 9),
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been answered as past the element limit.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                [5, ResultCode::ADMIN_LIMIT_EXCEEDED],
+                [$e->getMessageId(), $e->getResultCode()],
+            );
+        }
+    }
+
+    public function test_it_should_decode_a_request_whose_nested_parts_fit_what_the_main_decode_left(): void
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn(self::encodedSortRequest());
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            limits: new RequestLimits(maxElements: 10),
+        );
+
+        self::assertSame(
+            5,
+            $queue->getMessage()->getMessageId(),
+        );
+    }
+
     /**
      * @return iterable<string, array{Closure(ServerQueue): mixed}>
      */
@@ -999,5 +1039,20 @@ final class ServerQueueTest extends TestCase
             $this->messageDecoder,
             $encoder,
         );
+    }
+
+    /**
+     * A request holding three elements in its main decode and seven in its controls.
+     */
+    private static function encodedSortRequest(): string
+    {
+        return (new LdapEncoder())->encode((new LdapMessageRequest(
+            5,
+            new DeleteRequest('dc=foo,dc=bar'),
+            new SortingControl(
+                new SortKey('cn'),
+                new SortKey('sn'),
+            ),
+        ))->toAsn1());
     }
 }
