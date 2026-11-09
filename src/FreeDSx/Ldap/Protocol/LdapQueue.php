@@ -15,8 +15,8 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Encoder\EncoderInterface;
-use FreeDSx\Asn1\Encoder\EncoderOptions;
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PduElementsException;
 use FreeDSx\Asn1\Exception\PduLengthException;
 use FreeDSx\Asn1\Helper\AttributeEntryEncoder;
 use FreeDSx\Asn1\Type\SequenceOfType;
@@ -52,11 +52,10 @@ class LdapQueue extends Asn1MessageQueue
     public function __construct(
         Socket $socket,
         ?EncoderInterface $encoder = null,
-        int $maxReceiveSize = 0,
     ) {
         parent::__construct(
             $socket,
-            $encoder ?? new LdapEncoder(new EncoderOptions(maxLength: $maxReceiveSize)),
+            $encoder ?? new LdapEncoder(),
         );
         $this->entryEncoder = new AttributeEntryEncoder();
     }
@@ -136,7 +135,7 @@ class LdapQueue extends Asn1MessageQueue
     {
         try {
             $message = parent::decode($bytes);
-        } catch (PduLengthException $e) {
+        } catch (PduLengthException|PduElementsException $e) {
             throw new RequestSizeExceededException(
                 $e->getMessage(),
                 previous: $e,

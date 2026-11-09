@@ -17,6 +17,7 @@ use Closure;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Exception\PduDepthException;
+use FreeDSx\Asn1\Exception\PduElementsException;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
@@ -36,6 +37,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -715,12 +717,53 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            maxReceiveSize: 100,
+            limits: new RequestLimits(maxSize: 100),
         );
 
         $this->expectException(RequestSizeExceededException::class);
 
         $queue->getMessage();
+    }
+
+    public function test_it_should_refuse_a_request_holding_more_elements_than_the_limit(): void
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn((new LdapEncoder())->encode(
+            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
+        ));
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            limits: new RequestLimits(maxElements: 1),
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been refused.');
+        } catch (RequestSizeExceededException $e) {
+            self::assertInstanceOf(
+                PduElementsException::class,
+                $e->getPrevious(),
+            );
+        }
+    }
+
+    public function test_it_should_decode_a_request_holding_exactly_the_element_limit(): void
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn((new LdapEncoder())->encode(
+            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
+        ));
+        $queue = new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            limits: new RequestLimits(maxElements: 2),
+        );
+
+        self::assertSame(
+            5,
+            $queue->getMessage()->getMessageId(),
+        );
     }
 
     /**
@@ -777,7 +820,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            maxReceiveSize: 5_242_880,
+            limits: new RequestLimits(maxSize: 5_242_880),
         );
 
         self::assertSame(

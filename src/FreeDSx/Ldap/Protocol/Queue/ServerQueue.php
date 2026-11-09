@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -78,14 +79,13 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         Socket $socket,
         private readonly RequestMessageDecoder $messageDecoder,
         ?EncoderInterface $encoder = null,
-        int $maxReceiveSize = 0,
+        RequestLimits $limits = new RequestLimits(),
         array $interceptors = [],
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ) {
         parent::__construct(
             $socket,
-            $encoder,
-            $maxReceiveSize,
+            $encoder ?? new LdapEncoder($limits->encoderOptions()),
         );
         $this->interceptors = $interceptors;
     }
