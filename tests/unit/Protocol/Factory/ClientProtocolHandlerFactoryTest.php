@@ -37,7 +37,6 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSearchHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientStartTlsHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
@@ -76,7 +75,6 @@ final class ClientProtocolHandlerFactoryTest extends TestCase
             $this->mockQueueInstantiator,
             $this->mockRootDseLoader,
             $container->get(TypedExtendedResponseDecoder::class),
-            $container->get(DecodeContextFactory::class),
         );
     }
 

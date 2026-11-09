@@ -27,7 +27,7 @@ final class DecodeContextTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new DecodeContext(new LdapEncoder());
+        $this->subject = new DecodeContext();
     }
 
     public function testItCompletesAnIncompleteTypeAsTheTypeItIsTold(): void

@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -37,7 +37,6 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
     public function __construct(
         ClientQueue $queue,
         private readonly TypedExtendedResponseDecoder $extendedResponses,
-        private readonly DecodeContextFactory $contexts,
     ) {
         parent::__construct($queue);
     }
@@ -117,7 +116,7 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
             $this->extendedResponses->decode(
                 $response,
                 $requestOid,
-                $this->contexts->create(),
+                new DecodeContext(),
             ),
             ...$message->controls()->toArray(),
         );

@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
@@ -40,7 +39,7 @@ final class SortingResponseControlDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(SortingResponseControlDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheResultAndAttribute(): void

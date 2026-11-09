@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
@@ -87,7 +86,6 @@ final class ServerDispatchHandlerTest extends TestCase
                     new Schema(),
                 ),
                 $this->fromContainer(AssertionControlDecoder::class),
-                $this->fromContainer(DecodeContextFactory::class),
             ),
             derived: new DerivedResolver($this->createMock(ReadEntryInterface::class)),
             readEntryControlHandler: new ReadEntryControlHandler(

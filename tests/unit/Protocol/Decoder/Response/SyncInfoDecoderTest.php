@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
 use FreeDSx\Ldap\Operation\Response\SyncInfoMessage;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\SyncInfoDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -41,7 +40,7 @@ final class SyncInfoDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(SyncInfoDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     #[DataProvider('messages')]

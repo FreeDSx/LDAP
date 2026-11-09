@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\ModifyRequestDecoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -38,7 +37,7 @@ final class ModifyRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(ModifyRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheEntryAndItsChanges(): void

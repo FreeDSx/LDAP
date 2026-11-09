@@ -17,7 +17,6 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\AttributeValueAssertionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecodeRun;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
@@ -51,7 +50,7 @@ final class AttributeValueAssertionDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new AttributeValueAssertionDecoder(EqualityFilter::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
         $this->run = new FilterDecodeRun(
             $this->context,
             $this->fromContainer(FilterDecoder::class),

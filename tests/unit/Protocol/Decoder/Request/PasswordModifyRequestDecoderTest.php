@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -36,7 +35,7 @@ final class PasswordModifyRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(PasswordModifyRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     #[DataProvider('requests')]

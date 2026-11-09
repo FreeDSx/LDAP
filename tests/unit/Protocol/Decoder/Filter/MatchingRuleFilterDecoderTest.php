@@ -16,7 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Filter;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecodeRun;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\MatchingRuleFilterDecoder;
@@ -41,7 +41,7 @@ final class MatchingRuleFilterDecoderTest extends TestCase
     {
         $this->subject = $this->fromContainer(MatchingRuleFilterDecoder::class);
         $this->run = new FilterDecodeRun(
-            $this->fromContainer(DecodeContextFactory::class)->create(),
+            new DecodeContext(),
             $this->fromContainer(FilterDecoder::class),
         );
     }

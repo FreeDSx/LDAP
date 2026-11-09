@@ -16,7 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Filter;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecodeRun;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Search\Filters;
@@ -32,7 +32,7 @@ final class FilterDecodeRunTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new FilterDecodeRun(
-            $this->fromContainer(DecodeContextFactory::class)->create(),
+            new DecodeContext(),
             $this->fromContainer(FilterDecoder::class),
         );
     }

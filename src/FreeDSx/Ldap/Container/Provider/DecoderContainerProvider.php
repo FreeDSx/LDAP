@@ -42,7 +42,6 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\SyncDoneControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SyncRequestControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SyncStateControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\VlvResponseControlDecoder;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\AttributeValueAssertionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterSetDecoder;
@@ -93,7 +92,6 @@ final class DecoderContainerProvider implements ContainerProviderInterface
     public function factories(): array
     {
         return [
-            DecodeContextFactory::class => $this->makeDecodeContextFactory(...),
             MessageEnvelopeReader::class => $this->makeMessageEnvelopeReader(...),
             RequestMessageDecoder::class => $this->makeRequestMessageDecoder(...),
             ResponseMessageDecoder::class => $this->makeResponseMessageDecoder(...),
@@ -212,11 +210,6 @@ final class DecoderContainerProvider implements ContainerProviderInterface
         return new ForwardPasswordPolicyStateRequestDecoder(new UuidSyntaxValidator());
     }
 
-    private function makeDecodeContextFactory(): DecodeContextFactory
-    {
-        return new DecodeContextFactory();
-    }
-
     private function makeMessageEnvelopeReader(): MessageEnvelopeReader
     {
         return new MessageEnvelopeReader();
@@ -227,7 +220,6 @@ final class DecoderContainerProvider implements ContainerProviderInterface
         // Keyed by the protocolOp tag RFC 4511 4.2 to 4.12 assigns each request.
         return new RequestMessageDecoder(
             $container->get(MessageEnvelopeReader::class),
-            $container->get(DecodeContextFactory::class),
             [
                 0 => $container->get(BindRequestDecoder::class),
                 2 => $container->get(UnbindRequestDecoder::class),
@@ -249,7 +241,6 @@ final class DecoderContainerProvider implements ContainerProviderInterface
         // Keyed by the protocolOp tag RFC 4511 4.2 to 4.13 assigns each response.
         return new ResponseMessageDecoder(
             $container->get(MessageEnvelopeReader::class),
-            $container->get(DecodeContextFactory::class),
             [
                 1 => $container->get(BindResponseDecoder::class),
                 4 => $container->get(SearchResultEntryDecoder::class),

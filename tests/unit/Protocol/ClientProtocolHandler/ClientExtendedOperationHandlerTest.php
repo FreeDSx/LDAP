@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientExtendedOperationHandler;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -47,7 +46,6 @@ final class ClientExtendedOperationHandlerTest extends TestCase
         $this->subject = new ClientExtendedOperationHandler(
             $this->mockQueue,
             $container->get(TypedExtendedResponseDecoder::class),
-            $container->get(DecodeContextFactory::class),
         );
     }
 

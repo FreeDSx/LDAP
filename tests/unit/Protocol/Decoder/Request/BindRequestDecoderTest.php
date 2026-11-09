@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\BindRequestDecoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +36,7 @@ final class BindRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(BindRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesASimpleBind(): void

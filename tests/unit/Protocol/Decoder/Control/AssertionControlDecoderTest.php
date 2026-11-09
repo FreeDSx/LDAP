@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
@@ -37,7 +36,7 @@ final class AssertionControlDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(AssertionControlDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheFilter(): void

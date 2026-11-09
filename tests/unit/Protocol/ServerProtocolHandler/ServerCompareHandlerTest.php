@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCompareHandler;
@@ -79,7 +78,6 @@ final class ServerCompareHandlerTest extends TestCase
                     new Schema(),
                 ),
                 $this->fromContainer(AssertionControlDecoder::class),
-                $this->fromContainer(DecodeContextFactory::class),
             ),
             withheld: new WithheldAttributePolicy($this->mockAccessControl),
         );

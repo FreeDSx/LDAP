@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\IntermediateResponseDecoder;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -34,7 +33,7 @@ final class IntermediateResponseDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(IntermediateResponseDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheNameAndValue(): void

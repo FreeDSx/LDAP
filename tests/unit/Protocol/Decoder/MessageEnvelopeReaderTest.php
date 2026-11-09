@@ -45,7 +45,7 @@ final class MessageEnvelopeReaderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new MessageEnvelopeReader();
-        $this->context = new DecodeContext(new LdapEncoder());
+        $this->context = new DecodeContext();
         $this->controls = new ControlDecoder([]);
     }
 

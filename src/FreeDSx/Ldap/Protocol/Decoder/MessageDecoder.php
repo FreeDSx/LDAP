@@ -36,7 +36,6 @@ abstract readonly class MessageDecoder
      */
     public function __construct(
         private MessageEnvelopeReader $envelopes,
-        private DecodeContextFactory $contexts,
         private array $operations,
         private ControlDecoderInterface $controls,
     ) {}
@@ -53,7 +52,7 @@ abstract readonly class MessageDecoder
         // An unrecognized operation ends the session before anything is decoded (RFC 4511 4.1.1).
         $decoder = $this->operations[$envelope->operationTag]
             ?? throw $this->envelopes->unsupported($envelope->operationTag);
-        $context = $this->contexts->create();
+        $context = new DecodeContext();
 
         [$operation, $controls] = $this->envelopes->answerable(
             $envelope,

@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
@@ -40,7 +39,7 @@ final class SortingControlDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(SortingControlDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheSortKeys(): void

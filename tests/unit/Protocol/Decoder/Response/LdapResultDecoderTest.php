@@ -22,18 +22,15 @@ use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\LdapResultDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\ResultReferralsTrait;
-use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class LdapResultDecoderTest extends TestCase
 {
     use ResultReferralsTrait;
-    use ServerContainerTrait;
 
     /**
      * @var LdapResultDecoder<SearchResultDone>
@@ -45,7 +42,7 @@ final class LdapResultDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new LdapResultDecoder(SearchResultDone::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheResultCodeDnDiagnosticAndReferrals(): void

@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\PasswordModifyResponseDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\TestCase;
@@ -38,7 +37,7 @@ final class PasswordModifyResponseDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(PasswordModifyResponseDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheGeneratedPasswordAndKeepsTheResult(): void

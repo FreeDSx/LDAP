@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -90,7 +89,6 @@ final class ServerPasswordModifyHandlerTest extends TestCase
                 ),
             ),
             requestDecoder: $this->fromContainer(PasswordModifyRequestDecoder::class),
-            contexts: $this->fromContainer(DecodeContextFactory::class),
         );
     }
 

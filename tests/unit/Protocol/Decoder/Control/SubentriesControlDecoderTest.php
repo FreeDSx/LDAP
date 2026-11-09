@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Control\SubentriesControl;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SubentriesControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
@@ -38,7 +37,7 @@ final class SubentriesControlDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(SubentriesControlDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheVisibility(): void

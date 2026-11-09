@@ -15,7 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Filter;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecodeRun;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\PresentFilterDecoder;
@@ -37,7 +37,7 @@ final class PresentFilterDecoderTest extends TestCase
     {
         $this->subject = $this->fromContainer(PresentFilterDecoder::class);
         $this->run = new FilterDecodeRun(
-            $this->fromContainer(DecodeContextFactory::class)->create(),
+            new DecodeContext(),
             $this->fromContainer(FilterDecoder::class),
         );
     }

@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultEntryDecoder;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
@@ -42,7 +41,7 @@ final class ReadEntryResponseControlDecoderTest extends TestCase
             PostReadResponseControl::class,
             $this->fromContainer(SearchResultEntryDecoder::class),
         );
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheEntry(): void

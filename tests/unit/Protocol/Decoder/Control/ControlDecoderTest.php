@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\PagingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -36,7 +35,7 @@ final class ControlDecoderTest extends TestCase
         $this->subject = new ControlDecoder([
             Control::OID_PAGING => $this->fromContainer(PagingControlDecoder::class),
         ]);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesAControlThroughTheDecoderForItsOid(): void

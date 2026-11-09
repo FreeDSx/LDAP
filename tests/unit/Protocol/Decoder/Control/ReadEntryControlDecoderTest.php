@@ -21,16 +21,13 @@ use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
-use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ReadEntryControlDecoderTest extends TestCase
 {
     use EncodedControlTrait;
-    use ServerContainerTrait;
 
     private ReadEntryControlDecoder $subject;
 
@@ -39,7 +36,7 @@ final class ReadEntryControlDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new ReadEntryControlDecoder(PostReadControl::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheAttributeSelection(): void

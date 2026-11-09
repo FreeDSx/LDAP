@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\ExtendedRequestDecoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -42,7 +41,7 @@ final class ExtendedRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(ExtendedRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesARequestWithNoValue(): void

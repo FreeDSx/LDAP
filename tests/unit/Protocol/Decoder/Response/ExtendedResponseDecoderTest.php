@@ -18,7 +18,6 @@ use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\ExtendedResponseDecoder;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\ResultReferralsTrait;
@@ -36,7 +35,7 @@ final class ExtendedResponseDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(ExtendedResponseDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheResultNameAndValue(): void

@@ -18,7 +18,6 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\ModifyDnRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -38,7 +37,7 @@ final class ModifyDnRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(ModifyDnRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesARenameWithANewSuperior(): void

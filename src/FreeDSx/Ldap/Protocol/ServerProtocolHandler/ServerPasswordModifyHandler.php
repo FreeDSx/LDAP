@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -44,7 +44,6 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
     public function __construct(
         private PasswordModifyService $service,
         private PasswordModifyRequestDecoder $requestDecoder,
-        private DecodeContextFactory $contexts,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
@@ -124,7 +123,7 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
         try {
             return $this->requestDecoder->decode(
                 $this->valueOf($request),
-                $this->contexts->create(),
+                new DecodeContext(),
             );
         } catch (ProtocolException $e) {
             throw new OperationException(

@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\SearchRequestDecoder;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -39,7 +38,7 @@ final class SearchRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(SearchRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesEachFieldOfTheSearch(): void

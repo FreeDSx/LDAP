@@ -18,7 +18,6 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\CompareRequestDecoder;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -38,7 +37,7 @@ final class CompareRequestDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(CompareRequestDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheEntryAndTheAssertion(): void
