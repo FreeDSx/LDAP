@@ -20,6 +20,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
@@ -27,6 +28,7 @@ use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
 use function count;
 use function is_int;
+use function sprintf;
 
 /**
  * Decodes a modify request (RFC 4511 4.6).
@@ -38,8 +40,14 @@ use function is_int;
 readonly class ModifyRequestDecoder implements OperationDecoderInterface
 {
     /**
+     * The most changes a received modify request may hold.
+     */
+    public const MAX_CHANGES = 1000;
+
+    /**
      * @param AbstractType<mixed> $type
      * @throws ProtocolException
+     * @throws AdminLimitExceededException when the request holds more changes than the limit.
      */
     public function decode(
         AbstractType $type,
@@ -53,6 +61,12 @@ readonly class ModifyRequestDecoder implements OperationDecoderInterface
         $changes = $type->getChild(1);
         if (!($dn instanceof OctetStringType && $changes instanceof SequenceType)) {
             throw new ProtocolException('The modify request is malformed');
+        }
+        if (count($changes) > self::MAX_CHANGES) {
+            throw new AdminLimitExceededException(sprintf(
+                'The modify request holds more than %d changes.',
+                self::MAX_CHANGES,
+            ));
         }
 
         $changeList = [];

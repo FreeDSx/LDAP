@@ -16,14 +16,18 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Request;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Request\ModifyRequestDecoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+
+use function array_fill;
 
 final class ModifyRequestDecoderTest extends TestCase
 {
@@ -98,6 +102,48 @@ final class ModifyRequestDecoderTest extends TestCase
         );
     }
 
+    public function testItDecodesARequestHoldingTheMaximumChanges(): void
+    {
+        $modify = self::modifyOf(ModifyRequestDecoder::MAX_CHANGES);
+
+        self::assertEquals(
+            $modify,
+            $this->subject->decode(
+                $modify->toAsn1(),
+                $this->context,
+            ),
+        );
+    }
+
+    public function testItRefusesARequestHoldingMoreThanTheMaximumChangesAsAnAdministrativeLimit(): void
+    {
+        $this->expectException(AdminLimitExceededException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+        $this->expectExceptionMessage('The modify request holds more than 1000 changes.');
+
+        $this->subject->decode(
+            self::modifyOf(ModifyRequestDecoder::MAX_CHANGES + 1)->toAsn1(),
+            $this->context,
+        );
+    }
+
+    public function testItRefusesARequestPastTheMaximumChangesBeforeReadingAnyOfThem(): void
+    {
+        $this->expectException(AdminLimitExceededException::class);
+
+        $this->subject->decode(
+            Asn1::sequence(
+                Asn1::octetString('cn=foo,dc=foo,dc=bar'),
+                Asn1::sequence(...array_fill(
+                    0,
+                    ModifyRequestDecoder::MAX_CHANGES + 1,
+                    Asn1::integer(999),
+                )),
+            ),
+            $this->context,
+        );
+    }
+
     /**
      * @param AbstractType<mixed> $type
      */
@@ -151,5 +197,20 @@ final class ModifyRequestDecoderTest extends TestCase
                 )),
             )],
         ];
+    }
+
+    private static function modifyOf(int $count): ModifyRequest
+    {
+        return new ModifyRequest(
+            'cn=foo,dc=foo,dc=bar',
+            ...array_fill(
+                0,
+                $count,
+                Change::replace(
+                    'description',
+                    'foo',
+                ),
+            ),
+        );
     }
 }

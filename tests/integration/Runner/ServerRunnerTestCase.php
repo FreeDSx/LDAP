@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Request\ModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
@@ -327,7 +328,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 
     public function testASortControlPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
     {
-        $this->assertAnsweredPastTheElementLimit(
+        $this->assertAnsweredAsAnAdministrativeLimit(
             self::baseSearch(),
             Controls::sort(...array_fill(
                 0,
@@ -339,7 +340,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 
     public function testAControlsListPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
     {
-        $this->assertAnsweredPastTheElementLimit(
+        $this->assertAnsweredAsAnAdministrativeLimit(
             self::baseSearch(),
             ...array_fill(
                 0,
@@ -351,7 +352,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 
     public function testAPasswordModifyValuePastTheElementLimitIsAnsweredAndTheSessionContinues(): void
     {
-        $this->assertAnsweredPastTheElementLimit(new ExtendedRequest(
+        $this->assertAnsweredAsAnAdministrativeLimit(new ExtendedRequest(
             ExtendedRequest::OID_PWD_MODIFY,
             (new LdapEncoder())->encode(Asn1::sequence(...array_fill(
                 0,
@@ -361,6 +362,21 @@ abstract class ServerRunnerTestCase extends ServerTestCase
                     Asn1::octetString('x'),
                 ),
             ))),
+        ));
+    }
+
+    public function testAModifyPastTheChangeLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredAsAnAdministrativeLimit(Operations::modify(
+            'cn=user,dc=foo,dc=bar',
+            ...array_fill(
+                0,
+                ModifyRequestDecoder::MAX_CHANGES + 1,
+                Change::replace(
+                    'description',
+                    'x',
+                ),
+            ),
         ));
     }
 
@@ -535,7 +551,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         return $queue;
     }
 
-    private function assertAnsweredPastTheElementLimit(
+    private function assertAnsweredAsAnAdministrativeLimit(
         RequestInterface $request,
         Control ...$controls,
     ): void {
