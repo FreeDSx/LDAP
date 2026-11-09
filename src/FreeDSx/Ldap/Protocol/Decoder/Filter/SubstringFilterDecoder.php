@@ -40,9 +40,11 @@ readonly class SubstringFilterDecoder implements FilterShapeDecoderInterface
         FilterDecodeRun $run,
     ): SubstringFilter {
         if ($type instanceof IncompleteType) {
-            $type = $run->context->complete(
+            // The attribute and the sequence of parts are not items, while a trailing component counts as one.
+            $type = $run->completeWithinItems(
                 $type,
                 AbstractType::TAG_TYPE_SEQUENCE,
+                otherElements: 2,
             );
         }
         if (!($type instanceof SequenceType && count($type->getChildren()) >= 2)) {

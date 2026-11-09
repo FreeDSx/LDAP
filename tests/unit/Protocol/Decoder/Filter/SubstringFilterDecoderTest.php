@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Filter;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecodeRun;
@@ -26,6 +27,8 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\ReceivedAsn1Trait;
 use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+
+use function array_fill;
 
 final class SubstringFilterDecoderTest extends TestCase
 {
@@ -125,6 +128,29 @@ final class SubstringFilterDecoderTest extends TestCase
                 self::received(self::withTrailingComponent($filter->toAsn1())),
                 $this->run,
             ),
+        );
+    }
+
+    public function testItRefusesASubstringFilterOfMorePartsThanTheItemsLeftBeforeReadingAny(): void
+    {
+        $this->expectException(FilterTooWideException::class);
+
+        $this->subject->decode(
+            self::received(Asn1::context(
+                4,
+                Asn1::sequence(
+                    Asn1::octetString('cn'),
+                    Asn1::sequence(
+                        Asn1::octetString('foo'),
+                        ...array_fill(
+                            0,
+                            FilterDecoder::MAX_ITEMS,
+                            self::part(1),
+                        ),
+                    ),
+                ),
+            )),
+            $this->run,
         );
     }
 

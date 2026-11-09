@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Exception;
 
 use FreeDSx\Ldap\Operation\ResultCode;
+use Throwable;
 
 /**
  * Thrown when a received filter holds more items than the server is willing to decode.
@@ -22,11 +23,14 @@ use FreeDSx\Ldap\Operation\ResultCode;
  */
 class FilterTooWideException extends RuntimeException implements AnswerableExceptionInterface
 {
-    public function __construct(string $message)
-    {
+    public function __construct(
+        string $message,
+        ?Throwable $previous = null,
+    ) {
         parent::__construct(
             $message,
             ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $previous,
         );
     }
 

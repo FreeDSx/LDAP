@@ -36,6 +36,11 @@ class DecodeContext
     private readonly LdapEncoder $encoder;
 
     /**
+     * The element cap the encoder holds, or null when it has none.
+     */
+    private ?int $cap = null;
+
+    /**
      * @param int|null $elementsLeft the elements the nested parts may hold, or null for no limit.
      */
     public function __construct(private ?int $elementsLeft = null)
@@ -45,16 +50,19 @@ class DecodeContext
 
     /**
      * @param array<int, array<int, int>> $tagMap
+     * @param int|null $atMost the most elements the type may hold, where 0 still allows one, or null for no limit.
      * @return AbstractType<mixed>
      * @throws EncoderException
+     * @throws PduElementsException when the type holds more elements than asked for before the budget runs out.
      * @throws AdminLimitExceededException when the nested parts hold more elements than the budget.
      */
     public function complete(
         IncompleteType $type,
         int $tagType,
         array $tagMap = [],
+        ?int $atMost = null,
     ): AbstractType {
-        $this->applyBudget();
+        $this->capAt($atMost);
 
         try {
             $completed = $this->encoder->complete(
@@ -63,7 +71,9 @@ class DecodeContext
                 $tagMap,
             );
         } catch (PduElementsException $e) {
-            throw $this->overBudget($e);
+            throw $this->budgetCaps($atMost)
+                ? $this->overBudget($e)
+                : $e;
         }
         $this->charge();
 
@@ -86,7 +96,7 @@ class DecodeContext
         if ($bytes === '') {
             throw new ProtocolException('The data to decode cannot be empty.');
         }
-        $this->applyBudget();
+        $this->capAt(null);
 
         try {
             $decoded = $this->encoder->decode(
@@ -101,17 +111,33 @@ class DecodeContext
         return $decoded;
     }
 
-    private function applyBudget(): void
+    /**
+     * Caps the encoder at the lower of the budget left and the elements asked for.
+     */
+    private function capAt(?int $atMost): void
     {
-        if ($this->elementsLeft === null) {
+        $cap = $this->budgetCaps($atMost)
+            ? $this->elementsLeft
+            : $atMost;
+        if ($cap === $this->cap) {
             return;
         }
+        $this->cap = $cap;
 
-        // A spent budget still allows one element because the encoder reads 0 as unlimited; the charge refuses it.
-        $this->encoder->setOptions(new EncoderOptions(maxElements: max(
-            1,
-            $this->elementsLeft,
-        )));
+        // A cap of 0 allows one element because the encoder reads 0 as unlimited; a spent budget's charge refuses it.
+        $maxElements = $cap === null
+            ? 0
+            : max(
+                1,
+                $cap,
+            );
+        $this->encoder->setOptions(new EncoderOptions(maxElements: $maxElements));
+    }
+
+    private function budgetCaps(?int $atMost): bool
+    {
+        return $this->elementsLeft !== null
+            && ($atMost === null || $this->elementsLeft < $atMost);
     }
 
     /**

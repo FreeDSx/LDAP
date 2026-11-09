@@ -198,6 +198,30 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         );
     }
 
+    public function testASearchFilterPastTheItemLimitIsRefusedBeforeAnyOfItsFiltersIsDecoded(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->search(
+            Operations::search(Filters::or(
+                self::filterNestedWithin(FilterDecoder::MAX_NESTING_DEPTH + 1),
+                ...array_map(
+                    static fn(int $i): FilterInterface => Filters::equal(
+                        'cn',
+                        "absent-{$i}",
+                    ),
+                    range(
+                        1,
+                        FilterDecoder::MAX_ITEMS,
+                    ),
+                ),
+            ))->base('dc=foo,dc=bar'),
+        );
+    }
+
     public function testAnAssertionFilterPastTheItemLimitIsRefusedAsAnAdministrativeLimit(): void
     {
         $this->authenticateUser();
