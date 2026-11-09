@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ProxyAuthorizationControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -34,7 +33,7 @@ final class ProxyAuthorizationControlDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(ProxyAuthorizationControlDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheRawValueAsTheAuthzId(): void

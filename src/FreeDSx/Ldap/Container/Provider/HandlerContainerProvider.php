@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Request\PasswordModifyRequestDecoder;
 use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
@@ -148,7 +147,6 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 passwordPolicyContext: $context->passwordPolicyContext,
             ),
             requestDecoder: $container->get(PasswordModifyRequestDecoder::class),
-            contexts: $container->get(DecodeContextFactory::class),
         );
     }
 

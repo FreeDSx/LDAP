@@ -18,7 +18,6 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\SearchResultEntryDecoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -35,7 +34,7 @@ final class SearchResultEntryDecoderTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(SearchResultEntryDecoder::class);
-        $this->context = $this->fromContainer(DecodeContextFactory::class)->create();
+        $this->context = new DecodeContext();
     }
 
     public function testItDecodesTheEntry(): void

@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
@@ -129,7 +128,6 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             $container->get(AccessControlInterface::class),
             $container->get(LinkedLeafWitness::class),
             $container->get(AssertionControlDecoder::class),
-            $container->get(DecodeContextFactory::class),
         );
     }
 

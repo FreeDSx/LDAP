@@ -28,7 +28,12 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  */
 readonly class DecodeContext
 {
-    public function __construct(private LdapEncoder $encoder) {}
+    private LdapEncoder $encoder;
+
+    public function __construct()
+    {
+        $this->encoder = new LdapEncoder();
+    }
 
     /**
      * @param array<int, array<int, int>> $tagMap

@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
-use FreeDSx\Ldap\Protocol\Decoder\DecodeContextFactory;
 use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
@@ -39,7 +38,6 @@ readonly class ClientProtocolHandlerFactory
         private ClientQueueInstantiator $queueInstantiator,
         private RootDseLoader $rootDseLoader,
         private TypedExtendedResponseDecoder $extendedResponses,
-        private DecodeContextFactory $contexts,
     ) {}
 
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
@@ -95,7 +93,6 @@ readonly class ClientProtocolHandlerFactory
             return new ClientProtocolHandler\ClientExtendedOperationHandler(
                 $this->queue(),
                 $this->extendedResponses,
-                $this->contexts,
             );
         } else {
             return new ClientProtocolHandler\ClientBasicHandler($this->queue());
