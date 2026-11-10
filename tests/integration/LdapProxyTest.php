@@ -20,7 +20,9 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -197,6 +199,58 @@ final class LdapProxyTest extends ServerTestCase
         self::assertTrue($message->controls()->has(Control::OID_PAGING));
     }
 
+    public function testARequestPastTheAnonymousSizeLimitEndsAProxiedSessionWithoutABind(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                self::searchPastTheAnonymousSize(),
+            ));
+            $queue->getMessage();
+            self::fail('The connection ended without a notice of disconnection.');
+        } catch (UnsolicitedNotificationException $e) {
+            self::assertTrue($e->isNoticeOfDisconnection());
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    public function testARequestPastTheAnonymousSizeLimitIsForwardedOnceTheProxiedSessionBinds(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchPastTheAnonymousSize(),
+            ));
+            self::assertSame(
+                [2 => ResultCode::SUCCESS],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     public function testItUpgradesTheDownstreamConnectionWithStartTls(): void
     {
         $this->ldapClient()->startTls();
@@ -323,5 +377,18 @@ final class LdapProxyTest extends ServerTestCase
         }
 
         usleep(300_000);
+    }
+
+    /**
+     * A base search a little over the 256 KiB a session without a bind may send, matching nothing.
+     */
+    private static function searchPastTheAnonymousSize(): SearchRequest
+    {
+        return Operations::search(Filters::equal(
+            'cn',
+            str_repeat('x', 300_000),
+        ))
+            ->base('dc=foo,dc=bar')
+            ->useBaseScope();
     }
 }

@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -43,6 +44,7 @@ trait ServerConnectionScaffoldingTrait
     private function makeServerQueue(
         Socket $socket,
         RequestMessageDecoder $messageDecoder,
+        ServerAuthorization $authorization,
         array $interceptors = [],
         MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ): ServerQueue {
@@ -51,8 +53,10 @@ trait ServerConnectionScaffoldingTrait
         return new ServerQueue(
             $socket,
             $messageDecoder,
-            limits: new RequestLimits(
+            new RequestLimits(
+                authorization: $authorization,
                 maxSize: $networkConfig->getMaxRequestSize(),
+                maxAnonymousSize: $networkConfig->getMaxAnonymousRequestSize(),
                 maxElements: $networkConfig->getMaxRequestElements(),
             ),
             interceptors: $interceptors,

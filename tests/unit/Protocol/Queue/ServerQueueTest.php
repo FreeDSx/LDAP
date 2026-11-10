@@ -17,12 +17,14 @@ use Closure;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\PduDepthException;
 use FreeDSx\Asn1\Exception\PduElementsException;
+use FreeDSx\Asn1\Exception\PduLengthException;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
@@ -32,6 +34,8 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -42,7 +46,11 @@ use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
+use FreeDSx\Ldap\Server\Token\AnonToken;
+use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Socket;
 use Generator;
@@ -51,6 +59,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Protocol\Queue\Response\RecordingInterceptor;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ServerQueueTest extends TestCase
@@ -70,11 +79,17 @@ final class ServerQueueTest extends TestCase
 
     private RequestMessageDecoder $messageDecoder;
 
+    private ServerAuthorization $authorization;
+
+    private RequestLimits $limits;
+
     protected function setUp(): void
     {
         $this->mockSocket = $this->createMock(Socket::class);
         $this->mockEncoder = $this->createMock(LdapEncoder::class);
         $this->messageDecoder = $this->fromContainer(RequestMessageDecoder::class);
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
+        $this->limits = new RequestLimits($this->authorization);
 
         $this->mockSocket
             ->method('read')
@@ -90,6 +105,7 @@ final class ServerQueueTest extends TestCase
         $this->subject = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
+            $this->limits,
             $this->mockEncoder,
         );
     }
@@ -276,6 +292,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
             metricsRecorder: $recorder,
         );
@@ -311,6 +328,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
             metricsRecorder: $recorder,
         );
@@ -330,6 +348,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             new LdapEncoder(),
         );
 
@@ -441,6 +460,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         );
 
@@ -462,6 +482,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             new LdapEncoder(),
         );
 
@@ -480,6 +501,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         );
         $queue->peekForCancelSignal(2);
@@ -524,6 +546,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         );
 
@@ -573,6 +596,7 @@ final class ServerQueueTest extends TestCase
         (new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         ))->sendMessage($response);
 
@@ -609,6 +633,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         );
 
@@ -653,6 +678,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         );
 
@@ -720,7 +746,10 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            limits: new RequestLimits(maxSize: 100),
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxSize: 100,
+            ),
         );
 
         $this->expectException(RequestSizeExceededException::class);
@@ -737,7 +766,10 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            limits: new RequestLimits(maxElements: 1),
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxElements: 1,
+            ),
         );
 
         try {
@@ -760,7 +792,10 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            limits: new RequestLimits(maxElements: 2),
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxElements: 2,
+            ),
         );
 
         self::assertSame(
@@ -776,7 +811,10 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            limits: new RequestLimits(maxElements: 9),
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxElements: 9,
+            ),
         );
 
         try {
@@ -797,7 +835,10 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            limits: new RequestLimits(maxElements: 10),
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxElements: 10,
+            ),
         );
 
         self::assertSame(
@@ -836,6 +877,7 @@ final class ServerQueueTest extends TestCase
             $read(new ServerQueue(
                 $socket,
                 $this->messageDecoder,
+                $this->limits,
                 $encoder,
             ));
             self::fail('The deeply nested request should have been refused.');
@@ -860,13 +902,52 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            limits: new RequestLimits(maxSize: 5_242_880),
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxSize: 5_242_880,
+            ),
         );
 
         self::assertSame(
             5,
             $queue->getMessage()->getMessageId(),
         );
+    }
+
+    public function test_it_should_refuse_a_request_past_the_anonymous_size_until_the_session_binds(): void
+    {
+        $queue = $this->makeQueueWithAnonymousSize(self::encodedSearchPastTheAnonymousSize());
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been refused before the session bound.');
+        } catch (RequestSizeExceededException $e) {
+            self::assertInstanceOf(
+                PduLengthException::class,
+                $e->getPrevious(),
+            );
+        }
+        $this->authorization->setToken(new BindToken(AuthzId::fromDn(new Dn('cn=user,dc=foo,dc=bar'))));
+
+        self::assertSame(
+            5,
+            $queue->getMessage()->getMessageId(),
+        );
+    }
+
+    public function test_it_should_refuse_a_request_past_the_anonymous_size_once_the_bind_is_reset(): void
+    {
+        $queue = $this->makeQueueWithAnonymousSize(str_repeat(
+            self::encodedSearchPastTheAnonymousSize(),
+            2,
+        ));
+        $this->authorization->setToken(new BindToken(AuthzId::fromDn(new Dn('cn=user,dc=foo,dc=bar'))));
+        $queue->getMessage();
+        $this->authorization->setToken(new AnonToken());
+
+        $this->expectException(RequestSizeExceededException::class);
+
+        $queue->getMessage();
     }
 
     public function test_it_applies_interceptors_to_a_sent_message(): void
@@ -881,6 +962,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
+            $this->limits,
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -903,6 +985,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
+            $this->limits,
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -928,6 +1011,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
+            $this->limits,
             $this->mockEncoder,
             interceptors: [
                 new RecordingInterceptor($log, 'a'),
@@ -1021,6 +1105,7 @@ final class ServerQueueTest extends TestCase
         (new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
         ))->sendMessage($message);
 
         return $written;
@@ -1037,8 +1122,39 @@ final class ServerQueueTest extends TestCase
         return new ServerQueue(
             $socket,
             $this->messageDecoder,
+            $this->limits,
             $encoder,
         );
+    }
+
+    private function makeQueueWithAnonymousSize(string $bytes): ServerQueue
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn($bytes);
+
+        return new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            new RequestLimits(
+                authorization: $this->authorization,
+                maxSize: 2_621_440,
+                maxAnonymousSize: 262_144,
+            ),
+        );
+    }
+
+    /**
+     * A search a little over the 256 KiB a session without a bind may send.
+     */
+    private static function encodedSearchPastTheAnonymousSize(): string
+    {
+        return (new LdapEncoder())->encode((new LdapMessageRequest(
+            5,
+            Operations::search(Filters::equal(
+                'cn',
+                str_repeat('a', 300_000),
+            ))->base('dc=foo,dc=bar'),
+        ))->toAsn1());
     }
 
     /**

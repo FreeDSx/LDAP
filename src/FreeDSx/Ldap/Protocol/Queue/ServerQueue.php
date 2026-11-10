@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
@@ -71,7 +72,10 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     private array $deferredMessages = [];
 
-    private readonly LdapEncoder $ldapEncoder;
+    /**
+     * The request size the encoder holds, or null until the first decode sets it.
+     */
+    private ?int $maxSize = null;
 
     /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
@@ -79,12 +83,11 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     public function __construct(
         Socket $socket,
         private readonly RequestMessageDecoder $messageDecoder,
-        ?LdapEncoder $encoder = null,
-        private readonly RequestLimits $limits = new RequestLimits(),
+        private readonly RequestLimits $limits,
+        private readonly LdapEncoder $ldapEncoder = new LdapEncoder(),
         array $interceptors = [],
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ) {
-        $this->ldapEncoder = $encoder ?? new LdapEncoder($limits->encoderOptions());
         parent::__construct(
             $socket,
             $this->ldapEncoder,
@@ -264,6 +267,23 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         $this->metricsRecorder->trafficObserved(new TrafficObservation(
             bytesReceived: (int) $message->getLastPosition(),
         ));
+    }
+
+    /**
+     * Holds the request to the size the session's bind allows when it is read.
+     *
+     * @throws RequestSizeExceededException
+     * @throws ProtocolException
+     */
+    protected function decode(string $bytes): Message
+    {
+        $maxSize = $this->limits->maxSize();
+        if ($maxSize !== $this->maxSize) {
+            $this->maxSize = $maxSize;
+            $this->ldapEncoder->setOptions($this->limits->encoderOptions());
+        }
+
+        return parent::decode($bytes);
     }
 
     /**

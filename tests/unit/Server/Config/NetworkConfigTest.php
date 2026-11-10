@@ -91,6 +91,32 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
+    public function test_max_anonymous_request_size_defaults_to_256_kib(): void
+    {
+        self::assertSame(
+            262_144,
+            $this->subject->getMaxAnonymousRequestSize(),
+        );
+    }
+
+    public function test_it_can_set_max_anonymous_request_size(): void
+    {
+        $this->subject->setMaxAnonymousRequestSize(0);
+
+        self::assertSame(
+            0,
+            $this->subject->getMaxAnonymousRequestSize(),
+        );
+    }
+
+    public function test_it_refuses_a_negative_max_anonymous_request_size(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The anonymous request size limit cannot be negative, but received -1.');
+
+        $this->subject->setMaxAnonymousRequestSize(-1);
+    }
+
     public function test_max_request_elements_defaults_to_one_hundred_thousand(): void
     {
         self::assertSame(

@@ -59,13 +59,14 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         Socket $socket,
         ConnectionContext $context = new ConnectionContext(),
     ): ServerProtocolHandler {
+        $serverAuthorization = new ServerAuthorization($this->options);
         $queue = $this->makeServerQueue(
             $socket,
             $this->messageDecoder,
+            $serverAuthorization,
         );
         $eventLogger = $this->makeEventLogger($context);
         $upstream = new LdapClient($this->proxyOptions->getClientOptions());
-        $serverAuthorization = new ServerAuthorization($this->options);
         $session = new ProxyUpstreamSession(
             client: $upstream,
             useStartTls: $this->proxyOptions->getUseStartTls(),

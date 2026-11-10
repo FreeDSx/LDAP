@@ -14,6 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Queue;
 
 use FreeDSx\Asn1\Encoder\EncoderOptions;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
+
+use function min;
 
 /**
  * The limits a server applies to each request it reads from a client.
@@ -24,21 +28,43 @@ use FreeDSx\Asn1\Encoder\EncoderOptions;
 readonly class RequestLimits
 {
     /**
+     * @param ServerAuthorization $authorization the session whose bind decides which size limit applies.
      * @param int $maxSize the largest request in bytes, or 0 for no limit.
+     * @param int $maxAnonymousSize the largest request in bytes without an authenticated bind, or 0 for no own limit.
      * @param int $maxElements the most ASN.1 elements a request may hold, or 0 for no limit.
      */
     public function __construct(
+        private ServerAuthorization $authorization,
         private int $maxSize = 0,
+        private int $maxAnonymousSize = 0,
         private int $maxElements = 0,
     ) {}
 
     /**
-     * The decoding options that hold a request to these limits.
+     * The largest request in bytes the session may send now, or 0 for no limit.
+     */
+    public function maxSize(): int
+    {
+        if ($this->maxAnonymousSize === 0 || $this->hasAuthenticatedBind()) {
+            return $this->maxSize;
+        }
+        if ($this->maxSize === 0) {
+            return $this->maxAnonymousSize;
+        }
+
+        return min(
+            $this->maxSize,
+            $this->maxAnonymousSize,
+        );
+    }
+
+    /**
+     * The decoding options that hold the session's next request to these limits.
      */
     public function encoderOptions(): EncoderOptions
     {
         return new EncoderOptions(
-            maxLength: $this->maxSize,
+            maxLength: $this->maxSize(),
             maxElements: $this->maxElements,
         );
     }
@@ -53,5 +79,11 @@ readonly class RequestLimits
         }
 
         return $this->maxElements - $elementCount;
+    }
+
+    private function hasAuthenticatedBind(): bool
+    {
+        // The token's kind decides, as a session counts as authenticated whenever authentication is not required.
+        return $this->authorization->getToken() instanceof AuthenticatedTokenInterface;
     }
 }
