@@ -174,6 +174,26 @@ final class DecodeContextTest extends TestCase
         );
     }
 
+    public function testAPartLongEnoughToPassTheBudgetIsRefusedBeforeItIsBuilt(): void
+    {
+        try {
+            $this->subject->complete(
+                self::incompleteSequenceOf(...array_fill(
+                    0,
+                    4,
+                    Asn1::octetString(''),
+                )),
+                AbstractType::TAG_TYPE_SEQUENCE,
+            );
+            self::fail('The part should have been refused.');
+        } catch (AdminLimitExceededException $e) {
+            self::assertInstanceOf(
+                PduElementsException::class,
+                $e->getPrevious(),
+            );
+        }
+    }
+
     public function testWithoutABudgetItDecodesAnyNumberOfElements(): void
     {
         self::assertCount(
@@ -208,10 +228,18 @@ final class DecodeContextTest extends TestCase
 
     private static function incompleteSequence(): IncompleteType
     {
-        $encoded = (new LdapEncoder())->encode(Asn1::sequence(
+        return self::incompleteSequenceOf(
             Asn1::octetString('cn'),
             Asn1::octetString('foo'),
-        ));
+        );
+    }
+
+    /**
+     * @param AbstractType<mixed> ...$children
+     */
+    private static function incompleteSequenceOf(AbstractType ...$children): IncompleteType
+    {
+        $encoded = (new LdapEncoder())->encode(Asn1::sequence(...$children));
 
         return (new IncompleteType(substr(
             $encoded,
