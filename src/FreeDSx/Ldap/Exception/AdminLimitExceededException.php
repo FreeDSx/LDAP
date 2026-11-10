@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use Throwable;
 
 /**
- * Thrown when a received request is past a limit the server sets on what it will decode.
+ * Thrown when a received request is past a limit the server set.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

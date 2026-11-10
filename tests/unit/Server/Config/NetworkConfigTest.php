@@ -91,6 +91,14 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
+    public function test_it_refuses_a_negative_max_request_size(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The request size limit cannot be negative, but received -1.');
+
+        $this->subject->setMaxRequestSize(-1);
+    }
+
     public function test_max_anonymous_request_size_defaults_to_256_kib(): void
     {
         self::assertSame(

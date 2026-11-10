@@ -110,6 +110,19 @@ $ldap = new LdapServer(
 );
 ```
 
+## Request Limits
+
+A client without an authenticated bind may send requests of at most 256 KiB, and a larger one ends its connection. If
+clients write large entries without binding, raise or disable the limit:
+
+```php
+$options->getNetworkConfig()->setMaxAnonymousRequestSize(0);
+```
+
+A modify request may hold at most 1,000 changes, and every request is held to an ASN.1 element limit (100,000 by
+default). See
+[Configuration](docs/Server/Configuration.md#setmaxrequestsize).
+
 ## Constructing a Proxy Server
 
 A proxy is now a dedicated `LdapProxyServer` constructed with a single `ProxyOptions` object, instead of

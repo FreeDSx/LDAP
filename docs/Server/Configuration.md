@@ -17,6 +17,8 @@ LDAP Server Configuration
     * [NetworkConfig:setSocketAcceptTimeout](#setsocketaccepttimeout)
     * [NetworkConfig:setMaxConnections](#setmaxconnections)
     * [NetworkConfig:setMaxRequestSize](#setmaxrequestsize)
+    * [NetworkConfig:setMaxAnonymousRequestSize](#setmaxanonymousrequestsize)
+    * [NetworkConfig:setMaxRequestElements](#setmaxrequestelements)
     * [TLS](#tls)
         * [NetworkConfig:setUseSsl](#setusessl)
         * [NetworkConfig:setSslCert](#setsslcert)
@@ -341,13 +343,50 @@ The largest request, in bytes, the server reads from a client. A larger request 
 disconnection (protocolError) and the connection is closed, which `connectionsRequestSizeExceeded` in
 [cn=monitor](Monitoring.md) counts. The proxy server applies it the same way. Set `0` for no limit.
 
+Until a client completes an authenticated bind, the smaller
+[setMaxAnonymousRequestSize](#setmaxanonymousrequestsize) applies instead.
+
 ```php
 $options->getNetworkConfig()->setMaxRequestSize(1_048_576);
 ```
 
-Raising it also raises the memory a single request can cost a worker.
+Raising it also raises the memory a single request can cost a worker. A request is held to
+[setMaxRequestElements](#setmaxrequestelements) as well, which a large request of many small values may reach first.
 
 **Default**: `2621440` (2.5 MiB)
+
+------------------
+#### setMaxAnonymousRequestSize
+
+The largest request, in bytes, the server reads from a client without an authenticated bind. This covers a client that
+has not bound, one that bound anonymously, and one whose last bind failed. A larger request is handled the same way as
+one past [setMaxRequestSize](#setmaxrequestsize), which still applies when it is the smaller of the two. Set `0` to
+apply only `setMaxRequestSize`.
+
+```php
+$options->getNetworkConfig()->setMaxAnonymousRequestSize(0);
+```
+
+Set it to `0`, or raise it, if clients write large entries without binding.
+
+**Default**: `262144` (256 KiB)
+
+------------------
+#### setMaxRequestElements
+
+The most ASN.1 elements a request may hold. A request with more is answered with a notice of disconnection
+(protocolError) and the connection is closed, which `connectionsRequestSizeExceeded` in [cn=monitor](Monitoring.md)
+counts. When the extra elements are inside a filter, a control, SASL bind credentials or an extended operation's value,
+the request is answered with `ADMIN_LIMIT_EXCEEDED` instead and the connection stays open. Set `0` for no limit.
+
+```php
+$options->getNetworkConfig()->setMaxRequestElements(200_000);
+```
+
+At the default, one request can carry about 100,000 attribute values. Raise it along with
+[setMaxRequestSize](#setmaxrequestsize) if clients send more.
+
+**Default**: `100000`
 
 ### TLS
 
@@ -778,6 +817,8 @@ stricter value wins. A server value of `0` means no server-side cap.
 A received filter, in a search or an assertion control, has two fixed limits. It may hold at most 1,000 items, each part
 of a substring item and each empty AND or OR counting as one, and a wider filter is refused with `ADMIN_LIMIT_EXCEEDED`.
 It may nest at most 30 levels of AND, OR and NOT, and a deeper filter is refused with `UNWILLING_TO_PERFORM`.
+
+A received modify request may hold at most 1,000 changes, and one with more is refused with `ADMIN_LIMIT_EXCEEDED`.
 
 ------------------
 #### setMaxSearchSize

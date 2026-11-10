@@ -221,9 +221,14 @@ final class NetworkConfig
 
     /**
      * @param int $maxRequestSize the size in bytes, or 0 to disable the limit.
+     * @throws InvalidArgumentException when the limit is negative
      */
     public function setMaxRequestSize(int $maxRequestSize): self
     {
+        self::assertNotNegative(
+            $maxRequestSize,
+            'The request size limit',
+        );
         $this->maxRequestSize = $maxRequestSize;
 
         return $this;

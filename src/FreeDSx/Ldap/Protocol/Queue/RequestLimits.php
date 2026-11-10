@@ -59,12 +59,12 @@ readonly class RequestLimits
     }
 
     /**
-     * The decoding options that hold the session's next request to these limits.
+     * The decoding options that hold a request to the given size and the element limit.
      */
-    public function encoderOptions(): EncoderOptions
+    public function encoderOptions(int $maxSize): EncoderOptions
     {
         return new EncoderOptions(
-            maxLength: $this->maxSize(),
+            maxLength: $maxSize,
             maxElements: $this->maxElements,
         );
     }

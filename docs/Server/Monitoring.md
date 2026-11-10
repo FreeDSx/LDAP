@@ -54,7 +54,7 @@ off rather than returned empty.
 | `connectionsTotal` | Connections accepted since start. |
 | `connectionsRejected` | Connections turned away at the connection limit. |
 | `connectionsWriteTimeouts`, `connectionsIdleTimeouts` | Connections closed by the write or idle timeout. |
-| `connectionsRequestSizeExceeded` | Connections dropped because a request exceeded `setMaxRequestSize`. |
+| `connectionsRequestSizeExceeded` | Connections dropped because a request exceeded `setMaxRequestSize`, `setMaxAnonymousRequestSize` or `setMaxRequestElements`. |
 | `connectionsProtocolErrors` | Connections dropped by a malformed/undecodable request PDU (Notice of Disconnection). |
 | `connectionsUnavailable` | Connections dropped because the connection the session depended on was lost (Notice of Disconnection). On a proxy this counts sessions ended with their upstream. |
 | `journalPruneSuccesses`, `journalPruneFailures` | Change-journal retention sweeps that completed or threw. |

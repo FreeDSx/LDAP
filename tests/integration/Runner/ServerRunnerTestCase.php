@@ -19,12 +19,14 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -435,6 +437,93 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         ));
     }
 
+    public function testABindPastTheElementLimitLeavesTheSessionAnonymous(): void
+    {
+        $client = $this->buildClient('tcp');
+        $client->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        try {
+            $client->sendAndReceive(
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+                ...array_fill(
+                    0,
+                    60_000,
+                    new Control('1.2.3.4'),
+                ),
+            );
+            self::fail('The bind was accepted past the element limit.');
+        } catch (BindException $e) {
+            self::assertSame(
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            '',
+            $client->whoami(),
+        );
+    }
+
+    public function testASaslContinuationPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--sasl'],
+        );
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            self::assertSame(
+                [1 => ResultCode::SASL_BIND_IN_PROGRESS],
+                $this->resultCodesFor(
+                    $queue,
+                    1,
+                ),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new SaslBindRequest(
+                    'CRAM-MD5',
+                    'cn=user,dc=foo,dc=bar 00000000000000000000000000000000',
+                ),
+                ...self::controlsPastTheElementLimitWithinTheAnonymousSize(),
+            ));
+            self::assertSame(
+                [2 => ResultCode::ADMIN_LIMIT_EXCEEDED],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                ),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                3,
+                Operations::read(''),
+            ));
+            self::assertSame(
+                [3 => ResultCode::SUCCESS],
+                $this->resultCodesFor(
+                    $queue,
+                    3,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     public function testTheConnectionLimitHoldsAcrossTheWholeServer(): void
     {
         $this->createServerProcess(
@@ -678,10 +767,27 @@ abstract class ServerRunnerTestCase extends ServerTestCase
     {
         return Operations::search(Filters::equal(
             'cn',
-            str_repeat('x', 300_000),
+            str_repeat(
+                'x',
+                300_000,
+            ),
         ))
             ->base('dc=foo,dc=bar')
             ->useBaseScope();
+    }
+
+    /**
+     * Controls past the element limit that stay within the size a session without a bind may send.
+     *
+     * @return list<Control>
+     */
+    private static function controlsPastTheElementLimitWithinTheAnonymousSize(): array
+    {
+        return array_fill(
+            0,
+            55_000,
+            new Control(''),
+        );
     }
 
     private static function filterNestedWithin(int $depth): FilterInterface

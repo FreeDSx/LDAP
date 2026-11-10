@@ -19,19 +19,29 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Server\Token\AnonToken;
+use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class DecodeFailureResponderTest extends TestCase
 {
     private ServerQueue&MockObject $queue;
+
+    private ServerAuthorization $authorization;
 
     private DecodeFailureResponder $subject;
 
     protected function setUp(): void
     {
         $this->queue = $this->createMock(ServerQueue::class);
-        $this->subject = new DecodeFailureResponder($this->queue);
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
+        $this->subject = new DecodeFailureResponder(
+            $this->queue,
+            $this->authorization,
+        );
     }
 
     public function test_a_malformed_request_is_answered_on_its_message_id(): void
@@ -65,5 +75,40 @@ final class DecodeFailureResponderTest extends TestCase
             3,
             'The search request is malformed.',
         )));
+    }
+
+    public function test_a_bind_that_fails_to_decode_leaves_the_session_anonymous(): void
+    {
+        $this->authorization->setToken(BindToken::fromDn('cn=user,dc=foo,dc=bar'));
+
+        $this->subject->answer(new MessageDecodeException(
+            2,
+            0,
+            'The request holds more elements than the server allows.',
+            resultCode: ResultCode::ADMIN_LIMIT_EXCEEDED,
+        ));
+
+        self::assertInstanceOf(
+            AnonToken::class,
+            $this->authorization->getToken(),
+        );
+    }
+
+    public function test_another_request_that_fails_to_decode_keeps_the_sessions_bind(): void
+    {
+        $token = BindToken::fromDn('cn=user,dc=foo,dc=bar');
+        $this->authorization->setToken($token);
+
+        $this->subject->answer(new MessageDecodeException(
+            2,
+            3,
+            'The request holds more elements than the server allows.',
+            resultCode: ResultCode::ADMIN_LIMIT_EXCEEDED,
+        ));
+
+        self::assertSame(
+            $token,
+            $this->authorization->getToken(),
+        );
     }
 }

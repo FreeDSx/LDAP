@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
@@ -29,6 +30,7 @@ use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -40,12 +42,14 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
@@ -476,6 +480,100 @@ final class SaslExchangeTest extends TestCase
         $this->subject->run($this->makeInput());
     }
 
+    public function test_a_continuation_that_fails_to_decode_is_answered_on_its_own_message_id(): void
+    {
+        $sent = [];
+
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$sent): ServerQueue {
+                $sent[] = $response;
+
+                return $this->mockQueue;
+            });
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willThrowException(new MessageDecodeException(
+                2,
+                0,
+                'The request holds more elements than the server allows.',
+                resultCode: ResultCode::ADMIN_LIMIT_EXCEEDED,
+            ));
+
+        try {
+            $this->subject->run($this->makeInput());
+            self::fail('The continuation was not answered.');
+        } catch (ResponseAlreadySentException $e) {
+            self::assertSame(
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e->getCode(),
+            );
+        }
+
+        $answer = $sent[1]->getResponse();
+        self::assertSame(
+            2,
+            $sent[1]->getMessageId(),
+        );
+        self::assertInstanceOf(
+            BindResponse::class,
+            $answer,
+        );
+        self::assertSame(
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $answer->getResultCode(),
+        );
+    }
+
+    #[DataProvider('unanswerableDecodeFailures')]
+    public function test_a_message_mid_exchange_that_fails_to_decode_unanswerably_ends_the_session(
+        MessageDecodeException $failure,
+    ): void {
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willThrowException($failure);
+
+        $this->expectExceptionObject($failure);
+
+        $this->subject->run($this->makeInput());
+    }
+
+    /**
+     * @return array<string, array{MessageDecodeException}>
+     */
+    public static function unanswerableDecodeFailures(): array
+    {
+        return [
+            'an abandon' => [
+                new MessageDecodeException(
+                    2,
+                    16,
+                    'The abandon request is malformed.',
+                ),
+            ],
+            'message ID 0' => [
+                new MessageDecodeException(
+                    0,
+                    0,
+                    'The bind request is malformed.',
+                ),
+            ],
+        ];
+    }
+
     /**
      * @return array<string, array{RequestInterface, string}>
      */
@@ -634,6 +732,10 @@ final class SaslExchangeTest extends TestCase
     {
         return new SaslExchange(
             queue: $this->mockQueue,
+            decodeFailures: new DecodeFailureResponder(
+                $this->mockQueue,
+                $this->fromContainer(ServerAuthorization::class),
+            ),
             responseFactory: new ResponseFactory(),
             optionsBuilderFactory: new MechanismOptionsBuilderFactory(
                 $authenticator,

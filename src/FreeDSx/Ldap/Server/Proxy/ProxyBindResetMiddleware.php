@@ -18,9 +18,10 @@ use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
+use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 
 /**
- * Ends the upstream session for a bind the proxy did not carry through.
+ * Ends the upstream session whenever the proxied session holds no authenticated bind.
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
@@ -39,6 +40,9 @@ final readonly class ProxyBindResetMiddleware implements MiddlewareInterface
         ServerRequestContext $context,
         MiddlewareHandlerInterface $next,
     ): ResponseStream {
+        // A bind refused before it reached the pipeline leaves the session anonymous while the upstream stays bound.
+        $this->resetWithoutBind();
+
         if (!$this->authorization->isAuthenticationRequest($context->message->getRequest())) {
             return $next->handle($context);
         }
@@ -46,10 +50,18 @@ final readonly class ProxyBindResetMiddleware implements MiddlewareInterface
         try {
             return $next->handle($context);
         } finally {
-            // RFC 4511 §4.2.1 leaves a session anonymous when its bind does not succeed.
-            if (!$this->authorization->isAuthenticated()) {
-                $this->session->reset();
-            }
+            // RFC 4513 §4 leaves a session anonymous when its bind does not succeed.
+            $this->resetWithoutBind();
         }
+    }
+
+    private function resetWithoutBind(): void
+    {
+        // The token's kind decides, as a session counts as authenticated whenever authentication is not required.
+        if ($this->authorization->getToken() instanceof AuthenticatedTokenInterface) {
+            return;
+        }
+
+        $this->session->reset();
     }
 }

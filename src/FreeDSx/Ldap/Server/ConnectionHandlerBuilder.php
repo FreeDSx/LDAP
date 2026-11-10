@@ -149,6 +149,11 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             $interceptors,
             $metricsRecorder,
         );
+        $decodeFailures = new DecodeFailureResponder(
+            $serverQueue,
+            $authorization,
+            $eventLogger,
+        );
 
         $authzIdResolver = new AuthzIdResolver(
             $this->container->get(AccessControlInterface::class),
@@ -174,6 +179,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         if (!empty($saslMechanisms)) {
             $authenticators[] = $this->makeSaslBind(
                 $serverQueue,
+                $decodeFailures,
                 $eventLogger,
                 $passwordAuthenticator,
                 $authzIdResolver,
@@ -198,6 +204,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             queue: $serverQueue,
             requestPipeline: $this->makeRequestPipeline(
                 $serverQueue,
+                $decodeFailures,
                 $eventLogger,
                 $authorization,
                 $authenticators,
@@ -210,10 +217,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $serverQueue,
                 $eventLogger,
             ),
-            decodeFailures: new DecodeFailureResponder(
-                $serverQueue,
-                $eventLogger,
-            ),
+            decodeFailures: $decodeFailures,
             eventLogger: $eventLogger,
             connectionContext: $context,
         );
@@ -244,6 +248,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
 
     private function makeSaslBind(
         ServerQueue $queue,
+        DecodeFailureResponder $decodeFailures,
         EventLogger $eventLogger,
         PasswordAuthenticatableInterface $authenticator,
         AuthzIdResolver $authzIdResolver,
@@ -256,6 +261,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             queue: $queue,
             exchange: new SaslExchange(
                 $queue,
+                $decodeFailures,
                 $responseFactory,
                 $this->makeOptionsBuilderFactory(
                     $authenticator,
@@ -383,6 +389,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
      */
     private function makeRequestPipeline(
         ServerQueue $queue,
+        DecodeFailureResponder $decodeFailures,
         EventLogger $eventLogger,
         ServerAuthorization $authorization,
         array $authenticators,
@@ -429,10 +436,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 new ResponseWriterMiddleware(
                     new ResponseWriter(
                         $queue,
-                        new DecodeFailureResponder(
-                            $queue,
-                            $eventLogger,
-                        ),
+                        $decodeFailures,
                         new OutOfSequenceResponder(
                             $queue,
                             $eventLogger,

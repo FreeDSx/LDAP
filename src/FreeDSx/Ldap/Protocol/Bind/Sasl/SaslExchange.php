@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
@@ -33,6 +34,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\UsernameExtractor\SaslUsernameExtractorFactory;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -61,6 +63,7 @@ final class SaslExchange
 
     public function __construct(
         private readonly ServerQueue $queue,
+        private readonly DecodeFailureResponder $decodeFailures,
         private readonly ResponseFactory $responseFactory,
         private readonly MechanismOptionsBuilderFactory $optionsBuilderFactory,
         private readonly AuthzIdResolver $authzIdResolver,
@@ -391,11 +394,13 @@ final class SaslExchange
      * Reads the next message of the exchange, passing over an abandon since RFC 4511 4.11 makes a bind unabandonable.
      *
      * @throws RequestValidationException if a message carries an unusable message ID.
+     * @throws ResponseAlreadySentException when a message that fails to decode is answered on its own ID.
+     * @throws MessageDecodeException when a message that fails to decode cannot be answered.
      */
     private function nextMessage(): LdapMessageRequest
     {
         do {
-            $message = $this->queue->getMessage();
+            $message = $this->readMessage();
 
             // Continuations skip the validation middleware, and the challenge echoes back whatever ID arrives.
             if ($message->getMessageId() === 0) {
@@ -404,6 +409,28 @@ final class SaslExchange
         } while ($message->getRequest() instanceof AbandonRequest);
 
         return $message;
+    }
+
+    /**
+     * @throws ResponseAlreadySentException when a message that fails to decode is answered on its own ID.
+     * @throws MessageDecodeException when a message that fails to decode cannot be answered.
+     */
+    private function readMessage(): LdapMessageRequest
+    {
+        try {
+            return $this->queue->getMessage();
+        } catch (MessageDecodeException $e) {
+            if (!$this->decodeFailures->answer($e)) {
+                throw $e;
+            }
+
+            // The bind ends with the message that broke it, which is already answered.
+            throw new ResponseAlreadySentException(
+                $e->getMessage(),
+                $e->getResultCode(),
+                $e,
+            );
+        }
     }
 
     /**

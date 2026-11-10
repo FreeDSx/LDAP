@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
@@ -65,6 +66,7 @@ use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class ServerSearchHandlerTest extends TestCase
 {
@@ -1327,7 +1329,10 @@ final class ServerSearchHandlerTest extends TestCase
 
         return (new ResponseWriter(
             $this->mockQueue,
-            new DecodeFailureResponder($this->mockQueue),
+            new DecodeFailureResponder(
+                $this->mockQueue,
+                new ServerAuthorization(TestServerOptions::defaults()),
+            ),
             new OutOfSequenceResponder($this->mockQueue),
         ))->write(
             $stream,

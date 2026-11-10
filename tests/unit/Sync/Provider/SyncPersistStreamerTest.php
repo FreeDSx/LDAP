@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -457,7 +458,10 @@ final class SyncPersistStreamerTest extends TestCase
 
         (new ResponseWriter(
             $this->queue,
-            new DecodeFailureResponder($this->queue),
+            new DecodeFailureResponder(
+                $this->queue,
+                $this->fromContainer(ServerAuthorization::class),
+            ),
             new OutOfSequenceResponder($this->queue),
         ))->write(
             $stream,

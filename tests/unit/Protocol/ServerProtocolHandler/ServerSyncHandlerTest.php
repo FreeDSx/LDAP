@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSyncHandler;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
@@ -739,7 +740,10 @@ final class ServerSyncHandlerTest extends TestCase
     ): OperationResult {
         return (new ResponseWriter(
             $this->queue,
-            new DecodeFailureResponder($this->queue),
+            new DecodeFailureResponder(
+                $this->queue,
+                $this->fromContainer(ServerAuthorization::class),
+            ),
             new OutOfSequenceResponder($this->queue),
         ))->write(
             $handler->handleRequest(

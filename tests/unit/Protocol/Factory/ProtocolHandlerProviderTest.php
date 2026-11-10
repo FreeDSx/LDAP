@@ -13,17 +13,22 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Factory;
 
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCompareHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
@@ -41,6 +46,7 @@ use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Token\BindToken;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -68,6 +74,51 @@ final class ProtocolHandlerProviderTest extends TestCase
                 Operations::extended(ExtendedRequest::OID_PWD_MODIFY),
                 new ControlBag(),
             ),
+        );
+    }
+
+    public function test_a_password_modify_handler_decodes_any_request_when_the_element_limit_is_off(): void
+    {
+        $options = TestServerOptions::defaults();
+        $options->getNetworkConfig()->setMaxRequestElements(0);
+        $container = Container::forServer($options);
+        $handler = (new ProtocolHandlerProvider(
+            routeResolver: $container->get(ServerProtocolHandlerFactory::class),
+            factories: $container->get(ProtocolHandlerFactoryMap::class),
+            context: $this->handlerContext(),
+        ))->get(
+            Operations::extended(ExtendedRequest::OID_PWD_MODIFY),
+            new ControlBag(),
+        );
+
+        $messages = [...$handler->handleRequest(
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(
+                    ExtendedRequest::OID_PWD_MODIFY,
+                    (new LdapEncoder())->encode(Asn1::sequence(
+                        Asn1::context(
+                            1,
+                            Asn1::octetString('12345'),
+                        ),
+                        Asn1::context(
+                            2,
+                            Asn1::octetString('newpass'),
+                        ),
+                    )),
+                ),
+            ),
+            BindToken::fromDn('cn=user,dc=foo,dc=bar'),
+        )->messages];
+        $response = $messages[0]->getResponse();
+
+        self::assertInstanceOf(
+            LdapResult::class,
+            $response,
+        );
+        self::assertNotSame(
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $response->getResultCode(),
         );
     }
 
