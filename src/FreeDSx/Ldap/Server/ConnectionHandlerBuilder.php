@@ -139,9 +139,13 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             $interceptors[] = $this->container->get(MetricsResponseInterceptor::class);
         }
 
+        // Per connection: the bound-token state must not be shared across connections (e.g., coroutines).
+        $authorization = new ServerAuthorization($options);
+
         $serverQueue = $this->makeServerQueue(
             $socket,
             $this->container->get(RequestMessageDecoder::class),
+            $authorization,
             $interceptors,
             $metricsRecorder,
         );
@@ -176,9 +180,6 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $policyContext,
             );
         }
-
-        // Per connection: the bound-token state must not be shared across connections (e.g., coroutines).
-        $authorization = new ServerAuthorization($options);
 
         $dispatchAuthorizer = new DispatchAuthorizer(
             $authorization,

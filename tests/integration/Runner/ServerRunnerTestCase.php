@@ -45,6 +45,7 @@ use function array_fill;
 use function array_map;
 use function extension_loaded;
 use function range;
+use function str_repeat;
 
 /**
  * Behavior that runs against every server runner.
@@ -326,6 +327,60 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
     }
 
+    public function testARequestPastTheAnonymousSizeLimitEndsASessionWithoutABind(): void
+    {
+        $this->assertASearchPastTheAnonymousSizeEndsTheSession(
+            $this->rawQueue(),
+            1,
+        );
+    }
+
+    public function testARequestPastTheAnonymousSizeLimitEndsASessionThatRebindsAnonymously(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--allow-anonymous'],
+        );
+        $queue = $this->boundRawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            2,
+            Operations::bindAnonymously(),
+        ));
+        self::assertSame(
+            [2 => ResultCode::SUCCESS],
+            $this->resultCodesFor(
+                $queue,
+                2,
+            ),
+        );
+
+        $this->assertASearchPastTheAnonymousSizeEndsTheSession(
+            $queue,
+            3,
+        );
+    }
+
+    public function testARequestPastTheAnonymousSizeLimitIsAnsweredOnceTheSessionBinds(): void
+    {
+        $queue = $this->boundRawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchPastTheAnonymousSize(),
+            ));
+            self::assertSame(
+                [2 => ResultCode::SUCCESS],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                ),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     public function testASortControlPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
     {
         $this->assertAnsweredAsAnAdministrativeLimit(
@@ -587,9 +642,44 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
     }
 
+    private function assertASearchPastTheAnonymousSizeEndsTheSession(
+        ClientQueue $queue,
+        int $messageId,
+    ): void {
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                $messageId,
+                self::searchPastTheAnonymousSize(),
+            ));
+            $queue->getMessage();
+            self::fail('The connection ended without a notice of disconnection.');
+        } catch (UnsolicitedNotificationException $e) {
+            self::assertTrue($e->isNoticeOfDisconnection());
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
     private static function baseSearch(): SearchRequest
     {
         return Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useBaseScope();
+    }
+
+    /**
+     * A base search a little over the 256 KiB a session without a bind may send, matching nothing.
+     */
+    private static function searchPastTheAnonymousSize(): SearchRequest
+    {
+        return Operations::search(Filters::equal(
+            'cn',
+            str_repeat('x', 300_000),
+        ))
             ->base('dc=foo,dc=bar')
             ->useBaseScope();
     }

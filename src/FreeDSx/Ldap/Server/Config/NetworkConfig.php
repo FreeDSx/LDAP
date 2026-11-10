@@ -56,6 +56,11 @@ final class NetworkConfig
     private int $maxRequestSize = 2_621_440;
 
     /**
+     * The largest request PDU accepted without an authenticated bind, in bytes (256 KiB); 0 disables the limit.
+     */
+    private int $maxAnonymousRequestSize = 262_144;
+
+    /**
      * The most ASN.1 elements an incoming request may hold; 0 disables the limit.
      */
     private int $maxRequestElements = 100_000;
@@ -154,6 +159,9 @@ final class NetworkConfig
         return $this->idleTimeout;
     }
 
+    /**
+     * @param int $idleTimeout the time in seconds, or -1 to never time out.
+     */
     public function setIdleTimeout(int $idleTimeout): self
     {
         $this->idleTimeout = $idleTimeout;
@@ -166,6 +174,9 @@ final class NetworkConfig
         return $this->writeTimeout;
     }
 
+    /**
+     * @param int $writeTimeout the time in seconds, or 0 to disable the timeout.
+     */
     public function setWriteTimeout(int $writeTimeout): self
     {
         $this->writeTimeout = $writeTimeout;
@@ -178,6 +189,9 @@ final class NetworkConfig
         return $this->socketAcceptTimeout;
     }
 
+    /**
+     * @param float $socketAcceptTimeout the time in seconds, which may be fractional.
+     */
     public function setSocketAcceptTimeout(float $socketAcceptTimeout): self
     {
         $this->socketAcceptTimeout = $socketAcceptTimeout;
@@ -190,6 +204,9 @@ final class NetworkConfig
         return $this->shutdownTimeout;
     }
 
+    /**
+     * @param int $shutdownTimeout the time in seconds.
+     */
     public function setShutdownTimeout(int $shutdownTimeout): self
     {
         $this->shutdownTimeout = $shutdownTimeout;
@@ -202,9 +219,32 @@ final class NetworkConfig
         return $this->maxRequestSize;
     }
 
+    /**
+     * @param int $maxRequestSize the size in bytes, or 0 to disable the limit.
+     */
     public function setMaxRequestSize(int $maxRequestSize): self
     {
         $this->maxRequestSize = $maxRequestSize;
+
+        return $this;
+    }
+
+    public function getMaxAnonymousRequestSize(): int
+    {
+        return $this->maxAnonymousRequestSize;
+    }
+
+    /**
+     * @param int $maxAnonymousRequestSize the size in bytes, or 0 to disable the limit.
+     * @throws InvalidArgumentException when the limit is negative
+     */
+    public function setMaxAnonymousRequestSize(int $maxAnonymousRequestSize): self
+    {
+        self::assertNotNegative(
+            $maxAnonymousRequestSize,
+            'The anonymous request size limit',
+        );
+        $this->maxAnonymousRequestSize = $maxAnonymousRequestSize;
 
         return $this;
     }
@@ -215,6 +255,7 @@ final class NetworkConfig
     }
 
     /**
+     * @param int $maxRequestElements the number of ASN.1 elements, or 0 to disable the limit.
      * @throws InvalidArgumentException when the limit is negative
      */
     public function setMaxRequestElements(int $maxRequestElements): self
@@ -233,6 +274,9 @@ final class NetworkConfig
         return $this->maxConnections;
     }
 
+    /**
+     * @param int $maxConnections the number of concurrent connections, or 0 for no limit.
+     */
     public function setMaxConnections(int $maxConnections): self
     {
         $this->maxConnections = $maxConnections;
@@ -329,6 +373,9 @@ final class NetworkConfig
         return $this->sslHandshakeTimeout;
     }
 
+    /**
+     * @param int $sslHandshakeTimeout the time in seconds.
+     */
     public function setSslHandshakeTimeout(int $sslHandshakeTimeout): self
     {
         $this->sslHandshakeTimeout = $sslHandshakeTimeout;
