@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 use function max;
+use function strlen;
 
 /**
  * Decodes the nested parts of one received message, all through the same encoder and within one element budget.
@@ -62,7 +63,10 @@ class DecodeContext
         array $tagMap = [],
         ?int $atMost = null,
     ): AbstractType {
-        $this->capAt($atMost);
+        $this->capAt(
+            $atMost,
+            strlen($type->getValue()),
+        );
 
         try {
             $completed = $this->encoder->complete(
@@ -96,7 +100,10 @@ class DecodeContext
         if ($bytes === '') {
             throw new ProtocolException('The data to decode cannot be empty.');
         }
-        $this->capAt(null);
+        $this->capAt(
+            null,
+            strlen($bytes),
+        );
 
         try {
             $decoded = $this->encoder->decode(
@@ -112,13 +119,20 @@ class DecodeContext
     }
 
     /**
-     * Caps the encoder at the lower of the budget left and the elements asked for.
+     * Caps the encoder at the lower of the budget left and the elements asked for, when the part could hold more.
      */
-    private function capAt(?int $atMost): void
-    {
-        $cap = $this->budgetCaps($atMost)
-            ? $this->elementsLeft
-            : $atMost;
+    private function capAt(
+        ?int $atMost,
+        int $byteLength,
+    ): void {
+        $cap = $this->elementsLeft;
+        if ($atMost !== null && ($cap === null || $atMost <= $cap)) {
+            $cap = $atMost;
+        }
+        // A part holds at most one element for every two bytes, and needs no cap that covers that many.
+        if ($cap !== null && $cap * 2 >= $byteLength) {
+            $cap = null;
+        }
         if ($cap === $this->cap) {
             return;
         }
