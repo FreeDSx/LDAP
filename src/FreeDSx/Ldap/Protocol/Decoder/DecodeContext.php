@@ -75,9 +75,9 @@ class DecodeContext
                 $tagMap,
             );
         } catch (PduElementsException $e) {
-            throw $this->budgetCaps($atMost)
+            $this->budgetCaps($atMost)
                 ? $this->overBudget($e)
-                : $e;
+                : throw $e;
         }
         $this->charge();
 
@@ -111,7 +111,7 @@ class DecodeContext
                 $tagMap,
             );
         } catch (PduElementsException $e) {
-            throw $this->overBudget($e);
+            $this->overBudget($e);
         }
         $this->charge();
 
@@ -165,13 +165,13 @@ class DecodeContext
         $this->elementsLeft -= $this->encoder->getLastElementCount();
 
         if ($this->elementsLeft < 0) {
-            throw $this->overBudget();
+            $this->overBudget();
         }
     }
 
-    private function overBudget(?PduElementsException $previous = null): AdminLimitExceededException
+    private function overBudget(?PduElementsException $previous = null): never
     {
-        return new AdminLimitExceededException(
+        throw new AdminLimitExceededException(
             'The request holds more elements than the server allows.',
             $previous,
         );

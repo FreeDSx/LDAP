@@ -62,6 +62,12 @@ final class LdapProxyCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Refuse to start unless the upstream hop is encrypted',
+            )
+            ->addOption(
+                'no-require-authentication',
+                null,
+                InputOption::VALUE_NONE,
+                'Forward operations for sessions that have not bound',
             );
     }
 
@@ -96,6 +102,7 @@ final class LdapProxyCommand extends Command
             serverOptions: $this->makeServerOptions(
                 $output,
                 $this->getStringOption($input, 'transport') === 'ssl',
+                $input->getOption('no-require-authentication') !== true,
             ),
             clientOptions: (new ClientOptions())
                 ->setServers(['127.0.0.1'])
@@ -114,6 +121,7 @@ final class LdapProxyCommand extends Command
     private function makeServerOptions(
         OutputInterface $output,
         bool $useSsl,
+        bool $requireAuthentication,
     ): ProxyServerOptions {
         return (new ProxyServerOptions((new NetworkConfig())
             ->setPort(TestWorker::port())
@@ -121,6 +129,7 @@ final class LdapProxyCommand extends Command
             ->setSslCert(self::SSL_CERT)
             ->setSslCertKey(self::SSL_KEY)
             ->setSocketAcceptTimeout(0.1)))
+            ->setRequireAuthentication($requireAuthentication)
             ->setOnServerReady(fn() => $output->writeln('server starting...'));
     }
 

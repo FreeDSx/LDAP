@@ -104,7 +104,7 @@ $ldap->bindSasl(
 ```
 
 Use `setHost()` to override the host in the DIGEST-MD5 digest-uri. The integrity and privacy security layers are not
-supported, so a bind that asks for one is refused. Use TLS to protect the connection instead.
+supported, and a bind that asks for one is refused. Use TLS to protect the connection instead.
 
 ### SCRAM
 

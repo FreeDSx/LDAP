@@ -134,22 +134,24 @@ final class RequestLimitsTest extends TestCase
         );
     }
 
-    public function testItHoldsTheNextRequestToTheSessionsSizeAndTheElementLimit(): void
+    public function testItHoldsARequestToTheGivenSizeAndTheElementLimit(): void
     {
         self::assertEquals(
             new EncoderOptions(
                 maxLength: 256,
                 maxElements: 50,
             ),
-            $this->subject->encoderOptions(),
+            $this->subject->encoderOptions(256),
         );
     }
 
     public function testItSetsNoLimitsByDefault(): void
     {
+        $limits = new RequestLimits($this->authorization);
+
         self::assertEquals(
             new EncoderOptions(),
-            (new RequestLimits($this->authorization))->encoderOptions(),
+            $limits->encoderOptions($limits->maxSize()),
         );
     }
 

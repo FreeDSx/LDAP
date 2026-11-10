@@ -282,6 +282,64 @@ final class LdapProxyTest extends ServerTestCase
         );
     }
 
+    public function testARefusedBindLeavesTheUpstreamSessionAnonymousWhenAuthenticationIsNotRequired(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--no-require-authentication'],
+        );
+        $this->authenticateUser();
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+
+        try {
+            $this->ldapClient()->send(Operations::bindAnonymously());
+            self::fail('The proxy was expected to refuse an anonymous bind.');
+        } catch (BindException) {
+        }
+
+        self::assertSame(
+            '',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testABindPastTheElementLimitLeavesTheUpstreamSessionAnonymous(): void
+    {
+        $this->authenticateUser();
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(
+                Operations::bind(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+                ...array_fill(
+                    0,
+                    60_000,
+                    new Control('1.2.3.4'),
+                ),
+            );
+            self::fail('The proxy accepted a bind past the element limit.');
+        } catch (BindException $e) {
+            self::assertSame(
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            '',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
     public function testLosingTheUpstreamEndsTheProxiedSession(): void
     {
         $this->authenticateUser();
@@ -386,7 +444,10 @@ final class LdapProxyTest extends ServerTestCase
     {
         return Operations::search(Filters::equal(
             'cn',
-            str_repeat('x', 300_000),
+            str_repeat(
+                'x',
+                300_000,
+            ),
         ))
             ->base('dc=foo,dc=bar')
             ->useBaseScope();

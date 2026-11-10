@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -53,6 +54,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\StreamMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Middleware\StubMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Middleware\ThrowingMiddlewareHandler;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class ResponseWriterMiddlewareTest extends TestCase
 {
@@ -93,7 +95,10 @@ final class ResponseWriterMiddlewareTest extends TestCase
         $this->subject = new ResponseWriterMiddleware(
             new ResponseWriter(
                 $this->mockQueue,
-                new DecodeFailureResponder($this->mockQueue),
+                new DecodeFailureResponder(
+                    $this->mockQueue,
+                    new ServerAuthorization(TestServerOptions::defaults()),
+                ),
                 new OutOfSequenceResponder($this->mockQueue),
             ),
             $this->mockBackend,

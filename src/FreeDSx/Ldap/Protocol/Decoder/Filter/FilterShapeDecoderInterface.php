@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Decoder\Filter;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 
@@ -28,6 +29,7 @@ interface FilterShapeDecoderInterface
 {
     /**
      * @param AbstractType<mixed> $type
+     * @throws AdminLimitExceededException
      * @throws ProtocolException
      * @throws EncoderException
      */

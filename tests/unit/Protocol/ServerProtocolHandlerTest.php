@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -52,6 +53,7 @@ use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Middleware\StubMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Middleware\ThrowingMiddlewareHandler;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class ServerProtocolHandlerTest extends TestCase
 {
@@ -588,6 +590,7 @@ final class ServerProtocolHandlerTest extends TestCase
             ),
             new DecodeFailureResponder(
                 $this->mockQueue,
+                new ServerAuthorization(TestServerOptions::defaults()),
                 $eventLogger,
             ),
             $eventLogger,

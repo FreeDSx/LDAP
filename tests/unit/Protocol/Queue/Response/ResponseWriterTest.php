@@ -25,11 +25,13 @@ use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class ResponseWriterTest extends TestCase
 {
@@ -52,7 +54,10 @@ final class ResponseWriterTest extends TestCase
 
         $this->subject = new ResponseWriter(
             $this->queue,
-            new DecodeFailureResponder($this->queue),
+            new DecodeFailureResponder(
+                $this->queue,
+                new ServerAuthorization(TestServerOptions::defaults()),
+            ),
             new OutOfSequenceResponder($this->queue),
         );
     }

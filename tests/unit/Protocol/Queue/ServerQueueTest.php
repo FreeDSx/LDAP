@@ -761,7 +761,10 @@ final class ServerQueueTest extends TestCase
     {
         $socket = $this->createMock(Socket::class);
         $socket->method('read')->willReturn((new LdapEncoder())->encode(
-            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
+            (new LdapMessageRequest(
+                5,
+                new DeleteRequest('dc=foo,dc=bar'),
+            ))->toAsn1(),
         ));
         $queue = new ServerQueue(
             $socket,
@@ -787,7 +790,10 @@ final class ServerQueueTest extends TestCase
     {
         $socket = $this->createMock(Socket::class);
         $socket->method('read')->willReturn((new LdapEncoder())->encode(
-            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
+            (new LdapMessageRequest(
+                5,
+                new DeleteRequest('dc=foo,dc=bar'),
+            ))->toAsn1(),
         ));
         $queue = new ServerQueue(
             $socket,
@@ -1152,7 +1158,10 @@ final class ServerQueueTest extends TestCase
             5,
             Operations::search(Filters::equal(
                 'cn',
-                str_repeat('a', 300_000),
+                str_repeat(
+                    'a',
+                    300_000,
+                ),
             ))->base('dc=foo,dc=bar'),
         ))->toAsn1());
     }

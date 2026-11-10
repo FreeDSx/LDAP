@@ -15,11 +15,13 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
+use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Token\AnonToken;
 
 /**
  * Answers a message whose envelope parsed but whose body did not.
@@ -31,6 +33,7 @@ final readonly class DecodeFailureResponder
 {
     public function __construct(
         private ServerQueue $queue,
+        private ServerAuthorization $authorization,
         private EventLogger $eventLogger = new EventLogger(null),
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
@@ -55,6 +58,11 @@ final readonly class DecodeFailureResponder
         // An operation with no response, or a response tag masquerading as a request, leaves nothing to answer with.
         if ($response === null) {
             return false;
+        }
+
+        // RFC 4513 §4 moves a session to anonymous on receipt of a bind, and one that fails leaves it there.
+        if ($response->getResponse() instanceof BindResponse) {
+            $this->authorization->setToken(new AnonToken());
         }
 
         $this->eventLogger->record(

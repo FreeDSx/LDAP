@@ -66,6 +66,11 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
             $serverAuthorization,
         );
         $eventLogger = $this->makeEventLogger($context);
+        $decodeFailures = new DecodeFailureResponder(
+            $queue,
+            $serverAuthorization,
+            $eventLogger,
+        );
         $upstream = new LdapClient($this->proxyOptions->getClientOptions());
         $session = new ProxyUpstreamSession(
             client: $upstream,
@@ -118,10 +123,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 ),
                 new ResponseWriter(
                     $queue,
-                    new DecodeFailureResponder(
-                        $queue,
-                        $eventLogger,
-                    ),
+                    $decodeFailures,
                     new OutOfSequenceResponder(
                         $queue,
                         $eventLogger,
@@ -137,10 +139,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 $queue,
                 $eventLogger,
             ),
-            decodeFailures: new DecodeFailureResponder(
-                $queue,
-                $eventLogger,
-            ),
+            decodeFailures: $decodeFailures,
             eventLogger: $eventLogger,
             connectionContext: $context,
         );

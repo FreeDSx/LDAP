@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Decoder\Filter;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\FilterDepthExceededException;
 use FreeDSx\Ldap\Exception\FilterTooWideException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -55,6 +56,7 @@ readonly class FilterDecoder
      * @param AbstractType<mixed> $type
      * @throws FilterDepthExceededException
      * @throws FilterTooWideException
+     * @throws AdminLimitExceededException
      * @throws ProtocolException
      * @throws EncoderException
      */
@@ -75,6 +77,7 @@ readonly class FilterDecoder
      * @param AbstractType<mixed> $type
      * @throws FilterDepthExceededException
      * @throws FilterTooWideException
+     * @throws AdminLimitExceededException
      * @throws ProtocolException
      * @throws EncoderException
      */

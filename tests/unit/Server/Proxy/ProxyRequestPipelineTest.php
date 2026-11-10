@@ -13,6 +13,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -21,6 +22,7 @@ use FreeDSx\Ldap\Server\Proxy\ProxyRequestPipeline;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class ProxyRequestPipelineTest extends TestCase
 {
@@ -39,7 +41,10 @@ final class ProxyRequestPipelineTest extends TestCase
             $this->forwarder,
             new ResponseWriter(
                 $queue = $this->createMock(ServerQueue::class),
-                new DecodeFailureResponder($queue),
+                new DecodeFailureResponder(
+                    $queue,
+                    new ServerAuthorization(TestServerOptions::defaults()),
+                ),
                 new OutOfSequenceResponder($queue),
             ),
         );

@@ -280,7 +280,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         $maxSize = $this->limits->maxSize();
         if ($maxSize !== $this->maxSize) {
             $this->maxSize = $maxSize;
-            $this->ldapEncoder->setOptions($this->limits->encoderOptions());
+            $this->ldapEncoder->setOptions($this->limits->encoderOptions($maxSize));
         }
 
         return parent::decode($bytes);

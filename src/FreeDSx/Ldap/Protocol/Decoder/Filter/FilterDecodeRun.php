@@ -60,6 +60,7 @@ class FilterDecodeRun
      * @param AbstractType<mixed> $type
      * @throws FilterDepthExceededException
      * @throws FilterTooWideException
+     * @throws AdminLimitExceededException
      * @throws ProtocolException
      * @throws EncoderException
      */
