@@ -119,9 +119,8 @@ clients write large entries without binding, raise or disable the limit:
 $options->getNetworkConfig()->setMaxAnonymousRequestSize(0);
 ```
 
-A modify request may hold at most 1,000 changes, and every request is held to an ASN.1 element limit (100,000 by
-default). See
-[Configuration](docs/Server/Configuration.md#setmaxrequestsize).
+Other limits apply to every request as well, such as 1,000 changes per modify request and 100 controls per request. See
+[Request Limits](docs/Server/Configuration.md#request-limits) for the full list.
 
 ## Constructing a Proxy Server
 

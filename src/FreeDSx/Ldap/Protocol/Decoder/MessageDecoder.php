@@ -68,6 +68,7 @@ abstract readonly class MessageDecoder
                     $envelope,
                     $context,
                     $this->controls,
+                    $this->maxControls(),
                 ),
             ],
         );
@@ -77,6 +78,14 @@ abstract readonly class MessageDecoder
             $operation,
             ...$controls,
         );
+    }
+
+    /**
+     * The most controls a received message may carry, or null for no limit.
+     */
+    protected function maxControls(): ?int
+    {
+        return null;
     }
 
     /**

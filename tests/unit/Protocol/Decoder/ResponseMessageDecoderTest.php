@@ -35,12 +35,16 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+
+use function array_map;
+use function range;
 
 final class ResponseMessageDecoderTest extends TestCase
 {
@@ -182,6 +186,26 @@ final class ResponseMessageDecoderTest extends TestCase
                 [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
             );
         }
+    }
+
+    public function testItDecodesMoreControlsThanARequestMayCarry(): void
+    {
+        $message = $this->subject->decode(self::received(new LdapMessageResponse(
+            6,
+            new DeleteResponse(0),
+            ...array_map(
+                static fn(int $i): Control => new Control("1.2.{$i}"),
+                range(
+                    1,
+                    RequestMessageDecoder::MAX_CONTROLS + 1,
+                ),
+            ),
+        )));
+
+        self::assertCount(
+            RequestMessageDecoder::MAX_CONTROLS + 1,
+            $message->controls()->toArray(),
+        );
     }
 
     /**

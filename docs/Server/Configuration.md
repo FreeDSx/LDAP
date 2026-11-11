@@ -30,6 +30,7 @@ LDAP Server Configuration
         * [NetworkConfig:setSslAllowSelfSigned](#setsslallowselfsigned)
         * [NetworkConfig:setSslCaCert](#setsslcacert)
         * [NetworkConfig:setSslHandshakeTimeout](#setsslhandshaketimeout)
+* [Request Limits](#request-limits)
 * [Access Control](#access-control)
     * [ServerOptions:setAclRules](#setaclrules)
 * [Storage](#storage)
@@ -499,6 +500,32 @@ Raise it if legitimate clients on slow links fail to connect.
 
 **Default**: `5`
 
+## Request Limits
+
+Limits on each request the server reads from a client, which the proxy server applies the same way. A request past one
+either ends the connection with a notice of disconnection (protocolError), or is refused with a result code and the
+connection stays open.
+
+Configurable:
+
+* **Request size:** 2.5 MiB ([setMaxRequestSize](#setmaxrequestsize)). A larger request ends the connection.
+* **Request size before an authenticated bind:** 256 KiB
+  ([setMaxAnonymousRequestSize](#setmaxanonymousrequestsize)). A larger request ends the connection.
+* **ASN.1 elements:** 100,000 ([setMaxRequestElements](#setmaxrequestelements)). More ends the connection, or is
+  refused with `ADMIN_LIMIT_EXCEEDED` when the extra elements are inside a filter, a control, SASL bind credentials or
+  an extended operation's value.
+
+Fixed:
+
+* **ASN.1 nesting:** 16 levels.
+* **Filter items:** 1,000 in a search or an assertion control, each part of a substring item and each empty AND or OR
+  counting as one.
+* **Filter nesting:** 30 levels of AND, OR and NOT.
+* **Modify changes:** 1,000 per modify request.
+* **Selected attributes:** 1,000 in a search, a Pre-Read control or a Post-Read control.
+* **Sort keys:** 100 in a sorting control.
+* **Controls:** 100 per request.
+
 ## Access Control
 
 ------------------
@@ -814,11 +841,8 @@ The vendorVersion attribute for the RootDSE.
 Server-side caps applied independently of what the client requests. When both the client and server specify a limit, the
 stricter value wins. A server value of `0` means no server-side cap.
 
-A received filter, in a search or an assertion control, has two fixed limits. It may hold at most 1,000 items, each part
-of a substring item and each empty AND or OR counting as one, and a wider filter is refused with `ADMIN_LIMIT_EXCEEDED`.
-It may nest at most 30 levels of AND, OR and NOT, and a deeper filter is refused with `UNWILLING_TO_PERFORM`.
-
-A received modify request may hold at most 1,000 changes, and one with more is refused with `ADMIN_LIMIT_EXCEEDED`.
+Limits on the search request itself, such as how many items its filter may hold, are listed under
+[Request Limits](#request-limits).
 
 ------------------
 #### setMaxSearchSize

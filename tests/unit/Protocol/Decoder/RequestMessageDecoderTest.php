@@ -333,6 +333,32 @@ final class RequestMessageDecoderTest extends TestCase
         );
     }
 
+    public function testItDecodesAsManyControlsAsTheLimitAllows(): void
+    {
+        self::assertCount(
+            RequestMessageDecoder::MAX_CONTROLS,
+            $this->subject->decode(self::received(new LdapMessageRequest(
+                6,
+                new DeleteRequest('dc=foo,dc=bar'),
+                ...self::controls(RequestMessageDecoder::MAX_CONTROLS),
+            )))->controls()->toArray(),
+        );
+    }
+
+    public function testMoreControlsThanTheLimitAreAnsweredAsAnAdministrativeLimit(): void
+    {
+        $e = $this->decodeFailureOf(self::received(new LdapMessageRequest(
+            6,
+            new DeleteRequest('dc=foo,dc=bar'),
+            ...self::controls(RequestMessageDecoder::MAX_CONTROLS + 1),
+        )));
+
+        self::assertSame(
+            [6, 10, ResultCode::ADMIN_LIMIT_EXCEEDED, 'The request carries more than 100 controls.'],
+            [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode(), $e->getMessage()],
+        );
+    }
+
     /**
      * @param AbstractType<mixed> $pdu
      */
@@ -360,6 +386,20 @@ final class RequestMessageDecoderTest extends TestCase
         $encoder = new LdapEncoder();
 
         return $encoder->decode($encoder->encode($message->toAsn1()));
+    }
+
+    /**
+     * @return list<Control>
+     */
+    private static function controls(int $count): array
+    {
+        return array_map(
+            static fn(int $i): Control => new Control("1.2.{$i}"),
+            range(
+                1,
+                $count,
+            ),
+        );
     }
 
     private static function filterNestedPastTheLimit(): FilterInterface

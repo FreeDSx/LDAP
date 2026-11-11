@@ -21,8 +21,12 @@ use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
+
+use function count;
+use function sprintf;
 
 /**
  * Decodes a server side sorting request control (RFC 2891).
@@ -33,12 +37,24 @@ use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
  */
 readonly class SortingControlDecoder extends EncodedValueControlDecoder
 {
+    /**
+     * The most sort keys a received sorting control may hold.
+     */
+    public const MAX_KEYS = 100;
+
     protected function decodeValue(
         AbstractType $value,
         DecodeContext $context,
     ): SortingControl {
         if (!$value instanceof SequenceType) {
             throw new ProtocolException('The sorting control is malformed.');
+        }
+        // RFC 2891 lets a server restrict the keys, and the decoded list is held for the whole search.
+        if (count($value) > self::MAX_KEYS) {
+            throw new AdminLimitExceededException(sprintf(
+                'The sorting control holds more than %d sort keys.',
+                self::MAX_KEYS,
+            ));
         }
 
         $sortKeys = [];

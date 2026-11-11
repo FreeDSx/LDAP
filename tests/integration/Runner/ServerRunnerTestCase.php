@@ -31,8 +31,11 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Decoder\AttributeSelectionDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\SortingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Request\ModifyRequestDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
@@ -299,21 +302,12 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         self::assertTrue($this->bindsUser($this->buildClient('tcp')));
     }
 
-    public function testARequestWithinTheElementLimitIsAnswered(): void
+    public function testASearchSelectingAsManyAttributesAsTheLimitAllowsIsAnswered(): void
     {
         $queue = $this->boundRawQueue();
         $queue->sendMessage(new LdapMessageRequest(
             2,
-            Operations::search(
-                Filters::present('objectClass'),
-                ...array_map(
-                    static fn(int $i): string => "attr{$i}",
-                    range(
-                        1,
-                        50_000,
-                    ),
-                ),
-            )->base('dc=foo,dc=bar')->useBaseScope(),
+            self::searchSelecting(AttributeSelectionDecoder::MAX_ATTRIBUTES),
         ));
 
         try {
@@ -383,15 +377,48 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
     }
 
-    public function testASortControlPastTheElementLimitIsAnsweredAndTheSessionContinues(): void
+    public function testASearchSelectingMoreAttributesThanTheLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredAsAnAdministrativeLimit(
+            self::searchSelecting(AttributeSelectionDecoder::MAX_ATTRIBUTES + 1),
+        );
+    }
+
+    public function testASortControlPastTheKeyLimitIsAnsweredAndTheSessionContinues(): void
     {
         $this->assertAnsweredAsAnAdministrativeLimit(
             self::baseSearch(),
             Controls::sort(...array_fill(
                 0,
-                60_000,
+                SortingControlDecoder::MAX_KEYS + 1,
                 new SortKey('cn'),
             )),
+        );
+    }
+
+    public function testARequestCarryingMoreControlsThanTheLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredAsAnAdministrativeLimit(
+            self::baseSearch(),
+            ...array_fill(
+                0,
+                RequestMessageDecoder::MAX_CONTROLS + 1,
+                new Control('1.2.3.4'),
+            ),
+        );
+    }
+
+    public function testAPostReadControlSelectingMoreAttributesThanTheLimitIsAnsweredAndTheSessionContinues(): void
+    {
+        $this->assertAnsweredAsAnAdministrativeLimit(
+            Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::replace(
+                    'description',
+                    'x',
+                ),
+            ),
+            Controls::postRead(...self::attributeNames(AttributeSelectionDecoder::MAX_ATTRIBUTES + 1)),
         );
     }
 
@@ -758,6 +785,30 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         return Operations::search(Filters::present('objectClass'))
             ->base('dc=foo,dc=bar')
             ->useBaseScope();
+    }
+
+    private static function searchSelecting(int $attributes): SearchRequest
+    {
+        return Operations::search(
+            Filters::present('objectClass'),
+            ...self::attributeNames($attributes),
+        )
+            ->base('dc=foo,dc=bar')
+            ->useBaseScope();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function attributeNames(int $count): array
+    {
+        return array_map(
+            static fn(int $i): string => "attr{$i}",
+            range(
+                1,
+                $count,
+            ),
+        );
     }
 
     /**
