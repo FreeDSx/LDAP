@@ -22,6 +22,9 @@ use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
+use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -36,6 +39,8 @@ use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Logging\StdoutLogger;
+use Tests\Support\FreeDSx\Ldap\Server\FailingAcceptSocketServerFactory;
+use Tests\Support\FreeDSx\Ldap\Server\Process\Child\FailingChildForker;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\FileFlagConfigReloader;
 use PDO;
 use Symfony\Component\Console\Command\Command;
@@ -121,6 +126,20 @@ final class LdapServerCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Bytes of description added to each extra entry, so a search can outgrow the socket buffers',
+                '0',
+            )
+            ->addOption(
+                'fail-fork',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Fail this numbered connection fork (counted from 1) without forking, under pcntl; 0 for none',
+                '0',
+            )
+            ->addOption(
+                'fail-accept',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Fail this many accepts in each accepting process before accepting for real; 0 for none',
                 '0',
             )
             ->addOption(
@@ -408,7 +427,13 @@ final class LdapServerCommand extends Command
             $options->setConfigReloader(new FileFlagConfigReloader($reloadFlagFile));
         }
 
-        $container = Container::forServer($options);
+        $container = Container::forServer(
+            $options,
+            $this->makeScriptedFailures(
+                $input,
+                $options,
+            ),
+        );
         $server = new LdapServer(
             $options,
             $container,
@@ -520,6 +545,45 @@ final class LdapServerCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Swaps in the collaborators that fail forks or accepts on cue.
+     *
+     * @return array<class-string, object>
+     */
+    private function makeScriptedFailures(
+        InputInterface $input,
+        ServerOptions $options,
+    ): array {
+        $instances = [];
+        $failFork = (int) $this->getStringOption(
+            $input,
+            'fail-fork',
+        );
+        if ($failFork > 0) {
+            $instances[ChildForker::class] = new FailingChildForker($failFork);
+        }
+
+        $failAccept = (int) $this->getStringOption(
+            $input,
+            'fail-accept',
+        );
+        if ($failAccept > 0) {
+            $runnerConfig = $options->getRunnerConfig();
+            $instances[SocketServerFactory::class] = new FailingAcceptSocketServerFactory(
+                network: $options->getNetworkConfig(),
+                runner: $runnerConfig->getMode(),
+                eventLogger: new EventLogger(
+                    $options->getLogger(),
+                    $options->getEventLogPolicy(),
+                ),
+                reusePort: $runnerConfig->getMode() === RunnerMode::Swoole && $runnerConfig->resolvedWorkers() > 1,
+                failingAccepts: $failAccept,
+            );
+        }
+
+        return $instances;
     }
 
     private function createStorageConfig(string $storageType): StorageConfigInterface

@@ -21,9 +21,11 @@ use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ConnectionAcceptor;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Socket\Exception\AcceptException;
 use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Swoole\Coroutine;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
@@ -128,6 +130,49 @@ final class ConnectionAcceptorTest extends TestCase
         self::assertFalse($arriving->isConnected());
     }
 
+    public function test_failed_accepts_are_logged_once_and_the_client_after_them_is_served(): void
+    {
+        $failure = new AcceptException('Unable to accept a waiting client: Too many open files');
+        $server = new ScriptedSocketServer(
+            [$failure, $failure, $this->connectedSocket()],
+            onDrained: $this->subject->shutdown(...),
+        );
+
+        $this->protocolFactory
+            ->expects(self::once())
+            ->method('make')
+            ->willThrowException(new RuntimeException('The client reached the protocol handler.'));
+
+        Coroutine\run(function () use ($server): void {
+            $this->subject->accept($server);
+        });
+
+        self::assertSame(
+            [
+                ServerEvent::ServerAcceptFailed->value,
+                ServerEvent::ServerAcceptRecovered->value,
+            ],
+            $this->acceptEvents(),
+        );
+    }
+
+    public function test_an_unexpected_accept_error_stops_accepting(): void
+    {
+        $server = new ScriptedSocketServer(
+            [],
+            onDrained: static fn() => throw new RuntimeException('The listener broke.'),
+        );
+
+        Coroutine\run(function () use ($server): void {
+            $this->subject->accept($server);
+        });
+
+        self::assertSame(
+            [ServerEvent::ServerAcceptFailed->value],
+            $this->acceptEvents(),
+        );
+    }
+
     private function connectedSocket(): Socket
     {
         $pair = stream_socket_pair(
@@ -139,6 +184,29 @@ final class ConnectionAcceptorTest extends TestCase
         $this->peers[] = $pair[1];
 
         return new Socket($pair[0]);
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private function acceptEvents(): array
+    {
+        $accepts = [
+            ServerEvent::ServerAcceptFailed->value,
+            ServerEvent::ServerAcceptRecovered->value,
+        ];
+
+        return array_values(array_filter(
+            array_map(
+                static fn(array $record): mixed => $record['context'][EventContext::EVENT] ?? null,
+                $this->logger->records,
+            ),
+            static fn(mixed $event): bool => in_array(
+                $event,
+                $accepts,
+                true,
+            ),
+        ));
     }
 
     /**

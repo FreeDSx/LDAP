@@ -37,6 +37,14 @@ final class ProxyListenerContributor implements ListenerContributorInterface
         return true;
     }
 
+    /**
+     * Each client holds its own socket and its upstream connection.
+     */
+    public function descriptorsPerClient(): int
+    {
+        return 2;
+    }
+
     public function reloadInstances(): array
     {
         return [];

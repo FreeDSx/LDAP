@@ -93,7 +93,8 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | Event                                | Default | Level   | Fires when                                                |
 |--------------------------------------|---------|---------|-----------------------------------------------------------|
 | `server.started`                     | on      | info    | The server is listening and accepting clients             |
-| `server.accept_failed`               | on      | error   | Accepting a connection failed and the accept loop ended   |
+| `server.accept_failed`               | on      | error   | Accepting failed; retried unless the error was unexpected |
+| `server.accept_recovered`            | on      | info    | Accepting connections works again                         |
 | `server.shutdown.started`            | on      | info    | A shutdown signal was received                            |
 | `server.shutdown.draining`           | on      | info    | The server stopped accepting and is waiting on open connections |
 | `server.shutdown.forced`             | on      | warning | Connections still open past the shutdown timeout were closed |
@@ -138,11 +139,13 @@ Every event carries a structured `context` array with a stable shape:
 | `result_code`                                              | failure events                                                     | LDAP result code from the caught `OperationException`.                                             |
 | `reason`                                                   | failure events, `ldap.starttls.buffer_discarded`                   | Human-readable diagnostic. Taken from the exception on failure events.                             |
 | `reason`                                                   | `server.client.rejected`, `server.reload.ignored`, `server.socket.unusable`, `server.task.failed` | `connection_limit`, `shutting_down` or `not_started` for a rejection; `no_reloader` or `unsupported` for a reload; `not_writeable` or `not_removable` for a socket; `error`, `not_started` or `exited` for a task. |
-| `reason`                                                   | `server.concurrency_limited`                                       | `storage_not_shareable` when several workers were configured but the storage cannot be shared between processes, so one is used; `storage_blocks_worker` when SQLite runs on a Swoole built without `--enable-swoole-sqlite`, where a lock wait blocks the whole worker. |
+| `reason`                                                   | `server.concurrency_limited`                                       | What limits concurrency; see [Concurrency Limits](Configuration.md#concurrency-limits).            |
 | `task`                                                     | `server.task.failed`                                               | The background task's name.                                                                        |
 | `socket`, `requested_workers`                              | `server.socket.unusable`, `server.concurrency_limited`             | The unix socket path, and the worker count that was configured.                                    |
 | `worker_id`, `child_pid`, `signal`                         | `server.*` events                                                  | The Swoole worker, the PCNTL client process, and the signal that caused the event.                 |
 | `max_connections`, `active_connections`                    | `server.client.rejected`, `server.shutdown.forced`                 | The connection limit reached, and the connections force closed.                                    |
+| `open_file_limit`, `descriptors_per_client`                | `server.concurrency_limited`                                       | The open-file limit, and the open files each client holds.                                         |
+| `failures`                                                 | `server.accept_recovered`                                          | Accepts that failed before it recovered.                                                           |
 | `validation_mode`                                          | `ldap.schema.violation`                                            | How it was handled: `strict` (rejected), `lenient` (allowed by policy), or `relaxed` (Relax control). |
 | `mechanism`, `version`                                     | bind events                                                        | SASL mechanism name (or `simple`) and LDAP protocol version.                                       |
 | `entries_added`, `entries_skipped`                         | `storage.import.completed`, `storage.import.failed`                | Counts for the batch. On a failure they say how far it got before the rollback.                    |

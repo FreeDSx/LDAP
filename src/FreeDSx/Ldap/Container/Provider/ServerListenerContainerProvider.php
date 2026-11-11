@@ -35,7 +35,9 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Recorder\SwooleTableMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\OpenFileLimit;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
@@ -59,6 +61,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     {
         return [
             SocketServerFactory::class => $this->makeSocketServerFactory(...),
+            ChildForker::class => static fn(): ChildForker => new ChildForker(),
             ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
@@ -102,6 +105,12 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $options,
                 $workers,
             );
+            // Only a worker serving many clients in one process holds every client's descriptors.
+            $this->recordOpenFileLimit(
+                $options,
+                OpenFileLimit::ofThisProcess(),
+                $container->get(ListenerContributorInterface::class)->descriptorsPerClient(),
+            );
             $workerFactory = new WorkerFactory(
                 configuration: $this->makeRunnerConfiguration($container),
                 socketServerFactory: $container->get(SocketServerFactory::class),
@@ -121,6 +130,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         return new PcntlServerRunner(
             configuration: $this->makeRunnerConfiguration($container),
             socketServerFactory: $container->get(SocketServerFactory::class),
+            childForker: $container->get(ChildForker::class),
             metrics: new MetricsRelay(
                 $metricsRecorder,
                 $this->makeSnapshotPublisher($container),
@@ -216,6 +226,27 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             [
                 EventContext::REASON => ConcurrencyLimitReason::StorageNotShareable->value,
                 'requested_workers' => $requestedWorkers,
+            ],
+        );
+    }
+
+    private function recordOpenFileLimit(
+        ServerListenerOptionsInterface $options,
+        OpenFileLimit $openFileLimit,
+        int $descriptorsPerClient,
+    ): void {
+        $maxConnections = $options->getNetworkConfig()->getMaxConnections();
+        if (!$openFileLimit->isReachedBefore($maxConnections, $descriptorsPerClient)) {
+            return;
+        }
+
+        $this->makeEventLogger($options)->record(
+            ServerEvent::ConcurrencyLimited,
+            [
+                EventContext::REASON => ConcurrencyLimitReason::OpenFileLimit->value,
+                'open_file_limit' => $openFileLimit->getSoftLimit(),
+                'max_connections' => $maxConnections,
+                'descriptors_per_client' => $descriptorsPerClient,
             ],
         );
     }

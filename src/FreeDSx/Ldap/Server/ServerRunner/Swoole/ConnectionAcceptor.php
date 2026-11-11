@@ -23,8 +23,10 @@ use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\AcceptBackoff;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
+use FreeDSx\Socket\Exception\AcceptException;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use Swoole\Coroutine;
@@ -60,6 +62,8 @@ class ConnectionAcceptor
 
     private readonly WaitGroup $waitGroup;
 
+    private readonly AcceptBackoff $acceptBackoff;
+
     /**
      * @param bool $isTlsHandshakeDeferred Whether each connection negotiates TLS itself rather than the listener.
      * @param ?BackgroundTasksInterface $backgroundTasks Ticked between accepts; null when this process runs none.
@@ -74,6 +78,7 @@ class ConnectionAcceptor
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
     ) {
         $this->waitGroup = new WaitGroup();
+        $this->acceptBackoff = new AcceptBackoff();
     }
 
     /**
@@ -91,6 +96,14 @@ class ConnectionAcceptor
 
             try {
                 $socket = $this->server->accept($this->options->getNetworkConfig()->getSocketAcceptTimeout());
+            } catch (AcceptException $e) {
+                // Sleeping lets the connection coroutines run and release descriptors.
+                Coroutine::sleep($this->acceptBackoff->failed(
+                    $e,
+                    $this->events,
+                ));
+
+                continue;
             } catch (Throwable $e) {
                 $this->events->record(
                     ServerEvent::ServerAcceptFailed,
@@ -103,6 +116,7 @@ class ConnectionAcceptor
             if ($socket === null) {
                 continue;
             }
+            $this->acceptBackoff->accepted($this->events);
 
             // A shutdown that began while accepting may already be draining
             if ($this->isShuttingDown) {

@@ -29,4 +29,9 @@ enum ConcurrencyLimitReason: string
      * SQLite runs on a Swoole built without its SQLite hook, where a lock wait blocks the whole worker.
      */
     case StorageBlocksWorker = 'storage_blocks_worker';
+
+    /**
+     * A worker serving many clients in one process reaches its open-file limit before the connection limit.
+     */
+    case OpenFileLimit = 'open_file_limit';
 }

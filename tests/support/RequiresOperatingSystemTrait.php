@@ -28,4 +28,13 @@ trait RequiresOperatingSystemTrait
 
         self::markTestSkipped($reason);
     }
+
+    protected function requireLinux(string $reason): void
+    {
+        if (PHP_OS_FAMILY === 'Linux') {
+            return;
+        }
+
+        self::markTestSkipped($reason);
+    }
 }

@@ -67,6 +67,7 @@ enum ServerEvent: string
     case IdleTimeout                    = 'server.client.idle_timeout';
     case ServerStarted                  = 'server.started';
     case ServerAcceptFailed             = 'server.accept_failed';
+    case ServerAcceptRecovered          = 'server.accept_recovered';
     case ShutdownStarted                = 'server.shutdown.started';
     case ShutdownDraining               = 'server.shutdown.draining';
     case ShutdownForced                 = 'server.shutdown.forced';
@@ -179,6 +180,7 @@ enum ServerEvent: string
             self::IdleTimeout => 'The connection was closed after being idle too long.',
             self::ServerStarted => 'The server process has started and is now accepting clients.',
             self::ServerAcceptFailed => 'Failed to accept incoming connection.',
+            self::ServerAcceptRecovered => 'Accepting incoming connections recovered.',
             self::ShutdownStarted => 'The server shutdown process has started.',
             self::ShutdownDraining => 'Accept loop ended, draining active connections.',
             self::ShutdownForced => 'Shutdown timeout exceeded, forcing close of active connections.',

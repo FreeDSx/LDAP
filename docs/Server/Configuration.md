@@ -218,6 +218,15 @@ process. Anything else is clamped back to a single worker with a logged warning.
 
 A proxy has no local directory, so it can always use multiple workers.
 
+### Concurrency Limits
+
+The server logs `server.concurrency_limited` at startup when one of these limits how many clients it serves at once:
+
+* `storage_not_shareable`: the storage cannot be shared between processes.
+* `storage_blocks_worker`: a SQLite lock wait blocks a worker that serves many clients in one process.
+* `open_file_limit`: `ulimit -n` is below the open files a worker that serves many clients in one process needs at the
+  connection limit.
+
 ### Signals
 
 | Signal | Single process | Worker pool |
@@ -333,7 +342,8 @@ $options->getNetworkConfig()->setMaxConnections(4096);
 ```
 
 The Pcntl runner forks a process per connection, so this bounds process count rather than memory alone. Pick a value
-the host can fork, keeping the process limit and open file descriptors (`ulimit -n`) in mind.
+the host can fork. A worker that serves many clients in one process also needs `ulimit -n` above this limit times the
+open files each client holds (up to 3).
 
 **Default**: `1024`
 

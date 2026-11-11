@@ -15,7 +15,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Process\Child;
 
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcesses;
-use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\TestCase;
 
 final class ChildProcessesTest extends TestCase
@@ -27,17 +26,9 @@ final class ChildProcessesTest extends TestCase
         $this->subject = new ChildProcesses();
     }
 
-    public function test_a_fork_releases_its_copies_of_the_others_connections_without_ending_them(): void
+    public function test_a_fork_forgets_the_children_it_inherited(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket
-            ->expects(self::once())
-            ->method('close')
-            ->with(false);
-        $this->subject->add(new ChildProcess(
-            1,
-            $socket,
-        ));
+        $this->subject->add(new ChildProcess(1));
 
         $this->subject->releaseInherited();
 
