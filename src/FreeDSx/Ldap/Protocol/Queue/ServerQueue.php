@@ -54,9 +54,24 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     private const MAX_PENDING_MESSAGES = 128;
 
     /**
+     * Bounds what read-ahead holds by size, as a few large requests decode into far more memory than many small ones.
+     */
+    private const MAX_PENDING_BYTES = 65_536;
+
+    /**
      * @var LdapMessageRequest[]
      */
     private array $pendingMessages = [];
+
+    /**
+     * The bytes of the messages read ahead into the buffer, counted until it next empties.
+     */
+    private int $pendingBytes = 0;
+
+    /**
+     * The bytes of the message decoded last.
+     */
+    private int $lastMessageBytes = 0;
 
     /**
      * @var ResponseInterceptor[]
@@ -102,11 +117,11 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function getMessage(?int $id = null): LdapMessageRequest
     {
-        if ($id === null && $this->pendingMessages !== []) {
-            return array_shift($this->pendingMessages);
-        }
+        $pending = $id === null
+            ? $this->takePending()
+            : null;
 
-        return $this->readRequest($id);
+        return $pending ?? $this->readRequest($id);
     }
 
     /**
@@ -139,7 +154,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     public function peekForCancelSignal(int $inFlightMessageId): ?LdapMessageRequest
     {
         // Nothing drains the buffer until the stream ends, so reading pauses here, and the socket holds the backlog.
-        if (count($this->pendingMessages) >= self::MAX_PENDING_MESSAGES) {
+        if ($this->isReadAheadFull()) {
             return null;
         }
 
@@ -155,6 +170,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
             return $message;
         }
         $this->pendingMessages[] = $message;
+        $this->pendingBytes += $this->lastMessageBytes;
 
         // Buffered as well as signalled.
         // The session still has to end the way an unbind normally ends it.
@@ -173,8 +189,9 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function pollMessage(): ?LdapMessageRequest
     {
-        if ($this->pendingMessages !== []) {
-            return array_shift($this->pendingMessages);
+        $pending = $this->takePending();
+        if ($pending !== null) {
+            return $pending;
         }
 
         if (!$this->hasPendingData()) {
@@ -264,8 +281,9 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     protected function onMessageDecoded(Message $message): void
     {
+        $this->lastMessageBytes = (int) $message->getLastPosition();
         $this->metricsRecorder->trafficObserved(new TrafficObservation(
-            bytesReceived: (int) $message->getLastPosition(),
+            bytesReceived: $this->lastMessageBytes,
         ));
     }
 
@@ -342,6 +360,29 @@ class ServerQueue extends LdapQueue implements ConnectionControl
 
         $this->isCloseDeferred = false;
         $this->close();
+    }
+
+    /**
+     * Whether the buffer holds as many messages, or as many bytes of them, as read-ahead may.
+     */
+    private function isReadAheadFull(): bool
+    {
+        return count($this->pendingMessages) >= self::MAX_PENDING_MESSAGES
+            || $this->pendingBytes >= self::MAX_PENDING_BYTES;
+    }
+
+    /**
+     * Takes the oldest buffered message, or null when none is buffered.
+     */
+    private function takePending(): ?LdapMessageRequest
+    {
+        $message = array_shift($this->pendingMessages);
+        // The bytes are counted for the buffer as a whole, so they are only forgotten once it empties.
+        if ($this->pendingMessages === []) {
+            $this->pendingBytes = 0;
+        }
+
+        return $message;
     }
 
     private function applyInterceptors(LdapMessageResponse $response): LdapMessageResponse

@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
@@ -647,6 +648,53 @@ final class ServerQueueTest extends TestCase
         );
     }
 
+    public function test_peek_stops_reading_once_the_pending_requests_reach_the_byte_limit(): void
+    {
+        $reads = 0;
+        $queue = new ServerQueue(
+            $this->socketRepeating(
+                self::encodedRequestPastTheReadAheadBytes(),
+                $reads,
+            ),
+            $this->messageDecoder,
+            $this->limits,
+            new LdapEncoder(),
+        );
+
+        for ($attempt = 0; $attempt < self::FLOOD_ATTEMPTS; $attempt++) {
+            self::assertNull($queue->peekForCancelSignal(2));
+        }
+
+        self::assertSame(
+            1,
+            $reads,
+        );
+    }
+
+    public function test_peek_reads_again_once_the_pending_requests_are_taken(): void
+    {
+        $reads = 0;
+        $queue = new ServerQueue(
+            $this->socketRepeating(
+                self::encodedRequestPastTheReadAheadBytes(),
+                $reads,
+            ),
+            $this->messageDecoder,
+            $this->limits,
+            new LdapEncoder(),
+        );
+
+        $queue->peekForCancelSignal(2);
+        $queue->peekForCancelSignal(2);
+        $queue->getMessage();
+        $queue->peekForCancelSignal(2);
+
+        self::assertSame(
+            2,
+            $reads,
+        );
+    }
+
     public function test_peek_buffers_abandon_targeting_different_message_and_returns_null(): void
     {
         $queue = $this->makeQueueWithEncodedRequest(
@@ -1133,6 +1181,24 @@ final class ServerQueueTest extends TestCase
         );
     }
 
+    /**
+     * A socket that hands back the same bytes on every read, counting the reads.
+     */
+    private function socketRepeating(
+        string $bytes,
+        int &$reads,
+    ): Socket&MockObject {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')
+            ->willReturnCallback(function () use ($bytes, &$reads): string {
+                $reads++;
+
+                return $bytes;
+            });
+
+        return $socket;
+    }
+
     private function makeQueueWithAnonymousSize(string $bytes): ServerQueue
     {
         $socket = $this->createMock(Socket::class);
@@ -1163,6 +1229,26 @@ final class ServerQueueTest extends TestCase
                     300_000,
                 ),
             ))->base('dc=foo,dc=bar'),
+        ))->toAsn1());
+    }
+
+    /**
+     * A modify a little over the 64 KiB read-ahead may buffer.
+     */
+    private static function encodedRequestPastTheReadAheadBytes(): string
+    {
+        return (new LdapEncoder())->encode((new LdapMessageRequest(
+            5,
+            Operations::modify(
+                'cn=foo,dc=foo,dc=bar',
+                Change::replace(
+                    'description',
+                    str_repeat(
+                        'x',
+                        70_000,
+                    ),
+                ),
+            ),
         ))->toAsn1());
     }
 
