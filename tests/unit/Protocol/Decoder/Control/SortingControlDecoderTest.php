@@ -16,10 +16,13 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Control;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -75,6 +78,29 @@ final class SortingControlDecoderTest extends TestCase
                 ),
                 $this->context,
             )->setValue(null),
+        );
+    }
+
+    public function testItDecodesAsManySortKeysAsTheLimitAllows(): void
+    {
+        self::assertCount(
+            SortingControlDecoder::MAX_KEYS,
+            $this->subject->decode(
+                self::sortControlOf(SortingControlDecoder::MAX_KEYS),
+                $this->context,
+            )->getSortKeys(),
+        );
+    }
+
+    public function testItRefusesMoreSortKeysThanTheLimitAsAnAdministrativeLimit(): void
+    {
+        $this->expectException(AdminLimitExceededException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+        $this->expectExceptionMessage('The sorting control holds more than 100 sort keys.');
+
+        $this->subject->decode(
+            self::sortControlOf(SortingControlDecoder::MAX_KEYS + 1),
+            $this->context,
         );
     }
 
@@ -141,5 +167,19 @@ final class SortingControlDecoderTest extends TestCase
             )),
             'The sorting control contains unexpected data.',
         ];
+    }
+
+    private static function sortControlOf(int $keys): SequenceType
+    {
+        return self::encodedControl(
+            Control::OID_SORTING,
+            Asn1::sequenceOf(...array_map(
+                static fn(int $i): SequenceType => Asn1::sequence(Asn1::octetString("attr{$i}")),
+                range(
+                    1,
+                    $keys,
+                ),
+            )),
+        );
     }
 }

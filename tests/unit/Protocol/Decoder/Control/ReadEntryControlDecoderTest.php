@@ -18,16 +18,23 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\Decoder\AttributeSelectionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\EncodedControlTrait;
 
+use function array_map;
+use function range;
+
 final class ReadEntryControlDecoderTest extends TestCase
 {
     use EncodedControlTrait;
+
+    private AttributeSelectionDecoder $attributeSelection;
 
     private ReadEntryControlDecoder $subject;
 
@@ -35,7 +42,11 @@ final class ReadEntryControlDecoderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ReadEntryControlDecoder(PostReadControl::class);
+        $this->attributeSelection = new AttributeSelectionDecoder();
+        $this->subject = new ReadEntryControlDecoder(
+            PostReadControl::class,
+            $this->attributeSelection,
+        );
         $this->context = new DecodeContext();
     }
 
@@ -75,10 +86,30 @@ final class ReadEntryControlDecoderTest extends TestCase
     {
         self::assertInstanceOf(
             PreReadControl::class,
-            (new ReadEntryControlDecoder(PreReadControl::class))->decode(
+            (new ReadEntryControlDecoder(
+                PreReadControl::class,
+                $this->attributeSelection,
+            ))->decode(
                 (new PreReadControl('cn'))->toAsn1(),
                 $this->context,
             ),
+        );
+    }
+
+    public function testItRefusesMoreAttributesThanTheLimit(): void
+    {
+        $this->expectException(AdminLimitExceededException::class);
+        $this->expectExceptionMessage('The request selects more than 1000 attributes.');
+
+        $this->subject->decode(
+            (new PostReadControl(...array_map(
+                static fn(int $i): string => "attr{$i}",
+                range(
+                    1,
+                    AttributeSelectionDecoder::MAX_ATTRIBUTES + 1,
+                ),
+            )))->toAsn1(),
+            $this->context,
         );
     }
 
@@ -113,7 +144,7 @@ final class ReadEntryControlDecoderTest extends TestCase
         ];
         yield 'an attribute that is not an octet string' => [
             Asn1::sequence(Asn1::integer(1)),
-            'A read-entry attribute selection must contain octet string values.',
+            'An attribute selection must contain octet string values.',
         ];
     }
 }

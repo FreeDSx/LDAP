@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
+use FreeDSx\Ldap\Protocol\Decoder\AttributeSelectionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\DirSyncResponseControlDecoder;
@@ -95,6 +96,8 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             MessageEnvelopeReader::class => $this->makeMessageEnvelopeReader(...),
             RequestMessageDecoder::class => $this->makeRequestMessageDecoder(...),
             ResponseMessageDecoder::class => $this->makeResponseMessageDecoder(...),
+            AttributeSelectionDecoder::class => static fn(): AttributeSelectionDecoder
+                => new AttributeSelectionDecoder(),
             AbandonRequestDecoder::class => static fn(): AbandonRequestDecoder => new AbandonRequestDecoder(),
             AddRequestDecoder::class => static fn(): AddRequestDecoder => new AddRequestDecoder(),
             BindRequestDecoder::class => static fn(): BindRequestDecoder => new BindRequestDecoder(),
@@ -169,7 +172,10 @@ final class DecoderContainerProvider implements ContainerProviderInterface
 
     private function makeSearchRequestDecoder(Container $container): SearchRequestDecoder
     {
-        return new SearchRequestDecoder($container->get(FilterDecoder::class));
+        return new SearchRequestDecoder(
+            $container->get(FilterDecoder::class),
+            $container->get(AttributeSelectionDecoder::class),
+        );
     }
 
     private function makeCompareRequestDecoder(): CompareRequestDecoder
@@ -269,8 +275,14 @@ final class DecoderContainerProvider implements ContainerProviderInterface
             Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
             Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
             Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
-            Control::OID_PRE_READ => new ReadEntryControlDecoder(PreReadControl::class),
-            Control::OID_POST_READ => new ReadEntryControlDecoder(PostReadControl::class),
+            Control::OID_PRE_READ => new ReadEntryControlDecoder(
+                PreReadControl::class,
+                $container->get(AttributeSelectionDecoder::class),
+            ),
+            Control::OID_POST_READ => new ReadEntryControlDecoder(
+                PostReadControl::class,
+                $container->get(AttributeSelectionDecoder::class),
+            ),
             Control::OID_SUBENTRIES => $container->get(SubentriesControlDecoder::class),
         ]);
     }

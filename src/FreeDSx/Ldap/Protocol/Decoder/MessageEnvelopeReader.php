@@ -21,6 +21,7 @@ use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -125,7 +126,9 @@ readonly class MessageEnvelopeReader
     /**
      * Decodes each control the message carries, in order, with the control decoder this side uses.
      *
+     * @param int|null $maxControls the most controls the message may carry, or null for no limit.
      * @return list<Control>
+     * @throws AdminLimitExceededException when the message carries more controls than the limit.
      * @throws ProtocolException
      * @throws EncoderException
      */
@@ -133,6 +136,7 @@ readonly class MessageEnvelopeReader
         MessageEnvelope $envelope,
         DecodeContext $context,
         ControlDecoderInterface $decoder,
+        ?int $maxControls = null,
     ): array {
         $controls = [];
         $count = count($envelope->pdu->getChildren());
@@ -150,11 +154,20 @@ readonly class MessageEnvelopeReader
                 throw new ProtocolException('The ASN1 structure for the controls is malformed.');
             }
 
+            $listed = $context->complete(
+                $child,
+                AbstractType::TAG_TYPE_SEQUENCE,
+            );
+            // Counted before any control is built, as the decoded controls are held for as long as the request runs.
+            if ($maxControls !== null && count($controls) + count($listed->getChildren()) > $maxControls) {
+                throw new AdminLimitExceededException(sprintf(
+                    'The request carries more than %d controls.',
+                    $maxControls,
+                ));
+            }
+
             $decoded = $this->decodeControls(
-                $context->complete(
-                    $child,
-                    AbstractType::TAG_TYPE_SEQUENCE,
-                ),
+                $listed,
                 $context,
                 $decoder,
             );

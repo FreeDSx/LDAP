@@ -16,8 +16,10 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Decoder\Request;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Protocol\Decoder\AttributeSelectionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Request\SearchRequestDecoder;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
@@ -25,6 +27,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\TrailingComponentTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+
+use function array_map;
+use function range;
 
 final class SearchRequestDecoderTest extends TestCase
 {
@@ -100,7 +105,7 @@ final class SearchRequestDecoderTest extends TestCase
     public function testItChecksTheAttributesBeforeTheNumericFields(): void
     {
         $this->expectException(ProtocolException::class);
-        $this->expectExceptionMessage('The search request is malformed.');
+        $this->expectExceptionMessage('An attribute selection must contain octet string values.');
 
         $this->subject->decode(
             Asn1::sequence(
@@ -116,6 +121,29 @@ final class SearchRequestDecoderTest extends TestCase
                 ),
                 Asn1::sequenceOf(Asn1::integer(1)),
             ),
+            $this->context,
+        );
+    }
+
+    public function testItRefusesASearchSelectingMoreAttributesThanTheLimit(): void
+    {
+        $this->expectException(AdminLimitExceededException::class);
+        $this->expectExceptionMessage('The request selects more than 1000 attributes.');
+
+        $this->subject->decode(
+            (new SearchRequest(
+                new EqualityFilter(
+                    'foo',
+                    'bar',
+                ),
+                ...array_map(
+                    static fn(int $i): string => "attr{$i}",
+                    range(
+                        1,
+                        AttributeSelectionDecoder::MAX_ATTRIBUTES + 1,
+                    ),
+                ),
+            ))->base('dc=foo,dc=bar')->toAsn1(),
             $this->context,
         );
     }

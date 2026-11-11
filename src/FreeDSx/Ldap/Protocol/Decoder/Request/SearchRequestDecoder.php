@@ -20,12 +20,15 @@ use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Exception\AdminLimitExceededException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Protocol\Decoder\AttributeSelectionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\OperationDecoderInterface;
 
+use function array_map;
 use function count;
 use function is_int;
 
@@ -38,10 +41,14 @@ use function is_int;
  */
 readonly class SearchRequestDecoder implements OperationDecoderInterface
 {
-    public function __construct(private FilterDecoder $filters) {}
+    public function __construct(
+        private FilterDecoder $filters,
+        private AttributeSelectionDecoder $attributeSelection,
+    ) {}
 
     /**
      * @param AbstractType<mixed> $type
+     * @throws AdminLimitExceededException
      * @throws ProtocolException
      */
     public function decode(
@@ -111,18 +118,14 @@ readonly class SearchRequestDecoder implements OperationDecoderInterface
 
     /**
      * @return list<Attribute>
+     * @throws AdminLimitExceededException
      * @throws ProtocolException
      */
     private function attributes(SequenceType $attributes): array
     {
-        $attrList = [];
-        foreach ($attributes->getChildren() as $attribute) {
-            if (!$attribute instanceof OctetStringType) {
-                throw new ProtocolException('The search request is malformed.');
-            }
-            $attrList[] = new Attribute($attribute->getValue());
-        }
-
-        return $attrList;
+        return array_map(
+            static fn(string $name): Attribute => new Attribute($name),
+            $this->attributeSelection->decode($attributes),
+        );
     }
 }

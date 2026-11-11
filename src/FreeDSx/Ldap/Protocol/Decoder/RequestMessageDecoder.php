@@ -27,6 +27,16 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
  */
 readonly class RequestMessageDecoder extends MessageDecoder
 {
+    /**
+     * The most controls a received request may carry.
+     */
+    public const MAX_CONTROLS = 100;
+
+    protected function maxControls(): int
+    {
+        return self::MAX_CONTROLS;
+    }
+
     protected function message(
         int $messageId,
         ProtocolElementInterface $operation,

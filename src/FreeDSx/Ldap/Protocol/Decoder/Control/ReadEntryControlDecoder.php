@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Decoder\Control;
 
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\ReadEntry\ReadEntryControl;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\Decoder\AttributeSelectionDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 
 /**
@@ -32,7 +32,10 @@ readonly class ReadEntryControlDecoder extends EncodedValueControlDecoder
     /**
      * @param class-string<ReadEntryControl> $controlClass the pre-read or post-read control to build.
      */
-    public function __construct(private string $controlClass) {}
+    public function __construct(
+        private string $controlClass,
+        private AttributeSelectionDecoder $attributeSelection,
+    ) {}
 
     protected function decodeValue(
         AbstractType $value,
@@ -42,14 +45,6 @@ readonly class ReadEntryControlDecoder extends EncodedValueControlDecoder
             throw new ProtocolException('A read-entry control value must be a sequence of attribute names.');
         }
 
-        $attributes = [];
-        foreach ($value->getChildren() as $child) {
-            if (!$child instanceof OctetStringType) {
-                throw new ProtocolException('A read-entry attribute selection must contain octet string values.');
-            }
-            $attributes[] = $child->getValue();
-        }
-
-        return new $this->controlClass(...$attributes);
+        return new $this->controlClass(...$this->attributeSelection->decode($value));
     }
 }
