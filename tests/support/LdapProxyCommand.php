@@ -9,11 +9,14 @@ use FreeDSx\Ldap\LdapProxyServer;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
+use Tests\Support\FreeDSx\Ldap\Logging\StdoutLogger;
 
 final class LdapProxyCommand extends Command
 {
@@ -68,6 +71,40 @@ final class LdapProxyCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Forward operations for sessions that have not bound',
+            )
+            ->addOption(
+                'runner',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Server runner the proxy accepts clients on (pcntl, swoole)',
+                'pcntl',
+            )
+            ->addOption(
+                'workers',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Swoole worker processes to accept on; more than one uses the pooled runner',
+                '1',
+            )
+            ->addOption(
+                'write-timeout',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds a write may stall before the connection is closed; the library default when omitted',
+                '',
+            )
+            ->addOption(
+                'entry-padding',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Bytes of description the upstream adds to each extra entry',
+                '0',
+            )
+            ->addOption(
+                'log',
+                null,
+                InputOption::VALUE_NONE,
+                'Write proxy log messages to stdout, so a test can wait on one instead of sleeping',
             );
     }
 
@@ -88,21 +125,28 @@ final class LdapProxyCommand extends Command
             return Command::FAILURE;
         }
 
+        $runner = $this->getStringOption($input, 'runner');
+        if (!in_array($runner, ['pcntl', 'swoole'], true)) {
+            $output->writeln("<error>Invalid --runner value: {$runner}. Expected one of: pcntl, swoole.</error>");
+
+            return Command::FAILURE;
+        }
+
         $upstreamPort = TestWorker::port(TestWorker::OFFSET_UPSTREAM);
         $upstream = $this->startUpstream(
             $upstreamPort,
             $upstreamStartTls,
             $upstreamConfidentiality,
             $this->getStringOption($input, 'entries'),
+            $this->getStringOption($input, 'entry-padding'),
         );
 
         register_shutdown_function(static fn() => $upstream->stop());
 
         $server = new LdapProxyServer(new ProxyOptions(
             serverOptions: $this->makeServerOptions(
+                $input,
                 $output,
-                $this->getStringOption($input, 'transport') === 'ssl',
-                $input->getOption('no-require-authentication') !== true,
             ),
             clientOptions: (new ClientOptions())
                 ->setServers(['127.0.0.1'])
@@ -119,17 +163,28 @@ final class LdapProxyCommand extends Command
     }
 
     private function makeServerOptions(
+        InputInterface $input,
         OutputInterface $output,
-        bool $useSsl,
-        bool $requireAuthentication,
     ): ProxyServerOptions {
-        return (new ProxyServerOptions((new NetworkConfig())
+        $network = (new NetworkConfig())
             ->setPort(TestWorker::port())
-            ->setUseSsl($useSsl)
+            ->setUseSsl($this->getStringOption($input, 'transport') === 'ssl')
             ->setSslCert(self::SSL_CERT)
             ->setSslCertKey(self::SSL_KEY)
-            ->setSocketAcceptTimeout(0.1)))
-            ->setRequireAuthentication($requireAuthentication)
+            ->setSocketAcceptTimeout(0.1);
+
+        $writeTimeout = $this->getStringOption($input, 'write-timeout');
+        if ($writeTimeout !== '') {
+            $network->setWriteTimeout((int) $writeTimeout);
+        }
+
+        return (new ProxyServerOptions($network))
+            ->setRunnerConfig(new RunnerConfig(
+                $this->getStringOption($input, 'runner') === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl,
+                (int) $this->getStringOption($input, 'workers'),
+            ))
+            ->setRequireAuthentication($input->getOption('no-require-authentication') !== true)
+            ->setLogger($input->getOption('log') === true ? new StdoutLogger() : null)
             ->setOnServerReady(fn() => $output->writeln('server starting...'));
     }
 
@@ -141,6 +196,7 @@ final class LdapProxyCommand extends Command
         bool $useStartTls,
         string $confidentiality,
         string $entries,
+        string $entryPadding,
     ): Process {
         $upstream = new Process([
             'php',
@@ -150,6 +206,7 @@ final class LdapProxyCommand extends Command
             '--transport=' . ($useStartTls ? 'tcp' : 'ssl'),
             '--port=' . $port,
             '--entries=' . $entries,
+            '--entry-padding=' . $entryPadding,
             '--require-confidentiality=' . $confidentiality,
         ]);
         $upstream->start();
