@@ -26,4 +26,12 @@ final class InMemoryStorageConfigTest extends TestCase
             (new InMemoryStorageConfig())->type(),
         );
     }
+
+    public function test_its_connections_hold_no_open_files(): void
+    {
+        self::assertSame(
+            0,
+            (new InMemoryStorageConfig())->descriptorsPerConnection(),
+        );
+    }
 }

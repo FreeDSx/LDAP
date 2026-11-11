@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Process\Child;
 
 use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
-use FreeDSx\Socket\Socket;
 
 use function posix_kill;
 
@@ -22,7 +21,6 @@ readonly class ChildProcess
 {
     public function __construct(
         private int $pid,
-        private Socket $socket,
         private ?ChildChannel $channel = null,
     ) {}
 
@@ -31,19 +29,9 @@ readonly class ChildProcess
         return $this->pid;
     }
 
-    public function getSocket(): Socket
-    {
-        return $this->socket;
-    }
-
     public function getChannel(): ?ChildChannel
     {
         return $this->channel;
-    }
-
-    public function closeSocket(): void
-    {
-        $this->socket->close();
     }
 
     public function signal(int $signal): void
@@ -52,13 +40,5 @@ readonly class ChildProcess
             $this->pid,
             $signal,
         );
-    }
-
-    /**
-     * Drop this process's own handle on the connection, leaving the process that owns it unaffected.
-     */
-    public function releaseSocket(): void
-    {
-        $this->socket->close(shutdown: false);
     }
 }

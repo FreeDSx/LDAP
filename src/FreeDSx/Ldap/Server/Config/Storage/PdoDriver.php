@@ -51,6 +51,17 @@ enum PdoDriver
     }
 
     /**
+     * The open files each connection holds, such as the database file and its write-ahead log.
+     */
+    public function descriptorsPerConnection(): int
+    {
+        return match ($this) {
+            self::Sqlite => 2,
+            self::Mysql => 1,
+        };
+    }
+
+    /**
      * @return array<int, mixed>
      */
     public function defaultPdoOptions(): array

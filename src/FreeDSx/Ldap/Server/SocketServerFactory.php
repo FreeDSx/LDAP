@@ -78,12 +78,24 @@ readonly class SocketServerFactory
             ->setReusePort($this->reusePort)
             ->setTcpNoDelay(!$isUnixSocket);
 
-        return SocketServer::bind(
+        return $this->bind(
             $resource,
             $isUnixSocket
                 ? null
                 : $this->network->getPort(),
             $socketServerOptions,
+        );
+    }
+
+    protected function bind(
+        string $resource,
+        ?int $port,
+        SocketServerOptions $options,
+    ): SocketServer {
+        return SocketServer::bind(
+            $resource,
+            $port,
+            $options,
         );
     }
 

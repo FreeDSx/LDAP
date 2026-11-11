@@ -50,6 +50,11 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
         return $this->storageConfig->isMultiProcessSafe();
     }
 
+    public function descriptorsPerClient(): int
+    {
+        return 1 + $this->storageConfig->descriptorsPerConnection();
+    }
+
     public function reloadInstances(): array
     {
         return $this->reloadInstances;

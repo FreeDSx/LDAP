@@ -14,16 +14,17 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Server;
 
 use Closure;
+use FreeDSx\Socket\Exception\AcceptException;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 
 /**
- * A listening server that hands out the given connections in order.
+ * A listening server that hands out the given connections in order, throwing any accept failure among them.
  */
 final class ScriptedSocketServer extends SocketServer
 {
     /**
-     * @param list<Socket> $arrivals
+     * @param list<Socket|AcceptException> $arrivals
      * @param ?Closure(): void $onArrival Runs as each connection is accepted.
      * @param ?Closure(): void $onDrained Runs when an accept finds no connection left.
      */
@@ -43,6 +44,9 @@ final class ScriptedSocketServer extends SocketServer
             $this->onDrained?->__invoke();
 
             return null;
+        }
+        if ($socket instanceof AcceptException) {
+            throw $socket;
         }
         $this->onArrival?->__invoke();
         $this->clients[] = $socket;

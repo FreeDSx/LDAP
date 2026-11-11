@@ -35,6 +35,11 @@ interface ListenerContributorInterface
     public function supportsMultipleWorkers(): bool;
 
     /**
+     * The open files a process holds for each client it serves, counting the client's own socket.
+     */
+    public function descriptorsPerClient(): int;
+
+    /**
      * Live services to seed into the reloaded container so their state survives the reload.
      *
      * @return array<class-string, object>

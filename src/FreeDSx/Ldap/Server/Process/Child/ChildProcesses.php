@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Process\Child;
 
 use Countable;
 
+use function class_exists;
 use function count;
 use function pcntl_waitpid;
 
@@ -33,6 +34,11 @@ class ChildProcesses implements Countable
      * @var list<ChildProcess>
      */
     private array $children = [];
+
+    public function __construct()
+    {
+        self::loadReapClasses();
+    }
 
     public function add(ChildProcess $child): void
     {
@@ -95,15 +101,23 @@ class ChildProcesses implements Countable
     }
 
     /**
-     * A fresh fork drops its copies of the others' connections, so it neither leaks them nor ends them when it exits.
+     * A fresh fork closes its copies of the other children's channels and forgets those children.
      */
     public function releaseInherited(): void
     {
         foreach ($this->children as $child) {
             $child->getChannel()?->close();
-            $child->releaseSocket();
         }
 
         $this->children = [];
+    }
+
+    /**
+     * Loads what reaping needs up front, guarding against no descriptor being free to load it later.
+     */
+    private static function loadReapClasses(): void
+    {
+        class_exists(ReapedChild::class);
+        class_exists(ChildExitCode::class);
     }
 }

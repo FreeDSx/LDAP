@@ -178,6 +178,26 @@ final class PdoConfigTest extends TestCase
         );
     }
 
+    public function test_a_sqlite_connection_holds_the_database_file_and_its_write_ahead_log(): void
+    {
+        self::assertSame(
+            2,
+            PdoConfig::forSqlite('/var/lib/ldap.sqlite')->descriptorsPerConnection(),
+        );
+    }
+
+    public function test_a_mysql_connection_holds_one_network_socket(): void
+    {
+        self::assertSame(
+            1,
+            PdoConfig::forMysql(
+                'mysql:host=localhost;dbname=ldap',
+                'user',
+                'secret',
+            )->descriptorsPerConnection(),
+        );
+    }
+
     #[DataProvider('inMemorySqliteDsnProvider')]
     public function test_an_in_memory_sqlite_database_is_not_multi_process_safe(string $path): void
     {

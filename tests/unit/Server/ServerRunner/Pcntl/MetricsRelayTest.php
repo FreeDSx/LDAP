@@ -30,7 +30,6 @@ use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ReapedChild;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
-use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -79,7 +78,13 @@ final class MetricsRelayTest extends TestCase
         $channel = $this->channelReportingOneSearch();
 
         $this->subject->sweep(
-            [new ReapedChild(new ChildProcess(1, $this->createStub(Socket::class), $channel), ConnectionObservation::IdleTimeout)],
+            [new ReapedChild(
+                new ChildProcess(
+                    1,
+                    $channel,
+                ),
+                ConnectionObservation::IdleTimeout,
+            )],
             [],
         );
 
@@ -99,7 +104,10 @@ final class MetricsRelayTest extends TestCase
 
         $this->subject->sweep(
             [],
-            [new ChildProcess(1, $this->createStub(Socket::class), $channel)],
+            [new ChildProcess(
+                1,
+                $channel,
+            )],
         );
 
         self::assertSame(

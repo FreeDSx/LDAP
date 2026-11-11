@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
@@ -39,7 +40,7 @@ final class DirectoryListenerContributorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->options = TestServerOptions::defaults();
+        $this->options = TestServerOptions::forStorage(PdoConfig::forSqlite('/var/lib/ldap.sqlite'));
         $this->accessControl = new ReloadableAccessControl(new RuleBasedAccessControl(AclRules::fromEmpty()));
 
         $this->subject = new DirectoryListenerContributor(
@@ -62,6 +63,14 @@ final class DirectoryListenerContributorTest extends TestCase
         $this->accessControl->authorizeExtendedOperation(
             BindToken::fromDn('cn=user,dc=foo,dc=bar'),
             self::OID,
+        );
+    }
+
+    public function test_each_client_holds_its_socket_plus_its_storage_connection(): void
+    {
+        self::assertSame(
+            3,
+            $this->subject->descriptorsPerClient(),
         );
     }
 

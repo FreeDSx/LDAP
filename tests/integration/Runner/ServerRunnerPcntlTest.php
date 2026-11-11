@@ -68,6 +68,24 @@ final class ServerRunnerPcntlTest extends ServerRunnerTestCase
         }
     }
 
+    public function testAClientWhoseForkFailsIsTurnedAwayAndTheServerKeepsServing(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--log', '--fail-fork=2'],
+        );
+
+        self::assertSame(
+            [true, false, true],
+            [
+                $this->bindsUser($this->buildClient('tcp')),
+                $this->bindsUser($this->buildClient('tcp')),
+                $this->bindsUser($this->buildClient('tcp')),
+            ],
+        );
+        $this->waitForServerOutput('A client connection was rejected.');
+    }
+
     /**
      * The parent reloads first, then each connection child applies it for itself.
      */

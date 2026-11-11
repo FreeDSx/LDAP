@@ -212,4 +212,9 @@ final class PdoConfig implements StorageConfigInterface
         return !str_contains($dsn, ':memory:')
             && !str_contains($dsn, 'mode=memory');
     }
+
+    public function descriptorsPerConnection(): int
+    {
+        return $this->driver->descriptorsPerConnection();
+    }
 }

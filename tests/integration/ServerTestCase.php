@@ -136,10 +136,12 @@ class ServerTestCase extends LdapTestCase
      * Anything already listening is stopped first, since only one server can hold the port.
      *
      * @param list<string> $extraArgs
+     * @param int|null $openFileLimit the number of files the server may hold open, or null to leave it as inherited.
      */
     protected function createServerProcess(
         string $transport,
         array $extraArgs = [],
+        ?int $openFileLimit = null,
     ): void {
         $this->stopServer();
 
@@ -150,6 +152,15 @@ class ServerTestCase extends LdapTestCase
             '--transport=' . $transport,
             ...$extraArgs,
         ];
+        if ($openFileLimit !== null) {
+            $processArgs = [
+                'sh',
+                '-c',
+                'ulimit -n ' . $openFileLimit . ' && exec "$@"',
+                'sh',
+                ...$processArgs,
+            ];
+        }
 
         $process = new Process($processArgs);
         $process->start();
@@ -379,9 +390,10 @@ class ServerTestCase extends LdapTestCase
         int $maxWaitSeconds = self::SERVER_MAX_WAIT_SECONDS,
     ): string {
         $deadline = microtime(true) + $maxWaitSeconds;
+        $output = '';
 
         while ($process->isRunning()) {
-            $output = $process->getOutput();
+            $output .= $process->getOutput();
             $process->clearOutput();
 
             if (str_contains($output, $marker)) {

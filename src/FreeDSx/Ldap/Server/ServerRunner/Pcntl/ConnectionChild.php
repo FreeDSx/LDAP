@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Process\Child\ChildExitCode;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Socket\Socket;
@@ -51,9 +52,6 @@ class ConnectionChild
         private readonly array $blockedSignals,
     ) {}
 
-    /**
-     * @throws EncoderException
-     */
     public function run(
         Socket $socket,
         ?ChildReporter $reporter,
@@ -62,12 +60,44 @@ class ConnectionChild
         $pid = posix_getpid();
         $context = ['pid' => $pid];
 
+        $closeReason = null;
+        try {
+            $closeReason = $this->serve(
+                $socket,
+                $pid,
+                $context,
+            );
+        } catch (Throwable $e) {
+            $this->configuration->events()->record(
+                ServerEvent::ClientError,
+                $context,
+                cause: $e,
+            );
+        } finally {
+            $reporter?->finish();
+        }
+
+        // Convey a timeout close to the parent through the exit code.
+        exit(ChildExitCode::forCloseReason($closeReason));
+    }
+
+    /**
+     * Prepares the connection and serves its session, returning how it closed.
+     *
+     * @param array<string, scalar> $context
+     * @throws EncoderException
+     */
+    private function serve(
+        Socket $socket,
+        int $pid,
+        array $context,
+    ): ?ConnectionObservation {
         $this->resettable->reset();
 
         if (!$this->encryptConnectionIfDeferred($socket, $context)) {
             $socket->close();
 
-            exit(0);
+            return null;
         }
 
         $protocolHandler = $this->configuration->protocolFactory()->make(
@@ -83,21 +113,7 @@ class ConnectionChild
             $this->blockedSignals,
         );
 
-        $closeReason = null;
-        try {
-            $closeReason = $protocolHandler->handle();
-        } catch (Throwable $e) {
-            $this->configuration->events()->record(
-                ServerEvent::ClientError,
-                $context,
-                cause: $e,
-            );
-        } finally {
-            $reporter?->finish();
-        }
-
-        // Convey a timeout close to the parent through the exit code.
-        exit(ChildExitCode::forCloseReason($closeReason));
+        return $protocolHandler->handle();
     }
 
     /**

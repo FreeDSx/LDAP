@@ -31,4 +31,9 @@ final readonly class InMemoryStorageConfig implements StorageConfigInterface
     {
         return StorageType::InMemory->isMultiProcessSafe();
     }
+
+    public function descriptorsPerConnection(): int
+    {
+        return 0;
+    }
 }

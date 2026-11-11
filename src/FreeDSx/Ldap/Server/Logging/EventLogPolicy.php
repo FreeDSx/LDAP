@@ -81,6 +81,7 @@ final readonly class EventLogPolicy
             ServerEvent::BulkImportFailed,
             ServerEvent::ServerStarted,
             ServerEvent::ServerAcceptFailed,
+            ServerEvent::ServerAcceptRecovered,
             ServerEvent::ShutdownStarted,
             ServerEvent::ShutdownDraining,
             ServerEvent::ShutdownForced,

@@ -15,8 +15,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Process\Child;
 
 use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
-use FreeDSx\Socket\Socket;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Process\Channel\FakeChannelMessageFactory;
@@ -27,16 +25,9 @@ final class ChildProcessTest extends TestCase
 
     private ChildProcess $subject;
 
-    private Socket&MockObject $mockSocket;
-
     protected function setUp(): void
     {
-        $this->mockSocket = $this->createMock(Socket::class);
-
-        $this->subject = new ChildProcess(
-            9001,
-            $this->mockSocket,
-        );
+        $this->subject = new ChildProcess(9001);
     }
 
     public function test_it_should_get_the_pid(): void
@@ -45,33 +36,6 @@ final class ChildProcessTest extends TestCase
             9001,
             $this->subject->getPid(),
         );
-    }
-
-    public function test_it_should_get_the_socket(): void
-    {
-        self::assertSame(
-            $this->mockSocket,
-            $this->subject->getSocket(),
-        );
-    }
-
-    public function test_it_should_close_the_socket(): void
-    {
-        $this->mockSocket
-            ->expects(self::once())
-            ->method('close');
-
-        $this->subject->closeSocket();
-    }
-
-    public function test_it_should_release_the_socket_without_shutting_it_down(): void
-    {
-        $this->mockSocket
-            ->expects(self::once())
-            ->method('close')
-            ->with(false);
-
-        $this->subject->releaseSocket();
     }
 
     public function test_the_channel_is_null_by_default(): void
@@ -87,7 +51,6 @@ final class ChildProcessTest extends TestCase
 
         $subject = new ChildProcess(
             9002,
-            $this->mockSocket,
             $channel,
         );
 

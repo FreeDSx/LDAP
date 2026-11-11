@@ -18,7 +18,10 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Throwable;
+
+use function class_exists;
 
 /**
  * Wraps a (nullable) PSR-3 logger with policy-gated, structured server events.
@@ -36,7 +39,9 @@ final readonly class EventLogger
         private ?LoggerInterface $logger,
         private EventLogPolicy $policy = new EventLogPolicy(),
         private array $context = [],
-    ) {}
+    ) {
+        self::loadRecordClasses();
+    }
 
     /**
      * @param array<string, mixed> $context Merged on top of the existing context
@@ -147,6 +152,16 @@ final readonly class EventLogger
             $message,
             $cause,
         );
+    }
+
+    /**
+     * Loads what recording an event needs up front, guarding against no descriptor being free to load it later.
+     */
+    private static function loadRecordClasses(): void
+    {
+        class_exists(EventContext::class);
+        class_exists(ExceptionLogging::class);
+        class_exists(LogLevel::class);
     }
 
     /**

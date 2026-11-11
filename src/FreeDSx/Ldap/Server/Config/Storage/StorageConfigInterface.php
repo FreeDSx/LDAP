@@ -33,4 +33,9 @@ interface StorageConfigInterface
      * @see StorageType::isMultiProcessSafe()
      */
     public function isMultiProcessSafe(): bool;
+
+    /**
+     * The open files each client's connection to the storage holds.
+     */
+    public function descriptorsPerConnection(): int;
 }

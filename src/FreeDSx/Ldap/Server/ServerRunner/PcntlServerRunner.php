@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\ForkFailedException;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Logging\EventContext;
@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcesses;
 use FreeDSx\Ldap\Server\Process\Child\ReapedChild;
@@ -29,10 +30,13 @@ use FreeDSx\Ldap\Server\ServerRunner\Pcntl\ChildReporter;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\ConnectionChild;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\SocketServerFactory;
+use FreeDSx\Socket\Exception\AcceptException;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use Throwable;
+
+use function usleep;
 
 /**
  * Uses PNCTL to fork incoming requests and send them to the server protocol handler.
@@ -44,6 +48,8 @@ class PcntlServerRunner implements ServerRunnerInterface
     private SocketServer $server;
 
     private ChildProcesses $childProcesses;
+
+    private readonly AcceptBackoff $acceptBackoff;
 
     private bool $isMainProcess = true;
 
@@ -69,6 +75,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     public function __construct(
         private readonly RunnerConfiguration $configuration,
         private readonly SocketServerFactory $socketServerFactory,
+        private readonly ChildForker $childForker,
         private readonly MetricsRelay $metrics = new MetricsRelay(),
         private readonly ResettableInterface $resettable = new NonResettable(),
         BackgroundTasksInterface $backgroundTasks = new PcntlBackgroundTasks(
@@ -77,6 +84,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         ),
     ) {
         $this->childProcesses = new ChildProcesses();
+        $this->acceptBackoff = new AcceptBackoff();
 
         // We need to be able to handle signals as they come in, regardless of what is going on...
         pcntl_async_signals(true);
@@ -137,7 +145,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $reaped = $this->childProcesses->reapExited();
 
         foreach ($reaped as $child) {
-            $this->releaseReapedChild($child);
+            $this->recordClosedChild($child);
         }
 
         $this->metrics->sweep(
@@ -146,12 +154,8 @@ class PcntlServerRunner implements ServerRunnerInterface
         );
     }
 
-    private function releaseReapedChild(ReapedChild $reaped): void
+    private function recordClosedChild(ReapedChild $reaped): void
     {
-        $socket = $reaped->process->getSocket();
-        $this->server->removeClient($socket);
-        $socket->close();
-
         $this->events()->record(
             ServerEvent::ClientClosed,
             ['child_pid' => $reaped->process->getPid()],
@@ -172,7 +176,16 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         do {
             $this->backgroundTasks->tick();
-            $socket = $this->server->accept($this->options()->getNetworkConfig()->getSocketAcceptTimeout());
+            try {
+                $socket = $this->server->accept($this->options()->getNetworkConfig()->getSocketAcceptTimeout());
+            } catch (AcceptException $e) {
+                $this->waitToAccept($this->acceptBackoff->failed(
+                    $e,
+                    $this->events(),
+                ));
+
+                continue;
+            }
 
             if ($this->isShuttingDown) {
                 if ($socket) {
@@ -192,6 +205,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
                 continue;
             }
+            $this->acceptBackoff->accepted($this->events());
 
             if ($this->isConnectionLimitReached()) {
                 $this->cleanUpChildProcesses();
@@ -215,58 +229,75 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             $reporter = $this->metrics->openChildReporter();
 
-            // A child inherits the parent's handlers. Block them until it has installed its own.
-            $this->blockSignals();
-
-            $pid = pcntl_fork();
-            if ($pid == -1) {
-                // In parent process, but could not fork...
-                $this->unblockSignals();
+            // Signals stay blocked across the fork until the child installs its own handlers.
+            try {
+                $this->childForker->start(
+                    fn(): never => $this->runConnectionChild(
+                        $socket,
+                        $reporter,
+                    ),
+                    function (int $pid) use ($socket, $reporter): void {
+                        $this->runAfterChildStarted(
+                            $pid,
+                            $socket,
+                            $reporter,
+                        );
+                    },
+                    $this->blockableSignals(),
+                );
+            } catch (ForkFailedException $e) {
                 $reporter?->close();
-                $this->events()->record(
-                    ServerEvent::ClientRejected,
-                    [EventContext::REASON => 'not_started'],
-                );
-
-                throw new RuntimeException('Unable to fork process.');
-            } elseif ($pid === 0) {
-                // This is the child's thread of execution...
-                $this->runConnectionChild(
+                $this->refuseUnstartedClient(
                     $socket,
-                    $reporter,
+                    $e,
                 );
-            } else {
-                // We are in the parent; the PID is the child process. It is tracked before signals are unblocked, so
-                $this->runAfterChildStarted(
-                    $pid,
-                    $socket,
-                    $reporter,
-                );
-                $this->unblockSignals();
             }
             // Use the shutdown flag, not the socket state (not reliable after forking)
         } while (!$this->isShuttingDown);
     }
 
+    /**
+     * Waits out an accept back-off, reaping the children that end meanwhile.
+     */
+    private function waitToAccept(float $seconds): void
+    {
+        usleep((int) ($seconds * 1_000_000));
+        $this->reapUnlessShuttingDown();
+    }
+
+    /**
+     * Turns away a client whose connection child could not be started.
+     */
+    private function refuseUnstartedClient(
+        Socket $socket,
+        ForkFailedException $failure,
+    ): void {
+        $this->events()->record(
+            ServerEvent::ClientRejected,
+            [EventContext::REASON => 'not_started'],
+            cause: $failure,
+        );
+        $this->metrics->connectionRejected();
+        $this->server->removeClient($socket);
+        $socket->close();
+        $this->reapUnlessShuttingDown();
+    }
+
+    /**
+     * A shutdown signal handled meanwhile has already reaped and removed the cn=monitor snapshot.
+     */
+    private function reapUnlessShuttingDown(): void
+    {
+        if ($this->isShuttingDown) {
+            return;
+        }
+
+        $this->cleanUpChildProcesses();
+    }
+
     private function isOwnerProcess(): bool
     {
         return posix_getpid() === $this->ownerPid;
-    }
-
-    private function blockSignals(): void
-    {
-        pcntl_sigprocmask(
-            SIG_BLOCK,
-            $this->blockableSignals(),
-        );
-    }
-
-    private function unblockSignals(): void
-    {
-        pcntl_sigprocmask(
-            SIG_UNBLOCK,
-            $this->blockableSignals(),
-        );
     }
 
     /**
@@ -318,8 +349,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      *     2. First sends a SIG_TERM to all child processes asking them to shut down and send a notice to the client.
      *     3. Waits for child processes to stop / clean them up.
      *     4. Force ends any remaining child process after a max time by sending a SIG_KILL.
-     *     5. Cleans up any child socket resources.
-     *     6. Stops the main socket server process.
+     *     5. Stops the main socket server process.
      */
     private function handleServerShutdown(): void
     {
@@ -370,15 +400,10 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * Iterates through each child process and sends the specified signal.
      */
-    private function endChildProcesses(
-        int $signal,
-        bool $closeSocket = false,
-    ): void {
+    private function endChildProcesses(int $signal): void
+    {
         foreach ($this->childProcesses->all() as $childProcess) {
             $childProcess->signal($signal);
-            if ($closeSocket) {
-                $childProcess->closeSocket();
-            }
         }
     }
 
@@ -434,10 +459,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * When a new Socket is received, we do the following:
-     *
-     *     1. Add the ChildProcess to the list of running child processes.
-     *     2. Clean-up any currently running child processes.
+     * Tracks a started child, releases the parent's copy of its connection, and reaps the children that have ended.
      */
     private function runAfterChildStarted(
         int $pid,
@@ -447,9 +469,12 @@ class PcntlServerRunner implements ServerRunnerInterface
         $reporter?->inParent();
         $this->childProcesses->add(new ChildProcess(
             $pid,
-            $socket,
             $reporter?->channel(),
         ));
+
+        // The child owns the connection now and the parent keeps no descriptor for it.
+        $this->server->removeClient($socket);
+        $socket->close(shutdown: false);
         $this->metrics->childStarted();
         $this->events()->record(
             ServerEvent::ClientConnected,
@@ -477,10 +502,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             ServerEvent::ShutdownForced,
             ['active_connections' => count($this->childProcesses)],
         );
-        $this->endChildProcesses(
-            SIGKILL,
-            true,
-        );
+        $this->endChildProcesses(SIGKILL);
         $this->cleanUpChildProcesses();
     }
 

@@ -45,12 +45,14 @@ use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\Protocol\NestedSequenceRequest;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 use function array_fill;
 use function array_map;
 use function extension_loaded;
 use function range;
 use function str_repeat;
+use function substr_count;
 
 /**
  * Behavior that runs against every server runner.
@@ -59,6 +61,11 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 {
     use TlsTestsTrait;
     use RawClientQueueTrait;
+
+    /**
+     * Enough files to start and serve a few clients, and far fewer than the clients a test opens.
+     */
+    protected const OPEN_FILE_LIMIT = 64;
 
     public static function setUpBeforeClass(): void
     {
@@ -572,6 +579,48 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         );
     }
 
+    public function testTheServerServesAgainOnceClientsPastItsOpenFileLimitLeave(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--log'],
+            self::OPEN_FILE_LIMIT,
+        );
+
+        $this->closeRawClients($this->openRawClients(100));
+
+        $this->authenticateUser();
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testFailedAcceptsAreLoggedOnceAndTheClientWaitingOnThemIsServed(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--log',
+                '--fail-accept=3',
+            ],
+        );
+
+        $this->authenticateUser();
+
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+        self::assertSame(
+            1,
+            substr_count(
+                $this->waitForServerOutput('Accepting incoming connections recovered.'),
+                'Failed to accept incoming connection.',
+            ),
+        );
+    }
+
     public function testAClientThatStopsReadingIsDisconnectedOnceAWriteStallsAndOthersAreStillServed(): void
     {
         $this->createServerProcess(
@@ -681,11 +730,46 @@ abstract class ServerRunnerTestCase extends ServerTestCase
     protected function createServerProcess(
         string $transport,
         array $extraArgs = [],
+        ?int $openFileLimit = null,
     ): void {
         parent::createServerProcess(
             $transport,
             [...$extraArgs, ...static::runnerArgs()],
+            $openFileLimit,
         );
+    }
+
+    /**
+     * Connects without binding, leaving each connection for the server to accept and hold.
+     *
+     * @return list<resource>
+     */
+    protected function openRawClients(int $count): array
+    {
+        $clients = [];
+        for ($i = 0; $i < $count; $i++) {
+            $client = @stream_socket_client(
+                'tcp://127.0.0.1:' . TestWorker::port(),
+                $errorNumber,
+                $errorMessage,
+                0.1,
+            );
+            if ($client !== false) {
+                $clients[] = $client;
+            }
+        }
+
+        return $clients;
+    }
+
+    /**
+     * @param list<resource> $clients
+     */
+    protected function closeRawClients(array $clients): void
+    {
+        foreach ($clients as $client) {
+            fclose($client);
+        }
     }
 
     protected function reloadServer(): void
