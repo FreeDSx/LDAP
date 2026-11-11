@@ -35,11 +35,9 @@ use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Logging\StdoutLogger;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\FileFlagConfigReloader;
 use PDO;
-use Psr\Log\AbstractLogger;
-use Psr\Log\LoggerInterface;
-use Stringable;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -117,6 +115,20 @@ final class LdapServerCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Number of extra entries to seed (used to test paging)',
                 '0',
+            )
+            ->addOption(
+                'entry-padding',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Bytes of description added to each extra entry, so a search can outgrow the socket buffers',
+                '0',
+            )
+            ->addOption(
+                'write-timeout',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds a write may stall before the connection is closed; the library default when omitted',
+                '',
             )
             ->addOption(
                 'shutdown-timeout',
@@ -321,16 +333,24 @@ final class LdapServerCommand extends Command
             );
         }
 
+        $padding = str_repeat(
+            'x',
+            (int) $this->getStringOption($input, 'entry-padding'),
+        );
         for ($i = 1; $i <= $entryCount; $i++) {
+            $attributes = [
+                'cn' => "entry-{$i}",
+                'objectClass' => 'inetOrgPerson',
+                'sn' => 'Entry',
+                // Must be a type the schema defines, or every assertion on it is Undefined (RFC 4511 4.5.1.7).
+                'employeeNumber' => (string) $i,
+            ];
+            if ($padding !== '') {
+                $attributes['description'] = $padding;
+            }
             $entries[] = Entry::fromArray(
                 "cn=entry-{$i},dc=foo,dc=bar",
-                [
-                    'cn' => "entry-{$i}",
-                    'objectClass' => 'inetOrgPerson',
-                    'sn' => 'Entry',
-                    // Must be a type the schema defines, or every assertion on it is Undefined (RFC 4511 4.5.1.7).
-                    'employeeNumber' => (string) $i,
-                ],
+                $attributes,
             );
         }
 
@@ -350,6 +370,11 @@ final class LdapServerCommand extends Command
             $network->setMaxConnections((int) $maxConnections);
         }
 
+        $writeTimeout = $this->getStringOption($input, 'write-timeout');
+        if ($writeTimeout !== '') {
+            $network->setWriteTimeout((int) $writeTimeout);
+        }
+
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
             ->setRunnerConfig(new RunnerConfig(
                 $runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl,
@@ -358,7 +383,7 @@ final class LdapServerCommand extends Command
             ->setAllowAnonymous($allowAnonymous)
             ->setRequireConfidentiality($confidentiality)
             ->setMonitorEnabled($input->getOption('monitor') === true)
-            ->setLogger($input->getOption('log') === true ? $this->makeStdoutLogger() : null)
+            ->setLogger($input->getOption('log') === true ? new StdoutLogger() : null)
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
@@ -495,32 +520,6 @@ final class LdapServerCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * Lets a test wait for a specific server event rather than sleeping and hoping it happened.
-     */
-    private function makeStdoutLogger(): LoggerInterface
-    {
-        return new class extends AbstractLogger {
-            /**
-             * @param mixed[] $context
-             */
-            public function log(
-                $level,
-                Stringable|string $message,
-                array $context = [],
-            ): void {
-                fwrite(
-                    STDOUT,
-                    sprintf(
-                        "[%s] %s\n",
-                        is_string($level) ? $level : 'log',
-                        $message,
-                    ),
-                );
-            }
-        };
     }
 
     private function createStorageConfig(string $storageType): StorageConfigInterface

@@ -572,6 +572,37 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         );
     }
 
+    public function testAClientThatStopsReadingIsDisconnectedOnceAWriteStallsAndOthersAreStillServed(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--log',
+                '--write-timeout=2',
+                '--entries=300',
+                '--entry-padding=65536',
+            ],
+        );
+
+        $stalled = $this->boundRawQueue();
+        $stalled->sendMessage(new LdapMessageRequest(
+            2,
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+        ));
+
+        try {
+            $this->waitForServerOutput('The connection was closed because the client stopped reading.');
+        } finally {
+            $stalled->close();
+        }
+
+        $this->authenticateUser();
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
     public function testAReloadedAccessPolicyReachesASessionAlreadyOpen(): void
     {
         $this->requirePosix();
