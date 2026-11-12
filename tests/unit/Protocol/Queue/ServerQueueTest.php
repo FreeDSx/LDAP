@@ -53,6 +53,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\WriteTimeoutException;
 use FreeDSx\Socket\Socket;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -124,6 +125,88 @@ final class ServerQueueTest extends TestCase
             1,
             new DeleteResponse(0),
         ), );
+    }
+
+    public function test_a_stream_started_while_another_write_holds_the_connection_is_refused_without_writing(): void
+    {
+        $refused = null;
+        $this->mockEncoder
+            ->method('encode')
+            ->willReturn('foo');
+        $this->mockSocket
+            ->expects(self::once())
+            ->method('write')
+            ->willReturnCallback(function () use (&$refused): Socket {
+                try {
+                    $this->subject->sendMessages([new LdapMessageResponse(
+                        2,
+                        new DeleteResponse(0),
+                    )]);
+                } catch (ConnectionException $e) {
+                    $refused = $e;
+                }
+
+                return $this->mockSocket;
+            });
+
+        $this->subject->sendMessage(new LdapMessageResponse(
+            1,
+            new DeleteResponse(0),
+        ));
+
+        self::assertInstanceOf(
+            ConnectionException::class,
+            $refused,
+        );
+    }
+
+    public function test_a_queue_whose_writes_went_out_has_no_failed_write(): void
+    {
+        $this->mockEncoder
+            ->method('encode')
+            ->willReturn('foo');
+
+        $this->subject->sendMessage(new LdapMessageResponse(
+            1,
+            new DeleteResponse(0),
+        ));
+
+        self::assertFalse($this->subject->hasFailedWrite());
+    }
+
+    public function test_a_write_the_socket_did_not_finish_leaves_a_failed_write(): void
+    {
+        $this->failWrite();
+
+        self::assertTrue($this->subject->hasFailedWrite());
+    }
+
+    public function test_a_send_after_a_failed_write_fails_the_same_way_without_writing(): void
+    {
+        $failure = $this->failWrite();
+
+        $this->expectExceptionObject($failure);
+
+        $this->subject->sendMessage(new LdapMessageResponse(
+            2,
+            new DeleteResponse(0),
+        ));
+    }
+
+    public function test_a_failed_write_is_rethrown_when_asked(): void
+    {
+        $failure = $this->failWrite();
+
+        $this->expectExceptionObject($failure);
+
+        $this->subject->throwIfWriteFailed();
+    }
+
+    public function test_nothing_is_thrown_when_asked_and_no_write_failed(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->throwIfWriteFailed();
     }
 
     public function test_it_should_get_a_request_message(): void
@@ -1163,6 +1246,31 @@ final class ServerQueueTest extends TestCase
         ))->sendMessage($message);
 
         return $written;
+    }
+
+    /**
+     * Sends a response the socket stalls on, allowing that one write and no other.
+     */
+    private function failWrite(): WriteTimeoutException
+    {
+        $failure = new WriteTimeoutException('The write operation timed out after 30 seconds.');
+        $this->mockEncoder
+            ->method('encode')
+            ->willReturn('foo');
+        $this->mockSocket
+            ->expects(self::once())
+            ->method('write')
+            ->willThrowException($failure);
+
+        try {
+            $this->subject->sendMessage(new LdapMessageResponse(
+                1,
+                new DeleteResponse(0),
+            ));
+        } catch (WriteTimeoutException) {
+        }
+
+        return $failure;
     }
 
     private function makeQueueWithEncodedRequest(LdapMessageRequest $message): ServerQueue

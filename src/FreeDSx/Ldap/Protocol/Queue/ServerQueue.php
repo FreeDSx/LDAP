@@ -93,6 +93,11 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     private ?int $maxSize = null;
 
     /**
+     * The failed write that every later write rethrows.
+     */
+    private ?ConnectionException $writeFailure = null;
+
+    /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
      */
     public function __construct(
@@ -251,9 +256,14 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      *
      * @param iterable<LdapMessageResponse> $responses
      * @throws EncoderException
+     * @throws ConnectionException when another write already holds the connection.
      */
     public function sendMessages(iterable $responses): self
     {
+        // Only a concurrent writer can hold the connection here, and interleaving with it corrupts both.
+        if ($this->isSending) {
+            throw new ConnectionException('Another write already holds the connection.');
+        }
         $this->isSending = true;
 
         try {
@@ -265,6 +275,44 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         $this->flushDeferred();
 
         return $this;
+    }
+
+    /**
+     * Whether a write has failed on the connection.
+     */
+    public function hasFailedWrite(): bool
+    {
+        return $this->writeFailure !== null;
+    }
+
+    /**
+     * Rethrows the failure of an earlier write, if one failed.
+     *
+     * @throws ConnectionException
+     */
+    public function throwIfWriteFailed(): void
+    {
+        if ($this->writeFailure !== null) {
+            throw $this->writeFailure;
+        }
+    }
+
+    /**
+     * A write after a failed one fails at once instead of waiting on the same socket again.
+     *
+     * @throws ConnectionException
+     */
+    protected function writeToSocket(string $bytes): void
+    {
+        $this->throwIfWriteFailed();
+
+        try {
+            parent::writeToSocket($bytes);
+        } catch (ConnectionException $e) {
+            $this->writeFailure = $e;
+
+            throw $e;
+        }
     }
 
     /**

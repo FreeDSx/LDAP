@@ -250,10 +250,10 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
-    public function test_write_timeout_defaults_to_600(): void
+    public function test_write_timeout_defaults_to_30(): void
     {
         self::assertSame(
-            600,
+            30,
             $this->subject->getWriteTimeout(),
         );
     }

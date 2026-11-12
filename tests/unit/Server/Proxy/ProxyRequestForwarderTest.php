@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Proxy\ProxyRequestForwarder;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Socket\Exception\WriteTimeoutException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -186,6 +187,33 @@ final class ProxyRequestForwarderTest extends TestCase
             ResultCode::UNAVAILABLE,
             $result->getResultCode(),
         );
+    }
+
+    public function test_a_client_that_stopped_reading_ends_the_session_with_its_failed_write_rather_than_an_answer(): void
+    {
+        $failure = new WriteTimeoutException('The write operation timed out after 30 seconds.');
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->method('sendAndReceive')
+            ->willThrowException(new ConnectionException('The write operation timed out after 30 seconds.'));
+        $this->queue
+            ->method('throwIfWriteFailed')
+            ->willThrowException($failure);
+
+        $this->client
+            ->expects(self::once())
+            ->method('disconnect');
+        $this->queue
+            ->expects(self::never())
+            ->method('sendMessage');
+        $this->expectExceptionObject($failure);
+
+        $this->subject->handle($this->contextFor(
+            1,
+            new SearchRequest(Filters::present('objectClass')),
+        ));
     }
 
     public function test_it_answers_an_upstream_referral_on_a_non_search_operation(): void

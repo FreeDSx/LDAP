@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnrecoverableExceptionInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Socket\Exception\ConnectionException as SocketException;
 use Throwable;
 
 /**
@@ -37,7 +38,8 @@ trait FailureAnswerTrait
         if ($failure instanceof OperationException) {
             return $failure;
         }
-        if ($failure instanceof UnrecoverableExceptionInterface) {
+        // A socket that failed has no room for an answer, and trying would only wait on it again.
+        if ($failure instanceof UnrecoverableExceptionInterface || $failure instanceof SocketException) {
             return null;
         }
         if ($failure instanceof AnswerableExceptionInterface) {

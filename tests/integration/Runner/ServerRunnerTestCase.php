@@ -50,6 +50,7 @@ use Tests\Support\FreeDSx\Ldap\TestWorker;
 use function array_fill;
 use function array_map;
 use function extension_loaded;
+use function microtime;
 use function range;
 use function str_repeat;
 use function substr_count;
@@ -66,6 +67,11 @@ abstract class ServerRunnerTestCase extends ServerTestCase
      * Enough files to start and serve a few clients, and far fewer than the clients a test opens.
      */
     protected const OPEN_FILE_LIMIT = 64;
+
+    /**
+     * Seconds a write may stall in the stalled-reader test.
+     */
+    private const STALLED_WRITE_TIMEOUT = 3;
 
     public static function setUpBeforeClass(): void
     {
@@ -621,19 +627,20 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         );
     }
 
-    public function testAClientThatStopsReadingIsDisconnectedOnceAWriteStallsAndOthersAreStillServed(): void
+    public function testAClientThatStopsReadingIsDisconnectedAfterOneWriteTimeoutAndOthersAreStillServed(): void
     {
         $this->createServerProcess(
             'tcp',
             [
                 '--log',
-                '--write-timeout=2',
+                '--write-timeout=' . self::STALLED_WRITE_TIMEOUT,
                 '--entries=300',
                 '--entry-padding=65536',
             ],
         );
 
         $stalled = $this->boundRawQueue();
+        $startedAt = microtime(true);
         $stalled->sendMessage(new LdapMessageRequest(
             2,
             Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
@@ -645,6 +652,10 @@ abstract class ServerRunnerTestCase extends ServerTestCase
             $stalled->close();
         }
 
+        self::assertLessThan(
+            2 * self::STALLED_WRITE_TIMEOUT,
+            microtime(true) - $startedAt,
+        );
         $this->authenticateUser();
         self::assertSame(
             'dn:cn=user,dc=foo,dc=bar',
@@ -820,21 +831,6 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         }
 
         return true;
-    }
-
-    private function boundRawQueue(): ClientQueue
-    {
-        $queue = $this->rawQueue();
-        $queue->sendMessage(new LdapMessageRequest(
-            1,
-            Operations::bind(
-                'cn=user,dc=foo,dc=bar',
-                '12345',
-            ),
-        ));
-        $queue->getMessage(1);
-
-        return $queue;
     }
 
     private function assertAnsweredAsAnAdministrativeLimit(

@@ -16,7 +16,9 @@ namespace Tests\Support\FreeDSx\Ldap;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
@@ -51,6 +53,21 @@ trait RawClientQueueTrait
             ),
             Container::forClient(new ClientOptions())->get(ResponseMessageDecoder::class),
         );
+    }
+
+    private function boundRawQueue(): ClientQueue
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ),
+        ));
+        $queue->getMessage(1);
+
+        return $queue;
     }
 
     /**

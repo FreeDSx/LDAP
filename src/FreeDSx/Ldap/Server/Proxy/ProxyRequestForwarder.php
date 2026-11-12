@@ -133,6 +133,8 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
             );
         } catch (ConnectionException $e) {
             $this->session->dropConnection();
+            // A result relayed to a client that stopped reading surfaces here as an upstream failure.
+            $this->queue->throwIfWriteFailed();
 
             // Reconnecting returns an anonymous session
             // Ending it beats answering as an identity we no longer are.

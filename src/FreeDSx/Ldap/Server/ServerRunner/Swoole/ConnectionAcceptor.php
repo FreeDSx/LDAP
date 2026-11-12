@@ -154,8 +154,9 @@ class ConnectionAcceptor
 
         $this->isShuttingDown = true;
         $this->server->close();
-        $this->notifyClientsOfShutdown();
+        // A client that stopped reading holds up its own notice, never the drain timer or the other notices.
         $this->startDrainTimeout();
+        $this->notifyClientsOfShutdown();
     }
 
     /**
@@ -269,14 +270,16 @@ class ConnectionAcceptor
     private function notifyClientsOfShutdown(): void
     {
         foreach ($this->activeHandlers as $handler) {
-            try {
-                $handler->shutdown();
-            } catch (Throwable $e) {
-                $this->events->record(
-                    ServerEvent::ClientNotifyFailed,
-                    cause: $e,
-                );
-            }
+            Coroutine::create(function () use ($handler): void {
+                try {
+                    $handler->shutdown();
+                } catch (Throwable $e) {
+                    $this->events->record(
+                        ServerEvent::ClientNotifyFailed,
+                        cause: $e,
+                    );
+                }
+            });
         }
     }
 

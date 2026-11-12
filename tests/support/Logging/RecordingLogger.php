@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Logging;
 
+use FreeDSx\Ldap\Server\Logging\EventContext;
 use Psr\Log\AbstractLogger;
 use Stringable;
 
@@ -41,5 +42,18 @@ final class RecordingLogger extends AbstractLogger
             'message' => (string) $message,
             'context' => $context,
         ];
+    }
+
+    /**
+     * The event each record names, in the order they were logged.
+     *
+     * @return list<mixed>
+     */
+    public function events(): array
+    {
+        return array_map(
+            static fn(array $record): mixed => $record['context'][EventContext::EVENT] ?? null,
+            $this->records,
+        );
     }
 }
