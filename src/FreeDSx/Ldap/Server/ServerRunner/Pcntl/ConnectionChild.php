@@ -20,13 +20,13 @@ use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Process\Child\ChildExitCode;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
 use FreeDSx\Socket\Socket;
 use Throwable;
 
 use function array_merge;
 use function pcntl_signal;
-use function pcntl_sigprocmask;
 use function posix_getpid;
 
 /**
@@ -42,14 +42,13 @@ class ConnectionChild
 
     /**
      * @param list<int> $shutdownSignals Each ends the session with a notice of disconnection.
-     * @param list<int> $blockedSignals What the parent blocked around the fork, unblocked once the handlers are in place.
      */
     public function __construct(
         private readonly RunnerConfiguration $configuration,
         private readonly ResettableInterface $resettable,
+        private readonly ChildForker $childForker,
         private readonly bool $isTlsHandshakeDeferred,
         private readonly array $shutdownSignals,
-        private readonly array $blockedSignals,
     ) {}
 
     public function run(
@@ -108,10 +107,7 @@ class ConnectionChild
             $protocolHandler,
             $context,
         );
-        pcntl_sigprocmask(
-            SIG_UNBLOCK,
-            $this->blockedSignals,
-        );
+        $this->childForker->unblockSignals();
 
         return $protocolHandler->handle();
     }

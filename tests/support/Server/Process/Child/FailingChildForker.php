@@ -32,7 +32,6 @@ final class FailingChildForker extends ChildForker
     public function start(
         Closure $inChild,
         Closure $inParent,
-        array $blockedSignals,
     ): void {
         $this->starts++;
         if ($this->starts === $this->failingStart) {
@@ -42,7 +41,6 @@ final class FailingChildForker extends ChildForker
         parent::start(
             $inChild,
             $inParent,
-            $blockedSignals,
         );
     }
 }

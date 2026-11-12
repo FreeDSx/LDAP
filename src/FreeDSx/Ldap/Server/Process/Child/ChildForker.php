@@ -24,6 +24,11 @@ use function sprintf;
 
 use const SIG_BLOCK;
 use const SIG_UNBLOCK;
+use const SIGHUP;
+use const SIGINT;
+use const SIGQUIT;
+use const SIGTERM;
+use const SIGUSR1;
 
 /**
  * Starts a child process with signals held blocked across the fork.
@@ -35,21 +40,30 @@ use const SIG_UNBLOCK;
 class ChildForker
 {
     /**
+     * Every signal a server process or its children handle.
+     */
+    private const BLOCKED_SIGNALS = [
+        SIGINT,
+        SIGTERM,
+        SIGQUIT,
+        SIGHUP,
+        SIGUSR1,
+    ];
+
+    /**
      * Runs the child's work in a new process and the parent's with the child's PID.
      *
-     * @param Closure(): void $inChild must unblock the signals itself once its own handlers are installed.
+     * @param Closure(): void $inChild must call unblockSignals() once its own handlers are installed.
      * @param Closure(int): void $inParent runs before the signals are unblocked.
-     * @param list<int> $blockedSignals
      * @throws ForkFailedException
      */
     public function start(
         Closure $inChild,
         Closure $inParent,
-        array $blockedSignals,
     ): void {
         pcntl_sigprocmask(
             SIG_BLOCK,
-            $blockedSignals,
+            self::BLOCKED_SIGNALS,
         );
 
         $pid = @pcntl_fork();
@@ -66,11 +80,19 @@ class ChildForker
             }
             $inParent($pid);
         } finally {
-            pcntl_sigprocmask(
-                SIG_UNBLOCK,
-                $blockedSignals,
-            );
+            $this->unblockSignals();
         }
+    }
+
+    /**
+     * Delivers the signals held since the fork.
+     */
+    public function unblockSignals(): void
+    {
+        pcntl_sigprocmask(
+            SIG_UNBLOCK,
+            self::BLOCKED_SIGNALS,
+        );
     }
 
     /**
