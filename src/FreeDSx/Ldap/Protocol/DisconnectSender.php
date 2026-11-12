@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Socket\Exception\ConnectionException;
 use Throwable;
 
 /**
@@ -39,6 +40,7 @@ readonly class DisconnectSender
 
     /**
      * @throws EncoderException
+     * @throws ConnectionException
      */
     public function send(
         string $message = '',
@@ -63,6 +65,7 @@ readonly class DisconnectSender
      * For a failure that may itself have been the connection going away.
      *
      * @throws EncoderException
+     * @throws ConnectionException
      */
     public function sendIfConnected(
         string $message = '',

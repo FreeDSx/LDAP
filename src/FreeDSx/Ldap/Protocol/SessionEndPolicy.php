@@ -47,6 +47,7 @@ readonly class SessionEndPolicy
      * Note: The order is important here.
      *
      * @throws EncoderException
+     * @throws ConnectionException when the notice ending the session fails on the socket.
      */
     public function end(Throwable $exception): ?ConnectionObservation
     {
@@ -95,6 +96,7 @@ readonly class SessionEndPolicy
      * Ends the session because the server is going away rather than because anything about it failed.
      *
      * @throws EncoderException
+     * @throws ConnectionException
      */
     public function shuttingDown(): void
     {
@@ -108,6 +110,7 @@ readonly class SessionEndPolicy
      * Ends the session because the server can no longer serve it.
      *
      * @throws EncoderException
+     * @throws ConnectionException
      */
     public function unavailable(): void
     {
@@ -119,6 +122,7 @@ readonly class SessionEndPolicy
 
     /**
      * @throws EncoderException
+     * @throws ConnectionException
      */
     private function disconnect(
         string $message = '',
@@ -153,6 +157,7 @@ readonly class SessionEndPolicy
 
     /**
      * @throws EncoderException
+     * @throws ConnectionException
      */
     private function unexpectedFailure(Throwable $exception): null
     {

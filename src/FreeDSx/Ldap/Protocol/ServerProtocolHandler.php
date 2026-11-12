@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
+use FreeDSx\Socket\Exception\ConnectionException as SocketException;
 use Throwable;
 
 /**
@@ -57,9 +58,11 @@ readonly class ServerProtocolHandler
     public function handle(): ?ConnectionObservation
     {
         try {
-            return $this->readMessages();
+            $this->readMessages();
+
+            return null;
         } catch (Throwable $e) {
-            return $this->sessionEndPolicy->end($e);
+            return $this->endSession($e);
         } finally {
             if ($this->queue->isConnected()) {
                 $this->queue->close();
@@ -90,30 +93,59 @@ readonly class ServerProtocolHandler
     }
 
     /**
-     * Reads and dispatches messages until the session ends, reporting whatever about the close is worth counting.
+     * Ends the session for a failure or for the socket failing while it ends.
      *
      * @throws EncoderException
      */
-    private function readMessages(): ?ConnectionObservation
+    private function endSession(Throwable $failure): ?ConnectionObservation
+    {
+        try {
+            return $this->sessionEndPolicy->end($failure);
+        } catch (SocketException $e) {
+            # Ending a session for a socket failure writes nothing to the socket.
+            return $this->sessionEndPolicy->end($e);
+        }
+    }
+
+    /**
+     * Reads and dispatches messages until the connection is closed or a failure ends the session.
+     *
+     * @throws EncoderException
+     */
+    private function readMessages(): void
     {
         while (true) {
-            try {
-                $message = $this->queue->getMessage();
-            } catch (MessageDecodeException $e) {
-                # The envelope parsed, so this message can be answered by its ID and the session continues. The
-                # PDU was consumed before its contents were decoded, so the stream is already past it.
-                if ($this->decodeFailures->answer($e)) {
-                    continue;
-                }
-
-                return $this->sessionEndPolicy->end($e);
+            $message = $this->nextMessage();
+            if ($message === null) {
+                continue;
             }
 
             $this->dispatchRequest($message);
+            # A finished request is released before the wait for the next one.
+            unset($message);
             # If a protocol handler closed the TCP connection, then just break here...
             if (!$this->queue->isConnected()) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Reads the next request, or null when one that failed to decode was answered instead.
+     *
+     * @throws MessageDecodeException when the failure cannot be answered.
+     */
+    private function nextMessage(): ?LdapMessageRequest
+    {
+        try {
+            return $this->queue->getMessage();
+        } catch (MessageDecodeException $e) {
+            # A message whose envelope parsed is answered by its ID, and the stream is already past it.
+            if ($this->decodeFailures->answer($e)) {
                 return null;
             }
+
+            throw $e;
         }
     }
 
