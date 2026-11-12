@@ -48,6 +48,7 @@ use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Socket\Exception\WriteTimeoutException;
 use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -381,6 +382,20 @@ final class ResponseWriterMiddlewareTest extends TestCase
         $this->subject->process(
             $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
             new ThrowingMiddlewareHandler(new ProtocolException('The response could not be encoded.')),
+        );
+    }
+
+    public function test_a_failed_socket_ends_the_session_without_writing_an_answer_to_it(): void
+    {
+        $this->mockQueue
+            ->expects(self::never())
+            ->method('sendMessages');
+
+        $this->expectException(WriteTimeoutException::class);
+
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
+            new ThrowingMiddlewareHandler(new WriteTimeoutException('The write operation timed out after 30 seconds.')),
         );
     }
 

@@ -47,6 +47,10 @@ readonly class DisconnectSender
         int $reasonCode = ResultCode::PROTOCOL_ERROR,
         ?Throwable $cause = null,
     ): void {
+        if ($this->queue->hasFailedWrite()) {
+            return;
+        }
+
         $this->queue->sendMessage($this->responseFactory->getExtendedError(
             $message,
             $reasonCode,

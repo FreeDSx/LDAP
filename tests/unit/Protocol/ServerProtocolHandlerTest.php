@@ -487,6 +487,34 @@ final class ServerProtocolHandlerTest extends TestCase
             ->shutdown();
     }
 
+    public function test_a_shutdown_notice_that_fails_still_closes_the_queue(): void
+    {
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willThrowException(new WriteTimeoutException('The write operation timed out after 30 seconds.'));
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('close');
+        $this->expectException(WriteTimeoutException::class);
+
+        $this->handlerWith(new StubMiddlewareHandler(OperationOutcomeResult::succeeded()))
+            ->shutdown();
+    }
+
+    public function test_an_unavailable_notice_that_fails_still_closes_the_queue(): void
+    {
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willThrowException(new WriteTimeoutException('The write operation timed out after 30 seconds.'));
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('close');
+        $this->expectException(WriteTimeoutException::class);
+
+        $this->handlerWith(new StubMiddlewareHandler(OperationOutcomeResult::succeeded()))
+            ->endAsUnavailable();
+    }
+
     public function test_a_notice_that_stalls_while_ending_the_session_ends_it_as_a_write_timeout(): void
     {
         $this->mockQueue

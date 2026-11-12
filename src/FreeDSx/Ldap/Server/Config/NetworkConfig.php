@@ -38,7 +38,7 @@ final class NetworkConfig
     /**
      * Disconnect a client whose response send makes no progress for this many seconds (a stalled reader).
      */
-    private int $writeTimeout = 600;
+    private int $writeTimeout = 30;
 
     /**
      * Seconds (fractional) to wait for a new client connection before re-checking server state.

@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ConnectionAcceptor;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
@@ -28,6 +30,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Swoole\Coroutine;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
+use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\ScriptedSocketServer;
@@ -35,6 +38,11 @@ use Tests\Support\FreeDSx\Ldap\Server\ScriptedSocketServer;
 final class ConnectionAcceptorTest extends TestCase
 {
     use RequiresExtensionsTrait;
+
+    /**
+     * The longest a connection waits on its shutdown notice before it ends on its own.
+     */
+    private const CONNECTION_HOLD_SECONDS = 5.0;
 
     private RecordingLogger $logger;
 
@@ -173,6 +181,92 @@ final class ConnectionAcceptorTest extends TestCase
         );
     }
 
+    public function test_a_client_slow_to_take_its_shutdown_notice_holds_up_no_other_notice(): void
+    {
+        $notified = new CallLog();
+        $this->protocolFactory
+            ->method('make')
+            ->willReturnOnConsecutiveCalls(
+                $this->connectionHeldUntilShutdown(
+                    'stalled',
+                    0.2,
+                    $notified,
+                ),
+                $this->connectionHeldUntilShutdown(
+                    'reading',
+                    0.001,
+                    $notified,
+                ),
+            );
+        $server = new ScriptedSocketServer(
+            [$this->connectedSocket(), $this->connectedSocket()],
+            onDrained: $this->subject->shutdown(...),
+        );
+
+        Coroutine\run(function () use ($server): void {
+            $this->subject->accept($server);
+        });
+
+        self::assertSame(
+            ['reading', 'stalled'],
+            $notified->entries,
+        );
+    }
+
+    public function test_the_drain_timer_runs_while_a_shutdown_notice_is_still_going_out(): void
+    {
+        $this->options->getNetworkConfig()->setShutdownTimeout(1);
+        $this->protocolFactory
+            ->method('make')
+            ->willReturn($this->connectionHeldUntilShutdown(
+                'stalled',
+                1.5,
+                new CallLog(),
+            ));
+        $server = new ScriptedSocketServer(
+            [$this->connectedSocket()],
+            onDrained: $this->subject->shutdown(...),
+        );
+
+        Coroutine\run(function () use ($server): void {
+            $this->subject->accept($server);
+        });
+
+        self::assertContains(
+            ServerEvent::ShutdownForced->value,
+            $this->logger->events(),
+        );
+    }
+
+    /**
+     * A connection held open until its shutdown notice goes out after the given seconds.
+     */
+    private function connectionHeldUntilShutdown(
+        string $name,
+        float $noticeSeconds,
+        CallLog $notified,
+    ): ServerProtocolHandler {
+        $handler = $this->createMock(ServerProtocolHandler::class);
+        $handler
+            ->method('handle')
+            ->willReturnCallback(static function () use ($name, $notified): ?ConnectionObservation {
+                $deadline = microtime(true) + self::CONNECTION_HOLD_SECONDS;
+                while (!in_array($name, $notified->entries, true) && microtime(true) < $deadline) {
+                    Coroutine::sleep(0.01);
+                }
+
+                return null;
+            });
+        $handler
+            ->method('shutdown')
+            ->willReturnCallback(static function () use ($name, $noticeSeconds, $notified): void {
+                Coroutine::sleep($noticeSeconds);
+                $notified->record($name);
+            });
+
+        return $handler;
+    }
+
     private function connectedSocket(): Socket
     {
         $pair = stream_socket_pair(
@@ -197,10 +291,7 @@ final class ConnectionAcceptorTest extends TestCase
         ];
 
         return array_values(array_filter(
-            array_map(
-                static fn(array $record): mixed => $record['context'][EventContext::EVENT] ?? null,
-                $this->logger->records,
-            ),
+            $this->logger->events(),
             static fn(mixed $event): bool => in_array(
                 $event,
                 $accepts,

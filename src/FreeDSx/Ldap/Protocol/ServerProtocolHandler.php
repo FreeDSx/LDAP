@@ -77,8 +77,11 @@ readonly class ServerProtocolHandler
      */
     public function shutdown(): void
     {
-        $this->sessionEndPolicy->shuttingDown();
-        $this->queue->close();
+        try {
+            $this->sessionEndPolicy->shuttingDown();
+        } finally {
+            $this->queue->close();
+        }
     }
 
     /**
@@ -88,8 +91,11 @@ readonly class ServerProtocolHandler
      */
     public function endAsUnavailable(): void
     {
-        $this->sessionEndPolicy->unavailable();
-        $this->queue->close();
+        try {
+            $this->sessionEndPolicy->unavailable();
+        } finally {
+            $this->queue->close();
+        }
     }
 
     /**

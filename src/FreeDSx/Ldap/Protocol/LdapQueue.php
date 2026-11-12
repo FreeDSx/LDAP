@@ -173,10 +173,20 @@ class LdapQueue extends Asn1MessageQueue
         }
 
         if (strlen($buffer) > 0) {
-            $this->socket->write($buffer);
+            $this->writeToSocket($buffer);
         }
 
         return $this;
+    }
+
+    /**
+     * Extension point every outgoing byte passes through on its way to the socket.
+     *
+     * @throws ConnectionException
+     */
+    protected function writeToSocket(string $bytes): void
+    {
+        $this->socket->write($bytes);
     }
 
     /**
@@ -252,7 +262,11 @@ class LdapQueue extends Asn1MessageQueue
     private function flushFilledChunks(string $buffer): string
     {
         while (strlen($buffer) >= self::BUFFER_SIZE) {
-            $this->socket->write(substr($buffer, 0, self::BUFFER_SIZE));
+            $this->writeToSocket(substr(
+                $buffer,
+                0,
+                self::BUFFER_SIZE,
+            ));
             $buffer = substr($buffer, self::BUFFER_SIZE);
         }
 

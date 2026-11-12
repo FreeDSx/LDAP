@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner;
 
-use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -48,7 +47,7 @@ final class AcceptBackoffTest extends TestCase
         );
         self::assertSame(
             [ServerEvent::ServerAcceptFailed->value],
-            $this->loggedEvents(),
+            $this->logger->events(),
         );
     }
 
@@ -65,7 +64,7 @@ final class AcceptBackoffTest extends TestCase
         );
         self::assertSame(
             [ServerEvent::ServerAcceptFailed->value],
-            $this->loggedEvents(),
+            $this->logger->events(),
         );
     }
 
@@ -81,7 +80,7 @@ final class AcceptBackoffTest extends TestCase
                 ServerEvent::ServerAcceptFailed->value,
                 ServerEvent::ServerAcceptRecovered->value,
             ],
-            $this->loggedEvents(),
+            $this->logger->events(),
         );
         self::assertSame(
             2,
@@ -99,7 +98,7 @@ final class AcceptBackoffTest extends TestCase
 
         self::assertSame(
             [],
-            $this->loggedEvents(),
+            $this->logger->events(),
         );
     }
 
@@ -108,17 +107,6 @@ final class AcceptBackoffTest extends TestCase
         return $this->subject->failed(
             new AcceptException('Unable to accept a waiting client: Too many open files'),
             $this->events,
-        );
-    }
-
-    /**
-     * @return list<mixed>
-     */
-    private function loggedEvents(): array
-    {
-        return array_map(
-            static fn(array $record): mixed => $record['context'][EventContext::EVENT] ?? null,
-            $this->logger->records,
         );
     }
 }
