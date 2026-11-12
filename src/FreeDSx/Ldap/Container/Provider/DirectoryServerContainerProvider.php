@@ -149,6 +149,7 @@ use FreeDSx\Ldap\Server\Process\BackgroundTask\LongLivedTask;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PeriodicTask;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\Process\Signals\PcntlShutdownSignals;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
@@ -954,6 +955,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         }
 
         return new PcntlBackgroundTasks(
+            childForker: $container->get(ChildForker::class),
             periodicTasks: $periodicTasks,
             longLivedTasks: $longLivedTasks,
             eventLogger: new EventLogger(

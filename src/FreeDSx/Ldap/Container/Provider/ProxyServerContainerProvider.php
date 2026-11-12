@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -87,6 +88,7 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
         }
 
         return new PcntlBackgroundTasks(
+            childForker: $container->get(ChildForker::class),
             periodicTasks: [],
             longLivedTasks: [],
             eventLogger: $eventLogger,

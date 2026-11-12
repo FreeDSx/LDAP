@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
-use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcess;
 use FreeDSx\Ldap\Server\Process\Child\ChildProcesses;
@@ -76,12 +75,9 @@ class PcntlServerRunner implements ServerRunnerInterface
         private readonly RunnerConfiguration $configuration,
         private readonly SocketServerFactory $socketServerFactory,
         private readonly ChildForker $childForker,
+        BackgroundTasksInterface $backgroundTasks,
         private readonly MetricsRelay $metrics = new MetricsRelay(),
         private readonly ResettableInterface $resettable = new NonResettable(),
-        BackgroundTasksInterface $backgroundTasks = new PcntlBackgroundTasks(
-            periodicTasks: [],
-            longLivedTasks: [],
-        ),
     ) {
         $this->childProcesses = new ChildProcesses();
         $this->acceptBackoff = new AcceptBackoff();
@@ -243,7 +239,6 @@ class PcntlServerRunner implements ServerRunnerInterface
                             $reporter,
                         );
                     },
-                    $this->blockableSignals(),
                 );
             } catch (ForkFailedException $e) {
                 $reporter?->close();
@@ -298,18 +293,6 @@ class PcntlServerRunner implements ServerRunnerInterface
     private function isOwnerProcess(): bool
     {
         return posix_getpid() === $this->ownerPid;
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function blockableSignals(): array
-    {
-        return [
-            ...$this->handledSignals,
-            SIGHUP,
-            SIGUSR1,
-        ];
     }
 
     /**
@@ -424,9 +407,9 @@ class PcntlServerRunner implements ServerRunnerInterface
         (new ConnectionChild(
             $this->configuration,
             $this->resettable,
+            $this->childForker,
             $this->socketServerFactory->isTlsHandshakeDeferred(),
             $this->handledSignals,
-            $this->blockableSignals(),
         ))->run(
             $socket,
             $reporter,

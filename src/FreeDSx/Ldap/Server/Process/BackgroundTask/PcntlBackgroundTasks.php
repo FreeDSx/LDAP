@@ -14,12 +14,14 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Process\BackgroundTask;
 
 use Closure;
+use FreeDSx\Ldap\Exception\ForkFailedException;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Process\Child\ChildForker;
+use Throwable;
 
 use function microtime;
-use function pcntl_fork;
 use function pcntl_waitpid;
 use function posix_getpid;
 use function posix_kill;
@@ -57,6 +59,7 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
      * @param list<LongLivedTask> $longLivedTasks
      */
     public function __construct(
+        private readonly ChildForker $childForker,
         private readonly array $periodicTasks,
         private readonly array $longLivedTasks,
         private readonly EventLogger $eventLogger = new EventLogger(null),
@@ -78,9 +81,12 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
         }
 
         foreach ($this->longLivedTasks as $index => $task) {
-            $this->longLivedPids[$index] = $this->fork(
+            $this->startTask(
                 $task->name,
                 $task->run,
+                function (int $pid) use ($index): void {
+                    $this->longLivedPids[$index] = $pid;
+                },
             );
         }
     }
@@ -196,9 +202,12 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
             }
 
             $state->lastRunAt = $now;
-            $state->pid = $this->fork(
+            $this->startTask(
                 $task->name,
                 $task->run,
+                static function (int $pid) use ($state): void {
+                    $state->pid = $pid;
+                },
             );
         }
     }
@@ -212,44 +221,78 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
             }
 
             $this->longLivedPids[$index] = null;
-            $this->eventLogger->record(
-                ServerEvent::TaskFailed,
-                [
-                    'task' => $task->name,
-                    EventContext::REASON => 'exited',
-                ],
+            $this->recordTaskFailed(
+                $task->name,
+                'exited',
             );
         }
     }
 
     /**
-     * @param Closure(): void $childBody
+     * Starts a task in its own process, recording its PID before any signal is handled.
+     *
+     * @param Closure(): void $run
+     * @param Closure(int): void $onStarted
      */
-    private function fork(
+    private function startTask(
         string $name,
-        Closure $childBody,
-    ): ?int {
-        $pid = pcntl_fork();
+        Closure $run,
+        Closure $onStarted,
+    ): void {
+        try {
+            $this->childForker->start(
+                fn(): never => $this->runTask(
+                    $name,
+                    $run,
+                ),
+                $onStarted,
+            );
+        } catch (ForkFailedException $e) {
+            $this->recordTaskFailed(
+                $name,
+                'not_started',
+                $e,
+            );
+        }
+    }
 
-        if ($pid === -1) {
-            $this->eventLogger->record(
-                ServerEvent::TaskFailed,
-                [
-                    'task' => $name,
-                    EventContext::REASON => 'not_started',
-                ],
+    /**
+     * @param Closure(): void $run
+     */
+    private function runTask(
+        string $name,
+        Closure $run,
+    ): never {
+        try {
+            ($this->childStart)();
+            $this->childForker->unblockSignals();
+            $run();
+        } catch (Throwable $e) {
+            $this->recordTaskFailed(
+                $name,
+                'error',
+                $e,
             );
 
-            return null;
+            exit(1);
         }
 
-        if ($pid === 0) {
-            ($this->childStart)();
-            $childBody();
-            exit(0);
-        }
+        exit(0);
+    }
 
-        return $pid;
+    private function recordTaskFailed(
+        string $name,
+        string $reason,
+        ?Throwable $cause = null,
+    ): void {
+        $this->eventLogger->record(
+            ServerEvent::TaskFailed,
+            [
+                'task' => $name,
+                EventContext::REASON => $reason,
+            ],
+            cause: $cause,
+        );
     }
 
     private function ownsTasks(): bool
