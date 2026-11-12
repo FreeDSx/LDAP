@@ -205,6 +205,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      * Anything sent while a response is already going out waits for it to finish.
      *
      * @throws EncoderException
+     * @throws ConnectionException
      */
     public function sendMessage(LdapMessageResponse ...$response): self
     {

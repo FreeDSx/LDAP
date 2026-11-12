@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
@@ -54,6 +55,7 @@ use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Middleware\StubMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Middleware\ThrowingMiddlewareHandler;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use WeakReference;
 
 final class ServerProtocolHandlerTest extends TestCase
 {
@@ -485,6 +487,25 @@ final class ServerProtocolHandlerTest extends TestCase
             ->shutdown();
     }
 
+    public function test_a_notice_that_stalls_while_ending_the_session_ends_it_as_a_write_timeout(): void
+    {
+        $this->mockQueue
+            ->method('getMessage')
+            ->willThrowException(new MessageDecodeException(
+                0,
+                3,
+                'The search request is malformed.',
+            ));
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willThrowException(new WriteTimeoutException('The write operation timed out after 30 seconds.'));
+
+        self::assertSame(
+            ConnectionObservation::WriteTimeout,
+            $this->handlerWith(new StubMiddlewareHandler(OperationOutcomeResult::succeeded()))->handle(),
+        );
+    }
+
     public function test_an_unexpected_throwable_emits_a_notice_of_disconnect_with_exception_context(): void
     {
         $recordingLogger = new RecordingLogger();
@@ -554,6 +575,65 @@ final class ServerProtocolHandlerTest extends TestCase
                 'A stalled reader must not be sent a Notice of Disconnection.',
             );
         }
+    }
+
+    public function test_a_handled_request_is_released_before_the_next_one_is_read(): void
+    {
+        $handled = null;
+        $isReleased = null;
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturnCallback(static function () use (&$handled, &$isReleased): LdapMessageRequest {
+                if ($handled === null) {
+                    $message = new LdapMessageRequest(
+                        1,
+                        new ModifyDnRequest(
+                            'cn=foo,dc=bar',
+                            'cn=bar',
+                            true,
+                        ),
+                    );
+                    $handled = WeakReference::create($message);
+
+                    return $message;
+                }
+                $isReleased = $handled->get() === null;
+
+                throw new ConnectionException();
+            });
+
+        $this->handlerWith(new StubMiddlewareHandler(OperationOutcomeResult::succeeded()))
+            ->handle();
+
+        self::assertTrue($isReleased);
+    }
+
+    public function test_a_refused_request_is_released_before_the_next_one_is_read(): void
+    {
+        $refused = null;
+        $isReleased = null;
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturnCallback(static function () use (&$refused, &$isReleased): LdapMessageRequest {
+                if ($refused === null) {
+                    $failure = new MessageDecodeException(
+                        2,
+                        3,
+                        'The search request is malformed.',
+                    );
+                    $refused = WeakReference::create($failure);
+
+                    throw $failure;
+                }
+                $isReleased = $refused->get() === null;
+
+                throw new ConnectionException();
+            });
+
+        $this->handlerWith(new StubMiddlewareHandler(OperationOutcomeResult::succeeded()))
+            ->handle();
+
+        self::assertTrue($isReleased);
     }
 
     /**
