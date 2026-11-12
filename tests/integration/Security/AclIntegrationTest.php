@@ -961,7 +961,6 @@ final class AclIntegrationTest extends ServerTestCase
             '555-0100',
             '555-9999',
         ];
-
     }
 
     public function testNegatingThePresenceOfAFilterDeniedAttributeSinglesOutNobody(): void

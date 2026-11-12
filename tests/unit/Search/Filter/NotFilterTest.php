@@ -32,7 +32,6 @@ final class NotFilterTest extends TestCase
 
     public function test_it_should_set_the_filter(): void
     {
-
         $this->subject->set(Filters::gte(
             'foobar',
             'foo',
