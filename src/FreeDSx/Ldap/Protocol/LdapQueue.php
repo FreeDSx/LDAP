@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\PartialMessageException;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
 use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
@@ -130,6 +131,7 @@ class LdapQueue extends Asn1MessageQueue
      *
      * @throws RequestSizeExceededException
      * @throws ProtocolException
+     * @throws PartialMessageException
      */
     protected function decode(string $bytes): Message
     {

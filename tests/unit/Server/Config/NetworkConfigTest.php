@@ -151,6 +151,37 @@ final class NetworkConfigTest extends TestCase
         $this->subject->setMaxRequestElements(-1);
     }
 
+    public function test_max_held_request_size_defaults_to_half_of_the_memory_limit(): void
+    {
+        self::assertNull($this->subject->getMaxHeldRequestSize());
+    }
+
+    public function test_it_can_set_max_held_request_size(): void
+    {
+        $this->subject->setMaxHeldRequestSize(0);
+
+        self::assertSame(
+            0,
+            $this->subject->getMaxHeldRequestSize(),
+        );
+    }
+
+    public function test_it_can_set_max_held_request_size_back_to_half_of_the_memory_limit(): void
+    {
+        $this->subject->setMaxHeldRequestSize(1_000);
+        $this->subject->setMaxHeldRequestSize(null);
+
+        self::assertNull($this->subject->getMaxHeldRequestSize());
+    }
+
+    public function test_it_refuses_a_negative_max_held_request_size(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The held request size limit cannot be negative, but received -1.');
+
+        $this->subject->setMaxHeldRequestSize(-1);
+    }
+
     public function test_shutdown_timeout_defaults_to_fifteen_seconds(): void
     {
         self::assertSame(15, $this->subject->getShutdownTimeout());

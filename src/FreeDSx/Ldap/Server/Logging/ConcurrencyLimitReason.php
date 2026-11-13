@@ -34,4 +34,19 @@ enum ConcurrencyLimitReason: string
      * A worker serving many clients in one process reaches its open-file limit before the connection limit.
      */
     case OpenFileLimit = 'open_file_limit';
+
+    /**
+     * A worker serving many clients in one process can need more than its memory limit before the connection limit.
+     */
+    case MemoryLimit = 'memory_limit';
+
+    /**
+     * The largest request allowed, or any request when there is no size limit, can hold more than the held size.
+     */
+    case HeldRequestSize = 'held_request_size';
+
+    /**
+     * The process has no memory limit, leaving the held request size at a fixed size.
+     */
+    case NoMemoryLimit = 'no_memory_limit';
 }

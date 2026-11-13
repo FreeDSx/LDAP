@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProviderInterface;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\PasswordPolicyResponseInterceptor;
@@ -147,6 +148,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             $socket,
             $this->container->get(RequestMessageDecoder::class),
             $authorization,
+            $this->container->get(RequestBudget::class),
             $interceptors,
             $metricsRecorder,
         );

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Resources;
 
+use function gc_collect_cycles;
+
 /**
  * The resources this process may use.
  *
@@ -26,11 +28,15 @@ class SystemResources
 
     private readonly OpenFileLimit $openFileLimit;
 
+    private readonly MemoryLimit $memoryLimit;
+
     public function __construct(
         private readonly CpuCount $cpus = new CpuCount(),
         ?OpenFileLimit $openFileLimit = null,
+        ?MemoryLimit $memoryLimit = null,
     ) {
         $this->openFileLimit = $openFileLimit ?? OpenFileLimit::ofThisProcess();
+        $this->memoryLimit = $memoryLimit ?? MemoryLimit::ofThisProcess();
     }
 
     /**
@@ -44,5 +50,18 @@ class SystemResources
     public function openFileLimit(): OpenFileLimit
     {
         return $this->openFileLimit;
+    }
+
+    public function memoryLimit(): MemoryLimit
+    {
+        return $this->memoryLimit;
+    }
+
+    /**
+     * Frees memory held only by reference cycles, returning how many cycles were collected.
+     */
+    public function reclaimMemory(): int
+    {
+        return gc_collect_cycles();
     }
 }

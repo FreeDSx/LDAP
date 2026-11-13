@@ -18,7 +18,13 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -37,6 +43,7 @@ use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\Resources\MemoryLimit;
 use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
 use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
@@ -64,6 +71,11 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             SocketServerFactory::class => $this->makeSocketServerFactory(...),
             ChildForker::class => static fn(): ChildForker => new ChildForker(),
             SystemResources::class => static fn(): SystemResources => new SystemResources(),
+            SleeperInterface::class => $this->makeSleeper(...),
+            RequestBudget::class => static fn(Container $c): RequestBudget => new RequestBudget(
+                $c->get(SleeperInterface::class),
+                $c->get(SystemResources::class),
+            ),
             ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
@@ -89,6 +101,16 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         );
     }
 
+    /**
+     * The runner-appropriate sleeper: a coroutine-aware sleeper under Swoole, else a blocking one.
+     */
+    private function makeSleeper(Container $container): SleeperInterface
+    {
+        return $container->get(ServerListenerOptionsInterface::class)->isRunnerMode(RunnerMode::Swoole)
+            ? new CoroutineSleeper()
+            : new BlockingSleeper();
+    }
+
     private function makeServerAuthorizer(Container $container): ServerAuthorization
     {
         return new ServerAuthorization($container->get(ServerListenerOptionsInterface::class));
@@ -99,6 +121,18 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         $options = $container->get(ServerListenerOptionsInterface::class);
         $this->assertRunnerExtensionsAreLoaded($options);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
+        $heldRequestSize = $container->get(RequestBudget::class)->limitFor(
+            $options->getNetworkConfig()->getMaxHeldRequestSize(),
+        );
+        $this->recordNoMemoryLimit(
+            $options,
+            $container->get(SystemResources::class)->memoryLimit(),
+            $heldRequestSize,
+        );
+        $this->recordHeldRequestSize(
+            $options,
+            $heldRequestSize,
+        );
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
             $this->assertClientCertificatesAreNotExpected($options);
@@ -107,11 +141,16 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $options,
                 $workers,
             );
-            // Only a worker serving many clients in one process holds every client's descriptors.
+            // Only a worker serving many clients in one process holds every client's descriptors and memory.
             $this->recordOpenFileLimit(
                 $options,
                 $container->get(SystemResources::class)->openFileLimit(),
                 $container->get(ListenerContributorInterface::class)->descriptorsPerClient(),
+            );
+            $this->recordMemoryLimit(
+                $options,
+                $container->get(SystemResources::class)->memoryLimit(),
+                $heldRequestSize,
             );
             $workerFactory = new WorkerFactory(
                 configuration: $this->makeRunnerConfiguration($container),
@@ -253,6 +292,99 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         );
     }
 
+    private function recordMemoryLimit(
+        ServerListenerOptionsInterface $options,
+        MemoryLimit $memoryLimit,
+        int $heldRequestSize,
+    ): void {
+        $maxConnections = $options->getNetworkConfig()->getMaxConnections();
+        if (!$memoryLimit->isReachedBefore($maxConnections, $heldRequestSize)) {
+            return;
+        }
+
+        $this->makeEventLogger($options)->record(
+            ServerEvent::ConcurrencyLimited,
+            [
+                EventContext::REASON => ConcurrencyLimitReason::MemoryLimit->value,
+                'memory_limit' => $memoryLimit->getBytes(),
+                'max_connections' => $maxConnections,
+                'max_held_request_size' => $heldRequestSize,
+            ],
+        );
+    }
+
+    private function recordNoMemoryLimit(
+        ServerListenerOptionsInterface $options,
+        MemoryLimit $memoryLimit,
+        int $heldRequestSize,
+    ): void {
+        if ($options->getNetworkConfig()->getMaxHeldRequestSize() !== null || $memoryLimit->getBytes() !== null) {
+            return;
+        }
+
+        $this->makeEventLogger($options)->record(
+            ServerEvent::ConcurrencyLimited,
+            [
+                EventContext::REASON => ConcurrencyLimitReason::NoMemoryLimit->value,
+                'max_held_request_size' => $heldRequestSize,
+            ],
+        );
+    }
+
+    private function recordHeldRequestSize(
+        ServerListenerOptionsInterface $options,
+        int $heldRequestSize,
+    ): void {
+        $network = $options->getNetworkConfig();
+        if ($heldRequestSize === 0 || $this->largestHeld($network) <= $heldRequestSize) {
+            return;
+        }
+
+        $this->makeEventLogger($options)->record(
+            ServerEvent::ConcurrencyLimited,
+            [
+                EventContext::REASON => ConcurrencyLimitReason::HeldRequestSize->value,
+                'max_held_request_size' => $heldRequestSize,
+                'max_request_size' => $network->getMaxRequestSize(),
+            ],
+        );
+    }
+
+    /**
+     * What the largest request allowed holds once decoded, without bound when requests have no size limit.
+     */
+    private function largestHeld(NetworkConfig $network): int
+    {
+        $maxRequestSize = $network->getMaxRequestSize();
+        if ($maxRequestSize === 0) {
+            return PHP_INT_MAX;
+        }
+
+        return HeldRequests::estimate(
+            $maxRequestSize,
+            $this->mostElementsOf($network),
+        );
+    }
+
+    /**
+     * The most elements the largest request allowed can carry, at most one for every two of its bytes.
+     */
+    private function mostElementsOf(NetworkConfig $network): int
+    {
+        $mostBySize = intdiv(
+            $network->getMaxRequestSize(),
+            2,
+        );
+        $maxElements = $network->getMaxRequestElements();
+
+        return $maxElements === 0
+            ? $mostBySize
+            : min(
+                $maxElements,
+                $mostBySize,
+            );
+    }
+
     private function makeEventLogger(ServerListenerOptionsInterface $options): EventLogger
     {
         return new EventLogger(
@@ -287,6 +419,8 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             MetricsRecorderInterface::class => $container->get(MetricsRecorderInterface::class),
             MetricsSnapshotProvider::class => $container->get(MetricsSnapshotProvider::class),
             InMemoryMetricsRecorder::class => $container->get(InMemoryMetricsRecorder::class),
+            // Kept so connections from before and after a reload count against one budget.
+            RequestBudget::class => $container->get(RequestBudget::class),
         ];
 
         // Carried so a reload keeps the one shared table rather than allocating a second, empty one.

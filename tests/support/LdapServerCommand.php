@@ -157,6 +157,13 @@ final class LdapServerCommand extends Command
                 '',
             )
             ->addOption(
+                'max-held-request-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Bytes of requests one process holds at once (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'shutdown-timeout',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -403,6 +410,10 @@ final class LdapServerCommand extends Command
         $requestReadTimeout = $this->getStringOption($input, 'request-read-timeout');
         if ($requestReadTimeout !== '') {
             $network->setRequestReadTimeout((int) $requestReadTimeout);
+        }
+        $maxHeldRequestSize = $this->getStringOption($input, 'max-held-request-size');
+        if ($maxHeldRequestSize !== '') {
+            $network->setMaxHeldRequestSize((int) $maxHeldRequestSize);
         }
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))

@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
 use FreeDSx\Ldap\Protocol\Decoder\Filter\FilterDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -369,7 +370,7 @@ final class RequestMessageDecoderTest extends TestCase
         try {
             $this->subject->decode(
                 $pdu,
-                $elementBudget,
+                new DecodeContext($elementBudget),
             );
         } catch (MessageDecodeException $e) {
             return $e;

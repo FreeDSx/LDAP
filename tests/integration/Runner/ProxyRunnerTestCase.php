@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Runner;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
+use Tests\Integration\FreeDSx\Ldap\Runner\Concern\RequestBudgetTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\DripsRequestsTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
@@ -29,6 +30,7 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
 {
     use RawClientQueueTrait;
     use DripsRequestsTrait;
+    use RequestBudgetTestsTrait;
 
     public static function setUpBeforeClass(): void
     {

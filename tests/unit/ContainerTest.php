@@ -112,11 +112,24 @@ class ContainerTest extends TestCase
 
     private Container $subject;
 
+    private string $memoryLimit = '';
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->memoryLimit = (string) ini_get('memory_limit');
         $this->subject = Container::forServer(TestServerOptions::defaults());
+    }
+
+    protected function tearDown(): void
+    {
+        ini_set(
+            'memory_limit',
+            $this->memoryLimit,
+        );
+
+        parent::tearDown();
     }
 
     public function test_every_storage_contract_resolves_to_one_in_memory_store(): void
@@ -746,6 +759,10 @@ class ContainerTest extends TestCase
     public function test_several_workers_are_clamped_to_one_process_for_in_memory_storage(): void
     {
         $this->requireSwoole();
+        ini_set(
+            'memory_limit',
+            '1G',
+        );
         $logger = $this->createMock(LoggerInterface::class);
         $logger
             ->expects(self::once())
@@ -805,6 +822,190 @@ class ContainerTest extends TestCase
             RunnerConfig::forPcntl(),
             $logger,
         );
+
+        self::assertSame(
+            [],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_a_held_request_size_too_small_for_the_largest_request_warns_at_startup(): void
+    {
+        $this->requirePcntl();
+        $this->requirePosix();
+        $logger = new RecordingLogger();
+        $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
+        $options->getNetworkConfig()->setMaxHeldRequestSize(1_000_000);
+
+        $this->containerFor($options)->get(ServerRunnerInterface::class);
+
+        self::assertSame(
+            [
+                [
+                    LogLevel::WARNING,
+                    ConcurrencyLimitReason::HeldRequestSize->value,
+                ],
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_a_held_request_size_too_small_for_the_elements_of_the_largest_request_warns_at_startup(): void
+    {
+        $this->requirePcntl();
+        $this->requirePosix();
+        $logger = new RecordingLogger();
+        $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
+        $options->getNetworkConfig()->setMaxHeldRequestSize(10_000_000);
+
+        $this->containerFor($options)->get(ServerRunnerInterface::class);
+
+        self::assertSame(
+            [
+                [
+                    LogLevel::WARNING,
+                    ConcurrencyLimitReason::HeldRequestSize->value,
+                ],
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_a_held_request_size_without_a_request_size_limit_warns_at_startup(): void
+    {
+        $this->requirePcntl();
+        $this->requirePosix();
+        $logger = new RecordingLogger();
+        $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
+        $options->getNetworkConfig()
+            ->setMaxRequestSize(0)
+            ->setMaxHeldRequestSize(10_000_000);
+
+        $this->containerFor($options)->get(ServerRunnerInterface::class);
+
+        self::assertSame(
+            [
+                [
+                    LogLevel::WARNING,
+                    ConcurrencyLimitReason::HeldRequestSize->value,
+                ],
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_the_default_held_request_size_does_not_warn_at_startup(): void
+    {
+        $this->requirePcntl();
+        $this->requirePosix();
+        ini_set(
+            'memory_limit',
+            '1G',
+        );
+        $logger = new RecordingLogger();
+
+        $this->containerFor(
+            TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger),
+        )->get(ServerRunnerInterface::class);
+
+        self::assertSame(
+            [],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_no_memory_limit_warns_at_startup_that_the_held_request_size_is_fixed(): void
+    {
+        $this->requirePcntl();
+        $this->requirePosix();
+        ini_set(
+            'memory_limit',
+            '-1',
+        );
+        $logger = new RecordingLogger();
+
+        $this->containerFor(
+            TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger),
+        )->get(ServerRunnerInterface::class);
+
+        self::assertSame(
+            [
+                [
+                    LogLevel::WARNING,
+                    ConcurrencyLimitReason::NoMemoryLimit->value,
+                ],
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_swoole_warns_at_startup_when_its_connections_can_need_more_than_its_memory_limit(): void
+    {
+        $this->requireSwoole();
+        ini_set(
+            'memory_limit',
+            '1G',
+        );
+        $logger = new RecordingLogger();
+        $options = TestServerOptions::defaults()
+            ->setLogger($logger)
+            ->setRunnerConfig(new RunnerConfig(
+                RunnerMode::Swoole,
+                1,
+            ));
+        $options->getNetworkConfig()->setMaxConnections(50_000);
+
+        $this->containerFor($options)->get(ServerRunnerInterface::class);
+
+        self::assertContains(
+            [
+                LogLevel::WARNING,
+                ConcurrencyLimitReason::MemoryLimit->value,
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_swoole_without_a_held_request_size_limit_warns_at_startup_about_its_memory_limit(): void
+    {
+        $this->requireSwoole();
+        ini_set(
+            'memory_limit',
+            '1G',
+        );
+        $logger = new RecordingLogger();
+        $options = TestServerOptions::defaults()
+            ->setLogger($logger)
+            ->setRunnerConfig(new RunnerConfig(
+                RunnerMode::Swoole,
+                1,
+            ));
+        $options->getNetworkConfig()->setMaxHeldRequestSize(0);
+
+        $this->containerFor($options)->get(ServerRunnerInterface::class);
+
+        self::assertContains(
+            [
+                LogLevel::WARNING,
+                ConcurrencyLimitReason::MemoryLimit->value,
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+    }
+
+    public function test_pcntl_does_not_warn_at_startup_about_its_connections_and_its_memory_limit(): void
+    {
+        $this->requirePcntl();
+        $this->requirePosix();
+        ini_set(
+            'memory_limit',
+            '1G',
+        );
+        $logger = new RecordingLogger();
+        $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
+        $options->getNetworkConfig()->setMaxConnections(50_000);
+
+        $this->containerFor($options)->get(ServerRunnerInterface::class);
 
         self::assertSame(
             [],

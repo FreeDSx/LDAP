@@ -110,8 +110,6 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BackoffSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
@@ -259,7 +257,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             ServerProtocolFactoryInterface::class => static fn(Container $c): ServerProtocolFactoryInterface => $c->get(ServerProtocolFactory::class),
             ServerProtocolHandlerFactory::class => $this->makeServerProtocolHandlerFactory(...),
             ClockInterface::class => static fn(): ClockInterface => new SystemClock(),
-            SleeperInterface::class => $this->makeSleeper(...),
             BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
             ListenerContributorInterface::class => $this->makeListenerContributor(...),
         ];
@@ -703,16 +700,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeServerProtocolHandlerFactory(Container $container): ServerProtocolHandlerFactory
     {
         return new ServerProtocolHandlerFactory($container->get(ServerOptions::class));
-    }
-
-    /**
-     * The runner-appropriate sleeper: a coroutine-aware sleeper under Swoole, else a blocking one.
-     */
-    private function makeSleeper(Container $container): SleeperInterface
-    {
-        return $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
-            ? new CoroutineSleeper()
-            : new BlockingSleeper();
     }
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface

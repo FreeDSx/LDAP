@@ -69,7 +69,7 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | `ldap.password_policy.grace_login`    | on      | info    | A bind used one of an expired password's grace logins     |
 | `ldap.password_policy.change_rejected` | on     | notice  | A password change violated the password policy            |
 | `ldap.password_policy.state_not_recorded` | on  | warning | A bind's password policy state could not be written to its entry, naming the entry and the refusal |
-| `ldap.operation.refused`              | off     | notice  | A bind or authorization failure, or an open sync listen, refused a request before it was processed |
+| `ldap.operation.refused`              | off     | notice  | A request was refused before it was processed             |
 | `ldap.message.decode_failed`          | off     | notice  | A request could not be decoded and was answered with an error |
 | `ldap.entry.added`                    | off     | info    | Add succeeds (audit-trail)                                |
 | `ldap.entry.modified`                 | off     | info    | Modify succeeds (audit-trail)                             |
@@ -146,6 +146,7 @@ Every event carries a structured `context` array with a stable shape:
 | `worker_id`, `child_pid`, `signal`                         | `server.*` events                                                  | The Swoole worker, the PCNTL client process, and the signal that caused the event.                 |
 | `max_connections`, `active_connections`                    | `server.client.rejected`, `server.shutdown.forced`                 | The connection limit reached, and the connections force closed.                                    |
 | `open_file_limit`, `descriptors_per_client`                | `server.concurrency_limited`                                       | The open-file limit, and the open files each client holds.                                         |
+| `memory_limit`, `max_held_request_size`, `max_request_size` | `server.concurrency_limited`                                      | The memory limit, what requests may hold at once, and the largest request allowed, in bytes.       |
 | `failures`                                                 | `server.accept_recovered`                                          | Accepts that failed before it recovered.                                                           |
 | `validation_mode`                                          | `ldap.schema.violation`                                            | How it was handled: `strict` (rejected), `lenient` (allowed by policy), or `relaxed` (Relax control). |
 | `mechanism`, `version`                                     | bind events                                                        | SASL mechanism name (or `simple`) and LDAP protocol version.                                       |

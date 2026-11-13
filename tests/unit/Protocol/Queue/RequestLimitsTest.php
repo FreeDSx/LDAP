@@ -134,23 +134,24 @@ final class RequestLimitsTest extends TestCase
         );
     }
 
-    public function testItHoldsARequestToTheGivenSizeAndTheElementLimit(): void
+    public function testItHoldsARequestToTheGivenSizeTheElementLimitAndTheTagNumbersLdapUses(): void
     {
         self::assertEquals(
             new EncoderOptions(
                 maxLength: 256,
                 maxElements: 50,
+                maxTagNumber: 30,
             ),
             $this->subject->encoderOptions(256),
         );
     }
 
-    public function testItSetsNoLimitsByDefault(): void
+    public function testItLimitsOnlyTheTagNumbersByDefault(): void
     {
         $limits = new RequestLimits($this->authorization);
 
         self::assertEquals(
-            new EncoderOptions(),
+            new EncoderOptions(maxTagNumber: 30),
             $limits->encoderOptions($limits->maxSize()),
         );
     }

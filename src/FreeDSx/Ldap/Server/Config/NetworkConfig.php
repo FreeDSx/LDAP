@@ -71,6 +71,11 @@ final class NetworkConfig
     private int $maxRequestElements = 100_000;
 
     /**
+     * The total size in bytes of the requests one process holds at once; null is half of the memory limit.
+     */
+    private ?int $maxHeldRequestSize = null;
+
+    /**
      * The maximum number of concurrent connections the server will accept; zero means no limit.
      */
     private int $maxConnections = 1024;
@@ -295,6 +300,28 @@ final class NetworkConfig
             'The request element limit',
         );
         $this->maxRequestElements = $maxRequestElements;
+
+        return $this;
+    }
+
+    public function getMaxHeldRequestSize(): ?int
+    {
+        return $this->maxHeldRequestSize;
+    }
+
+    /**
+     * @param int|null $maxHeldRequestSize the size in bytes, 0 for no limit, or null for half of the memory limit.
+     * @throws InvalidArgumentException when the limit is negative
+     */
+    public function setMaxHeldRequestSize(?int $maxHeldRequestSize): self
+    {
+        if ($maxHeldRequestSize !== null) {
+            self::assertNotNegative(
+                $maxHeldRequestSize,
+                'The held request size limit',
+            );
+        }
+        $this->maxHeldRequestSize = $maxHeldRequestSize;
 
         return $this;
     }

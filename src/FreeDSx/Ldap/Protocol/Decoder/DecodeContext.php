@@ -41,12 +41,22 @@ class DecodeContext
      */
     private ?int $cap = null;
 
+    private int $elementsDecoded = 0;
+
     /**
      * @param int|null $elementsLeft the elements the nested parts may hold, or null for no limit.
      */
     public function __construct(private ?int $elementsLeft = null)
     {
         $this->encoder = new LdapEncoder();
+    }
+
+    /**
+     * The elements the nested parts held, whether or not there is a limit.
+     */
+    public function elementsDecoded(): int
+    {
+        return $this->elementsDecoded;
     }
 
     /**
@@ -159,10 +169,12 @@ class DecodeContext
      */
     private function charge(): void
     {
+        $elements = $this->encoder->getLastElementCount();
+        $this->elementsDecoded += $elements;
         if ($this->elementsLeft === null) {
             return;
         }
-        $this->elementsLeft -= $this->encoder->getLastElementCount();
+        $this->elementsLeft -= $elements;
 
         if ($this->elementsLeft < 0) {
             $this->overBudget();
