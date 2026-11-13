@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -1228,6 +1229,72 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    public function testAPagingContinuationWithAnotherFilterIsAnOperationsError(): void
+    {
+        $this->authenticateUser();
+
+        $cookie = $this->firstPageCookie(Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OPERATIONS_ERROR);
+
+        $this->ldapClient()->sendAndReceive(
+            Operations::search(Filters::present('cn'))->base('dc=foo,dc=bar'),
+            new PagingControl(
+                1,
+                $cookie,
+            ),
+        );
+    }
+
+    public function testAPagingContinuationAskingForAttributeOptionsIsAnOperationsError(): void
+    {
+        $this->authenticateUser();
+
+        $cookie = $this->firstPageCookie(Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->select('cn'));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OPERATIONS_ERROR);
+
+        $this->ldapClient()->sendAndReceive(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->select('cn;lang-en'),
+            new PagingControl(
+                1,
+                $cookie,
+            ),
+        );
+    }
+
+    public function testAPagedSearchWithAnUndefinedFilterItemReturnsEachPage(): void
+    {
+        $this->authenticateUser();
+
+        // RFC 4511 §4.5.1.7: an item naming an attribute that is not a valid description is Undefined, not an error.
+        $paging = $this->ldapClient()->paging(
+            Operations::search(Filters::or(
+                Filters::present('objectClass'),
+                Filters::equal(
+                    'bad_attr',
+                    'x',
+                ),
+            ))->base('dc=foo,dc=bar'),
+            1,
+        );
+
+        $this->assertCount(
+            1,
+            $paging->getEntries(),
+        );
+        $this->assertCount(
+            1,
+            $paging->getEntries(),
+        );
+    }
+
     public function testAnUnfinishedPagingSessionIsDiscardedOnceTheCapIsReached(): void
     {
         $this->createServerProcess(
@@ -1356,6 +1423,34 @@ final class LdapServerTest extends ServerTestCase
                 // Connection may already be closed; ignore unbind failures.
             }
         }
+    }
+
+    /**
+     * Takes the first page of a paged search and returns the cookie that resumes it.
+     */
+    private function firstPageCookie(SearchRequest $search): string
+    {
+        $paging = $this->ldapClient()
+            ->sendAndReceive(
+                $search,
+                new PagingControl(
+                    1,
+                    '',
+                ),
+            )
+            ->controls()
+            ->get(Control::OID_PAGING);
+
+        $this->assertInstanceOf(
+            PagingControl::class,
+            $paging,
+        );
+        $this->assertNotSame(
+            '',
+            $paging->getCookie(),
+        );
+
+        return $paging->getCookie();
     }
 
     private function monitorEntry(): Entry

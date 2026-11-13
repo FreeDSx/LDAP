@@ -53,6 +53,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
+use FreeDSx\Ldap\Server\Paging\PagingRequestFingerprint;
+use FreeDSx\Ldap\Server\Paging\PagingSession;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -68,9 +70,14 @@ use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
+use WeakReference;
 
 class ServerPagingHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private RequestHistory $requestHistory;
 
     private ServerQueue&MockObject $mockQueue;
@@ -188,7 +195,6 @@ class ServerPagingHandlerTest extends TestCase
         );
 
         $cookie = $this->donePagingControl()->getCookie();
-        $pagingRequest = $this->requestHistory->pagingRequest()->findByNextCookie($cookie);
         $this->sentMessages = [];
 
         $this->drive(
@@ -196,7 +202,6 @@ class ServerPagingHandlerTest extends TestCase
             $this->makeSearchMessage(
                 size: 2,
                 cookie: $cookie,
-                searchRequest: $pagingRequest->getSearchRequest(),
             ),
         );
 
@@ -408,23 +413,63 @@ class ServerPagingHandlerTest extends TestCase
         self::assertNotSame('', $capturedCookie);
 
         // Second page: use the captured cookie.
-        $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($capturedCookie);
         $secondMessage = $this->makeSearchMessage(
             size: 10,
             cookie: $capturedCookie,
-            searchRequest: $pagingReq->getSearchRequest(),
         );
 
         $this->drive($this->subject, $secondMessage);
     }
 
+    public function test_a_session_resumes_from_the_next_request_without_keeping_the_first(): void
+    {
+        $subject = $this->makeHandler(
+            $this->hiding(),
+            backend: $this->backendFor(EntryFixture::inMemoryStorage(
+                Entry::create('dc=foo,dc=bar', ['dc' => 'foo']),
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+                Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
+            )),
+        );
+        $first = $this->makeSearchRequest('(cn=*)');
+        $firstRequest = WeakReference::create($first);
+        $firstFilter = WeakReference::create($first->getFilter());
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(
+                size: 1,
+                searchRequest: $first,
+            ),
+        );
+        unset($first);
+        $cookie = $this->donePagingControl()->getCookie();
+
+        self::assertNull($firstRequest->get());
+        self::assertNull($firstFilter->get());
+
+        $this->sentMessages = [];
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(
+                size: 1,
+                cookie: $cookie,
+                searchRequest: $this->makeSearchRequest('(cn=*)'),
+            ),
+        );
+
+        self::assertSame(
+            ['cn=2,dc=foo,dc=bar'],
+            $this->entryDns(),
+        );
+    }
+
     public function test_it_should_send_the_correct_response_if_paging_is_abandoned(): void
     {
-        $pagingReq = $this->makeExistingPagingRequest();
+        $session = $this->makeExistingSession();
         $message = $this->makeSearchMessage(
             size: 0,
-            cookie: $pagingReq->getNextCookie(),
-            searchRequest: $pagingReq->getSearchRequest(),
+            cookie: $session->nextCookie(),
         );
 
         $this->mockBackend
@@ -442,10 +487,10 @@ class ServerPagingHandlerTest extends TestCase
 
     public function test_it_sends_a_result_code_error_in_SearchResultDone_if_the_old_and_new_paging_requests_are_different(): void
     {
-        $pagingReq = $this->makeExistingPagingRequest();
+        $session = $this->makeExistingSession();
         $message = $this->makeSearchMessage(
             size: 10,
-            cookie: $pagingReq->getNextCookie(),
+            cookie: $session->nextCookie(),
             searchRequest: $this->makeSearchRequest('(oh=no)'),
         );
 
@@ -474,44 +519,46 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
-    public function test_it_is_unwilling_to_perform_when_the_paging_generator_has_expired(): void
+    public function test_a_page_that_drops_the_sort_of_the_first_is_an_operations_error(): void
     {
-        // A paging request exists and has been processed, but its generator was never stored
-        // (simulating a session that expired or was evicted).
-        $searchRequest = $this->makeSearchRequest();
-
-        $pagingReq = new PagingRequest(
-            new PagingControl(10, ''),
-            $searchRequest,
-            new ControlBag(),
-            'expiredcookie',
-        );
-        $pagingReq->markProcessed();
-        $this->requestHistory->pagingRequest()->add($pagingReq);
-
-        $message = $this->makeSearchMessage(
-            cookie: 'expiredcookie',
-            searchRequest: $searchRequest,
-        );
-
         $this->mockBackend
-            ->expects(self::never())
-            ->method('search');
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+                Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
+            ));
 
-        $result = $this->drive(
+        $this->drive(
             $this->subject,
-            $message,
+            new LdapMessageRequest(
+                2,
+                $this->makeSearchRequest(),
+                new PagingControl(
+                    1,
+                    '',
+                ),
+                new SortingControl(SortKey::ascending('cn')),
+            ),
+        );
+        $cookie = $this->donePagingControl()->getCookie();
+        $this->sentMessages = [];
+
+        $this->drive(
+            $this->subject,
+            $this->makeSearchMessage(
+                size: 1,
+                cookie: $cookie,
+            ),
         );
 
-        self::assertSame([], $this->entryMessages());
         $done = $this->doneMessage()->getResponse();
-        self::assertInstanceOf(SearchResultDone::class, $done);
-        self::assertSame(ResultCode::UNWILLING_TO_PERFORM, $done->getResultCode());
-        self::assertSame('', $this->donePagingControl()->getCookie());
-        self::assertInstanceOf(SearchOperationResult::class, $result);
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
         self::assertSame(
-            OperationOutcome::Failed,
-            $result->outcome(),
+            ResultCode::OPERATIONS_ERROR,
+            $done->getResultCode(),
         );
     }
 
@@ -570,14 +617,12 @@ class ServerPagingHandlerTest extends TestCase
         self::assertNotSame('', $cookie);
 
         $this->sentMessages = [];
-        $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($cookie);
 
         try {
             $subject->handleRequest(
                 $this->makeSearchMessage(
                     size: -1,
                     cookie: $cookie,
-                    searchRequest: $pagingReq->getSearchRequest(),
                 ),
                 $this->mockToken,
             );
@@ -694,10 +739,13 @@ class ServerPagingHandlerTest extends TestCase
         self::assertNotSame('', $capturedCookie, 'Expected a non-empty cookie after the first page.');
 
         // Second page: pageSize=10, sizeLimit=2 — gets entry2+entry3 (hits limit), entry4 unread → SIZE_LIMIT_EXCEEDED
-        $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($capturedCookie);
         $this->drive(
             $this->subject,
-            $this->makeSearchMessage(size: 10, cookie: $capturedCookie, searchRequest: $pagingReq->getSearchRequest()),
+            $this->makeSearchMessage(
+                size: 10,
+                cookie: $capturedCookie,
+                searchRequest: $searchRequest,
+            ),
         );
 
         $sizeLimitExceededSeen = false;
@@ -759,16 +807,31 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             2,
-            $this->requestHistory->pagingRequest()->count(),
-        );
-        self::assertNull(
-            $this->requestHistory->getPagingCursor($firstCookie),
-            'The evicted session must not keep a resume point.',
+            $this->requestHistory->pagingSessions()->count(),
         );
         self::assertFalse(
-            $this->requestHistory->pagingRequest()->has($firstCookie),
+            $this->requestHistory->pagingSessions()->has($firstCookie),
             'Resuming an evicted session must be refused.',
         );
+    }
+
+    public function test_a_search_finished_in_one_page_evicts_no_session_at_the_limit(): void
+    {
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+                Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
+            ));
+
+        $subject = $this->makeHandler(limits: new SearchLimits(maxPagingSessions: 1));
+
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+        $unfinishedCookie = $this->donePagingControl()->getCookie();
+        $this->sentMessages = [];
+        $this->drive($subject, $this->makeSearchMessage(size: 10));
+
+        self::assertTrue($this->requestHistory->pagingSessions()->has($unfinishedCookie));
     }
 
     public function test_a_session_that_runs_to_completion_releases_its_slot(): void
@@ -788,7 +851,7 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             0,
-            $this->requestHistory->pagingRequest()->count(),
+            $this->requestHistory->pagingSessions()->count(),
             'Completed sessions must be reclaimed without waiting for eviction.',
         );
     }
@@ -812,9 +875,8 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             0,
-            $this->requestHistory->pagingRequest()->count(),
+            $this->requestHistory->pagingSessions()->count(),
         );
-        self::assertNull($this->requestHistory->getPagingCursor($cookie));
     }
 
     public function test_sessions_are_not_evicted_when_no_limit_is_set(): void
@@ -834,7 +896,7 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             3,
-            $this->requestHistory->pagingRequest()->count(),
+            $this->requestHistory->pagingSessions()->count(),
         );
     }
 
@@ -1096,7 +1158,7 @@ class ServerPagingHandlerTest extends TestCase
         );
         self::assertSame(
             0,
-            $this->requestHistory->pagingRequest()->count(),
+            $this->requestHistory->pagingSessions()->count(),
         );
     }
 
@@ -1331,17 +1393,19 @@ class ServerPagingHandlerTest extends TestCase
         ?AccessControlInterface $accessControl = null,
         ?SearchLimits $limits = null,
         ?FilterEvaluatorInterface $filterEvaluator = null,
+        ?ReadBackendInterface $backend = null,
     ): ServerPagingHandler {
         $accessControl ??= $this->mockAccessControl;
         $limits ??= new SearchLimits();
+        $backend ??= $this->mockBackend;
 
         return new ServerPagingHandler(
-            backend: $this->mockBackend,
+            backend: $backend,
             accessControl: $accessControl,
             requestHistory: $this->requestHistory,
             schema: $this->schema,
             pageFiller: new PageFiller(
-                $this->mockBackend,
+                $backend,
                 new StrippedEntryMatcher(
                     $filterEvaluator ?? $this->mockFilterEvaluator,
                     $this->schema,
@@ -1441,6 +1505,19 @@ class ServerPagingHandlerTest extends TestCase
         ));
     }
 
+    /**
+     * @return list<string>
+     */
+    private function entryDns(): array
+    {
+        return array_map(
+            static fn(LdapMessageResponse $message): string => $message->getResponse() instanceof SearchResultEntry
+                ? $message->getResponse()->getEntry()->getDn()->toString()
+                : '',
+            $this->entryMessages(),
+        );
+    }
+
     private function doneMessage(): LdapMessageResponse
     {
         foreach ($this->sentMessages as $message) {
@@ -1460,26 +1537,28 @@ class ServerPagingHandlerTest extends TestCase
         return $paging;
     }
 
-    private function makeExistingPagingRequest(
-        int $size = 10,
-        string $cookie = 'bar',
-        string $nextCookie = 'foo',
-        ?SearchRequest $searchRequest = null,
-    ): PagingRequest {
-        $searchReq = $searchRequest ?? $this->makeSearchRequest();
-
-        $pagingReq = new PagingRequest(
-            new PagingControl($size, $cookie),
-            $searchReq,
-            new ControlBag(),
-            $nextCookie,
+    /**
+     * A session left unfinished by a first page of the default search.
+     */
+    private function makeExistingSession(): PagingSession
+    {
+        $session = new PagingSession(
+            $this->fingerprintOf($this->makeSearchRequest()),
+            'foo',
+            PageCursor::afterEntry(0),
         );
+        $this->requestHistory->pagingSessions()->add($session);
 
-        $pagingReq->markProcessed();
-        $this->requestHistory->pagingRequest()->add($pagingReq);
-        $this->requestHistory->storePagingCursor($nextCookie, PageCursor::afterEntry(0));
+        return $session;
+    }
 
-        return $pagingReq;
+    private function fingerprintOf(SearchRequest $searchRequest): string
+    {
+        return (new PagingRequestFingerprint())->of(new PagingRequest(
+            new PagingControl(10, ''),
+            $searchRequest,
+            new ControlBag(),
+        ));
     }
 
     private function makeSearchMessage(

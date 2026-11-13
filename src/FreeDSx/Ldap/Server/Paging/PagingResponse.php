@@ -31,6 +31,7 @@ final class PagingResponse
         private readonly bool $isComplete = false,
         private readonly int $remaining = 0,
         private readonly bool $sizeLimitExceeded = false,
+        private readonly string $cookie = '',
     ) {}
 
     /**
@@ -57,19 +58,31 @@ final class PagingResponse
     }
 
     /**
+     * The cookie that resumes the search, which is empty once nothing is left to resume.
+     */
+    public function getCookie(): string
+    {
+        return $this->cookie;
+    }
+
+    /**
      * Make a standard paging response that indicates that are still results left to return.
      *
      * @param Entries<Entry> $entries The entries returned for this response.
+     * @param string $cookie The cookie that resumes the search.
      * @param int $remaining The number of entries left (if known)
      */
     public static function make(
         Entries $entries,
+        string $cookie,
         int $remaining = 0,
     ): self {
         return new self(
             $entries,
             false,
             $remaining,
+            false,
+            $cookie,
         );
     }
 

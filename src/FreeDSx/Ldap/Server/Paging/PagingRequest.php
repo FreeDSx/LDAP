@@ -13,47 +13,27 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Paging;
 
-use DateTime;
-use DateTimeInterface;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 
 /**
- * Encapsulates the paging request from a client and provides some helpful methods.
+ * One page's request of a paged search, as the client sent it.
  *
- * @api
+ * @internal
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PagingRequest
+readonly class PagingRequest
 {
-    private int $iteration = 1;
-
-    private ?DateTimeInterface $lastProcessed = null;
-
-    private string $uniqueId;
-
-    private bool $hasProcessed = false;
-
+    /**
+     * @param ControlBag $controls The controls the backend acts on.
+     */
     public function __construct(
         private PagingControl $control,
-        private readonly SearchRequest $request,
-        private readonly ControlBag $controls,
-        private string $nextCookie,
-        private readonly DateTimeInterface $created = new DateTime(),
-        ?string $uniqueId = null,
-    ) {
-        $this->uniqueId = $uniqueId ?? random_bytes(16);
-    }
-
-    /**
-     * An opaque value that uniquely identifies this paging request across its lifecycle.
-     */
-    public function getUniqueId(): string
-    {
-        return $this->uniqueId;
-    }
+        private SearchRequest $request,
+        private ControlBag $controls,
+    ) {}
 
     /**
      * Whether the paging control is considered critical or not.
@@ -61,22 +41,6 @@ final class PagingRequest
     public function isCritical(): bool
     {
         return $this->control->getCriticality();
-    }
-
-    /**
-     * When the paging request was originally created.
-     */
-    public function createdAt(): DateTimeInterface
-    {
-        return $this->created;
-    }
-
-    /**
-     * When the request was last processed. May be null if not processed yet.
-     */
-    public function lastProcessedAt(): ?DateTimeInterface
-    {
-        return $this->lastProcessed;
     }
 
     public function getSearchRequest(): SearchRequest
@@ -92,14 +56,6 @@ final class PagingRequest
     public function getCookie(): string
     {
         return $this->control->getCookie();
-    }
-
-    /**
-     * The current iteration of paging that this request represents. Incremented by one for each request.
-     */
-    public function getIteration(): int
-    {
-        return $this->iteration;
     }
 
     /**
@@ -120,49 +76,10 @@ final class PagingRequest
     }
 
     /**
-     * Whether this represents the start of an unprocessed paging request.
+     * Whether this starts a paged search rather than resuming one.
      */
     public function isPagingStart(): bool
     {
-        if ($this->hasProcessed) {
-            return false;
-        }
-
-        return $this->control->getCookie() === ''
-            && $this->control->getSize() >= 0;
-    }
-
-    /**
-     * @internal
-     */
-    public function getNextCookie(): string
-    {
-        return $this->nextCookie;
-    }
-
-    /**
-     * @internal
-     */
-    public function updatePagingControl(PagingControl $pagingControl): void
-    {
-        $this->control = $pagingControl;
-    }
-
-    /**
-     * @internal
-     */
-    public function updateNextCookie(string $cookie): void
-    {
-        $this->nextCookie = $cookie;
-    }
-
-    /**
-     * @internal
-     */
-    public function markProcessed(): void
-    {
-        $this->lastProcessed = new DateTime();
-        $this->iteration++;
-        $this->hasProcessed = true;
+        return $this->control->getCookie() === '';
     }
 }

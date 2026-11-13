@@ -55,10 +55,36 @@ final class PagingResponseTest extends TestCase
         ;
     }
 
+    public function test_a_complete_response_has_no_cookie(): void
+    {
+        $this->subject = PagingResponse::makeFinal(new Entries());
+
+        self::assertSame(
+            '',
+            $this->subject->getCookie(),
+        );
+    }
+
     public function test_it_should_make_a_regular_response(): void
     {
-        $this->subject = PagingResponse::make(new Entries());
+        $this->subject = PagingResponse::make(
+            new Entries(),
+            'cookie',
+        );
 
         self::assertFalse($this->subject->isComplete());
+    }
+
+    public function test_a_regular_response_carries_the_cookie_that_resumes_the_search(): void
+    {
+        $this->subject = PagingResponse::make(
+            new Entries(),
+            'cookie',
+        );
+
+        self::assertSame(
+            'cookie',
+            $this->subject->getCookie(),
+        );
     }
 }

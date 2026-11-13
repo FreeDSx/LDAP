@@ -13,54 +13,22 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
-use FreeDSx\Ldap\Server\Paging\PagingRequests;
+use FreeDSx\Ldap\Server\Paging\PagingSessions;
 
 /**
  * Used to retain history regarding certain client request details.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class RequestHistory
+final readonly class RequestHistory
 {
-    private PagingRequests $pagingRequests;
+    public function __construct(private PagingSessions $pagingSessions = new PagingSessions()) {}
 
     /**
-     * Where each active paging session left off, keyed by the cookie the client returns on its next request.
-     *
-     * A position rather than an open result, so nothing is held between requests but the place to resume from.
-     *
-     * @var array<string, PageCursor>
+     * The paged searches the client has left unfinished.
      */
-    private array $pagingCursors = [];
-
-    public function __construct(?PagingRequests $pagingRequests = null)
+    public function pagingSessions(): PagingSessions
     {
-        $this->pagingRequests = $pagingRequests ?? new PagingRequests();
-    }
-
-    /**
-     * The currently active paging requests from the client.
-     */
-    public function pagingRequest(): PagingRequests
-    {
-        return $this->pagingRequests;
-    }
-
-    public function storePagingCursor(
-        string $cookie,
-        PageCursor $cursor,
-    ): void {
-        $this->pagingCursors[$cookie] = $cursor;
-    }
-
-    public function getPagingCursor(string $cookie): ?PageCursor
-    {
-        return $this->pagingCursors[$cookie] ?? null;
-    }
-
-    public function removePagingCursor(string $cookie): void
-    {
-        unset($this->pagingCursors[$cookie]);
+        return $this->pagingSessions;
     }
 }

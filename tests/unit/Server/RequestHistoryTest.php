@@ -25,10 +25,11 @@ final class RequestHistoryTest extends TestCase
         $this->subject = new RequestHistory();
     }
 
-    public function test_it_should_get_the_paging_requests(): void
+    public function test_it_starts_with_no_paging_sessions(): void
     {
-        self::assertFalse(
-            $this->subject->pagingRequest()->has('foo'),
+        self::assertSame(
+            0,
+            $this->subject->pagingSessions()->count(),
         );
     }
 }
