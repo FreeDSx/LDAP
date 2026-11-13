@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
@@ -75,6 +76,41 @@ trait SortControlTestsTrait
                 $e->getCode(),
             );
         }
+    }
+
+    public function testAPagedSearchCannotDropItsSortBetweenPages(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+        $paging = $this->ldapClient()
+            ->sendAndReceive(
+                $search,
+                new PagingControl(
+                    2,
+                    '',
+                ),
+                new SortingControl(SortKey::ascending('cn')),
+            )
+            ->controls()
+            ->get(Control::OID_PAGING);
+        self::assertInstanceOf(
+            PagingControl::class,
+            $paging,
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OPERATIONS_ERROR);
+
+        $this->ldapClient()->sendAndReceive(
+            $search,
+            new PagingControl(
+                2,
+                $paging->getCookie(),
+            ),
+        );
     }
 
     public function testANonCriticalSortThatCannotBePerformedStillReturnsPagedEntries(): void

@@ -340,7 +340,8 @@ $server->run();
 ```
 
 All client LDAP operations (search, add, delete, modify, rename, compare) are routed to the backend.
-Paging is handled automatically: a PHP generator is stored per connection and resumes it for each page request.
+Paging is handled automatically: the connection keeps where each unfinished paged search stopped and resumes it from
+there on the next page request.
 
 **Note**: Paging with the server side sort control resumes by position rather than by entry. Writes between pages can
 drop or repeat an entry. RFC 2696 §3 promises no snapshot. Unsorted paging is unaffected.
