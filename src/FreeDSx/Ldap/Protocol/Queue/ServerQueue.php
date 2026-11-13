@@ -39,8 +39,6 @@ use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
 use Generator;
 
-use function count;
-use function microtime;
 use function strlen;
 
 /**
@@ -50,26 +48,6 @@ use function strlen;
  */
 class ServerQueue extends LdapQueue implements ConnectionControl
 {
-    /**
-     * Well above what a pipelining client sends mid-stream, but low enough to bound what one connection can buffer.
-     */
-    private const MAX_PENDING_MESSAGES = 128;
-
-    /**
-     * Bounds what read-ahead holds by size, as a few large requests decode into far more memory than many small ones.
-     */
-    private const MAX_PENDING_BYTES = 65_536;
-
-    /**
-     * @var LdapMessageRequest[]
-     */
-    private array $pendingMessages = [];
-
-    /**
-     * The bytes of the messages read ahead into the buffer, counted until it next empties.
-     */
-    private int $pendingBytes = 0;
-
     /**
      * The bytes of the message decoded last.
      */
@@ -90,19 +68,9 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     private array $deferredMessages = [];
 
     /**
-     * The request size the encoder holds, or null until the first decode sets it.
-     */
-    private ?int $maxSize = null;
-
-    /**
      * The failed write that every later write rethrows.
      */
     private ?ConnectionException $writeFailure = null;
-
-    /**
-     * When the request partly in the buffer must have fully arrived, or null until a wait finds one.
-     */
-    private ?float $requestDeadline = null;
 
     /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
@@ -110,10 +78,11 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     public function __construct(
         Socket $socket,
         private readonly RequestMessageDecoder $messageDecoder,
-        private readonly RequestLimits $limits,
+        private readonly RequestArrival $arrival,
         private readonly LdapEncoder $ldapEncoder = new LdapEncoder(),
         array $interceptors = [],
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
+        private readonly ReadAheadBuffer $readAhead = new ReadAheadBuffer(),
     ) {
         parent::__construct(
             $socket,
@@ -130,7 +99,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     public function getMessage(?int $id = null): LdapMessageRequest
     {
         $pending = $id === null
-            ? $this->takePending()
+            ? $this->readAhead->take()
             : null;
 
         return $pending ?? $this->readRequest($id);
@@ -141,10 +110,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function requeue(LdapMessageRequest $message): void
     {
-        array_unshift(
-            $this->pendingMessages,
-            $message,
-        );
+        $this->readAhead->prepend($message);
     }
 
     /**
@@ -152,7 +118,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function buffer(LdapMessageRequest $message): void
     {
-        $this->pendingMessages[] = $message;
+        $this->readAhead->append($message);
     }
 
     /**
@@ -166,7 +132,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     public function peekForCancelSignal(int $inFlightMessageId): ?LdapMessageRequest
     {
         // Nothing drains the buffer until the stream ends, so reading pauses here, and the socket holds the backlog.
-        if ($this->isReadAheadFull()) {
+        if ($this->readAhead->isFull()) {
             return null;
         }
 
@@ -181,8 +147,10 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         if ($this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
             return $message;
         }
-        $this->pendingMessages[] = $message;
-        $this->pendingBytes += $this->lastMessageBytes;
+        $this->readAhead->append(
+            $message,
+            $this->lastMessageBytes,
+        );
 
         // Buffered as well as signalled.
         // The session still has to end the way an unbind normally ends it.
@@ -201,7 +169,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function pollMessage(): ?LdapMessageRequest
     {
-        $pending = $this->takePending();
+        $pending = $this->readAhead->take();
         if ($pending !== null) {
             return $pending;
         }
@@ -339,15 +307,21 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     protected function addToAvailableBufferOrFail(): void
     {
-        $timeout = $this->limits->readTimeout();
-        // Between requests only the idle timeout applies.
-        if ($timeout === 0 || !$this->hasBuffer()) {
+        $timeout = $this->arrival->readTimeout($this->hasBuffer());
+        if ($timeout === null) {
             parent::addToAvailableBufferOrFail();
 
             return;
         }
 
-        $bytes = $this->readRestOfRequest($timeout);
+        try {
+            $bytes = $this->socket->read(
+                true,
+                $timeout,
+            );
+        } catch (ReadTimeoutException $e) {
+            $this->arrival->timedOut($e);
+        }
         if ($bytes === false) {
             throw new ConnectionException('The connection to the server has been lost.');
         }
@@ -359,7 +333,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     protected function onMessageDecoded(Message $message): void
     {
-        $this->requestDeadline = null;
+        $this->arrival->arrived();
         $this->lastMessageBytes = (int) $message->getLastPosition();
         $this->metricsRecorder->trafficObserved(new TrafficObservation(
             bytesReceived: $this->lastMessageBytes,
@@ -374,11 +348,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     protected function decode(string $bytes): Message
     {
-        $maxSize = $this->limits->maxSize();
-        if ($maxSize !== $this->maxSize) {
-            $this->maxSize = $maxSize;
-            $this->ldapEncoder->setOptions($this->limits->encoderOptions($maxSize));
-        }
+        $this->arrival->limitDecoding($this->ldapEncoder);
 
         return parent::decode($bytes);
     }
@@ -399,7 +369,7 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         // The encoder still holds the count from decoding this message, which always runs right before it is built.
         return $this->messageDecoder->decode(
             $type,
-            $this->limits->elementsLeftAfter($this->ldapEncoder->getLastElementCount()),
+            $this->arrival->elementsLeftAfter($this->ldapEncoder->getLastElementCount()),
         );
     }
 
@@ -441,29 +411,6 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         $this->close();
     }
 
-    /**
-     * Whether the buffer holds as many messages, or as many bytes of them, as read-ahead may.
-     */
-    private function isReadAheadFull(): bool
-    {
-        return count($this->pendingMessages) >= self::MAX_PENDING_MESSAGES
-            || $this->pendingBytes >= self::MAX_PENDING_BYTES;
-    }
-
-    /**
-     * Takes the oldest buffered message, or null when none is buffered.
-     */
-    private function takePending(): ?LdapMessageRequest
-    {
-        $message = array_shift($this->pendingMessages);
-        // The bytes are counted for the buffer as a whole, so they are only forgotten once it empties.
-        if ($this->pendingMessages === []) {
-            $this->pendingBytes = 0;
-        }
-
-        return $message;
-    }
-
     private function applyInterceptors(LdapMessageResponse $response): LdapMessageResponse
     {
         foreach ($this->interceptors as $interceptor) {
@@ -471,32 +418,6 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         }
 
         return $response;
-    }
-
-    /**
-     * Reads within what is left of the time the request has to arrive.
-     *
-     * @throws ReadTimeoutException when the request does not finish arriving in time.
-     * @throws ConnectionException
-     */
-    private function readRestOfRequest(int $timeout): string|false
-    {
-        $this->requestDeadline ??= microtime(true) + $timeout;
-
-        try {
-            return $this->socket->read(
-                true,
-                $this->requestDeadline - microtime(true),
-            );
-        } catch (ReadTimeoutException $e) {
-            throw new ReadTimeoutException(
-                sprintf(
-                    'The request did not finish arriving within %d seconds.',
-                    $timeout,
-                ),
-                previous: $e,
-            );
-        }
     }
 
     /**

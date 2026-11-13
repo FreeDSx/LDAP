@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
+use FreeDSx\Ldap\Protocol\Queue\ReadAheadBuffer;
+use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -53,15 +55,16 @@ trait ServerConnectionScaffoldingTrait
         return new ServerQueue(
             $socket,
             $messageDecoder,
-            new RequestLimits(
+            new RequestArrival(new RequestLimits(
                 authorization: $authorization,
                 maxSize: $networkConfig->getMaxRequestSize(),
                 maxAnonymousSize: $networkConfig->getMaxAnonymousRequestSize(),
                 maxElements: $networkConfig->getMaxRequestElements(),
                 readTimeout: $networkConfig->getRequestReadTimeout(),
-            ),
+            )),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,
+            readAhead: new ReadAheadBuffer(),
         );
     }
 
