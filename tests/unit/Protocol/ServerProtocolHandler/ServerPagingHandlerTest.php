@@ -55,7 +55,7 @@ use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestFingerprint;
 use FreeDSx\Ldap\Server\Paging\PagingSession;
-use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Paging\PagingSessions;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
@@ -78,7 +78,7 @@ class ServerPagingHandlerTest extends TestCase
 {
     use ServerContainerTrait;
 
-    private RequestHistory $requestHistory;
+    private PagingSessions $pagingSessions;
 
     private ServerQueue&MockObject $mockQueue;
 
@@ -106,7 +106,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
-        $this->requestHistory = new RequestHistory();
+        $this->pagingSessions = new PagingSessions();
         $this->schema = SchemaResource::Core->load();
         $this->sentMessages = [];
 
@@ -807,10 +807,10 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             2,
-            $this->requestHistory->pagingSessions()->count(),
+            $this->pagingSessions->count(),
         );
         self::assertFalse(
-            $this->requestHistory->pagingSessions()->has($firstCookie),
+            $this->pagingSessions->has($firstCookie),
             'Resuming an evicted session must be refused.',
         );
     }
@@ -831,7 +831,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->sentMessages = [];
         $this->drive($subject, $this->makeSearchMessage(size: 10));
 
-        self::assertTrue($this->requestHistory->pagingSessions()->has($unfinishedCookie));
+        self::assertTrue($this->pagingSessions->has($unfinishedCookie));
     }
 
     public function test_a_session_that_runs_to_completion_releases_its_slot(): void
@@ -851,7 +851,7 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             0,
-            $this->requestHistory->pagingSessions()->count(),
+            $this->pagingSessions->count(),
             'Completed sessions must be reclaimed without waiting for eviction.',
         );
     }
@@ -875,7 +875,7 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             0,
-            $this->requestHistory->pagingSessions()->count(),
+            $this->pagingSessions->count(),
         );
     }
 
@@ -896,7 +896,7 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertSame(
             3,
-            $this->requestHistory->pagingSessions()->count(),
+            $this->pagingSessions->count(),
         );
     }
 
@@ -1158,7 +1158,7 @@ class ServerPagingHandlerTest extends TestCase
         );
         self::assertSame(
             0,
-            $this->requestHistory->pagingSessions()->count(),
+            $this->pagingSessions->count(),
         );
     }
 
@@ -1402,7 +1402,7 @@ class ServerPagingHandlerTest extends TestCase
         return new ServerPagingHandler(
             backend: $backend,
             accessControl: $accessControl,
-            requestHistory: $this->requestHistory,
+            pagingSessions: $this->pagingSessions,
             schema: $this->schema,
             pageFiller: new PageFiller(
                 $backend,
@@ -1547,7 +1547,7 @@ class ServerPagingHandlerTest extends TestCase
             'foo',
             PageCursor::afterEntry(0),
         );
-        $this->requestHistory->pagingSessions()->add($session);
+        $this->pagingSessions->add($session);
 
         return $session;
     }
