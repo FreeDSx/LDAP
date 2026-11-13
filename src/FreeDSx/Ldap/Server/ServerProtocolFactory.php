@@ -13,28 +13,31 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Socket\Socket;
 
 /**
- * Adapts the container-built connection graph to the protocol factory contract used by the runners.
+ * Resolves each accepted connection's protocol handler from its own connection scope.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 readonly class ServerProtocolFactory implements ServerProtocolFactoryInterface
 {
     public function __construct(
-        private ConnectionHandlerBuilderInterface $builder,
+        private Container $container,
     ) {}
 
     public function make(
         Socket $socket,
         ConnectionContext $context = new ConnectionContext(),
     ): ServerProtocolHandler {
-        return $this->builder->build(
-            $socket,
-            $context,
-        );
+        return $this->container
+            ->forConnection(
+                $socket,
+                $context,
+            )
+            ->get(ServerProtocolHandler::class);
     }
 }

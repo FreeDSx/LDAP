@@ -436,7 +436,7 @@ final class SaslBindTest extends TestCase
             $this->mockQueue,
             new DecodeFailureResponder(
                 $this->mockQueue,
-                $this->fromContainer(ServerAuthorization::class),
+                $this->fromConnectionScope(ServerAuthorization::class),
             ),
             new ResponseFactory(),
             new MechanismOptionsBuilderFactory(

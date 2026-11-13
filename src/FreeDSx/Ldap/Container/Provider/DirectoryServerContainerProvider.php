@@ -113,7 +113,6 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
-use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\AttributeSearchBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverChain;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
@@ -648,7 +647,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeServerProtocolFactory(Container $container): ServerProtocolFactory
     {
-        return new ServerProtocolFactory($container->get(ConnectionHandlerBuilderInterface::class));
+        return new ServerProtocolFactory($container);
     }
 
     private function makeServerProtocolHandlerFactory(Container $container): ServerProtocolHandlerFactory

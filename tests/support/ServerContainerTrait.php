@@ -16,7 +16,9 @@ namespace Tests\Support\FreeDSx\Ldap;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
+use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Socket\Socket;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 /**
@@ -25,6 +27,8 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 trait ServerContainerTrait
 {
     private ?Container $container = null;
+
+    private ?Container $connectionScope = null;
 
     private ?ServerOptions $serverOptions = null;
 
@@ -77,6 +81,23 @@ trait ServerContainerTrait
         }
 
         return $this->container()->get($className);
+    }
+
+    /**
+     * Resolves a connection-scoped service from this test's one connection scope over a mocked socket.
+     *
+     * @template T of object
+     * @param class-string<T> $className
+     * @return T
+     */
+    private function fromConnectionScope(string $className): object
+    {
+        $this->connectionScope ??= $this->container()->forConnection(
+            $this->createMock(Socket::class),
+            new ConnectionContext(),
+        );
+
+        return $this->connectionScope->get($className);
     }
 
     /**

@@ -32,8 +32,45 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
+use FreeDSx\Ldap\Protocol\Authenticator;
+use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
+use FreeDSx\Ldap\Protocol\Authorization\DispatchAuthorizer;
+use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
+use FreeDSx\Ldap\Protocol\Bind\SaslBind;
+use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
+use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
+use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
+use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
+use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
+use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Protocol\SessionEndPolicy;
+use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
+use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
+use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
+use FreeDSx\Ldap\Server\Middleware\PasswordPolicyRequestMiddleware;
+use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
+use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
+use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ResponseWriterMiddleware;
+use FreeDSx\Ldap\Server\Middleware\TargetDnSyntaxMiddleware;
+use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\ImmediateWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
@@ -85,7 +122,9 @@ use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
-use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
+use FreeDSx\Ldap\Server\Proxy\ProxyBindResetMiddleware;
+use FreeDSx\Ldap\Server\Proxy\ProxyRequestPipeline;
+use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
 use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
@@ -94,11 +133,13 @@ use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
+use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketPool;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -233,6 +274,156 @@ class ContainerTest extends TestCase
         self::assertSame(
             $this->subject->get($class),
             $this->subject->get($class),
+        );
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('connectionServiceDataProvider')]
+    public function test_a_connection_scope_builds_one_instance_of_a_connection_service(string $class): void
+    {
+        $scope = $this->openConnectionScope($this->saslAndManagerContainer());
+
+        self::assertSame(
+            $scope->get($class),
+            $scope->get($class),
+        );
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('connectionServiceDataProvider')]
+    public function test_each_connection_scope_builds_its_own_connection_services(string $class): void
+    {
+        $container = $this->saslAndManagerContainer();
+
+        self::assertNotSame(
+            $this->openConnectionScope($container)->get($class),
+            $this->openConnectionScope($container)->get($class),
+        );
+    }
+
+    #[DataProvider('connectionOptionsDataProvider')]
+    public function test_a_connection_scope_builds_the_protocol_handler(ServerOptions $options): void
+    {
+        $scope = Container::forServer($options)->forConnection(
+            $this->createMock(Socket::class),
+            new ConnectionContext(),
+        );
+
+        self::assertInstanceOf(
+            ServerProtocolHandler::class,
+            $scope->get(ServerProtocolHandler::class),
+        );
+    }
+
+    public function test_a_manager_aware_authenticator_is_refused_without_a_manager(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('A manager-aware authenticator requires a configured manager.');
+
+        $this->openConnectionScope($this->subject)->get(ManagerAwareAuthenticator::class);
+    }
+
+    public function test_a_replica_resolves_the_read_only_middleware(): void
+    {
+        $container = Container::forServer(TestServerOptions::defaults()->setReplicationConfig(
+            ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())),
+        ));
+
+        self::assertInstanceOf(
+            ReadOnlyMiddleware::class,
+            $container->get(ReadOnlyMiddleware::class),
+        );
+    }
+
+    public function test_the_read_only_middleware_is_refused_without_a_consumer_config(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The read-only middleware requires a consumer config.');
+
+        $this->subject->get(ReadOnlyMiddleware::class);
+    }
+
+    public function test_a_connection_scope_resolves_shared_services_from_the_container(): void
+    {
+        self::assertSame(
+            $this->subject->get(ReadEntryInterface::class),
+            $this->openConnectionScope($this->subject)->get(ReadEntryInterface::class),
+        );
+    }
+
+    public function test_every_connection_scope_shares_the_request_budget(): void
+    {
+        $budget = $this->subject->get(RequestBudget::class);
+
+        self::assertSame(
+            $budget,
+            $this->openConnectionScope($this->subject)->get(RequestBudget::class),
+        );
+        self::assertSame(
+            $budget,
+            $this->openConnectionScope($this->subject)->get(RequestBudget::class),
+        );
+    }
+
+    public function test_a_connection_scope_resolves_the_socket_and_context_it_was_opened_with(): void
+    {
+        $socket = $this->createMock(Socket::class);
+        $context = new ConnectionContext();
+        $scope = $this->subject->forConnection(
+            $socket,
+            $context,
+        );
+
+        self::assertSame(
+            $socket,
+            $scope->get(Socket::class),
+        );
+        self::assertSame(
+            $context,
+            $scope->get(ConnectionContext::class),
+        );
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('connectionServiceDataProvider')]
+    public function test_a_connection_service_is_refused_outside_a_connection_scope(string $class): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('is connection scoped');
+
+        $this->subject->get($class);
+    }
+
+    public function test_a_connection_scope_cannot_open_another_connection_scope(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('A connection scope can only be opened on a server container.');
+
+        $this->openConnectionScope($this->openConnectionScope($this->subject));
+    }
+
+    public function test_a_connection_scope_cannot_be_opened_on_a_client_container(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('A connection scope can only be opened on a server container.');
+
+        $this->openConnectionScope(Container::forClient(new ClientOptions()));
+    }
+
+    public function test_a_connection_service_cannot_be_seeded_into_the_container(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('is connection scoped and cannot be seeded into the container.');
+
+        Container::forServer(
+            TestServerOptions::defaults(),
+            [EventLogger::class => new EventLogger(null)],
         );
     }
 
@@ -371,14 +562,54 @@ class ContainerTest extends TestCase
         );
     }
 
-    public function test_a_proxy_container_uses_the_proxy_protocol_factory(): void
+    public function test_a_proxy_container_uses_the_server_protocol_factory(): void
     {
         $container = Container::forProxy(new ProxyOptions(new ProxyServerOptions()));
 
         self::assertInstanceOf(
-            ProxyProtocolFactory::class,
+            ServerProtocolFactory::class,
             $container->get(ServerProtocolFactoryInterface::class),
         );
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('proxyConnectionServiceDataProvider')]
+    public function test_a_proxy_connection_scope_builds_one_instance_of_a_connection_service(string $class): void
+    {
+        $scope = $this->openConnectionScope($this->proxyContainer());
+
+        self::assertSame(
+            $scope->get($class),
+            $scope->get($class),
+        );
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('proxyConnectionServiceDataProvider')]
+    public function test_each_proxy_connection_scope_builds_its_own_connection_services(string $class): void
+    {
+        $container = $this->proxyContainer();
+
+        self::assertNotSame(
+            $this->openConnectionScope($container)->get($class),
+            $this->openConnectionScope($container)->get($class),
+        );
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('proxyConnectionServiceDataProvider')]
+    public function test_a_proxy_connection_service_is_refused_outside_a_connection_scope(string $class): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('is connection scoped');
+
+        $this->proxyContainer()->get($class);
     }
 
     public function test_a_server_and_a_proxy_container_resolve_the_request_decoder(): void
@@ -429,7 +660,7 @@ class ContainerTest extends TestCase
         $container->get(ServerInitialization::class)->start();
 
         self::assertInstanceOf(
-            ProxyProtocolFactory::class,
+            ServerProtocolFactory::class,
             $container->get(ServerProtocolFactoryInterface::class),
         );
     }
@@ -467,6 +698,106 @@ class ContainerTest extends TestCase
     }
 
     /**
+     * Services holding a connection's state, or composed from one.
+     *
+     * @return array<array{class-string}>
+     */
+    public static function connectionServiceDataProvider(): array
+    {
+        return [
+            [ServerAuthorization::class],
+            [RequestLimits::class],
+            [RequestArrival::class],
+            [EventLogger::class],
+            [ServerQueue::class],
+            [DecodeFailureResponder::class],
+            [SessionEndPolicy::class],
+            [AnonymousBind::class],
+            [ResponseWriter::class],
+            [RequestValidationMiddleware::class],
+            [ConfidentialityMiddleware::class],
+            [ServerProtocolHandler::class],
+            [PasswordPolicyContext::class],
+            [PasswordPolicyBindGuard::class],
+            [PasswordPolicyAwareAuthenticator::class],
+            [AuthzIdResolver::class],
+            [ManagerAwareAuthenticator::class],
+            [SimpleBind::class],
+            [SaslBindPolicyEnforcer::class],
+            [MechanismOptionsBuilderFactory::class],
+            [SaslExchange::class],
+            [SaslBind::class],
+            [Authenticator::class],
+            [DispatchAuthorizer::class],
+            [HandlerContext::class],
+            [ProtocolHandlerProvider::class],
+            [PasswordPolicyRequestMiddleware::class],
+            [BindMiddleware::class],
+            [AuthorizationResolutionMiddleware::class],
+            [OperationAuditMiddleware::class],
+            [ResponseWriterMiddleware::class],
+            [MiddlewareChain::class],
+        ];
+    }
+
+    /**
+     * Services holding a proxied connection's state, or composed from one.
+     *
+     * @return array<array{class-string}>
+     */
+    public static function proxyConnectionServiceDataProvider(): array
+    {
+        return [
+            [ServerAuthorization::class],
+            [RequestLimits::class],
+            [RequestArrival::class],
+            [EventLogger::class],
+            [ServerQueue::class],
+            [DecodeFailureResponder::class],
+            [SessionEndPolicy::class],
+            [AnonymousBind::class],
+            [ResponseWriter::class],
+            [RequestValidationMiddleware::class],
+            [ConfidentialityMiddleware::class],
+            [BindMiddleware::class],
+            [ServerProtocolHandler::class],
+            [LdapClient::class],
+            [ProxyUpstreamSession::class],
+            [SimpleBind::class],
+            [Authenticator::class],
+            [DispatchAuthorizer::class],
+            [ProxyBindResetMiddleware::class],
+            [AuthorizationResolutionMiddleware::class],
+            [ProxyRequestPipeline::class],
+            [MiddlewareChain::class],
+        ];
+    }
+
+    /**
+     * @return array<string, array{ServerOptions}>
+     */
+    public static function connectionOptionsDataProvider(): array
+    {
+        return [
+            'defaults' => [TestServerOptions::defaults()],
+            'password policy' => [new ServerOptions(
+                storageConfig: TestServerOptions::transientStorage(),
+                passwordConfig: (new PasswordConfig())->setPolicy(new PasswordPolicy()),
+            )],
+            'sasl plain' => [TestServerOptions::defaults()->setSaslMechanisms(ServerOptions::SASL_PLAIN)],
+            'sasl external' => [TestServerOptions::defaults()->setSaslMechanisms(ServerOptions::SASL_EXTERNAL)],
+            'manager' => [TestServerOptions::defaults()->setManager(new ManagerIdentity(
+                new Dn('cn=manager'),
+                '{SHA}aGFzaA==',
+            ))],
+            'monitor' => [TestServerOptions::defaults()->setMonitorEnabled(true)],
+            'replica' => [(new ServerOptions(PdoConfig::forSqlite(':memory:')))->setReplicationConfig(
+                ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())),
+            )],
+        ];
+    }
+
+    /**
      * @return array<array{class-string}>
      */
     public static function serverDependenciesDataProvider(): array
@@ -475,7 +806,6 @@ class ContainerTest extends TestCase
             [ServerProtocolFactory::class],
             [BindNameResolverInterface::class],
             [PasswordAuthenticatableInterface::class],
-            [ServerAuthorization::class],
             [SocketServerFactory::class],
             [MetricsRecorderInterface::class],
             [MetricsSnapshotProvider::class],
@@ -496,6 +826,7 @@ class ContainerTest extends TestCase
             [AssertionMiddleware::class],
             [AttributeTypeCanonicalizationMiddleware::class],
             [ResourceLimitMiddleware::class],
+            [TargetDnSyntaxMiddleware::class],
             [ProtocolHandlerFactoryMap::class],
         ];
     }
@@ -1027,6 +1358,29 @@ class ContainerTest extends TestCase
                 ),
             ],
         );
+    }
+
+    private function openConnectionScope(Container $container): Container
+    {
+        return $container->forConnection(
+            $this->createMock(Socket::class),
+            new ConnectionContext(),
+        );
+    }
+
+    private function saslAndManagerContainer(): Container
+    {
+        return $this->containerFor(TestServerOptions::defaults()
+            ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
+            ->setManager(new ManagerIdentity(
+                new Dn('cn=manager'),
+                '{SHA}aGFzaA==',
+            )));
+    }
+
+    private function proxyContainer(): Container
+    {
+        return Container::forProxy(new ProxyOptions(new ProxyServerOptions()));
     }
 
     private function startOnSqlite(

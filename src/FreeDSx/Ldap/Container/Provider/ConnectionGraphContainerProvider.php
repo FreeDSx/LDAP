@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
@@ -39,7 +40,9 @@ use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
+use FreeDSx\Ldap\Server\Middleware\TargetDnSyntaxMiddleware;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\EntryBindStrategy;
@@ -47,8 +50,6 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStra
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\ReplicaBindStrategy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
-use FreeDSx\Ldap\Server\ConnectionHandlerBuilder;
-use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -63,7 +64,6 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
     public function factories(): array
     {
         return [
-            ConnectionHandlerBuilderInterface::class => static fn(Container $container): ConnectionHandlerBuilder => new ConnectionHandlerBuilder($container),
             PasswordPolicyBindStrategyInterface::class => $this->makeBindStrategy(...),
             SearchLimitResolver::class => $this->makeSearchLimitResolver(...),
             AssertionEvaluator::class => $this->makeAssertionEvaluator(...),
@@ -79,6 +79,11 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             WithheldAttributeMiddleware::class => $this->makeWithheldAttributeMiddleware(...),
             AssertionMiddleware::class => $this->makeAssertionMiddleware(...),
             ResourceLimitMiddleware::class => $this->makeResourceLimitMiddleware(...),
+            TargetDnSyntaxMiddleware::class => static fn(): TargetDnSyntaxMiddleware => new TargetDnSyntaxMiddleware(),
+            ReadOnlyMiddleware::class => static fn(Container $container): ReadOnlyMiddleware => new ReadOnlyMiddleware(
+                $container->get(ServerOptions::class)->getConsumerConfig()
+                    ?? throw new RuntimeException('The read-only middleware requires a consumer config.'),
+            ),
         ];
     }
 
