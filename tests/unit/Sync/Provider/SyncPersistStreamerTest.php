@@ -460,7 +460,7 @@ final class SyncPersistStreamerTest extends TestCase
             $this->queue,
             new DecodeFailureResponder(
                 $this->queue,
-                $this->fromContainer(ServerAuthorization::class),
+                $this->fromConnectionScope(ServerAuthorization::class),
             ),
             new OutOfSequenceResponder($this->queue),
         ))->write(

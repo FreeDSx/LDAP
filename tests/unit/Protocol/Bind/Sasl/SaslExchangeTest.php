@@ -734,7 +734,7 @@ final class SaslExchangeTest extends TestCase
             queue: $this->mockQueue,
             decodeFailures: new DecodeFailureResponder(
                 $this->mockQueue,
-                $this->fromContainer(ServerAuthorization::class),
+                $this->fromConnectionScope(ServerAuthorization::class),
             ),
             responseFactory: new ResponseFactory(),
             optionsBuilderFactory: new MechanismOptionsBuilderFactory(

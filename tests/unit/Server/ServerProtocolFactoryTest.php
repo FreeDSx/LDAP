@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
-use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Socket\Socket;
@@ -23,29 +23,35 @@ use PHPUnit\Framework\TestCase;
 
 final class ServerProtocolFactoryTest extends TestCase
 {
-    private ConnectionHandlerBuilderInterface&MockObject $builder;
+    private Container&MockObject $container;
 
     private ServerProtocolFactory $subject;
 
     protected function setUp(): void
     {
-        $this->builder = $this->createMock(ConnectionHandlerBuilderInterface::class);
-        $this->subject = new ServerProtocolFactory($this->builder);
+        $this->container = $this->createMock(Container::class);
+        $this->subject = new ServerProtocolFactory($this->container);
     }
 
-    public function test_it_delegates_make_to_the_connection_handler_builder(): void
+    public function test_it_resolves_the_handler_from_a_scope_opened_for_the_connection(): void
     {
         $socket = $this->createMock(Socket::class);
         $context = new ConnectionContext();
+        $scope = $this->createMock(Container::class);
         $handler = $this->createMock(ServerProtocolHandler::class);
 
-        $this->builder
+        $this->container
             ->expects($this->once())
-            ->method('build')
+            ->method('forConnection')
             ->with(
                 $socket,
                 $context,
             )
+            ->willReturn($scope);
+        $scope
+            ->expects($this->once())
+            ->method('get')
+            ->with(ServerProtocolHandler::class)
             ->willReturn($handler);
 
         self::assertSame(

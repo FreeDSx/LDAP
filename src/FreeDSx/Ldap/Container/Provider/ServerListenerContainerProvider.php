@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
-use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
@@ -59,7 +58,7 @@ use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
- * Registers the listener services shared by every server type: the socket, runner, reload, authorization, and metrics.
+ * Registers the listener services shared by every server type: the socket, runner, reload, and metrics.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -76,7 +75,6 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $c->get(SleeperInterface::class),
                 $c->get(SystemResources::class),
             ),
-            ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             ServerInitialization::class => $this->makeServerInitialization(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
@@ -110,11 +108,6 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         return $container->get(ServerListenerOptionsInterface::class)->isRunnerMode(RunnerMode::Swoole)
             ? new CoroutineSleeper()
             : new BlockingSleeper();
-    }
-
-    private function makeServerAuthorizer(Container $container): ServerAuthorization
-    {
-        return new ServerAuthorization($container->get(ServerListenerOptionsInterface::class));
     }
 
     private function makeServerRunner(Container $container): ServerRunnerInterface

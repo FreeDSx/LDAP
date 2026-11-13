@@ -16,17 +16,16 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
-use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
-use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Initialization\Requirement\UpstreamConfidentialityRequirement;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\Child\ChildForker;
-use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
+use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 
@@ -43,6 +42,7 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
             ServerProtocolFactoryInterface::class => $this->makeProtocolFactory(...),
             BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
             ListenerContributorInterface::class => $this->makeListenerContributor(...),
+            CriticalControlValidator::class => static fn(): CriticalControlValidator => new CriticalControlValidator(),
         ];
     }
 
@@ -55,11 +55,7 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
 
     private function makeProtocolFactory(Container $container): ServerProtocolFactoryInterface
     {
-        return new ProxyProtocolFactory(
-            $container->get(ProxyOptions::class),
-            $container->get(RequestMessageDecoder::class),
-            $container->get(RequestBudget::class),
-        );
+        return new ServerProtocolFactory($container);
     }
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
