@@ -11,9 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\Utility;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Resources;
 
-use FreeDSx\Ldap\Server\Utility\CpuCount;
+use FreeDSx\Ldap\Server\Resources\CpuCount;
 use PHPUnit\Framework\TestCase;
 
 final class CpuCountTest extends TestCase

@@ -11,9 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Resources;
 
-use FreeDSx\Ldap\Server\ServerRunner\OpenFileLimit;
+use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
 use PHPUnit\Framework\TestCase;
 
 final class OpenFileLimitTest extends TestCase

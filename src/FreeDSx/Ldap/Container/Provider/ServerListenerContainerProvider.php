@@ -37,7 +37,8 @@ use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\Server\ServerRunner\OpenFileLimit;
+use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
+use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerConfiguration;
@@ -62,6 +63,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         return [
             SocketServerFactory::class => $this->makeSocketServerFactory(...),
             ChildForker::class => static fn(): ChildForker => new ChildForker(),
+            SystemResources::class => static fn(): SystemResources => new SystemResources(),
             ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
@@ -108,7 +110,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             // Only a worker serving many clients in one process holds every client's descriptors.
             $this->recordOpenFileLimit(
                 $options,
-                OpenFileLimit::ofThisProcess(),
+                $container->get(SystemResources::class)->openFileLimit(),
                 $container->get(ListenerContributorInterface::class)->descriptorsPerClient(),
             );
             $workerFactory = new WorkerFactory(

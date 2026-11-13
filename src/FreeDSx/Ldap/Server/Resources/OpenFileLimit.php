@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\ServerRunner;
+namespace FreeDSx\Ldap\Server\Resources;
 
 use function function_exists;
 use function is_numeric;
