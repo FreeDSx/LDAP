@@ -293,7 +293,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerPagingHandler(
             backend: $backend,
             accessControl: $accessControl,
-            requestHistory: $context->requestHistory,
+            pagingSessions: $context->pagingSessions,
             schema: $options->getSchema(),
             pageFiller: new PageFiller(
                 $backend,

@@ -45,7 +45,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
-use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Paging\PagingSessions;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -272,7 +272,7 @@ final class ProtocolHandlerProviderTest extends TestCase
         return new HandlerContext(
             connection: $this->createMock(ConnectionControl::class),
             eventLogger: new EventLogger(null),
-            requestHistory: new RequestHistory(),
+            pagingSessions: new PagingSessions(),
             passwordPolicyContext: $passwordPolicyContext,
         );
     }

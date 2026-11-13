@@ -15,8 +15,8 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Paging\PagingSessions;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
-use FreeDSx\Ldap\Server\RequestHistory;
 
 /**
  * The per-connection roots a handler factory needs to finish constructing a handler.
@@ -29,7 +29,7 @@ final readonly class HandlerContext
     public function __construct(
         public ConnectionControl $connection,
         public EventLogger $eventLogger,
-        public RequestHistory $requestHistory,
+        public PagingSessions $pagingSessions,
         public ?PasswordPolicyContext $passwordPolicyContext = null,
     ) {}
 }

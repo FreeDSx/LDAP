@@ -75,6 +75,7 @@ use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
 use FreeDSx\Ldap\Server\Middleware\TargetDnSyntaxMiddleware;
+use FreeDSx\Ldap\Server\Paging\PagingSessions;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
@@ -196,7 +197,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         $handlerProvider = $this->makeProtocolHandlerProvider(
             $serverQueue,
             $eventLogger,
-            new RequestHistory(),
+            new PagingSessions(),
             $policyContext,
         );
 
@@ -369,7 +370,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
     private function makeProtocolHandlerProvider(
         ServerQueue $queue,
         EventLogger $eventLogger,
-        RequestHistory $requestHistory,
+        PagingSessions $pagingSessions,
         ?PasswordPolicyContext $policyContext,
     ): ProtocolHandlerProvider {
         return new ProtocolHandlerProvider(
@@ -378,7 +379,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             context: new HandlerContext(
                 connection: $queue,
                 eventLogger: $eventLogger,
-                requestHistory: $requestHistory,
+                pagingSessions: $pagingSessions,
                 passwordPolicyContext: $policyContext,
             ),
         );

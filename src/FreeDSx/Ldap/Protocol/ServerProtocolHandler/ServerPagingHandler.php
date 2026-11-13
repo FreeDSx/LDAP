@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestFingerprint;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\Paging\PagingSession;
-use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Paging\PagingSessions;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -54,7 +54,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     public function __construct(
         private readonly ReadBackendInterface $backend,
         private readonly AccessControlInterface $accessControl,
-        private readonly RequestHistory $requestHistory,
+        private readonly PagingSessions $pagingSessions,
         private readonly Schema $schema,
         private readonly PageFiller $pageFiller,
         private readonly PagingRequestFingerprint $fingerprint = new PagingRequestFingerprint(),
@@ -144,7 +144,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $isClosed = ($response && $response->isComplete())
             || $searchResult->getState()->resultCode !== ResultCode::SUCCESS;
         if ($session !== null && $isClosed) {
-            $this->requestHistory->pagingSessions()->remove($session);
+            $this->pagingSessions->remove($session);
         }
 
         $outcome = $failure !== null
@@ -302,7 +302,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         }
 
         $this->evictOldestSessionAtLimit();
-        $this->requestHistory->pagingSessions()->add(new PagingSession(
+        $this->pagingSessions->add(new PagingSession(
             $this->fingerprint->of($pagingRequest),
             $cookie,
             $cursor,
@@ -316,7 +316,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     {
         $limit = $this->limits->maxPagingSessions() ?? 0;
 
-        if (!$this->requestHistory->pagingSessions()->evictOldestAtLimit($limit)) {
+        if (!$this->pagingSessions->evictOldestAtLimit($limit)) {
             return;
         }
 
@@ -355,9 +355,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         }
 
         try {
-            return $this->requestHistory
-                ->pagingSessions()
-                ->findByNextCookie($pagingRequest->getCookie());
+            return $this->pagingSessions->findByNextCookie($pagingRequest->getCookie());
         } catch (ProtocolException $e) {
             // An aged-out session leaves no record, so a resumed one and an invented one answer alike.
             throw new OperationException(
