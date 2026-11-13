@@ -18,7 +18,6 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\PduDepthException;
 use FreeDSx\Asn1\Exception\PduElementsException;
 use FreeDSx\Asn1\Exception\PduLengthException;
-use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
@@ -32,6 +31,7 @@ use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -95,38 +95,12 @@ final class ServerQueueTest extends TestCase
         $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
         $this->limits = new RequestLimits($this->authorization);
 
-        $this->mockSocket
-            ->method('read')
-            ->willReturnOnConsecutiveCalls(
-                'foo',
-                false,
-            );
-
-        $this->mockEncoder
-            ->method('getLastPosition')
-            ->willReturn(3);
-
         $this->subject = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
             $this->limits,
             $this->mockEncoder,
         );
-    }
-
-    public function test_it_should_send_a_message(): void
-    {
-        $this->mockEncoder
-            ->method('encode')
-            ->willReturn('foo');
-        $this->mockSocket
-            ->expects($this->once())
-            ->method('write');
-
-        $this->subject->sendMessage(new LdapMessageResponse(
-            1,
-            new DeleteResponse(0),
-        ), );
     }
 
     public function test_a_stream_started_while_another_write_holds_the_connection_is_refused_without_writing(): void
@@ -209,39 +183,6 @@ final class ServerQueueTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         $this->subject->throwIfWriteFailed();
-    }
-
-    public function test_it_should_get_a_request_message(): void
-    {
-        $this->mockEncoder
-            ->expects($this->once())
-            ->method('decode')
-            ->willReturn(
-                Asn1::sequence(
-                    Asn1::integer(1),
-                    Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
-                    new IncompleteType((new LdapEncoder())->encode(Asn1::context(0, Asn1::sequenceOf((new Control('foo'))->toAsn1())))),
-                ),
-            );
-
-        $this->subject->getMessage();
-    }
-
-    public function test_it_should_send_multiple_messages_with_write_and_respect_the_buffer_size(): void
-    {
-        $this->mockEncoder
-            ->expects(self::atLeast(2))
-            ->method('encode')
-            ->willReturn(str_repeat('f', 8000));
-
-        $this->mockSocket
-            ->expects(self::atLeast(2))
-            ->method('write');
-
-        $this->subject->sendMessage(
-            new LdapMessageResponse(1, new DeleteResponse(0)),
-            new LdapMessageResponse(2, new DeleteResponse(0)),
-        );
     }
 
     public function test_a_response_sent_while_another_is_going_out_is_not_written_into_the_middle_of_it(): void
@@ -396,53 +337,23 @@ final class ServerQueueTest extends TestCase
     public function test_it_records_bytes_received_for_each_decoded_request(): void
     {
         $recorder = new InMemoryMetricsRecorder();
-        $encoder = $this->createMock(LdapEncoder::class);
-        $encoder->method('getLastPosition')->willReturn(42);
-        $encoder->expects($this->once())
-            ->method('decode')
-            ->willReturn(Asn1::sequence(
-                Asn1::integer(1),
-                Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
-                new IncompleteType((new LdapEncoder())->encode(Asn1::context(0, Asn1::sequenceOf((new Control('foo'))->toAsn1())))),
-            ));
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturnOnConsecutiveCalls(
-            'foo',
-            false,
-        );
-
+        $request = self::encodedDelete(1);
         $queue = new ServerQueue(
-            $socket,
+            $this->socketHanding([$request]),
             $this->messageDecoder,
             $this->limits,
-            $encoder,
             metricsRecorder: $recorder,
         );
+
         $queue->getMessage();
 
         self::assertSame(
-            42,
+            strlen($request),
             $recorder->snapshot()->traffic->bytesReceived,
         );
     }
 
-    public function test_a_client_between_requests_is_waited_on_under_the_idle_timeout_alone(): void
-    {
-        $timeouts = [];
-        $queue = $this->queueReading(
-            [self::encodedDelete(1)],
-            $timeouts,
-        );
-
-        $queue->getMessage();
-
-        self::assertSame(
-            [null],
-            $timeouts,
-        );
-    }
-
-    public function test_the_rest_of_a_request_is_waited_on_for_no_longer_than_the_read_timeout(): void
+    public function test_only_the_rest_of_a_request_is_waited_on_for_no_longer_than_the_read_timeout(): void
     {
         $timeouts = [];
         $queue = $this->queueReading(
@@ -451,11 +362,13 @@ final class ServerQueueTest extends TestCase
                 5,
                 5,
             ),
+            $this->withReadTimeout(30),
             $timeouts,
         );
 
         $queue->getMessage();
 
+        self::assertNull($timeouts[0]);
         self::assertGreaterThan(
             29.9,
             $timeouts[1],
@@ -480,6 +393,7 @@ final class ServerQueueTest extends TestCase
                 5,
                 strlen($first),
             ),
+            $this->withReadTimeout(30),
             $timeouts,
         );
 
@@ -501,8 +415,8 @@ final class ServerQueueTest extends TestCase
                 self::encodedDelete(1),
                 5,
             ),
+            $this->withReadTimeout(0),
             $timeouts,
-            readTimeout: 0,
         );
 
         $queue->getMessage();
@@ -521,6 +435,7 @@ final class ServerQueueTest extends TestCase
                 self::encodedDelete(3),
                 5,
             ),
+            $this->withReadTimeout(30),
             $timeouts,
         );
 
@@ -538,7 +453,6 @@ final class ServerQueueTest extends TestCase
 
     public function test_a_request_that_does_not_arrive_in_time_names_the_read_timeout(): void
     {
-        $timeouts = [];
         $queue = $this->queueReading(
             [
                 self::chunksOf(
@@ -547,7 +461,7 @@ final class ServerQueueTest extends TestCase
                 )[0],
                 new ReadTimeoutException('The read did not complete within its timeout of 0 seconds.'),
             ],
-            $timeouts,
+            $this->withReadTimeout(30),
         );
 
         $this->expectException(ReadTimeoutException::class);
@@ -558,24 +472,15 @@ final class ServerQueueTest extends TestCase
 
     public function test_peek_returns_null_when_no_socket_data(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(false);
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            new LdapEncoder(),
-        );
-
-        self::assertNull($queue->peekForCancelSignal(2));
+        self::assertNull($this->queueReading([])->peekForCancelSignal(2));
     }
 
     public function test_peek_signals_an_unbind_and_still_leaves_it_to_be_read(): void
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(3, new UnbindRequest()),
-        );
+        $queue = $this->queueReading([self::encoded(new LdapMessageRequest(
+            3,
+            new UnbindRequest(),
+        ))]);
 
         $signal = $queue->peekForCancelSignal(2);
 
@@ -590,41 +495,46 @@ final class ServerQueueTest extends TestCase
         );
     }
 
-    public function test_peek_returns_abandon_request_targeting_in_flight_message(): void
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function signalForTheInFlightMessageProvider(): iterable
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(3, new AbandonRequest(2)),
-        );
+        yield 'an abandon' => [new AbandonRequest(2)];
+        yield 'a cancel' => [new CancelRequest(2)];
+    }
 
-        $result = $queue->peekForCancelSignal(2);
+    #[DataProvider('signalForTheInFlightMessageProvider')]
+    public function test_peek_returns_a_signal_targeting_the_in_flight_message(RequestInterface $signal): void
+    {
+        $queue = $this->queueReading([self::encoded(new LdapMessageRequest(
+            3,
+            $signal,
+        ))]);
 
-        self::assertNotNull($result);
         self::assertInstanceOf(
-            AbandonRequest::class,
-            $result->getRequest(),
+            $signal::class,
+            $queue->peekForCancelSignal(2)?->getRequest(),
         );
     }
 
-    public function test_peek_returns_cancel_request_targeting_in_flight_message(): void
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function notASignalForTheInFlightMessageProvider(): iterable
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(3, new CancelRequest(2)),
-        );
-
-        $result = $queue->peekForCancelSignal(2);
-
-        self::assertNotNull($result);
-        self::assertInstanceOf(
-            CancelRequest::class,
-            $result->getRequest(),
-        );
+        yield 'an unrelated request' => [new DeleteRequest('dc=foo,dc=bar')];
+        yield 'an abandon of another message' => [new AbandonRequest(99)];
     }
 
-    public function test_peek_buffers_non_cancel_message_and_returns_null(): void
-    {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')),
-        );
+    #[DataProvider('notASignalForTheInFlightMessageProvider')]
+    public function test_peek_buffers_a_message_that_is_not_a_signal_for_the_in_flight_message(
+        RequestInterface $request,
+    ): void {
+        $queue = $this->queueReading([self::encoded(new LdapMessageRequest(
+            5,
+            $request,
+        ))]);
 
         self::assertNull($queue->peekForCancelSignal(2));
 
@@ -635,50 +545,61 @@ final class ServerQueueTest extends TestCase
             $buffered->getMessageId(),
         );
         self::assertInstanceOf(
-            DeleteRequest::class,
+            $request::class,
             $buffered->getRequest(),
         );
     }
 
-    public function test_peek_refuses_a_cancel_carrying_a_zero_message_id(): void
+    /**
+     * @return iterable<string, array{RequestInterface, Closure(ServerQueue): mixed}>
+     */
+    public static function zeroMessageIdReadAheadProvider(): iterable
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(0, new CancelRequest(2)),
-        );
+        yield 'a peeked cancel' => [
+            new CancelRequest(2),
+            static fn(ServerQueue $queue): mixed => $queue->peekForCancelSignal(2),
+        ];
+        yield 'a peeked unrelated request' => [
+            new DeleteRequest('dc=foo,dc=bar'),
+            static fn(ServerQueue $queue): mixed => $queue->peekForCancelSignal(2),
+        ];
+        yield 'a polled request' => [
+            new DeleteRequest('dc=foo,dc=bar'),
+            static fn(ServerQueue $queue): mixed => $queue->pollMessage(),
+        ];
+    }
+
+    /**
+     * @param Closure(ServerQueue): mixed $readAhead
+     */
+    #[DataProvider('zeroMessageIdReadAheadProvider')]
+    public function test_a_request_read_ahead_with_a_zero_message_id_is_refused(
+        RequestInterface $request,
+        Closure $readAhead,
+    ): void {
+        $queue = $this->queueReading([self::encoded(new LdapMessageRequest(
+            0,
+            $request,
+        ))]);
 
         self::expectException(RequestValidationException::class);
         self::expectExceptionMessage('The message ID 0 cannot be used in a client request.');
 
-        $queue->peekForCancelSignal(2);
-    }
-
-    public function test_peek_refuses_an_unrelated_message_carrying_a_zero_message_id(): void
-    {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(0, new DeleteRequest('dc=foo,dc=bar')),
-        );
-
-        self::expectException(RequestValidationException::class);
-
-        $queue->peekForCancelSignal(2);
+        $readAhead($queue);
     }
 
     public function test_peek_finds_a_cancel_queued_behind_an_unrelated_message(): void
     {
-        $encoder = new LdapEncoder();
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(
-            $encoder->encode((new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1())
-                . $encoder->encode((new LdapMessageRequest(6, new CancelRequest(2)))->toAsn1()),
-            false,
-        );
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            $encoder,
-        );
+        $queue = $this->queueReading([self::encoded(
+            new LdapMessageRequest(
+                5,
+                new DeleteRequest('dc=foo,dc=bar'),
+            ),
+            new LdapMessageRequest(
+                6,
+                new CancelRequest(2),
+            ),
+        )]);
 
         $buffered = $queue->peekForCancelSignal(2);
         $signal = $queue->peekForCancelSignal(2);
@@ -692,34 +613,21 @@ final class ServerQueueTest extends TestCase
 
     public function test_poll_returns_null_when_nothing_is_waiting(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(false);
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            new LdapEncoder(),
-        );
-
-        self::assertNull($queue->pollMessage());
+        self::assertNull($this->queueReading([])->pollMessage());
     }
 
     public function test_poll_takes_a_buffered_message_before_reading_the_socket_and_holds_neither(): void
     {
-        $encoder = new LdapEncoder();
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(
-            $encoder->encode((new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1())
-                . $encoder->encode((new LdapMessageRequest(6, new DeleteRequest('dc=foo,dc=bar')))->toAsn1()),
-            false,
-        );
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            $encoder,
-        );
+        $queue = $this->queueReading([self::encoded(
+            new LdapMessageRequest(
+                5,
+                new DeleteRequest('dc=foo,dc=bar'),
+            ),
+            new LdapMessageRequest(
+                6,
+                new DeleteRequest('dc=foo,dc=bar'),
+            ),
+        )]);
         $queue->peekForCancelSignal(2);
 
         $buffered = $queue->pollMessage();
@@ -737,34 +645,18 @@ final class ServerQueueTest extends TestCase
         self::assertNull($nothing);
     }
 
-    public function test_poll_refuses_a_message_carrying_a_zero_message_id(): void
-    {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(0, new DeleteRequest('dc=foo,dc=bar')),
-        );
-
-        self::expectException(RequestValidationException::class);
-        self::expectExceptionMessage('The message ID 0 cannot be used in a client request.');
-
-        $queue->pollMessage();
-    }
-
     public function test_encrypt_discards_plaintext_pipelined_behind_the_upgrade(): void
     {
-        $encoder = new LdapEncoder();
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(
-            $encoder->encode((new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS)))->toAsn1())
-                . $encoder->encode((new LdapMessageRequest(2, new DeleteRequest('dc=foo,dc=bar')))->toAsn1()),
-            false,
-        );
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            $encoder,
-        );
+        $queue = $this->queueReading([self::encoded(
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(ExtendedRequest::OID_START_TLS),
+            ),
+            new LdapMessageRequest(
+                2,
+                new DeleteRequest('dc=foo,dc=bar'),
+            ),
+        )]);
 
         self::assertSame(
             1,
@@ -809,12 +701,7 @@ final class ServerQueueTest extends TestCase
             ),
         );
 
-        (new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            $encoder,
-        ))->sendMessage($response);
+        $this->queueFor($socket)->sendMessage($response);
 
         foreach ($writes as $write) {
             self::assertLessThanOrEqual(
@@ -832,26 +719,11 @@ final class ServerQueueTest extends TestCase
 
     public function test_peek_stops_reading_once_the_pending_buffer_is_full(): void
     {
-        $encoder = new LdapEncoder();
-        $bytes = $encoder->encode(
-            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
-        );
         $reads = 0;
-
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')
-            ->willReturnCallback(function () use ($bytes, &$reads): string {
-                $reads++;
-
-                return $bytes;
-            });
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            $encoder,
-        );
+        $queue = $this->queueFor($this->socketRepeating(
+            self::encodedDelete(5),
+            $reads,
+        ));
 
         for ($attempt = 0; $attempt < self::FLOOD_ATTEMPTS; $attempt++) {
             self::assertNull($queue->peekForCancelSignal(2));
@@ -866,15 +738,10 @@ final class ServerQueueTest extends TestCase
     public function test_peek_stops_reading_once_the_pending_requests_reach_the_byte_limit(): void
     {
         $reads = 0;
-        $queue = new ServerQueue(
-            $this->socketRepeating(
-                self::encodedRequestPastTheReadAheadBytes(),
-                $reads,
-            ),
-            $this->messageDecoder,
-            $this->limits,
-            new LdapEncoder(),
-        );
+        $queue = $this->queueFor($this->socketRepeating(
+            self::encodedRequestPastTheReadAheadBytes(),
+            $reads,
+        ));
 
         for ($attempt = 0; $attempt < self::FLOOD_ATTEMPTS; $attempt++) {
             self::assertNull($queue->peekForCancelSignal(2));
@@ -889,15 +756,10 @@ final class ServerQueueTest extends TestCase
     public function test_peek_reads_again_once_the_pending_requests_are_taken(): void
     {
         $reads = 0;
-        $queue = new ServerQueue(
-            $this->socketRepeating(
-                self::encodedRequestPastTheReadAheadBytes(),
-                $reads,
-            ),
-            $this->messageDecoder,
-            $this->limits,
-            new LdapEncoder(),
-        );
+        $queue = $this->queueFor($this->socketRepeating(
+            self::encodedRequestPastTheReadAheadBytes(),
+            $reads,
+        ));
 
         $queue->peekForCancelSignal(2);
         $queue->peekForCancelSignal(2);
@@ -910,58 +772,30 @@ final class ServerQueueTest extends TestCase
         );
     }
 
-    public function test_peek_buffers_abandon_targeting_different_message_and_returns_null(): void
-    {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(3, new AbandonRequest(99)),
-        );
-
-        self::assertNull($queue->peekForCancelSignal(2));
-
-        $buffered = $queue->getMessage();
-
-        self::assertInstanceOf(
-            AbandonRequest::class,
-            $buffered->getRequest(),
-        );
-    }
-
     public function test_get_message_drains_pending_before_reading_socket(): void
     {
-        $encoder = new LdapEncoder();
-        $bytes = $encoder->encode(
-            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
+        $reads = [];
+        $queue = $this->queueReading(
+            [self::encodedDelete(5)],
+            timeouts: $reads,
         );
-
-        $socket = $this->createMock(Socket::class);
-        $socket->expects(self::once())
-            ->method('read')
-            ->willReturn($bytes);
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-            $encoder,
-        );
-
-        // Peek decodes and buffers the DeleteRequest into pendingMessages
         $queue->peekForCancelSignal(2);
 
-        // getMessage() must drain pendingMessages — no second socket read
         $result = $queue->getMessage();
 
-        self::assertInstanceOf(
-            DeleteRequest::class,
-            $result->getRequest(),
+        self::assertSame(
+            5,
+            $result->getMessageId(),
+        );
+        self::assertCount(
+            1,
+            $reads,
         );
     }
 
     public function test_a_requeued_message_is_read_before_anything_already_pending(): void
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')),
-        );
+        $queue = $this->queueReading([self::encodedDelete(5)]);
         $queue->peekForCancelSignal(2);
 
         $queue->requeue(new LdapMessageRequest(
@@ -981,9 +815,7 @@ final class ServerQueueTest extends TestCase
 
     public function test_a_buffered_message_is_read_after_those_already_pending(): void
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')),
-        );
+        $queue = $this->queueReading([self::encodedDelete(5)]);
         $queue->peekForCancelSignal(2);
 
         $queue->buffer(new LdapMessageRequest(
@@ -1003,12 +835,8 @@ final class ServerQueueTest extends TestCase
 
     public function test_it_should_reject_a_request_whose_declared_length_exceeds_the_max_receive_size(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(hex2bin('3084000000c8'));
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        $queue = $this->queueReading(
+            [(string) hex2bin('3084000000c8')],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxSize: 100,
@@ -1022,16 +850,8 @@ final class ServerQueueTest extends TestCase
 
     public function test_it_should_refuse_a_request_holding_more_elements_than_the_limit(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn((new LdapEncoder())->encode(
-            (new LdapMessageRequest(
-                5,
-                new DeleteRequest('dc=foo,dc=bar'),
-            ))->toAsn1(),
-        ));
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        $queue = $this->queueReading(
+            [self::encodedDelete(5)],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxElements: 1,
@@ -1051,16 +871,8 @@ final class ServerQueueTest extends TestCase
 
     public function test_it_should_decode_a_request_holding_exactly_the_element_limit(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn((new LdapEncoder())->encode(
-            (new LdapMessageRequest(
-                5,
-                new DeleteRequest('dc=foo,dc=bar'),
-            ))->toAsn1(),
-        ));
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        $queue = $this->queueReading(
+            [self::encodedDelete(5)],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxElements: 2,
@@ -1075,11 +887,8 @@ final class ServerQueueTest extends TestCase
 
     public function test_it_should_answer_a_request_whose_nested_parts_run_past_what_the_main_decode_left(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(self::encodedSortRequest());
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        $queue = $this->queueReading(
+            [self::encodedSortRequest()],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxElements: 9,
@@ -1099,11 +908,8 @@ final class ServerQueueTest extends TestCase
 
     public function test_it_should_decode_a_request_whose_nested_parts_fit_what_the_main_decode_left(): void
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn(self::encodedSortRequest());
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        $queue = $this->queueReading(
+            [self::encodedSortRequest()],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxElements: 10,
@@ -1135,20 +941,13 @@ final class ServerQueueTest extends TestCase
         for ($i = 0; $i < 20; $i++) {
             $nested = Asn1::sequence($nested);
         }
-        $encoder = new LdapEncoder();
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn($encoder->encode(Asn1::sequence(
+        $queue = $this->queueReading([(new LdapEncoder())->encode(Asn1::sequence(
             Asn1::integer(1),
             $nested,
-        )));
+        ))]);
 
         try {
-            $read(new ServerQueue(
-                $socket,
-                $this->messageDecoder,
-                $this->limits,
-                $encoder,
-            ));
+            $read($queue);
             self::fail('The deeply nested request should have been refused.');
         } catch (ProtocolException $e) {
             self::assertInstanceOf(
@@ -1160,17 +959,8 @@ final class ServerQueueTest extends TestCase
 
     public function test_it_should_decode_a_request_within_the_max_receive_size(): void
     {
-        $encoder = new LdapEncoder();
-        $bytes = $encoder->encode(
-            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
-        );
-
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn($bytes);
-
-        $queue = new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        $queue = $this->queueReading(
+            [self::encodedDelete(5)],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxSize: 5_242_880,
@@ -1370,12 +1160,7 @@ final class ServerQueueTest extends TestCase
             return $socket;
         });
 
-        # A null encoder builds a real LdapEncoder, so the real search-entry fast path runs.
-        (new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            $this->limits,
-        ))->sendMessage($message);
+        $this->queueFor($socket)->sendMessage($message);
 
         return $written;
     }
@@ -1405,20 +1190,64 @@ final class ServerQueueTest extends TestCase
         return $failure;
     }
 
-    private function makeQueueWithEncodedRequest(LdapMessageRequest $message): ServerQueue
-    {
-        $encoder = new LdapEncoder();
-        $bytes = $encoder->encode($message->toAsn1());
-
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn($bytes);
-
+    /**
+     * A queue over the socket with a real encoder, under the given limits or none.
+     */
+    private function queueFor(
+        Socket $socket,
+        ?RequestLimits $limits = null,
+    ): ServerQueue {
         return new ServerQueue(
             $socket,
             $this->messageDecoder,
-            $this->limits,
-            $encoder,
+            $limits ?? $this->limits,
+            new LdapEncoder(),
         );
+    }
+
+    /**
+     * A queue whose socket hands out the chunks in turn and then nothing.
+     *
+     * @param list<string|Throwable> $chunks
+     * @param list<float|null> $timeouts
+     */
+    private function queueReading(
+        array $chunks,
+        ?RequestLimits $limits = null,
+        array &$timeouts = [],
+    ): ServerQueue {
+        return $this->queueFor(
+            $this->socketHanding(
+                $chunks,
+                $timeouts,
+            ),
+            $limits,
+        );
+    }
+
+    /**
+     * A socket that hands out the chunks in turn, throwing any exception among them, and records each read's timeout.
+     *
+     * @param list<string|Throwable> $chunks
+     * @param list<float|null> $timeouts
+     */
+    private function socketHanding(
+        array $chunks,
+        array &$timeouts = [],
+    ): Socket&MockObject {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')
+            ->willReturnCallback(function (bool $block, ?float $timeout) use (&$chunks, &$timeouts): string|false {
+                $timeouts[] = $timeout;
+                $chunk = array_shift($chunks) ?? false;
+                if ($chunk instanceof Throwable) {
+                    throw $chunk;
+                }
+
+                return $chunk;
+            });
+
+        return $socket;
     }
 
     /**
@@ -1439,46 +1268,33 @@ final class ServerQueueTest extends TestCase
         return $socket;
     }
 
-    /**
-     * A queue whose socket hands out the chunks in turn, throwing any exception among them, and records each timeout.
-     *
-     * @param list<string|Throwable> $chunks
-     * @param list<float|null> $timeouts
-     */
-    private function queueReading(
-        array $chunks,
-        array &$timeouts,
-        int $readTimeout = 30,
-    ): ServerQueue {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')
-            ->willReturnCallback(function (bool $block, ?float $timeout) use (&$chunks, &$timeouts): string|false {
-                $timeouts[] = $timeout;
-                $chunk = array_shift($chunks) ?? false;
-                if ($chunk instanceof Throwable) {
-                    throw $chunk;
-                }
+    private function withReadTimeout(int $seconds): RequestLimits
+    {
+        return new RequestLimits(
+            $this->authorization,
+            readTimeout: $seconds,
+        );
+    }
 
-                return $chunk;
-            });
+    private static function encoded(LdapMessageRequest ...$messages): string
+    {
+        $encoder = new LdapEncoder();
 
-        return new ServerQueue(
-            $socket,
-            $this->messageDecoder,
-            new RequestLimits(
-                $this->authorization,
-                readTimeout: $readTimeout,
+        return implode(
+            '',
+            array_map(
+                static fn(LdapMessageRequest $message): string => $encoder->encode($message->toAsn1()),
+                $messages,
             ),
-            new LdapEncoder(),
         );
     }
 
     private static function encodedDelete(int $messageId): string
     {
-        return (new LdapEncoder())->encode((new LdapMessageRequest(
+        return self::encoded(new LdapMessageRequest(
             $messageId,
             Operations::delete('cn=foo,dc=foo,dc=bar'),
-        ))->toAsn1());
+        ));
     }
 
     /**
@@ -1509,12 +1325,8 @@ final class ServerQueueTest extends TestCase
 
     private function makeQueueWithAnonymousSize(string $bytes): ServerQueue
     {
-        $socket = $this->createMock(Socket::class);
-        $socket->method('read')->willReturn($bytes);
-
-        return new ServerQueue(
-            $socket,
-            $this->messageDecoder,
+        return $this->queueReading(
+            [$bytes],
             new RequestLimits(
                 authorization: $this->authorization,
                 maxSize: 2_621_440,
