@@ -107,7 +107,8 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | `server.client.closed`               | on      | info    | A client connection closed                                |
 | `server.client.reload_followed`      | on      | info    | An open client connection applied a reloaded configuration (PCNTL; under Swoole, open connections follow their worker's reload) |
 | `server.client.write_timeout`        | on      | notice  | A client stopped reading and its connection was closed    |
-| `server.client.idle_timeout`         | on      | notice  | A client was idle past the read timeout and its connection was closed |
+| `server.client.idle_timeout`         | on      | notice  | A client was idle past the idle timeout and its connection was closed |
+| `server.client.read_timeout`         | on      | notice  | A request took too long to arrive and its connection was closed |
 | `server.reload.applied`              | on      | info    | A reload signal replaced the configuration                |
 | `server.reload.failed`               | on      | error   | A reload failed and the current configuration was kept    |
 | `server.reload.ignored`              | on      | info    | A reload signal arrived with nothing configured to reload |
@@ -153,7 +154,7 @@ Every event carries a structured `context` array with a stable shape:
 | `entries_returned`                                         | search events                                                      | Count of entries delivered to the client.                                                          |
 | `base_dn`, `scope`                                         | search events                                                      | Inside `target`.                                                                                   |
 | `new_rdn`, `new_superior_dn`                               | `ldap.entry.renamed`                                               | Inside `target`.                                                                                   |
-| `pid`, `conn_id`, `remote_ip`                              | connection scope                                                   | Auto-merged into every event from the runner's `ConnectionContext`.                                |
+| `pid`, `conn_id`, `remote_ip`                              | connection scope                                                   | Auto-merged into every event from the runner's `ConnectionContext`. `remote_ip` is left out for a unix socket. |
 | `reason_code`, `reason_message`                            | `ldap.session.disconnect_notice`                                   | The Notice of Disconnect's wire-level reason.                                                      |
 | `exception_class`, `exception_message`, `exception_origin` | events caused by an exception, e.g. `ldap.session.disconnect_notice` triggered by an unexpected `Throwable` | FQCN, message, `file:line` of the throw site.                                                      |
 | `exception_trace`                                          | as above, only when policy opts in                                 | Full `getTraceAsString()`. Disabled by default; see [Exception Traces](#exception-traces).         |

@@ -75,6 +75,11 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
     /**
      * @var int<0, max>
      */
+    private int $readTimeouts = 0;
+
+    /**
+     * @var int<0, max>
+     */
     private int $requestSizeExceeded = 0;
 
     /**
@@ -201,6 +206,7 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
             ConnectionObservation::Rejected => $this->rejectedConnections++,
             ConnectionObservation::WriteTimeout => $this->writeTimeouts++,
             ConnectionObservation::IdleTimeout => $this->idleTimeouts++,
+            ConnectionObservation::ReadTimeout => $this->readTimeouts++,
             ConnectionObservation::RequestSizeExceeded => $this->requestSizeExceeded++,
             ConnectionObservation::ProtocolError => $this->protocolErrors++,
             ConnectionObservation::Unavailable => $this->unavailable++,
@@ -240,6 +246,7 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
                 $this->rejectedConnections,
                 $this->writeTimeouts,
                 $this->idleTimeouts,
+                $this->readTimeouts,
                 $this->requestSizeExceeded,
                 $this->protocolErrors,
                 $this->unavailable,

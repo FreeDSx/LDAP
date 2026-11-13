@@ -326,6 +326,17 @@ final class SwooleTableMetricsRecorderTest extends TestCase
         );
     }
 
+    public function test_it_counts_connections_closed_because_a_request_took_too_long_to_arrive(): void
+    {
+        $this->subject->connectionObserved(ConnectionObservation::ReadTimeout);
+        $this->subject->connectionObserved(ConnectionObservation::ReadTimeout);
+
+        self::assertSame(
+            2,
+            $this->subject->snapshot()->connections->readTimeouts,
+        );
+    }
+
     public function test_closing_more_connections_than_were_opened_does_not_report_a_negative_gauge(): void
     {
         $this->subject->connectionObserved(ConnectionObservation::Closed);

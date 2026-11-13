@@ -14,6 +14,7 @@ LDAP Server Configuration
     * [NetworkConfig:setTransport](#settransport)
     * [NetworkConfig:setIdleTimeout](#setidletimeout)
     * [NetworkConfig:setWriteTimeout](#setwritetimeout)
+    * [NetworkConfig:setRequestReadTimeout](#setrequestreadtimeout)
     * [NetworkConfig:setSocketAcceptTimeout](#setsocketaccepttimeout)
     * [NetworkConfig:setMaxConnections](#setmaxconnections)
     * [NetworkConfig:setMaxRequestSize](#setmaxrequestsize)
@@ -322,6 +323,19 @@ Nothing more is written to it once a write fails. Set to `0` to disable.
 **Default**: `30`
 
 ------------------
+#### setRequestReadTimeout
+
+Disconnect a client whose request takes longer than this many seconds to finish arriving. Set `0` to disable.
+
+```php
+$options->getNetworkConfig()->setRequestReadTimeout(60);
+```
+
+Raise it if clients on slower links send large requests.
+
+**Default**: `30`
+
+------------------
 #### setSocketAcceptTimeout
 
 The number of seconds (fractional) to wait for a new client connection before re-checking server state. Lower values
@@ -524,6 +538,8 @@ Configurable:
 * **ASN.1 elements:** 100,000 ([setMaxRequestElements](#setmaxrequestelements)). More ends the connection, or is
   refused with `ADMIN_LIMIT_EXCEEDED` when the extra elements are inside a filter, a control, SASL bind credentials or
   an extended operation's value.
+* **Time to arrive:** 30 seconds ([setRequestReadTimeout](#setrequestreadtimeout)). A slower request ends the
+  connection.
 
 Fixed:
 

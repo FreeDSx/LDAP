@@ -186,6 +186,9 @@ final class InMemoryMetricsRecorderTest extends TestCase
         $this->subject->connectionObserved(ConnectionObservation::WriteTimeout);
         $this->subject->connectionObserved(ConnectionObservation::WriteTimeout);
         $this->subject->connectionObserved(ConnectionObservation::IdleTimeout);
+        $this->subject->connectionObserved(ConnectionObservation::ReadTimeout);
+        $this->subject->connectionObserved(ConnectionObservation::ReadTimeout);
+        $this->subject->connectionObserved(ConnectionObservation::ReadTimeout);
         $this->subject->connectionObserved(ConnectionObservation::RequestSizeExceeded);
         $this->subject->connectionObserved(ConnectionObservation::ProtocolError);
 
@@ -202,6 +205,10 @@ final class InMemoryMetricsRecorderTest extends TestCase
         self::assertSame(
             1,
             $connections->idleTimeouts,
+        );
+        self::assertSame(
+            3,
+            $connections->readTimeouts,
         );
         self::assertSame(
             1,

@@ -268,6 +268,32 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
+    public function test_request_read_timeout_defaults_to_30(): void
+    {
+        self::assertSame(
+            30,
+            $this->subject->getRequestReadTimeout(),
+        );
+    }
+
+    public function test_it_can_set_request_read_timeout(): void
+    {
+        $this->subject->setRequestReadTimeout(0);
+
+        self::assertSame(
+            0,
+            $this->subject->getRequestReadTimeout(),
+        );
+    }
+
+    public function test_it_refuses_a_negative_request_read_timeout(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The request read timeout cannot be negative, but received -1.');
+
+        $this->subject->setRequestReadTimeout(-1);
+    }
+
     public function test_ssl_is_disabled_by_default(): void
     {
         self::assertFalse($this->subject->isUseSsl());

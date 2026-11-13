@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\AcceptException;
 use FreeDSx\Socket\Socket;
+use FreeDSx\Socket\SocketAddress;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -136,6 +138,52 @@ final class ConnectionAcceptorTest extends TestCase
             $server->getClients(),
         );
         self::assertFalse($arriving->isConnected());
+    }
+
+    public function test_a_client_is_served_and_logged_with_its_address(): void
+    {
+        $handler = $this->createMock(ServerProtocolHandler::class);
+        $server = new ScriptedSocketServer(
+            [$this->socketAt('192.0.2.7:50000')],
+            onDrained: $this->subject->shutdown(...),
+        );
+
+        $this->protocolFactory
+            ->expects(self::once())
+            ->method('make')
+            ->with(
+                self::anything(),
+                self::callback(static fn(ConnectionContext $context): bool => $context->remoteIp === '192.0.2.7'),
+            )
+            ->willReturn($handler);
+
+        Coroutine\run(function () use ($server): void {
+            $this->subject->accept($server);
+        });
+
+        self::assertSame(
+            '192.0.2.7',
+            $this->contextOf(ServerEvent::ClientConnected)[EventContext::REMOTE_IP] ?? null,
+        );
+    }
+
+    public function test_a_rejected_client_is_logged_with_its_address(): void
+    {
+        $this->options->getNetworkConfig()->setMaxConnections(1);
+        $this->connectionSlots->tryAcquire(1);
+        $server = new ScriptedSocketServer(
+            [$this->socketAt('192.0.2.7:50000')],
+            onDrained: $this->subject->shutdown(...),
+        );
+
+        Coroutine\run(function () use ($server): void {
+            $this->subject->accept($server);
+        });
+
+        self::assertSame(
+            '192.0.2.7',
+            $this->contextOf(ServerEvent::ClientRejected)[EventContext::REMOTE_IP] ?? null,
+        );
     }
 
     public function test_failed_accepts_are_logged_once_and_the_client_after_them_is_served(): void
@@ -278,6 +326,34 @@ final class ConnectionAcceptorTest extends TestCase
         $this->peers[] = $pair[1];
 
         return new Socket($pair[0]);
+    }
+
+    /**
+     * A client socket whose peer is at the given address.
+     */
+    private function socketAt(string $address): Socket
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('getPeerAddress')->willReturn(SocketAddress::tryFromName($address));
+
+        return $socket;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contextOf(ServerEvent $event): array
+    {
+        foreach ($this->logger->records as $record) {
+            if (($record['context'][EventContext::EVENT] ?? null) === $event->value) {
+                return $record['context'];
+            }
+        }
+
+        self::fail(sprintf(
+            'No %s event was logged.',
+            $event->value,
+        ));
     }
 
     /**

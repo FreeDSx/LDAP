@@ -41,6 +41,11 @@ final class NetworkConfig
     private int $writeTimeout = 30;
 
     /**
+     * Disconnect a client whose request takes longer than this many seconds to finish arriving.
+     */
+    private int $requestReadTimeout = 30;
+
+    /**
      * Seconds (fractional) to wait for a new client connection before re-checking server state.
      */
     private float $socketAcceptTimeout = 0.5;
@@ -180,6 +185,26 @@ final class NetworkConfig
     public function setWriteTimeout(int $writeTimeout): self
     {
         $this->writeTimeout = $writeTimeout;
+
+        return $this;
+    }
+
+    public function getRequestReadTimeout(): int
+    {
+        return $this->requestReadTimeout;
+    }
+
+    /**
+     * @param int $requestReadTimeout the time in seconds, or 0 to disable the timeout.
+     * @throws InvalidArgumentException when the timeout is negative
+     */
+    public function setRequestReadTimeout(int $requestReadTimeout): self
+    {
+        self::assertNotNegative(
+            $requestReadTimeout,
+            'The request read timeout',
+        );
+        $this->requestReadTimeout = $requestReadTimeout;
 
         return $this;
     }

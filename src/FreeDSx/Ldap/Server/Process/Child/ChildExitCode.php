@@ -36,6 +36,8 @@ enum ChildExitCode: int
 
     case ProtocolError = 13;
 
+    case ReadTimeout = 14;
+
     /**
      * Zero when the close reason is not one the parent counts.
      */
@@ -46,6 +48,7 @@ enum ChildExitCode: int
             ConnectionObservation::IdleTimeout => self::IdleTimeout->value,
             ConnectionObservation::RequestSizeExceeded => self::RequestSizeExceeded->value,
             ConnectionObservation::ProtocolError => self::ProtocolError->value,
+            ConnectionObservation::ReadTimeout => self::ReadTimeout->value,
             default => 0,
         };
     }
@@ -75,6 +78,7 @@ enum ChildExitCode: int
             self::IdleTimeout => ConnectionObservation::IdleTimeout,
             self::RequestSizeExceeded => ConnectionObservation::RequestSizeExceeded,
             self::ProtocolError => ConnectionObservation::ProtocolError,
+            self::ReadTimeout => ConnectionObservation::ReadTimeout,
         };
     }
 }

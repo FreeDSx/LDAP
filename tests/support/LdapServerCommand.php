@@ -150,6 +150,13 @@ final class LdapServerCommand extends Command
                 '',
             )
             ->addOption(
+                'request-read-timeout',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds a request may take to finish arriving; the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'shutdown-timeout',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -392,6 +399,10 @@ final class LdapServerCommand extends Command
         $writeTimeout = $this->getStringOption($input, 'write-timeout');
         if ($writeTimeout !== '') {
             $network->setWriteTimeout((int) $writeTimeout);
+        }
+        $requestReadTimeout = $this->getStringOption($input, 'request-read-timeout');
+        if ($requestReadTimeout !== '') {
+            $network->setRequestReadTimeout((int) $requestReadTimeout);
         }
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))

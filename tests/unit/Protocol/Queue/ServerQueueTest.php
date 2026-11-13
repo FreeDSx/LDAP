@@ -53,6 +53,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\ReadTimeoutException;
 use FreeDSx\Socket\Exception\WriteTimeoutException;
 use FreeDSx\Socket\Socket;
 use Generator;
@@ -63,6 +64,7 @@ use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Protocol\Queue\Response\RecordingInterceptor;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Throwable;
 
 final class ServerQueueTest extends TestCase
 {
@@ -422,6 +424,136 @@ final class ServerQueueTest extends TestCase
             42,
             $recorder->snapshot()->traffic->bytesReceived,
         );
+    }
+
+    public function test_a_client_between_requests_is_waited_on_under_the_idle_timeout_alone(): void
+    {
+        $timeouts = [];
+        $queue = $this->queueReading(
+            [self::encodedDelete(1)],
+            $timeouts,
+        );
+
+        $queue->getMessage();
+
+        self::assertSame(
+            [null],
+            $timeouts,
+        );
+    }
+
+    public function test_the_rest_of_a_request_is_waited_on_for_no_longer_than_the_read_timeout(): void
+    {
+        $timeouts = [];
+        $queue = $this->queueReading(
+            self::chunksOf(
+                self::encodedDelete(1),
+                5,
+                5,
+            ),
+            $timeouts,
+        );
+
+        $queue->getMessage();
+
+        self::assertGreaterThan(
+            29.9,
+            $timeouts[1],
+        );
+        self::assertLessThanOrEqual(
+            30.0,
+            $timeouts[1],
+        );
+        self::assertLessThanOrEqual(
+            $timeouts[1],
+            $timeouts[2],
+        );
+    }
+
+    public function test_each_request_has_the_whole_read_timeout_to_arrive(): void
+    {
+        $first = self::encodedDelete(1);
+        $timeouts = [];
+        $queue = $this->queueReading(
+            self::chunksOf(
+                $first . self::encodedDelete(2),
+                5,
+                strlen($first),
+            ),
+            $timeouts,
+        );
+
+        $queue->getMessage();
+        usleep(50_000);
+        $queue->getMessage();
+
+        self::assertGreaterThan(
+            29.99,
+            $timeouts[2],
+        );
+    }
+
+    public function test_a_read_timeout_of_zero_leaves_every_wait_to_the_idle_timeout(): void
+    {
+        $timeouts = [];
+        $queue = $this->queueReading(
+            self::chunksOf(
+                self::encodedDelete(1),
+                5,
+            ),
+            $timeouts,
+            readTimeout: 0,
+        );
+
+        $queue->getMessage();
+
+        self::assertSame(
+            [null, null],
+            $timeouts,
+        );
+    }
+
+    public function test_a_request_read_ahead_during_a_response_is_waited_on_for_no_longer_than_the_read_timeout(): void
+    {
+        $timeouts = [];
+        $queue = $this->queueReading(
+            self::chunksOf(
+                self::encodedDelete(3),
+                5,
+            ),
+            $timeouts,
+        );
+
+        $queue->peekForCancelSignal(2);
+
+        self::assertGreaterThan(
+            29.9,
+            $timeouts[1],
+        );
+        self::assertLessThanOrEqual(
+            30.0,
+            $timeouts[1],
+        );
+    }
+
+    public function test_a_request_that_does_not_arrive_in_time_names_the_read_timeout(): void
+    {
+        $timeouts = [];
+        $queue = $this->queueReading(
+            [
+                self::chunksOf(
+                    self::encodedDelete(1),
+                    5,
+                )[0],
+                new ReadTimeoutException('The read did not complete within its timeout of 0 seconds.'),
+            ],
+            $timeouts,
+        );
+
+        $this->expectException(ReadTimeoutException::class);
+        $this->expectExceptionMessage('The request did not finish arriving within 30 seconds.');
+
+        $queue->getMessage();
     }
 
     public function test_peek_returns_null_when_no_socket_data(): void
@@ -1305,6 +1437,74 @@ final class ServerQueueTest extends TestCase
             });
 
         return $socket;
+    }
+
+    /**
+     * A queue whose socket hands out the chunks in turn, throwing any exception among them, and records each timeout.
+     *
+     * @param list<string|Throwable> $chunks
+     * @param list<float|null> $timeouts
+     */
+    private function queueReading(
+        array $chunks,
+        array &$timeouts,
+        int $readTimeout = 30,
+    ): ServerQueue {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')
+            ->willReturnCallback(function (bool $block, ?float $timeout) use (&$chunks, &$timeouts): string|false {
+                $timeouts[] = $timeout;
+                $chunk = array_shift($chunks) ?? false;
+                if ($chunk instanceof Throwable) {
+                    throw $chunk;
+                }
+
+                return $chunk;
+            });
+
+        return new ServerQueue(
+            $socket,
+            $this->messageDecoder,
+            new RequestLimits(
+                $this->authorization,
+                readTimeout: $readTimeout,
+            ),
+            new LdapEncoder(),
+        );
+    }
+
+    private static function encodedDelete(int $messageId): string
+    {
+        return (new LdapEncoder())->encode((new LdapMessageRequest(
+            $messageId,
+            Operations::delete('cn=foo,dc=foo,dc=bar'),
+        ))->toAsn1());
+    }
+
+    /**
+     * The bytes cut into chunks of the given lengths, then whatever is left.
+     *
+     * @return list<string>
+     */
+    private static function chunksOf(
+        string $bytes,
+        int ...$lengths,
+    ): array {
+        $chunks = [];
+        foreach ($lengths as $length) {
+            $chunks[] = substr(
+                $bytes,
+                0,
+                $length,
+            );
+            $bytes = substr(
+                $bytes,
+                $length,
+            );
+        }
+        $chunks[] = $bytes;
+
+        return $chunks;
     }
 
     private function makeQueueWithAnonymousSize(string $bytes): ServerQueue

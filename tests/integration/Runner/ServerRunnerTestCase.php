@@ -41,8 +41,10 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\DripsRequestsTrait;
 use Tests\Support\FreeDSx\Ldap\Protocol\NestedSequenceRequest;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
@@ -62,6 +64,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 {
     use TlsTestsTrait;
     use RawClientQueueTrait;
+    use DripsRequestsTrait;
 
     /**
      * Enough files to start and serve a few clients, and far fewer than the clients a test opens.
@@ -72,6 +75,11 @@ abstract class ServerRunnerTestCase extends ServerTestCase
      * Seconds a write may stall in the stalled-reader test.
      */
     private const STALLED_WRITE_TIMEOUT = 3;
+
+    /**
+     * Seconds a request may take to arrive in the dripped-request test.
+     */
+    private const REQUEST_READ_TIMEOUT = 2;
 
     public static function setUpBeforeClass(): void
     {
@@ -657,6 +665,62 @@ abstract class ServerRunnerTestCase extends ServerTestCase
             microtime(true) - $startedAt,
         );
         $this->authenticateUser();
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function transportProvider(): array
+    {
+        return [
+            'plain' => ['tcp'],
+            'tls' => ['ssl'],
+        ];
+    }
+
+    #[DataProvider('transportProvider')]
+    public function testARequestThatTakesTooLongToArriveEndsTheSessionAndOthersAreStillServed(string $transport): void
+    {
+        $this->createServerProcess(
+            $transport,
+            [
+                '--log',
+                '--request-read-timeout=' . self::REQUEST_READ_TIMEOUT,
+            ],
+        );
+
+        $closedAfter = $this->dripRequestUntilClosed(
+            $transport,
+            4 * self::REQUEST_READ_TIMEOUT,
+        );
+
+        self::assertNotNull($closedAfter);
+        self::assertLessThan(
+            2 * self::REQUEST_READ_TIMEOUT,
+            $closedAfter,
+        );
+        $this->waitForServerOutput('The connection was closed because a request took too long to arrive.');
+        $this->authenticateUser();
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testAnIdleConnectionOutlivesTheRequestReadTimeout(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--request-read-timeout=1'],
+        );
+        $this->authenticateUser();
+
+        usleep(1_500_000);
+
         self::assertSame(
             'dn:cn=user,dc=foo,dc=bar',
             $this->ldapClient()->whoami(),
