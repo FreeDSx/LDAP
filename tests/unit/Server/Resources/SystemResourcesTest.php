@@ -14,9 +14,11 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Resources;
 
 use FreeDSx\Ldap\Server\Resources\CpuCount;
+use FreeDSx\Ldap\Server\Resources\MemoryLimit;
 use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
 use FreeDSx\Ldap\Server\Resources\SystemResources;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 
 final class SystemResourcesTest extends TestCase
 {
@@ -78,6 +80,36 @@ final class SystemResourcesTest extends TestCase
         self::assertSame(
             OpenFileLimit::ofThisProcess()->getSoftLimit(),
             (new SystemResources())->openFileLimit()->getSoftLimit(),
+        );
+    }
+
+    public function test_it_gives_the_memory_limit_it_was_given(): void
+    {
+        $memoryLimit = new MemoryLimit(1_000_000);
+
+        self::assertSame(
+            $memoryLimit,
+            (new SystemResources(memoryLimit: $memoryLimit))->memoryLimit(),
+        );
+    }
+
+    public function test_it_reads_the_memory_limit_of_this_process_when_none_is_given(): void
+    {
+        self::assertSame(
+            MemoryLimit::ofThisProcess()->getBytes(),
+            (new SystemResources())->memoryLimit()->getBytes(),
+        );
+    }
+
+    public function test_it_reclaims_memory_held_only_by_reference_cycles(): void
+    {
+        $cycle = new stdClass();
+        $cycle->self = $cycle;
+        unset($cycle);
+
+        self::assertGreaterThanOrEqual(
+            1,
+            (new SystemResources())->reclaimMemory(),
         );
     }
 

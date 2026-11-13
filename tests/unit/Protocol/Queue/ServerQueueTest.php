@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\PduDepthException;
 use FreeDSx\Asn1\Exception\PduElementsException;
 use FreeDSx\Asn1\Exception\PduLengthException;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
@@ -43,26 +44,33 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RequestRefusedException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
+use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Exception\ReadTimeoutException;
 use FreeDSx\Socket\Exception\WriteTimeoutException;
+use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
+use FreeDSx\Socket\SocketOptions;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Protocol\Queue\Response\RecordingInterceptor;
+use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Throwable;
@@ -88,6 +96,10 @@ final class ServerQueueTest extends TestCase
 
     private RequestLimits $limits;
 
+    private SystemResources&MockObject $resources;
+
+    private RequestBudget $budget;
+
     protected function setUp(): void
     {
         $this->mockSocket = $this->createMock(Socket::class);
@@ -95,11 +107,16 @@ final class ServerQueueTest extends TestCase
         $this->messageDecoder = $this->fromContainer(RequestMessageDecoder::class);
         $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
         $this->limits = new RequestLimits($this->authorization);
+        $this->resources = $this->createMock(SystemResources::class);
+        $this->budget = new RequestBudget(
+            new CallbackSleeper(),
+            $this->resources,
+        );
 
         $this->subject = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            new RequestArrival($this->limits),
+            $this->arrival(),
             $this->mockEncoder,
         );
     }
@@ -320,7 +337,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            new RequestArrival($this->limits),
+            $this->arrival(),
             $encoder,
             metricsRecorder: $recorder,
         );
@@ -342,7 +359,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->socketHanding([$request]),
             $this->messageDecoder,
-            new RequestArrival($this->limits),
+            $this->arrival(),
             metricsRecorder: $recorder,
         );
 
@@ -449,6 +466,365 @@ final class ServerQueueTest extends TestCase
         $this->expectExceptionMessage('The request did not finish arriving within 30 seconds.');
 
         $queue->getMessage();
+    }
+
+    /**
+     * @param Closure(ServerQueue): mixed $read
+     */
+    #[DataProvider('requestReadProvider')]
+    public function test_a_partly_received_request_counts_against_the_process_budget_at_what_its_declared_bytes_hold(
+        Closure $read,
+    ): void {
+        $queue = $this->queueReading(
+            [self::partOfEncodedDelete(5)],
+            heldSize: 100_000,
+        );
+
+        try {
+            $read($queue);
+            self::fail('The connection should have ended before the request arrived.');
+        } catch (ConnectionException) {
+            self::assertSame(
+                self::admissionOfEncodedDelete(),
+                $this->budget->held(),
+            );
+        }
+    }
+
+    public function test_a_decoded_request_counts_against_the_process_budget_while_it_is_alive(): void
+    {
+        $queue = $this->queueReading(
+            [self::encodedDelete(1)],
+            heldSize: 100_000,
+        );
+
+        $message = $queue->getMessage();
+        $held = $this->budget->held();
+        unset($message);
+
+        self::assertGreaterThan(
+            0,
+            $held,
+        );
+        self::assertSame(
+            0,
+            $this->budget->held(),
+        );
+    }
+
+    public function test_a_decoded_request_counts_the_elements_of_its_nested_parts(): void
+    {
+        $request = self::encodedSortRequest();
+        $queue = $this->queueReading(
+            [$request],
+            heldSize: 100_000,
+        );
+
+        $message = $queue->getMessage();
+
+        self::assertSame(
+            HeldRequests::estimate(
+                strlen($request),
+                10,
+            ),
+            $this->budget->held(),
+        );
+        self::assertSame(
+            5,
+            $message->getMessageId(),
+        );
+    }
+
+    public function test_reading_more_of_a_request_waits_until_the_process_has_room(): void
+    {
+        $reads = [];
+        $readsBeforeRoom = null;
+        $socket = $this->socketHanding(
+            self::chunksOf(
+                self::encodedRequestPastTheReadAheadBytes(),
+                5_000,
+            ),
+            $reads,
+        );
+        $socket->method('getOptions')
+            ->willReturn(new SocketOptions());
+        $queue = $this->queueFor(
+            $socket,
+            heldSize: 100_000,
+        );
+        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $this->resources
+            ->expects(self::once())
+            ->method('reclaimMemory')
+            ->willReturnCallback(static function () use (&$otherConnections, &$reads, &$readsBeforeRoom): int {
+                $readsBeforeRoom = count($reads);
+                $otherConnections = null;
+
+                return 1;
+            });
+
+        self::assertSame(
+            [5, 1],
+            [$queue->getMessage()->getMessageId(), $readsBeforeRoom],
+        );
+    }
+
+    public function test_a_request_the_process_has_no_room_to_hold_is_refused_as_busy_on_its_message_id(): void
+    {
+        $otherConnections = $this->budget->reserveAnyway(1_000_000);
+        $queue = $this->queueReading(
+            [self::encodedRequestPastTheReadAheadBytes()],
+            heldSize: 1_000_000,
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been refused.');
+        } catch (RequestRefusedException $e) {
+            self::assertSame(
+                [5, ResultCode::BUSY, 6],
+                [$e->getMessageId(), $e->getResultCode(), $e->getProtocolOpTag()],
+            );
+        }
+    }
+
+    public function test_a_read_after_reading_ahead_still_waits_until_the_process_has_room(): void
+    {
+        $request = self::encodedRequestPastTheReadAheadBytes();
+        $queue = $this->queueReading(
+            [
+                self::encodedDelete(3),
+                substr(
+                    $request,
+                    0,
+                    5_000,
+                ),
+                substr(
+                    $request,
+                    5_000,
+                ),
+            ],
+            heldSize: 100_000,
+        );
+        $queue->peekForCancelSignal(2);
+        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $this->resources
+            ->expects(self::once())
+            ->method('reclaimMemory')
+            ->willReturnCallback(static function () use (&$otherConnections): int {
+                $otherConnections = null;
+
+                return 1;
+            });
+
+        self::assertSame(
+            [3, 5],
+            [$queue->getMessage()->getMessageId(), $queue->getMessage()->getMessageId()],
+        );
+    }
+
+    public function test_a_request_larger_than_the_process_may_hold_is_refused_as_past_the_admin_limit(): void
+    {
+        $queue = $this->queueReading(
+            [self::encodedRequestPastTheReadAheadBytes()],
+            heldSize: 50_000,
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been refused.');
+        } catch (RequestRefusedException $e) {
+            self::assertSame(
+                [5, ResultCode::ADMIN_LIMIT_EXCEEDED],
+                [$e->getMessageId(), $e->getResultCode()],
+            );
+        }
+    }
+
+    public function test_the_request_after_a_refused_one_is_still_read(): void
+    {
+        $otherConnections = $this->budget->reserveAnyway(1_000_000);
+        $queue = $this->queueReading(
+            [self::encodedRequestPastTheReadAheadBytes() . self::encodedDelete(6)],
+            heldSize: 1_000_000,
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been refused.');
+        } catch (RequestRefusedException $e) {
+            self::assertSame(
+                5,
+                $e->getMessageId(),
+            );
+        }
+
+        self::assertSame(
+            6,
+            $queue->getMessage()->getMessageId(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Closure(ServerQueue): mixed}>
+     */
+    public static function readAheadProvider(): iterable
+    {
+        yield 'peek' => [static fn(ServerQueue $queue): mixed => $queue->peekForCancelSignal(2)];
+        yield 'poll' => [static fn(ServerQueue $queue): mixed => $queue->pollMessage()];
+    }
+
+    #[DataProvider('readAheadProvider')]
+    public function test_a_request_read_ahead_that_the_process_has_no_room_to_hold_is_refused_on_its_message_id(
+        Closure $readAhead,
+    ): void {
+        $otherConnections = $this->budget->reserveAnyway(999_000);
+        $queue = $this->queueReading(
+            [self::encodedRequestPastTheReadAheadBytes()],
+            heldSize: 1_000_000,
+        );
+
+        try {
+            $readAhead($queue);
+            self::fail('The request should have been refused.');
+        } catch (RequestRefusedException $e) {
+            self::assertSame(
+                [5, ResultCode::BUSY],
+                [$e->getMessageId(), $e->getResultCode()],
+            );
+        }
+    }
+
+    /**
+     * @param Closure(ServerQueue): mixed $readAhead
+     */
+    #[DataProvider('readAheadProvider')]
+    public function test_a_request_read_ahead_without_room_to_arrive_is_left_for_the_next_read_without_waiting(
+        Closure $readAhead,
+    ): void {
+        $reads = [];
+        $queue = $this->queueReading(
+            self::chunksOf(
+                self::encodedRequestPastTheReadAheadBytes(),
+                5_000,
+            ),
+            heldSize: 100_000,
+            timeouts: $reads,
+        );
+        $otherConnections = $this->budget->reserveAnyway(60_000);
+        $this->resources
+            ->expects(self::never())
+            ->method('reclaimMemory');
+
+        $readAheadResult = $readAhead($queue);
+        $readsAhead = count($reads);
+        $otherConnections = null;
+
+        self::assertSame(
+            [null, 1, 5],
+            [$readAheadResult, $readsAhead, $queue->getMessage()->getMessageId()],
+        );
+    }
+
+    public function test_peek_stops_reading_ahead_once_the_process_holds_all_it_may(): void
+    {
+        $reads = 0;
+        $queue = $this->queueFor(
+            $this->socketRepeating(
+                self::encodedDelete(3),
+                $reads,
+            ),
+            heldSize: 100_000,
+        );
+        $otherConnections = $this->budget->reserveAnyway(100_000);
+
+        self::assertSame(
+            [null, 0],
+            [$queue->peekForCancelSignal(2), $reads],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Closure(ServerQueue): void}>
+     */
+    public static function discardProvider(): iterable
+    {
+        yield 'a close' => [
+            static function (ServerQueue $queue): void {
+                $queue->close();
+            },
+        ];
+        yield 'an upgrade to TLS' => [
+            static function (ServerQueue $queue): void {
+                $queue->encrypt();
+            },
+        ];
+    }
+
+    /**
+     * @param Closure(ServerQueue): void $discard
+     */
+    #[DataProvider('discardProvider')]
+    public function test_a_request_discarded_part_way_through_arriving_releases_what_it_reserved(Closure $discard): void
+    {
+        $queue = $this->queueReading(
+            [self::partOfEncodedDelete(5)],
+            heldSize: 100_000,
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The connection should have ended before the request arrived.');
+        } catch (ConnectionException) {
+            $held = $this->budget->held();
+            $discard($queue);
+
+            self::assertSame(
+                [self::admissionOfEncodedDelete(), 0],
+                [$held, $this->budget->held()],
+            );
+        }
+    }
+
+    public function test_a_refusal_carries_neither_the_request_nor_its_asn1_in_its_trace(): void
+    {
+        $ignoreArgs = (string) ini_get('zend.exception_ignore_args');
+        ini_set(
+            'zend.exception_ignore_args',
+            '0',
+        );
+        $otherConnections = $this->budget->reserveAnyway(1_000_000);
+        $queue = $this->queueReading(
+            [self::encodedRequestPastTheReadAheadBytes()],
+            heldSize: 1_000_000,
+        );
+
+        try {
+            $queue->getMessage();
+            self::fail('The request should have been refused.');
+        } catch (RequestRefusedException $e) {
+            $args = array_merge(...array_map(
+                static fn(array $frame): array => $frame['args'] ?? [],
+                $e->getTrace(),
+            ));
+            self::assertSame(
+                [true, []],
+                [
+                    $args !== [],
+                    array_filter(
+                        $args,
+                        static fn(mixed $arg): bool => $arg instanceof LdapMessageRequest
+                            || $arg instanceof Message
+                            || $arg instanceof AbstractType,
+                    ),
+                ],
+            );
+        } finally {
+            ini_set(
+                'zend.exception_ignore_args',
+                $ignoreArgs,
+            );
+        }
     }
 
     public function test_peek_returns_null_when_no_socket_data(): void
@@ -829,6 +1205,15 @@ final class ServerQueueTest extends TestCase
         $queue->getMessage();
     }
 
+    public function test_a_request_whose_tag_number_takes_more_than_one_octet_is_a_protocol_failure_at_once(): void
+    {
+        $queue = $this->queueReading([(string) hex2bin('1f81')]);
+
+        $this->expectException(ProtocolException::class);
+
+        $queue->getMessage();
+    }
+
     public function test_it_should_refuse_a_request_holding_more_elements_than_the_limit(): void
     {
         $queue = $this->queueReading(
@@ -910,6 +1295,7 @@ final class ServerQueueTest extends TestCase
     {
         yield 'a read' => [static fn(ServerQueue $queue): mixed => $queue->getMessage()];
         yield 'a peek' => [static fn(ServerQueue $queue): mixed => $queue->peekForCancelSignal(2)];
+        yield 'a poll' => [static fn(ServerQueue $queue): mixed => $queue->pollMessage()];
     }
 
     /**
@@ -1002,7 +1388,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            new RequestArrival($this->limits),
+            $this->arrival(),
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -1025,7 +1411,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            new RequestArrival($this->limits),
+            $this->arrival(),
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -1051,7 +1437,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            new RequestArrival($this->limits),
+            $this->arrival(),
             $this->mockEncoder,
             interceptors: [
                 new RecordingInterceptor($log, 'a'),
@@ -1177,12 +1563,32 @@ final class ServerQueueTest extends TestCase
     private function queueFor(
         Socket $socket,
         ?RequestLimits $limits = null,
+        int $heldSize = 0,
     ): ServerQueue {
         return new ServerQueue(
             $socket,
             $this->messageDecoder,
-            new RequestArrival($limits ?? $this->limits),
+            $this->arrival(
+                $limits,
+                $heldSize,
+            ),
             new LdapEncoder(),
+        );
+    }
+
+    /**
+     * The arrival of requests under the given limits or none, holding them against the test's budget.
+     */
+    private function arrival(
+        ?RequestLimits $limits = null,
+        int $heldSize = 0,
+    ): RequestArrival {
+        return new RequestArrival(
+            $limits ?? $this->limits,
+            new HeldRequests(
+                $this->budget,
+                $heldSize,
+            ),
         );
     }
 
@@ -1196,6 +1602,7 @@ final class ServerQueueTest extends TestCase
         array $chunks,
         ?RequestLimits $limits = null,
         array &$timeouts = [],
+        int $heldSize = 0,
     ): ServerQueue {
         return $this->queueFor(
             $this->socketHanding(
@@ -1203,6 +1610,7 @@ final class ServerQueueTest extends TestCase
                 $timeouts,
             ),
             $limits,
+            $heldSize,
         );
     }
 
@@ -1276,6 +1684,29 @@ final class ServerQueueTest extends TestCase
             $messageId,
             Operations::delete('cn=foo,dc=foo,dc=bar'),
         ));
+    }
+
+    /**
+     * What a delete request's declared bytes reserve on arrival, before its elements are known.
+     */
+    private static function admissionOfEncodedDelete(): int
+    {
+        return HeldRequests::estimate(
+            strlen(self::encodedDelete(2)),
+            2,
+        );
+    }
+
+    /**
+     * The first bytes of a delete request that never finishes arriving.
+     */
+    private static function partOfEncodedDelete(int $bytes): string
+    {
+        return substr(
+            self::encodedDelete(2),
+            0,
+            $bytes,
+        );
     }
 
     /**

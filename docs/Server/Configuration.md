@@ -20,6 +20,7 @@ LDAP Server Configuration
     * [NetworkConfig:setMaxRequestSize](#setmaxrequestsize)
     * [NetworkConfig:setMaxAnonymousRequestSize](#setmaxanonymousrequestsize)
     * [NetworkConfig:setMaxRequestElements](#setmaxrequestelements)
+    * [NetworkConfig:setMaxHeldRequestSize](#setmaxheldrequestsize)
     * [TLS](#tls)
         * [NetworkConfig:setUseSsl](#setusessl)
         * [NetworkConfig:setSslCert](#setsslcert)
@@ -227,6 +228,10 @@ The server logs `server.concurrency_limited` at startup when one of these limits
 * `storage_blocks_worker`: a SQLite lock wait blocks a worker that serves many clients in one process.
 * `open_file_limit`: `ulimit -n` is below the open files a worker that serves many clients in one process needs at the
   connection limit.
+* `memory_limit`: a worker that serves many clients in one process can run out of memory before the connection limit.
+* `held_request_size`: [setMaxHeldRequestSize](#setmaxheldrequestsize) is smaller than the largest request allowed, or
+  requests have no size limit.
+* `no_memory_limit`: `memory_limit` is `-1`, leaving the held request size at a fixed 512 MiB.
 
 ### Signals
 
@@ -413,6 +418,18 @@ At the default, one request can carry about 100,000 attribute values. Raise it a
 
 **Default**: `100000`
 
+------------------
+#### setMaxHeldRequestSize
+
+The most memory, in bytes, the requests of one process may hold at once. Each process has its own. A request with no room
+is answered with `BUSY`, and one that could never fit is refused. Set `0` for no limit.
+
+```php
+$options->getNetworkConfig()->setMaxHeldRequestSize(134_217_728);
+```
+
+**Default**: half of `memory_limit`, or 512 MiB when there is none
+
 ### TLS
 
 The StartTLS and LDAPS settings below are also part of `NetworkConfig`. Configure them on the network config passed to
@@ -540,6 +557,8 @@ Configurable:
   an extended operation's value.
 * **Time to arrive:** 30 seconds ([setRequestReadTimeout](#setrequestreadtimeout)). A slower request ends the
   connection.
+* **Memory held at once:** half of `memory_limit` per process ([setMaxHeldRequestSize](#setmaxheldrequestsize)). A
+  request with no room is refused with `BUSY`.
 
 Fixed:
 

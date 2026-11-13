@@ -28,11 +28,17 @@ use function min;
 readonly class RequestLimits
 {
     /**
+     * LDAP numbers no tag above 30, the highest a single tag octet holds.
+     */
+    private const MAX_TAG_NUMBER = 30;
+
+    /**
      * @param ServerAuthorization $authorization the session whose bind decides which size limit applies.
      * @param int $maxSize the largest request in bytes, or 0 for no limit.
      * @param int $maxAnonymousSize the largest request in bytes without an authenticated bind, or 0 for no own limit.
      * @param int $maxElements the most ASN.1 elements a request may hold, or 0 for no limit.
      * @param int $readTimeout the seconds a request may take to finish arriving, or 0 for no limit.
+     * @param int $idleTimeout the seconds a connection may go without a request, or -1 for no limit.
      */
     public function __construct(
         private ServerAuthorization $authorization,
@@ -40,6 +46,7 @@ readonly class RequestLimits
         private int $maxAnonymousSize = 0,
         private int $maxElements = 0,
         private int $readTimeout = 0,
+        private int $idleTimeout = -1,
     ) {}
 
     /**
@@ -48,6 +55,14 @@ readonly class RequestLimits
     public function readTimeout(): int
     {
         return $this->readTimeout;
+    }
+
+    /**
+     * The seconds a connection may go without a request, or -1 for no limit.
+     */
+    public function idleTimeout(): int
+    {
+        return $this->idleTimeout;
     }
 
     /**
@@ -69,13 +84,14 @@ readonly class RequestLimits
     }
 
     /**
-     * The decoding options that hold a request to the given size and the element limit.
+     * The decoding options that hold a request to the given size, the element limit and the tag numbers LDAP uses.
      */
     public function encoderOptions(int $maxSize): EncoderOptions
     {
         return new EncoderOptions(
             maxLength: $maxSize,
             maxElements: $this->maxElements,
+            maxTagNumber: self::MAX_TAG_NUMBER,
         );
     }
 

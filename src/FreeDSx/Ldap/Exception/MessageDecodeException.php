@@ -21,7 +21,7 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class MessageDecodeException extends ProtocolException
+class MessageDecodeException extends ProtocolException
 {
     public function __construct(
         private readonly int $messageId,

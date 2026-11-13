@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
+use FreeDSx\Ldap\Exception\RequestRefusedException;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -57,12 +58,46 @@ final readonly class DecodeFailureResponder
 
         // An operation with no response, or a response tag masquerading as a request, leaves nothing to answer with.
         if ($response === null) {
-            return false;
+            return $this->dropRefused($e);
         }
 
         // RFC 4513 §4 moves a session to anonymous on receipt of a bind, and one that fails leaves it there.
         if ($response->getResponse() instanceof BindResponse) {
             $this->authorization->setToken(new AnonToken());
+        }
+
+        $this->record($e);
+        $this->queue->sendMessage($response);
+
+        return true;
+    }
+
+    /**
+     * A request refused for room that takes no response is recorded and dropped instead of ending the session.
+     */
+    private function dropRefused(MessageDecodeException $e): bool
+    {
+        if (!$e instanceof RequestRefusedException) {
+            return false;
+        }
+        $this->record($e);
+
+        return true;
+    }
+
+    private function record(MessageDecodeException $e): void
+    {
+        if ($e instanceof RequestRefusedException) {
+            $this->eventLogger->record(
+                ServerEvent::OperationRefused,
+                [
+                    EventContext::MESSAGE_ID => $e->getMessageId(),
+                    EventContext::RESULT_CODE => $e->getResultCode(),
+                    EventContext::REASON => $e->getMessage(),
+                ],
+            );
+
+            return;
         }
 
         $this->eventLogger->record(
@@ -72,8 +107,5 @@ final readonly class DecodeFailureResponder
                 EventContext::REASON_CODE => $e->getResultCode(),
             ],
         );
-        $this->queue->sendMessage($response);
-
-        return true;
     }
 }

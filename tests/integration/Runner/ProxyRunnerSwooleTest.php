@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use Tests\Integration\FreeDSx\Ldap\Runner\Concern\SharedRequestBudgetTestsTrait;
+
 use function extension_loaded;
 
 /**
@@ -20,6 +22,8 @@ use function extension_loaded;
  */
 final class ProxyRunnerSwooleTest extends ProxyRunnerTestCase
 {
+    use SharedRequestBudgetTestsTrait;
+
     public function setUp(): void
     {
         $this->requireSwoole();

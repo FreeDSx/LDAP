@@ -101,6 +101,13 @@ final class LdapProxyCommand extends Command
                 '',
             )
             ->addOption(
+                'max-held-request-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Bytes of requests one process holds at once (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'entry-padding',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -187,6 +194,10 @@ final class LdapProxyCommand extends Command
         $requestReadTimeout = $this->getStringOption($input, 'request-read-timeout');
         if ($requestReadTimeout !== '') {
             $network->setRequestReadTimeout((int) $requestReadTimeout);
+        }
+        $maxHeldRequestSize = $this->getStringOption($input, 'max-held-request-size');
+        if ($maxHeldRequestSize !== '') {
+            $network->setMaxHeldRequestSize((int) $maxHeldRequestSize);
         }
 
         return (new ProxyServerOptions($network))

@@ -217,6 +217,32 @@ final class DecodeContextTest extends TestCase
         );
     }
 
+    public function testItCountsTheElementsOfEveryNestedPart(): void
+    {
+        $this->subject->complete(
+            self::incompleteSequence(),
+            AbstractType::TAG_TYPE_SEQUENCE,
+        );
+        $this->subject->decode(self::sequenceOf(1));
+
+        self::assertSame(
+            3,
+            $this->subject->elementsDecoded(),
+        );
+    }
+
+    public function testWithoutABudgetItStillCountsTheElementsOfEveryNestedPart(): void
+    {
+        $context = new DecodeContext();
+
+        $context->decode(self::sequenceOf(1_000));
+
+        self::assertSame(
+            1_000,
+            $context->elementsDecoded(),
+        );
+    }
+
     private static function sequenceOf(int $count): string
     {
         return (new LdapEncoder())->encode(Asn1::sequence(...array_fill(

@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\ReadAheadBuffer;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
@@ -47,6 +49,7 @@ trait ServerConnectionScaffoldingTrait
         Socket $socket,
         RequestMessageDecoder $messageDecoder,
         ServerAuthorization $authorization,
+        RequestBudget $requestBudget,
         array $interceptors = [],
         MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ): ServerQueue {
@@ -55,13 +58,20 @@ trait ServerConnectionScaffoldingTrait
         return new ServerQueue(
             $socket,
             $messageDecoder,
-            new RequestArrival(new RequestLimits(
-                authorization: $authorization,
-                maxSize: $networkConfig->getMaxRequestSize(),
-                maxAnonymousSize: $networkConfig->getMaxAnonymousRequestSize(),
-                maxElements: $networkConfig->getMaxRequestElements(),
-                readTimeout: $networkConfig->getRequestReadTimeout(),
-            )),
+            new RequestArrival(
+                new RequestLimits(
+                    authorization: $authorization,
+                    maxSize: $networkConfig->getMaxRequestSize(),
+                    maxAnonymousSize: $networkConfig->getMaxAnonymousRequestSize(),
+                    maxElements: $networkConfig->getMaxRequestElements(),
+                    readTimeout: $networkConfig->getRequestReadTimeout(),
+                    idleTimeout: $networkConfig->getIdleTimeout(),
+                ),
+                new HeldRequests(
+                    $requestBudget,
+                    $requestBudget->limitFor($networkConfig->getMaxHeldRequestSize()),
+                ),
+            ),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,
             readAhead: new ReadAheadBuffer(),

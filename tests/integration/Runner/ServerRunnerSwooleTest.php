@@ -13,9 +13,14 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use Tests\Integration\FreeDSx\Ldap\Runner\Concern\SharedRequestBudgetTestsTrait;
 use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 
 use function extension_loaded;
+use function fclose;
+use function unlink;
 
 /**
  * Runs the shared runner suite against the Swoole ServerRunner.
@@ -23,6 +28,7 @@ use function extension_loaded;
 final class ServerRunnerSwooleTest extends ServerRunnerTestCase
 {
     use RequiresOperatingSystemTrait;
+    use SharedRequestBudgetTestsTrait;
 
     public function setUp(): void
     {
@@ -52,6 +58,43 @@ final class ServerRunnerSwooleTest extends ServerRunnerTestCase
             'Failed to accept incoming connection.',
             $this->waitForServerOutput('Accepting incoming connections recovered.'),
         );
+    }
+
+    public function testConnectionsOpenedAcrossAReloadShareOneRequestBudget(): void
+    {
+        $this->requirePosix();
+        $flagFile = $this->makeFlagFile();
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--log',
+                '--reload-flag-file=' . $flagFile,
+                '--max-held-request-size=200000',
+            ],
+        );
+        $stalled = $this->stalledClient(120_000);
+        $queue = null;
+
+        try {
+            $this->reloadServer();
+            $queue = $this->boundRawQueue();
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchHoldingManyElements(),
+            ));
+
+            self::assertSame(
+                [2 => ResultCode::BUSY],
+                $this->resultCodesFor(
+                    $queue,
+                    2,
+                ),
+            );
+        } finally {
+            $queue?->close();
+            fclose($stalled);
+            @unlink($flagFile);
+        }
     }
 
     protected static function runnerArgs(): array

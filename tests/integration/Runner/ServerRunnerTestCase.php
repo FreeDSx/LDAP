@@ -18,6 +18,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\ConnectionTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\ReloadTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Runner\Concern\RequestBudgetTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\RequestLimitsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\SessionEndingLimitTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
@@ -34,6 +35,7 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 {
     use TlsTestsTrait;
     use RequestLimitsTestsTrait;
+    use RequestBudgetTestsTrait;
     use SessionEndingLimitTestsTrait;
     use ConnectionTestsTrait;
     use ReloadTestsTrait;
