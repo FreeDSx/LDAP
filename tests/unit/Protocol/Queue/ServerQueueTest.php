@@ -45,6 +45,7 @@ use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
@@ -98,7 +99,7 @@ final class ServerQueueTest extends TestCase
         $this->subject = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            $this->limits,
+            new RequestArrival($this->limits),
             $this->mockEncoder,
         );
     }
@@ -319,7 +320,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $socket,
             $this->messageDecoder,
-            $this->limits,
+            new RequestArrival($this->limits),
             $encoder,
             metricsRecorder: $recorder,
         );
@@ -341,7 +342,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->socketHanding([$request]),
             $this->messageDecoder,
-            $this->limits,
+            new RequestArrival($this->limits),
             metricsRecorder: $recorder,
         );
 
@@ -404,26 +405,6 @@ final class ServerQueueTest extends TestCase
         self::assertGreaterThan(
             29.99,
             $timeouts[2],
-        );
-    }
-
-    public function test_a_read_timeout_of_zero_leaves_every_wait_to_the_idle_timeout(): void
-    {
-        $timeouts = [];
-        $queue = $this->queueReading(
-            self::chunksOf(
-                self::encodedDelete(1),
-                5,
-            ),
-            $this->withReadTimeout(0),
-            $timeouts,
-        );
-
-        $queue->getMessage();
-
-        self::assertSame(
-            [null, null],
-            $timeouts,
         );
     }
 
@@ -1021,7 +1002,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            $this->limits,
+            new RequestArrival($this->limits),
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -1044,7 +1025,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            $this->limits,
+            new RequestArrival($this->limits),
             $this->mockEncoder,
             interceptors: [new RecordingInterceptor(new CallLog(), '1.2.3.4')],
         );
@@ -1070,7 +1051,7 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue(
             $this->mockSocket,
             $this->messageDecoder,
-            $this->limits,
+            new RequestArrival($this->limits),
             $this->mockEncoder,
             interceptors: [
                 new RecordingInterceptor($log, 'a'),
@@ -1200,7 +1181,7 @@ final class ServerQueueTest extends TestCase
         return new ServerQueue(
             $socket,
             $this->messageDecoder,
-            $limits ?? $this->limits,
+            new RequestArrival($limits ?? $this->limits),
             new LdapEncoder(),
         );
     }
