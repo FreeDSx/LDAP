@@ -77,6 +77,8 @@ final class SwooleTableMetricsRecorder implements
 
     private const CONNECTIONS_IDLE_TIMEOUTS = 'conn.idleTimeouts';
 
+    private const CONNECTIONS_READ_TIMEOUTS = 'conn.readTimeouts';
+
     private const CONNECTIONS_REQUEST_SIZE = 'conn.requestSizeExceeded';
 
     private const CONNECTIONS_PROTOCOL_ERRORS = 'conn.protocolErrors';
@@ -231,6 +233,7 @@ final class SwooleTableMetricsRecorder implements
             ConnectionObservation::Rejected => $this->add(self::CONNECTIONS_REJECTED, 1),
             ConnectionObservation::WriteTimeout => $this->add(self::CONNECTIONS_WRITE_TIMEOUTS, 1),
             ConnectionObservation::IdleTimeout => $this->add(self::CONNECTIONS_IDLE_TIMEOUTS, 1),
+            ConnectionObservation::ReadTimeout => $this->add(self::CONNECTIONS_READ_TIMEOUTS, 1),
             ConnectionObservation::RequestSizeExceeded => $this->add(self::CONNECTIONS_REQUEST_SIZE, 1),
             ConnectionObservation::ProtocolError => $this->add(self::CONNECTIONS_PROTOCOL_ERRORS, 1),
             ConnectionObservation::Unavailable => $this->add(self::CONNECTIONS_UNAVAILABLE, 1),
@@ -344,6 +347,7 @@ final class SwooleTableMetricsRecorder implements
                 rejected: $this->get(self::CONNECTIONS_REJECTED),
                 writeTimeouts: $this->get(self::CONNECTIONS_WRITE_TIMEOUTS),
                 idleTimeouts: $this->get(self::CONNECTIONS_IDLE_TIMEOUTS),
+                readTimeouts: $this->get(self::CONNECTIONS_READ_TIMEOUTS),
                 requestSizeExceeded: $this->get(self::CONNECTIONS_REQUEST_SIZE),
                 protocolErrors: $this->get(self::CONNECTIONS_PROTOCOL_ERRORS),
                 unavailable: $this->get(self::CONNECTIONS_UNAVAILABLE),

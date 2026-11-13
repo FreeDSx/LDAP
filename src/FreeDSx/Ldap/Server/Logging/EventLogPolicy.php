@@ -69,6 +69,7 @@ final readonly class EventLogPolicy
             ServerEvent::NoticeOfDisconnectSent,
             ServerEvent::WriteTimeout,
             ServerEvent::IdleTimeout,
+            ServerEvent::ReadTimeout,
             ServerEvent::PasswordPolicyAccountLocked,
             ServerEvent::PasswordPolicyAccountUnlocked,
             ServerEvent::PasswordPolicyExpired,

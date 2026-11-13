@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Exception\IdleTimeoutException;
+use FreeDSx\Socket\Exception\ReadTimeoutException;
 use FreeDSx\Socket\Exception\WriteTimeoutException;
 use Throwable;
 
@@ -65,6 +66,12 @@ readonly class SessionEndPolicy
                 ServerEvent::IdleTimeout,
                 $exception,
                 ConnectionObservation::IdleTimeout,
+            ),
+            // A request began to arrive but did not finish in time, and there is no request to answer.
+            $exception instanceof ReadTimeoutException => $this->timedOut(
+                ServerEvent::ReadTimeout,
+                $exception,
+                ConnectionObservation::ReadTimeout,
             ),
             // An ordinary client disconnect, which the runner's lifecycle logging already records.
             $exception instanceof ConnectionException => null,

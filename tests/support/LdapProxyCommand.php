@@ -94,6 +94,13 @@ final class LdapProxyCommand extends Command
                 '',
             )
             ->addOption(
+                'request-read-timeout',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds a request may take to finish arriving; the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'entry-padding',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -176,6 +183,10 @@ final class LdapProxyCommand extends Command
         $writeTimeout = $this->getStringOption($input, 'write-timeout');
         if ($writeTimeout !== '') {
             $network->setWriteTimeout((int) $writeTimeout);
+        }
+        $requestReadTimeout = $this->getStringOption($input, 'request-read-timeout');
+        if ($requestReadTimeout !== '') {
+            $network->setRequestReadTimeout((int) $requestReadTimeout);
         }
 
         return (new ProxyServerOptions($network))

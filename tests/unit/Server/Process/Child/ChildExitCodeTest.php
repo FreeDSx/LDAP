@@ -32,6 +32,7 @@ final class ChildExitCodeTest extends TestCase
         yield 'an idle timeout' => [ConnectionObservation::IdleTimeout];
         yield 'an oversized request' => [ConnectionObservation::RequestSizeExceeded];
         yield 'a protocol error' => [ConnectionObservation::ProtocolError];
+        yield 'a read timeout' => [ConnectionObservation::ReadTimeout];
     }
 
     #[DataProvider('countedCloseReasonProvider')]

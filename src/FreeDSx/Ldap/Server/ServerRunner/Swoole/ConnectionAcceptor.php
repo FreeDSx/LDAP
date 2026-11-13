@@ -122,14 +122,14 @@ class ConnectionAcceptor
             if ($this->isShuttingDown) {
                 $this->events->record(
                     ServerEvent::ClientRejected,
-                    [EventContext::REASON => 'shutting_down'],
+                    [EventContext::REASON => 'shutting_down'] + ConnectionContext::forSocket($socket)->toLogContext(),
                 );
                 $socket->close();
 
                 break;
             }
 
-            if (!$this->acquireConnectionSlot()) {
+            if (!$this->acquireConnectionSlot($socket)) {
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);
                 $this->server->removeClient($socket);
                 $socket->close();
@@ -172,7 +172,7 @@ class ConnectionAcceptor
         $this->events = $events;
     }
 
-    private function acquireConnectionSlot(): bool
+    private function acquireConnectionSlot(Socket $socket): bool
     {
         $maxConnections = $this->options->getNetworkConfig()->getMaxConnections();
         if ($this->connectionSlots->tryAcquire($maxConnections)) {
@@ -183,7 +183,7 @@ class ConnectionAcceptor
             [
                 EventContext::REASON => 'connection_limit',
                 'max_connections' => $maxConnections,
-            ],
+            ] + ConnectionContext::forSocket($socket)->toLogContext(),
         );
 
         return false;
@@ -216,16 +216,24 @@ class ConnectionAcceptor
         Socket $socket,
         int $socketId,
     ): void {
-        $this->events->record(ServerEvent::ClientConnected);
+        $connection = ConnectionContext::forSocket(
+            $socket,
+            connId: $socketId,
+        );
+        $context = $connection->toLogContext();
+        $this->events->record(
+            ServerEvent::ClientConnected,
+            $context,
+        );
 
         try {
-            if (!$this->encryptConnectionIfDeferred($socket)) {
+            if (!$this->encryptConnectionIfDeferred($socket, $context)) {
                 return;
             }
 
             $handler = $this->serverProtocolFactory->make(
                 $socket,
-                new ConnectionContext(connId: $socketId),
+                $connection,
             );
             $this->activeHandlers[$socketId] = $handler;
             $closeReason = $handler->handle();
@@ -236,19 +244,27 @@ class ConnectionAcceptor
         } catch (Throwable $e) {
             $this->events->record(
                 ServerEvent::ClientError,
+                $context,
                 cause: $e,
             );
         } finally {
-            $this->events->record(ServerEvent::ClientClosed);
+            $this->events->record(
+                ServerEvent::ClientClosed,
+                $context,
+            );
             $socket->close();
         }
     }
 
     /**
      * Runs in the connection's own coroutine, so a slow or silent handshake never holds up the accept loop.
+     *
+     * @param array<string, int|string> $context
      */
-    private function encryptConnectionIfDeferred(Socket $socket): bool
-    {
+    private function encryptConnectionIfDeferred(
+        Socket $socket,
+        array $context,
+    ): bool {
         if (!$this->isTlsHandshakeDeferred) {
             return true;
         }
@@ -258,6 +274,7 @@ class ConnectionAcceptor
         } catch (Throwable $e) {
             $this->events->record(
                 ServerEvent::ClientTlsFailed,
+                $context,
                 cause: $e,
             );
 

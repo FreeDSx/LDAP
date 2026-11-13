@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\DripsRequestsTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 use function extension_loaded;
@@ -27,6 +28,7 @@ use function extension_loaded;
 abstract class ProxyRunnerTestCase extends ServerTestCase
 {
     use RawClientQueueTrait;
+    use DripsRequestsTrait;
 
     public static function setUpBeforeClass(): void
     {
@@ -91,6 +93,31 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
             $stalled->close();
         }
 
+        $this->authenticateUser();
+        self::assertNotNull($this->ldapClient()->read('dc=foo,dc=bar'));
+    }
+
+    public function testARequestThatTakesTooLongToArriveEndsTheSessionAndOthersAreStillServed(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--log',
+                '--request-read-timeout=2',
+            ],
+        );
+
+        $closedAfter = $this->dripRequestUntilClosed(
+            'tcp',
+            8.0,
+        );
+
+        self::assertNotNull($closedAfter);
+        self::assertLessThan(
+            4.0,
+            $closedAfter,
+        );
+        $this->waitForServerOutput('The connection was closed because a request took too long to arrive.');
         $this->authenticateUser();
         self::assertNotNull($this->ldapClient()->read('dc=foo,dc=bar'));
     }

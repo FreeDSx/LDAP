@@ -56,20 +56,21 @@ class ConnectionChild
         ?ChildReporter $reporter,
     ): never {
         $reporter?->inChild();
-        $pid = posix_getpid();
-        $context = ['pid' => $pid];
+        $connection = ConnectionContext::forSocket(
+            $socket,
+            pid: posix_getpid(),
+        );
 
         $closeReason = null;
         try {
             $closeReason = $this->serve(
                 $socket,
-                $pid,
-                $context,
+                $connection,
             );
         } catch (Throwable $e) {
             $this->configuration->events()->record(
                 ServerEvent::ClientError,
-                $context,
+                $connection->toLogContext(),
                 cause: $e,
             );
         } finally {
@@ -83,15 +84,14 @@ class ConnectionChild
     /**
      * Prepares the connection and serves its session, returning how it closed.
      *
-     * @param array<string, scalar> $context
      * @throws EncoderException
      */
     private function serve(
         Socket $socket,
-        int $pid,
-        array $context,
+        ConnectionContext $connection,
     ): ?ConnectionObservation {
         $this->resettable->reset();
+        $context = $connection->toLogContext();
 
         if (!$this->encryptConnectionIfDeferred($socket, $context)) {
             $socket->close();
@@ -101,7 +101,7 @@ class ConnectionChild
 
         $protocolHandler = $this->configuration->protocolFactory()->make(
             $socket,
-            new ConnectionContext(pid: $pid),
+            $connection,
         );
         $this->installSignalHandlers(
             $protocolHandler,

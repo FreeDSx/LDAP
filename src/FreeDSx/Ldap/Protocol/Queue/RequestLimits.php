@@ -32,13 +32,23 @@ readonly class RequestLimits
      * @param int $maxSize the largest request in bytes, or 0 for no limit.
      * @param int $maxAnonymousSize the largest request in bytes without an authenticated bind, or 0 for no own limit.
      * @param int $maxElements the most ASN.1 elements a request may hold, or 0 for no limit.
+     * @param int $readTimeout the seconds a request may take to finish arriving, or 0 for no limit.
      */
     public function __construct(
         private ServerAuthorization $authorization,
         private int $maxSize = 0,
         private int $maxAnonymousSize = 0,
         private int $maxElements = 0,
+        private int $readTimeout = 0,
     ) {}
+
+    /**
+     * The seconds a request may take to finish arriving, or 0 for no limit.
+     */
+    public function readTimeout(): int
+    {
+        return $this->readTimeout;
+    }
 
     /**
      * The largest request in bytes the session may send now, or 0 for no limit.

@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\ForkFailedException;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -187,7 +188,8 @@ class PcntlServerRunner implements ServerRunnerInterface
                 if ($socket) {
                     $this->events()->record(
                         ServerEvent::ClientRejected,
-                        [EventContext::REASON => 'shutting_down'],
+                        [EventContext::REASON => 'shutting_down']
+                            + ConnectionContext::forSocket($socket)->toLogContext(),
                     );
                     $socket->close();
                 }
@@ -213,7 +215,7 @@ class PcntlServerRunner implements ServerRunnerInterface
                     [
                         EventContext::REASON => 'connection_limit',
                         'max_connections' => $this->options()->getNetworkConfig()->getMaxConnections(),
-                    ],
+                    ] + ConnectionContext::forSocket($socket)->toLogContext(),
                 );
                 $this->metrics->connectionRejected();
 
@@ -269,7 +271,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     ): void {
         $this->events()->record(
             ServerEvent::ClientRejected,
-            [EventContext::REASON => 'not_started'],
+            [EventContext::REASON => 'not_started'] + ConnectionContext::forSocket($socket)->toLogContext(),
             cause: $failure,
         );
         $this->metrics->connectionRejected();
@@ -461,7 +463,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->metrics->childStarted();
         $this->events()->record(
             ServerEvent::ClientConnected,
-            ['child_pid' => $pid],
+            ['child_pid' => $pid] + ConnectionContext::forSocket($socket)->toLogContext(),
         );
         $this->cleanUpChildProcesses();
     }

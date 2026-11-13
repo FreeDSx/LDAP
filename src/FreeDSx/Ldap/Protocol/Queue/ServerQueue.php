@@ -34,11 +34,13 @@ use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\ReadTimeoutException;
 use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
 use Generator;
 
 use function count;
+use function microtime;
 use function strlen;
 
 /**
@@ -96,6 +98,11 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      * The failed write that every later write rethrows.
      */
     private ?ConnectionException $writeFailure = null;
+
+    /**
+     * When the request partly in the buffer must have fully arrived, or null until a wait finds one.
+     */
+    private ?float $requestDeadline = null;
 
     /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
@@ -326,10 +333,33 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     }
 
     /**
+     * A request that has begun to arrive must finish within the read timeout.
+     *
+     * @throws ConnectionException
+     */
+    protected function addToAvailableBufferOrFail(): void
+    {
+        $timeout = $this->limits->readTimeout();
+        // Between requests only the idle timeout applies.
+        if ($timeout === 0 || !$this->hasBuffer()) {
+            parent::addToAvailableBufferOrFail();
+
+            return;
+        }
+
+        $bytes = $this->readRestOfRequest($timeout);
+        if ($bytes === false) {
+            throw new ConnectionException('The connection to the server has been lost.');
+        }
+        $this->buffer .= $bytes;
+    }
+
+    /**
      * Count the LDAP bytes received for each decoded request.
      */
     protected function onMessageDecoded(Message $message): void
     {
+        $this->requestDeadline = null;
         $this->lastMessageBytes = (int) $message->getLastPosition();
         $this->metricsRecorder->trafficObserved(new TrafficObservation(
             bytesReceived: $this->lastMessageBytes,
@@ -441,6 +471,32 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         }
 
         return $response;
+    }
+
+    /**
+     * Reads within what is left of the time the request has to arrive.
+     *
+     * @throws ReadTimeoutException when the request does not finish arriving in time.
+     * @throws ConnectionException
+     */
+    private function readRestOfRequest(int $timeout): string|false
+    {
+        $this->requestDeadline ??= microtime(true) + $timeout;
+
+        try {
+            return $this->socket->read(
+                true,
+                $this->requestDeadline - microtime(true),
+            );
+        } catch (ReadTimeoutException $e) {
+            throw new ReadTimeoutException(
+                sprintf(
+                    'The request did not finish arriving within %d seconds.',
+                    $timeout,
+                ),
+                previous: $e,
+            );
+        }
     }
 
     /**

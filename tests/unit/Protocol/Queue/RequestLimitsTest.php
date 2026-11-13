@@ -167,4 +167,23 @@ final class RequestLimitsTest extends TestCase
     {
         self::assertNull((new RequestLimits($this->authorization))->elementsLeftAfter(20));
     }
+
+    public function testItSetsNoReadTimeoutByDefault(): void
+    {
+        self::assertSame(
+            0,
+            (new RequestLimits($this->authorization))->readTimeout(),
+        );
+    }
+
+    public function testItHoldsARequestToTheGivenReadTimeout(): void
+    {
+        self::assertSame(
+            30,
+            (new RequestLimits(
+                $this->authorization,
+                readTimeout: 30,
+            ))->readTimeout(),
+        );
+    }
 }

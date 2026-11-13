@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Exception\IdleTimeoutException;
+use FreeDSx\Socket\Exception\ReadTimeoutException;
 use FreeDSx\Socket\Exception\WriteTimeoutException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -91,6 +92,11 @@ final class SessionEndPolicyTest extends TestCase
         yield 'the client went quiet' => [
             new IdleTimeoutException('idle too long'),
             ConnectionObservation::IdleTimeout,
+        ];
+
+        yield 'a request took too long to arrive' => [
+            new ReadTimeoutException('read too slow'),
+            ConnectionObservation::ReadTimeout,
         ];
 
         yield 'an ordinary disconnect' => [
@@ -206,12 +212,30 @@ final class SessionEndPolicyTest extends TestCase
     {
         $this->subject->end(new WriteTimeoutException('write timed out'));
         $this->subject->end(new IdleTimeoutException('idle too long'));
+        $this->subject->end(new ReadTimeoutException('read too slow'));
         $this->subject->end(new ConnectionException('client hung up'));
 
         self::assertSame(
             [],
             $this->sent,
         );
+    }
+
+    public function test_it_records_a_request_that_took_too_long_to_arrive(): void
+    {
+        $this->logger
+            ->expects(self::once())
+            ->method('log')
+            ->with(
+                self::anything(),
+                self::anything(),
+                self::callback(
+                    static fn(array $context): bool => $context[EventContext::EVENT] === ServerEvent::ReadTimeout->value
+                        && $context[EventContext::REASON_MESSAGE] === 'read too slow',
+                ),
+            );
+
+        $this->subject->end(new ReadTimeoutException('read too slow'));
     }
 
     public function test_it_keeps_quiet_about_an_unexpected_failure_once_the_connection_is_gone(): void

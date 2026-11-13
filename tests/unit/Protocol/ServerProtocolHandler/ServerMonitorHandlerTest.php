@@ -316,6 +316,19 @@ final class ServerMonitorHandlerTest extends TestCase
         );
     }
 
+    public function test_it_reports_connections_closed_because_a_request_took_too_long_to_arrive(): void
+    {
+        $this->metrics->connectionObserved(ConnectionObservation::ReadTimeout);
+        $this->metrics->connectionObserved(ConnectionObservation::ReadTimeout);
+
+        $entry = $this->handleAndCaptureEntry();
+
+        self::assertSame(
+            ['2'],
+            $entry->get('connectionsReadTimeouts')?->getValues(),
+        );
+    }
+
     public function test_it_reports_connections_closed_by_a_protocol_error(): void
     {
         $this->metrics->connectionObserved(ConnectionObservation::ProtocolError);

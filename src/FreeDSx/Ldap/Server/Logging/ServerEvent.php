@@ -65,6 +65,7 @@ enum ServerEvent: string
     case JournalPruneFailed             = 'storage.journal.prune_failed';
     case WriteTimeout                   = 'server.client.write_timeout';
     case IdleTimeout                    = 'server.client.idle_timeout';
+    case ReadTimeout                    = 'server.client.read_timeout';
     case ServerStarted                  = 'server.started';
     case ServerAcceptFailed             = 'server.accept_failed';
     case ServerAcceptRecovered          = 'server.accept_recovered';
@@ -125,6 +126,7 @@ enum ServerEvent: string
             self::NoticeOfDisconnectSent,
             self::WriteTimeout,
             self::IdleTimeout,
+            self::ReadTimeout,
             self::PagingSessionEvicted,
             self::PasswordPolicyExpired,
             self::PasswordPolicyChangeRejected => LogLevel::NOTICE,
@@ -178,6 +180,7 @@ enum ServerEvent: string
             self::JournalPruneFailed => 'Pruning the change journal failed.',
             self::WriteTimeout => 'The connection was closed because the client stopped reading.',
             self::IdleTimeout => 'The connection was closed after being idle too long.',
+            self::ReadTimeout => 'The connection was closed because a request took too long to arrive.',
             self::ServerStarted => 'The server process has started and is now accepting clients.',
             self::ServerAcceptFailed => 'Failed to accept incoming connection.',
             self::ServerAcceptRecovered => 'Accepting incoming connections recovered.',

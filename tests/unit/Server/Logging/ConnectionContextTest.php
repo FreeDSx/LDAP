@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Logging;
 
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
+use FreeDSx\Socket\Socket;
+use FreeDSx\Socket\SocketAddress;
 use PHPUnit\Framework\TestCase;
 
 final class ConnectionContextTest extends TestCase
@@ -58,5 +60,46 @@ final class ConnectionContextTest extends TestCase
                 remoteIp: '10.0.0.1',
             ))->toLogContext(),
         );
+    }
+
+    public function test_a_socket_gives_the_context_its_client_address(): void
+    {
+        self::assertSame(
+            [
+                'pid' => 4242,
+                'remote_ip' => '10.0.0.1',
+            ],
+            ConnectionContext::forSocket(
+                $this->socketFrom(SocketAddress::tryFromName('[::ffff:10.0.0.1]:40000')),
+                pid: 4242,
+            )->toLogContext(),
+        );
+    }
+
+    public function test_a_unix_socket_gives_the_context_no_client_address(): void
+    {
+        self::assertSame(
+            ['conn_id' => 7],
+            ConnectionContext::forSocket(
+                $this->socketFrom(SocketAddress::unix()),
+                connId: 7,
+            )->toLogContext(),
+        );
+    }
+
+    public function test_a_socket_without_a_known_peer_gives_the_context_no_client_address(): void
+    {
+        self::assertSame(
+            [],
+            ConnectionContext::forSocket($this->socketFrom(null))->toLogContext(),
+        );
+    }
+
+    private function socketFrom(?SocketAddress $address): Socket
+    {
+        $socket = $this->createMock(Socket::class);
+        $socket->method('getPeerAddress')->willReturn($address);
+
+        return $socket;
     }
 }

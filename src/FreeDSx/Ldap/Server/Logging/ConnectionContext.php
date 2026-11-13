@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Logging;
 
+use FreeDSx\Socket\Socket;
+
 /**
  * Per-connection context produced by a {@see ServerRunnerInterface} and merged into every event the connection emits.
  *
@@ -27,7 +29,22 @@ final readonly class ConnectionContext
     ) {}
 
     /**
-     * @return array<string, mixed>
+     * The context of the connection on a socket, with the client's address when it has one.
+     */
+    public static function forSocket(
+        Socket $socket,
+        ?int $pid = null,
+        ?int $connId = null,
+    ): self {
+        return new self(
+            pid: $pid,
+            connId: $connId,
+            remoteIp: $socket->getPeerAddress()?->getIp(),
+        );
+    }
+
+    /**
+     * @return array<string, int|string>
      */
     public function toLogContext(): array
     {

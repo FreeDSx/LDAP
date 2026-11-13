@@ -58,6 +58,7 @@ trait ServerConnectionScaffoldingTrait
                 maxSize: $networkConfig->getMaxRequestSize(),
                 maxAnonymousSize: $networkConfig->getMaxAnonymousRequestSize(),
                 maxElements: $networkConfig->getMaxRequestElements(),
+                readTimeout: $networkConfig->getRequestReadTimeout(),
             ),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,
