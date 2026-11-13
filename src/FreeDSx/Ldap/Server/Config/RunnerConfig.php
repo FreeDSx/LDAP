@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Config;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
-use FreeDSx\Ldap\Server\Utility\CpuCount;
+use FreeDSx\Ldap\Server\Resources\SystemResources;
 
 /**
  * The process model a server runs under.
@@ -105,7 +105,7 @@ final class RunnerConfig
     {
         return $this->resolvedWorkers ??= $this->workers > 0
             ? $this->workers
-            : (new CpuCount())->available();
+            : (new SystemResources())->cpuCount();
     }
 
     /**
