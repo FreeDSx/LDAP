@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Server\Configuration;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
+use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\ServerOptions;
 use RuntimeException;
@@ -24,6 +26,7 @@ use RuntimeException;
  * Reloads from a flag file: "allow-anonymous" enables anonymous bind, "deny-sn" withholds sn, and "invalid" fails.
  *
  * "deny-sn-parent-only" withholds sn in the process that built the reloader and fails in any process forked from it.
+ * "unstartable" enables anonymous bind alongside a manager password no bind could verify.
  */
 final readonly class FileFlagConfigReloader implements ConfigReloaderInterface
 {
@@ -45,7 +48,14 @@ final readonly class FileFlagConfigReloader implements ConfigReloaderInterface
         }
 
         fwrite(STDOUT, 'configuration reloaded...' . PHP_EOL);
-        $reloaded = (clone $current)->setAllowAnonymous($flag === 'allow-anonymous');
+        $reloaded = (clone $current)->setAllowAnonymous($flag === 'allow-anonymous' || $flag === 'unstartable');
+
+        if ($flag === 'unstartable') {
+            return $reloaded->setManager(new ManagerIdentity(
+                new Dn('cn=manager'),
+                '{PBKDF2-SHA512}10000$c2FsdA$aGFzaA',
+            ));
+        }
 
         if ($flag !== 'deny-sn' && $flag !== 'deny-sn-parent-only') {
             return $reloaded;

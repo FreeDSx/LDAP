@@ -14,15 +14,27 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
+use FreeDSx\Ldap\Server\Initialization\RequirementInterface;
 use PHPUnit\Framework\TestCase;
 
 final class ProxyListenerContributorTest extends TestCase
 {
+    private RequirementInterface $requirement;
+
     private ProxyListenerContributor $subject;
 
     protected function setUp(): void
     {
-        $this->subject = new ProxyListenerContributor();
+        $this->requirement = $this->createStub(RequirementInterface::class);
+        $this->subject = new ProxyListenerContributor([$this->requirement]);
+    }
+
+    public function test_it_contributes_the_requirements_it_was_given_and_no_advisories(): void
+    {
+        self::assertSame(
+            [[$this->requirement], []],
+            [$this->subject->requirements(), $this->subject->advisories()],
+        );
     }
 
     public function test_each_client_holds_its_socket_and_its_upstream_connection(): void

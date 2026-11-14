@@ -260,7 +260,8 @@ and everything else already configured while you change only the settings you ca
 * A StartTLS certificate change applies to new connections only
 
 **On failure:** if the reloader throws, the error is logged and the server keeps its current configuration. The bad
-reload is discarded rather than taking the server down.
+reload is discarded rather than taking the server down. A reloaded configuration the server would refuse to start with
+is refused the same way.
 
 ## Creating a Proxy Server
 

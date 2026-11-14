@@ -17,18 +17,21 @@ use Closure;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
-use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
-use FreeDSx\Ldap\Server\Config\NetworkConfig;
-use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
-use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Initialization\Advisory\HeldRequestSizeAdvisory;
+use FreeDSx\Ldap\Server\Initialization\Advisory\MemoryLimitAdvisory;
+use FreeDSx\Ldap\Server\Initialization\Advisory\NoMemoryLimitAdvisory;
+use FreeDSx\Ldap\Server\Initialization\Advisory\OpenFileLimitAdvisory;
+use FreeDSx\Ldap\Server\Initialization\Advisory\WorkerClampAdvisory;
+use FreeDSx\Ldap\Server\Initialization\AdvisoryInterface;
+use FreeDSx\Ldap\Server\Initialization\Requirement\RunnerExtensionsRequirement;
+use FreeDSx\Ldap\Server\Initialization\Requirement\SwooleClientCertificatesRequirement;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
-use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
@@ -43,8 +46,6 @@ use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\Child\ChildForker;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\Server\Resources\MemoryLimit;
-use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
 use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\ServerRunner\Pcntl\MetricsRelay;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
@@ -56,7 +57,6 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Registers the listener services shared by every server type: the socket, runner, reload, authorization, and metrics.
@@ -78,6 +78,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             ),
             ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
+            ServerInitialization::class => $this->makeServerInitialization(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
             SwooleTableMetricsRecorder::class => static fn(): SwooleTableMetricsRecorder => new SwooleTableMetricsRecorder(
                 SwooleTableMetricsRecorder::createTable(),
@@ -119,39 +120,10 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     private function makeServerRunner(Container $container): ServerRunnerInterface
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
-        $this->assertRunnerExtensionsAreLoaded($options);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
-        $heldRequestSize = $container->get(RequestBudget::class)->limitFor(
-            $options->getNetworkConfig()->getMaxHeldRequestSize(),
-        );
-        $this->recordNoMemoryLimit(
-            $options,
-            $container->get(SystemResources::class)->memoryLimit(),
-            $heldRequestSize,
-        );
-        $this->recordHeldRequestSize(
-            $options,
-            $heldRequestSize,
-        );
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
-            $this->assertClientCertificatesAreNotExpected($options);
             $workers = $this->resolveWorkerCount($container);
-            $this->recordWorkersClamped(
-                $options,
-                $workers,
-            );
-            // Only a worker serving many clients in one process holds every client's descriptors and memory.
-            $this->recordOpenFileLimit(
-                $options,
-                $container->get(SystemResources::class)->openFileLimit(),
-                $container->get(ListenerContributorInterface::class)->descriptorsPerClient(),
-            );
-            $this->recordMemoryLimit(
-                $options,
-                $container->get(SystemResources::class)->memoryLimit(),
-                $heldRequestSize,
-            );
             $workerFactory = new WorkerFactory(
                 configuration: $this->makeRunnerConfiguration($container),
                 socketServerFactory: $container->get(SocketServerFactory::class),
@@ -186,52 +158,74 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     private function makeRunnerConfiguration(Container $container): RunnerConfiguration
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
-        $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
+        $buildGeneration = $this->makeGenerationBuilder($container);
 
         return new RunnerConfiguration(
             $options,
-            $protocolFactoryProvider($options),
-            $protocolFactoryProvider,
+            $buildGeneration($options)->get(ServerProtocolFactoryInterface::class),
+            self::makeReloadedProtocolFactoryProvider($buildGeneration),
             $container->get(ListenerContributorInterface::class)->applyReload(...),
         );
     }
 
     /**
-     * The following features are not supported with Swoole:
-     *
-     *   * mTLS
-     *   * External SASL
-     *
-     * Swoole does not support capturing client certificates.
+     * The listener's requirements come first, since a runner this process cannot run leaves nothing else to check.
      */
-    private function assertClientCertificatesAreNotExpected(ServerListenerOptionsInterface $options): void
+    private function makeServerInitialization(Container $container): ServerInitialization
     {
-        if ($options->getNetworkConfig()->isSslValidateCert()) {
-            throw new RuntimeException(
-                'The Swoole runner cannot verify client certificates. Unset sslValidateCert or use the PCNTL runner.',
-            );
-        }
+        $options = $container->get(ServerListenerOptionsInterface::class);
+        $contributor = $container->get(ListenerContributorInterface::class);
 
-        if (in_array(ServerOptions::SASL_EXTERNAL, $options->getSaslMechanisms(), true)) {
-            throw new RuntimeException(
-                'The Swoole runner cannot support the EXTERNAL SASL mechanism. Remove it or use the PCNTL runner.',
-            );
-        }
+        return new ServerInitialization(
+            [
+                new RunnerExtensionsRequirement($options),
+                new SwooleClientCertificatesRequirement($options),
+                ...$contributor->requirements(),
+            ],
+            [
+                ...$this->makeListenerAdvisories($container),
+                ...$contributor->advisories(),
+            ],
+            $this->makeEventLogger($options),
+        );
     }
 
-    private function assertRunnerExtensionsAreLoaded(ServerListenerOptionsInterface $options): void
+    /**
+     * @return list<AdvisoryInterface>
+     */
+    private function makeListenerAdvisories(Container $container): array
     {
-        $isSwoole = $options->isRunnerMode(RunnerMode::Swoole);
+        $options = $container->get(ServerListenerOptionsInterface::class);
+        $network = $options->getNetworkConfig();
+        $resources = $container->get(SystemResources::class);
+        $contributor = $container->get(ListenerContributorInterface::class);
+        $heldRequestSize = $container->get(RequestBudget::class)->limitFor($network->getMaxHeldRequestSize());
 
-        if ($isSwoole && !extension_loaded('swoole')) {
-            throw new RuntimeException('The Swoole extension is required to use the Swoole runner.');
-        }
-
-        if (!$isSwoole && (!extension_loaded('pcntl') || !extension_loaded('posix'))) {
-            throw new RuntimeException(
-                'The pcntl and posix extensions are required to fork and manage child processes (not available on Windows).',
-            );
-        }
+        return [
+            new NoMemoryLimitAdvisory(
+                $network,
+                $resources->memoryLimit(),
+                $heldRequestSize,
+            ),
+            new HeldRequestSizeAdvisory(
+                $network,
+                $heldRequestSize,
+            ),
+            new WorkerClampAdvisory(
+                $options,
+                $contributor->supportsMultipleWorkers(),
+            ),
+            new OpenFileLimitAdvisory(
+                $options,
+                $resources->openFileLimit(),
+                $contributor->descriptorsPerClient(),
+            ),
+            new MemoryLimitAdvisory(
+                $options,
+                $resources->memoryLimit(),
+                $heldRequestSize,
+            ),
+        ];
     }
 
     /**
@@ -253,138 +247,6 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         return 1;
     }
 
-    private function recordWorkersClamped(
-        ServerListenerOptionsInterface $options,
-        int $workers,
-    ): void {
-        $requestedWorkers = $options->getRunnerConfig()->resolvedWorkers();
-        if ($requestedWorkers === $workers) {
-            return;
-        }
-
-        $this->makeEventLogger($options)->record(
-            ServerEvent::ConcurrencyLimited,
-            [
-                EventContext::REASON => ConcurrencyLimitReason::StorageNotShareable->value,
-                'requested_workers' => $requestedWorkers,
-            ],
-        );
-    }
-
-    private function recordOpenFileLimit(
-        ServerListenerOptionsInterface $options,
-        OpenFileLimit $openFileLimit,
-        int $descriptorsPerClient,
-    ): void {
-        $maxConnections = $options->getNetworkConfig()->getMaxConnections();
-        if (!$openFileLimit->isReachedBefore($maxConnections, $descriptorsPerClient)) {
-            return;
-        }
-
-        $this->makeEventLogger($options)->record(
-            ServerEvent::ConcurrencyLimited,
-            [
-                EventContext::REASON => ConcurrencyLimitReason::OpenFileLimit->value,
-                'open_file_limit' => $openFileLimit->getSoftLimit(),
-                'max_connections' => $maxConnections,
-                'descriptors_per_client' => $descriptorsPerClient,
-            ],
-        );
-    }
-
-    private function recordMemoryLimit(
-        ServerListenerOptionsInterface $options,
-        MemoryLimit $memoryLimit,
-        int $heldRequestSize,
-    ): void {
-        $maxConnections = $options->getNetworkConfig()->getMaxConnections();
-        if (!$memoryLimit->isReachedBefore($maxConnections, $heldRequestSize)) {
-            return;
-        }
-
-        $this->makeEventLogger($options)->record(
-            ServerEvent::ConcurrencyLimited,
-            [
-                EventContext::REASON => ConcurrencyLimitReason::MemoryLimit->value,
-                'memory_limit' => $memoryLimit->getBytes(),
-                'max_connections' => $maxConnections,
-                'max_held_request_size' => $heldRequestSize,
-            ],
-        );
-    }
-
-    private function recordNoMemoryLimit(
-        ServerListenerOptionsInterface $options,
-        MemoryLimit $memoryLimit,
-        int $heldRequestSize,
-    ): void {
-        if ($options->getNetworkConfig()->getMaxHeldRequestSize() !== null || $memoryLimit->getBytes() !== null) {
-            return;
-        }
-
-        $this->makeEventLogger($options)->record(
-            ServerEvent::ConcurrencyLimited,
-            [
-                EventContext::REASON => ConcurrencyLimitReason::NoMemoryLimit->value,
-                'max_held_request_size' => $heldRequestSize,
-            ],
-        );
-    }
-
-    private function recordHeldRequestSize(
-        ServerListenerOptionsInterface $options,
-        int $heldRequestSize,
-    ): void {
-        $network = $options->getNetworkConfig();
-        if ($heldRequestSize === 0 || $this->largestHeld($network) <= $heldRequestSize) {
-            return;
-        }
-
-        $this->makeEventLogger($options)->record(
-            ServerEvent::ConcurrencyLimited,
-            [
-                EventContext::REASON => ConcurrencyLimitReason::HeldRequestSize->value,
-                'max_held_request_size' => $heldRequestSize,
-                'max_request_size' => $network->getMaxRequestSize(),
-            ],
-        );
-    }
-
-    /**
-     * What the largest request allowed holds once decoded, without bound when requests have no size limit.
-     */
-    private function largestHeld(NetworkConfig $network): int
-    {
-        $maxRequestSize = $network->getMaxRequestSize();
-        if ($maxRequestSize === 0) {
-            return PHP_INT_MAX;
-        }
-
-        return HeldRequests::estimate(
-            $maxRequestSize,
-            $this->mostElementsOf($network),
-        );
-    }
-
-    /**
-     * The most elements the largest request allowed can carry, at most one for every two of its bytes.
-     */
-    private function mostElementsOf(NetworkConfig $network): int
-    {
-        $mostBySize = intdiv(
-            $network->getMaxRequestSize(),
-            2,
-        );
-        $maxElements = $network->getMaxRequestElements();
-
-        return $maxElements === 0
-            ? $mostBySize
-            : min(
-                $maxElements,
-                $mostBySize,
-            );
-    }
-
     private function makeEventLogger(ServerListenerOptionsInterface $options): EventLogger
     {
         return new EventLogger(
@@ -394,18 +256,37 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     }
 
     /**
-     * Builds a protocol factory from a (possibly reloaded) set of options via a freshly assembled container.
+     * Assembles a fresh container from (possibly reloaded) options, carrying over the services whose state survives.
      *
-     * @return Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface
+     * @return Closure(ServerListenerOptionsInterface): Container
      */
-    private function makeProtocolFactoryProvider(Container $container): Closure
+    private function makeGenerationBuilder(Container $container): Closure
     {
         $rebuild = $container->get(ContainerReloadFactory::class);
         $shared = $this->reloadSharedInstances($container);
 
-        return static fn(ServerListenerOptionsInterface $options): ServerProtocolFactoryInterface => $rebuild
-            ->rebuild($options, $shared)
-            ->get(ServerProtocolFactoryInterface::class);
+        return static fn(ServerListenerOptionsInterface $options): Container => $rebuild->rebuild(
+            $options,
+            $shared,
+        );
+    }
+
+    /**
+     * Builds a protocol factory from reloaded options, refusing options the server would refuse to start with.
+     *
+     * @param Closure(ServerListenerOptionsInterface): Container $buildGeneration
+     * @return Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface
+     */
+    private static function makeReloadedProtocolFactoryProvider(Closure $buildGeneration): Closure
+    {
+        return static function (
+            ServerListenerOptionsInterface $options,
+        ) use ($buildGeneration): ServerProtocolFactoryInterface {
+            $generation = $buildGeneration($options);
+            $generation->get(ServerInitialization::class)->reload();
+
+            return $generation->get(ServerProtocolFactoryInterface::class);
+        };
     }
 
     /**

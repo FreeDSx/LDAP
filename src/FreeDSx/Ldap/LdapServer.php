@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedStream;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use Generator;
@@ -69,12 +70,21 @@ class LdapServer
      * Runs the LDAP server. Binds the socket and starts accepting client connections.
      *
      * @throws ConnectionException
+     * @throws RuntimeException when the server cannot run with its configuration.
      */
     public function run(): void
     {
-        $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
+        $customRunner = $this->options->getServerRunner();
 
-        $runner->run();
+        // The server initializes only for the runners it builds itself.
+        if ($customRunner !== null) {
+            $customRunner->run();
+
+            return;
+        }
+
+        $this->container->get(ServerInitialization::class)->start();
+        $this->container->get(ServerRunnerInterface::class)->run();
     }
 
     /**

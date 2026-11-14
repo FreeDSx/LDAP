@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 
@@ -38,9 +40,11 @@ final class LdapProxyServer
      * Runs the proxy server. Binds the socket and starts accepting client connections.
      *
      * @throws ConnectionException
+     * @throws RuntimeException when the proxy cannot run with its configuration.
      */
     public function run(): void
     {
+        $this->container->get(ServerInitialization::class)->start();
         $this->container->get(ServerRunnerInterface::class)->run();
     }
 

@@ -75,4 +75,19 @@ final class LdapServerReloadTest extends ServerTestCase
             $response->getResultCode(),
         );
     }
+
+    public function testSighupReloadRefusesAConfigurationTheServerWouldRefuseToStartWith(): void
+    {
+        file_put_contents(
+            $this->reloadFlagFile,
+            'unstartable',
+        );
+
+        $this->sendServerSignal(SIGHUP);
+        $this->waitForServerOutput('configuration reloaded...');
+
+        $this->expectException(BindException::class);
+
+        $this->buildClient('tcp')->send(Operations::bindAnonymously());
+    }
 }
