@@ -424,6 +424,13 @@ At the default, one request can carry about 100,000 attribute values. Raise it a
 The most memory, in bytes, the requests of one process may hold at once. Each process has its own. A request with no room
 is answered with `BUSY`, and one that could never fit is refused. Set `0` for no limit.
 
+One identity may hold a quarter of it, but never less than what the largest request allowed holds:
+
+* The identity is the one the connection is bound as, however its DN is spelled.
+* Every connection that has not bound, bound anonymously or failed its last bind counts as one identity. Anonymous
+  clients can make each other wait.
+* With no request size limit, one identity may hold all of it.
+
 ```php
 $options->getNetworkConfig()->setMaxHeldRequestSize(134_217_728);
 ```
@@ -557,8 +564,8 @@ Configurable:
   an extended operation's value.
 * **Time to arrive:** 30 seconds ([setRequestReadTimeout](#setrequestreadtimeout)). A slower request ends the
   connection.
-* **Memory held at once:** half of `memory_limit` per process ([setMaxHeldRequestSize](#setmaxheldrequestsize)). A
-  request with no room is refused with `BUSY`.
+* **Memory held at once:** half of `memory_limit` per process ([setMaxHeldRequestSize](#setmaxheldrequestsize)), a
+  quarter of it per identity. A request with no room is refused with `BUSY`.
 
 Fixed:
 

@@ -20,9 +20,11 @@ use FreeDSx\Socket\Exception\ConnectionException;
 use WeakMap;
 
 use function ceil;
+use function intdiv;
+use function min;
 
 /**
- * The request one connection is receiving and the requests it decoded, held against the request budget of its process.
+ * The requests one connection is receiving and decoded, held against its process budget and its identity's share.
  *
  * @internal
  *
@@ -75,6 +77,7 @@ class HeldRequests
     public function __construct(
         private readonly RequestBudget $budget,
         private readonly int $limit,
+        private readonly IdentityShare $share,
     ) {
         $this->decoded = new WeakMap();
     }
@@ -90,6 +93,26 @@ class HeldRequests
     }
 
     /**
+     * What the largest request allowed holds once decoded, without bound when requests have no size limit.
+     */
+    public static function largestHeld(
+        int $maxRequestSize,
+        int $maxRequestElements,
+    ): int {
+        if ($maxRequestSize === 0) {
+            return PHP_INT_MAX;
+        }
+
+        return self::estimate(
+            $maxRequestSize,
+            self::mostElements(
+                $maxRequestSize,
+                $maxRequestElements,
+            ),
+        );
+    }
+
+    /**
      * Whether a request declaring the bytes could ever be admitted.
      */
     public function couldEverAdmit(int $pduLength): bool
@@ -100,7 +123,7 @@ class HeldRequests
         $cost = self::admissionCost($pduLength);
 
         return $cost <= self::ALWAYS_HELD_BYTES
-            || $cost <= $this->limit;
+            || $cost <= $this->share->current()->limit;
     }
 
     /**
@@ -120,7 +143,7 @@ class HeldRequests
     }
 
     /**
-     * Reserves for the declared bytes when the process has room for them now, or returns false without waiting.
+     * Reserves for the declared bytes when the process and the share have room now, or returns false without waiting.
      *
      * @throws ConnectionException when the connection has closed.
      */
@@ -132,11 +155,15 @@ class HeldRequests
         if ($this->limit === 0 || $this->arriving !== null) {
             return true;
         }
+        $share = $this->share->current();
         $cost = self::admissionCost($pduLength);
-        if ($cost > self::ALWAYS_HELD_BYTES && !$this->budget->fits($cost, $this->limit)) {
+        if ($cost > self::ALWAYS_HELD_BYTES && !$this->budget->fits($cost, $this->limit, $share)) {
             return false;
         }
-        $this->arriving = $this->budget->reserveAnyway($cost);
+        $this->arriving = $this->budget->reserveAnyway(
+            $cost,
+            $share,
+        );
 
         return true;
     }
@@ -159,12 +186,17 @@ class HeldRequests
     }
 
     /**
-     * Whether the process holds less than it may and requests may still be read ahead of the one in progress.
+     * Whether the process and the share hold less than they may and requests may still be read ahead.
      */
     public function hasRoomToReadAhead(): bool
     {
-        return $this->limit === 0
-            || $this->budget->held() < $this->limit;
+        if ($this->limit === 0) {
+            return true;
+        }
+        $share = $this->share->current();
+
+        return $this->budget->held() < $this->limit
+            && $this->budget->heldBy($share) < $share->limit;
     }
 
     /**
@@ -179,15 +211,20 @@ class HeldRequests
             return true;
         }
 
+        $share = $this->share->current();
         $estimate = self::estimate(
             $bytes,
             $elements,
         );
         $reservation = $estimate <= self::ALWAYS_HELD_BYTES
-            ? $this->budget->reserveAnyway($estimate)
+            ? $this->budget->reserveAnyway(
+                $estimate,
+                $share,
+            )
             : $this->budget->reserve(
                 $estimate,
                 $this->limit,
+                $share,
             );
         if ($reservation === null) {
             return false;
@@ -198,7 +235,7 @@ class HeldRequests
     }
 
     /**
-     * Refuses a request there was no room to hold, as one that could never fit when it is larger than the limit.
+     * Refuses a request there was no room to hold, as one that could never fit when it is larger than the share.
      *
      * @throws RequestRefusedException
      */
@@ -208,16 +245,27 @@ class HeldRequests
         int $bytes,
         int $elements,
     ): never {
+        $share = $this->share->current();
         $estimate = self::estimate(
             $bytes,
             $elements,
         );
-        if ($estimate > $this->limit) {
+
+        // The share is never less than the largest request allowed, unless the whole limit is.
+        if ($estimate > $share->limit) {
             throw new RequestRefusedException(
                 $messageId,
                 $operationTag,
                 'The request is larger than the server can hold.',
                 resultCode: ResultCode::ADMIN_LIMIT_EXCEEDED,
+            );
+        }
+        if ($this->budget->heldBy($share) + $estimate > $share->limit) {
+            throw new RequestRefusedException(
+                $messageId,
+                $operationTag,
+                'The server holds as much as it allows one identity to.',
+                resultCode: ResultCode::BUSY,
             );
         }
 
@@ -238,5 +286,25 @@ class HeldRequests
             $pduLength,
             self::MIN_ELEMENTS,
         );
+    }
+
+    /**
+     * The most elements the largest request allowed can carry, at most one for every two of its bytes.
+     */
+    private static function mostElements(
+        int $maxRequestSize,
+        int $maxRequestElements,
+    ): int {
+        $mostBySize = intdiv(
+            $maxRequestSize,
+            2,
+        );
+
+        return $maxRequestElements === 0
+            ? $mostBySize
+            : min(
+                $maxRequestElements,
+                $mostBySize,
+            );
     }
 }

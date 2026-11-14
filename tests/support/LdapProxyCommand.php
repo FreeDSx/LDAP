@@ -108,6 +108,20 @@ final class LdapProxyCommand extends Command
                 '',
             )
             ->addOption(
+                'max-request-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Bytes one request may take (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
+                'max-request-elements',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'ASN.1 elements one request may hold (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'entry-padding',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -198,6 +212,14 @@ final class LdapProxyCommand extends Command
         $maxHeldRequestSize = $this->getStringOption($input, 'max-held-request-size');
         if ($maxHeldRequestSize !== '') {
             $network->setMaxHeldRequestSize((int) $maxHeldRequestSize);
+        }
+        $maxRequestSize = $this->getStringOption($input, 'max-request-size');
+        if ($maxRequestSize !== '') {
+            $network->setMaxRequestSize((int) $maxRequestSize);
+        }
+        $maxRequestElements = $this->getStringOption($input, 'max-request-elements');
+        if ($maxRequestElements !== '') {
+            $network->setMaxRequestElements((int) $maxRequestElements);
         }
 
         return (new ProxyServerOptions($network))

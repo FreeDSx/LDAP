@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Queue\Budget;
 
 /**
- * Bytes counted against a request budget until the reservation is freed.
+ * Bytes counted against a request budget and the share they were taken under, until the reservation is freed.
  *
  * @internal
  *
@@ -25,10 +25,14 @@ class BudgetReservation
     public function __construct(
         private readonly RequestBudget $budget,
         private readonly int $bytes,
+        private readonly string $shareKey,
     ) {}
 
     public function __destruct()
     {
-        $this->budget->release($this->bytes);
+        $this->budget->release(
+            $this->bytes,
+            $this->shareKey,
+        );
     }
 }

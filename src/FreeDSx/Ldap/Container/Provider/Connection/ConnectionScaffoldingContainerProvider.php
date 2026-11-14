@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
@@ -51,6 +52,7 @@ class ConnectionScaffoldingContainerProvider implements ContainerProviderInterfa
         return [
             ServerAuthorization::class => $this->makeServerAuthorization(...),
             RequestLimits::class => $this->makeRequestLimits(...),
+            IdentityShare::class => $this->makeIdentityShare(...),
             RequestArrival::class => $this->makeRequestArrival(...),
             EventLogger::class => $this->makeEventLogger(...),
             DecodeFailureResponder::class => $this->makeDecodeFailureResponder(...),
@@ -83,20 +85,43 @@ class ConnectionScaffoldingContainerProvider implements ContainerProviderInterfa
         );
     }
 
+    private function makeIdentityShare(Container $container): IdentityShare
+    {
+        $networkConfig = $container->get(ServerListenerOptionsInterface::class)->getNetworkConfig();
+
+        return new IdentityShare(
+            $container->get(ServerAuthorization::class),
+            IdentityShare::limitOf(
+                $this->heldRequestLimit($container),
+                HeldRequests::largestHeld(
+                    $networkConfig->getMaxRequestSize(),
+                    $networkConfig->getMaxRequestElements(),
+                ),
+            ),
+        );
+    }
+
     private function makeRequestArrival(Container $container): RequestArrival
     {
-        $requestBudget = $container->get(RequestBudget::class);
-
         return new RequestArrival(
             $container->get(RequestLimits::class),
             new HeldRequests(
-                $requestBudget,
-                $requestBudget->limitFor(
-                    $container->get(ServerListenerOptionsInterface::class)
-                        ->getNetworkConfig()
-                        ->getMaxHeldRequestSize(),
-                ),
+                $container->get(RequestBudget::class),
+                $this->heldRequestLimit($container),
+                $container->get(IdentityShare::class),
             ),
+        );
+    }
+
+    /**
+     * The bytes the requests of this process may hold at once, or 0 for no limit.
+     */
+    private function heldRequestLimit(Container $container): int
+    {
+        return $container->get(RequestBudget::class)->limitFor(
+            $container->get(ServerListenerOptionsInterface::class)
+                ->getNetworkConfig()
+                ->getMaxHeldRequestSize(),
         );
     }
 

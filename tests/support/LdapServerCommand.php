@@ -164,6 +164,20 @@ final class LdapServerCommand extends Command
                 '',
             )
             ->addOption(
+                'max-request-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Bytes one request may take (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
+                'max-request-elements',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'ASN.1 elements one request may hold (0 = no limit); the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'shutdown-timeout',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -414,6 +428,14 @@ final class LdapServerCommand extends Command
         $maxHeldRequestSize = $this->getStringOption($input, 'max-held-request-size');
         if ($maxHeldRequestSize !== '') {
             $network->setMaxHeldRequestSize((int) $maxHeldRequestSize);
+        }
+        $maxRequestSize = $this->getStringOption($input, 'max-request-size');
+        if ($maxRequestSize !== '') {
+            $network->setMaxRequestSize((int) $maxRequestSize);
+        }
+        $maxRequestElements = $this->getStringOption($input, 'max-request-elements');
+        if ($maxRequestElements !== '') {
+            $network->setMaxRequestElements((int) $maxRequestElements);
         }
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
