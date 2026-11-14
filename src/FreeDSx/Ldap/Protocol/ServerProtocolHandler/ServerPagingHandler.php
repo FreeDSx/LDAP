@@ -23,23 +23,15 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
+use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\Paging\CollectedPage;
 use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
-use FreeDSx\Ldap\Server\Paging\PagingRequestFingerprint;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\Paging\PagingSession;
-use FreeDSx\Ldap\Server\Paging\PagingSessions;
+use FreeDSx\Ldap\Server\Paging\PagingSessionTracker;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
-use FreeDSx\Ldap\Server\Logging\EventContext;
-use FreeDSx\Ldap\Server\Logging\EventLogger;
-use FreeDSx\Ldap\Server\Logging\ServerEvent;
-use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use Throwable;
 
 /**
  * Handles paged searches, resuming each from the session it left unfinished on the connection.
@@ -49,17 +41,12 @@ use Throwable;
 class ServerPagingHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
-    use MatchedDnAccessFilterTrait;
 
     public function __construct(
-        private readonly ReadBackendInterface $backend,
-        private readonly AccessControlInterface $accessControl,
-        private readonly PagingSessions $pagingSessions,
+        private readonly MatchedDnFilter $matchedDnFilter,
+        private readonly PagingSessionTracker $sessions,
         private readonly Schema $schema,
         private readonly PageFiller $pageFiller,
-        private readonly PagingRequestFingerprint $fingerprint = new PagingRequestFingerprint(),
-        private readonly SearchLimits $limits = new SearchLimits(),
-        private readonly ?EventLogger $eventLogger = null,
     ) {}
 
     /**
@@ -79,7 +66,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             $message,
             $sortResponse,
         );
-        $session = $this->findSession($pagingRequest);
+        $session = $this->sessions->find($pagingRequest);
         $searchRequest = $pagingRequest->getSearchRequest();
 
         $response = null;
@@ -111,11 +98,9 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             $entriesReturned = $response->getEntries()->count();
         } catch (OperationException $e) {
             $failure = $e;
-            $matchedDn = $this->filterMatchedDn(
+            $matchedDn = $this->matchedDnFilter->filter(
                 $e->getMatchedDn(),
                 $token,
-                $this->backend,
-                $this->accessControl,
             );
             $searchResult = SearchResult::makeErrorResult(
                 $e->getCode(),
@@ -144,7 +129,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $isClosed = ($response && $response->isComplete())
             || $searchResult->getState()->resultCode !== ResultCode::SUCCESS;
         if ($session !== null && $isClosed) {
-            $this->pagingSessions->remove($session);
+            $this->sessions->end($session);
         }
 
         $outcome = $failure !== null
@@ -222,12 +207,10 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         PagingSession $session,
         TokenInterface $token,
     ): PagingResponse {
-        if ($this->fingerprint->of($pagingRequest) !== $session->fingerprint()) {
-            throw new OperationException(
-                'The search request and controls must be identical between paging requests.',
-                ResultCode::OPERATIONS_ERROR,
-            );
-        }
+        $this->sessions->assertSameSearch(
+            $pagingRequest,
+            $session,
+        );
 
         if ($pagingRequest->isAbandonRequest()) {
             return PagingResponse::makeFinal(new Entries());
@@ -267,62 +250,13 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             return PagingResponse::makeFinal($entries);
         }
 
-        $cookie = $this->generateCookie();
-        $this->keepSession(
-            $pagingRequest,
-            $session,
-            $cookie,
-            $collected->cursor,
-        );
-
         return PagingResponse::make(
             $entries,
-            $cookie,
-        );
-    }
-
-    /**
-     * Keeps the search resumable from the cursor under a new cookie, starting a session after its first page.
-     *
-     * @throws ProtocolException
-     */
-    private function keepSession(
-        PagingRequest $pagingRequest,
-        ?PagingSession $session,
-        string $cookie,
-        PageCursor $cursor,
-    ): void {
-        if ($session !== null) {
-            $session->advance(
-                $cookie,
-                $cursor,
-            );
-
-            return;
-        }
-
-        $this->evictOldestSessionAtLimit();
-        $this->pagingSessions->add(new PagingSession(
-            $this->fingerprint->of($pagingRequest),
-            $cookie,
-            $cursor,
-        ));
-    }
-
-    /**
-     * Unfinished sessions would otherwise accumulate for the life of the connection.
-     */
-    private function evictOldestSessionAtLimit(): void
-    {
-        $limit = $this->limits->maxPagingSessions() ?? 0;
-
-        if (!$this->pagingSessions->evictOldestAtLimit($limit)) {
-            return;
-        }
-
-        $this->eventLogger?->record(
-            ServerEvent::PagingSessionEvicted,
-            [EventContext::LIMIT => $limit],
+            $this->sessions->keep(
+                $pagingRequest,
+                $session,
+                $collected->cursor,
+            ),
         );
     }
 
@@ -341,39 +275,5 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 $sortResponse,
             ),
         );
-    }
-
-    /**
-     * The session a continuation resumes, or null for a search that is just starting.
-     *
-     * @throws OperationException
-     */
-    private function findSession(PagingRequest $pagingRequest): ?PagingSession
-    {
-        if ($pagingRequest->isPagingStart()) {
-            return null;
-        }
-
-        try {
-            return $this->pagingSessions->findByNextCookie($pagingRequest->getCookie());
-        } catch (ProtocolException $e) {
-            // An aged-out session leaves no record, so a resumed one and an invented one answer alike.
-            throw new OperationException(
-                $e->getMessage(),
-                ResultCode::UNWILLING_TO_PERFORM,
-            );
-        }
-    }
-
-    private function generateCookie(): string
-    {
-        try {
-            return random_bytes(16);
-        } catch (Throwable) {
-            throw new OperationException(
-                'Internal server error.',
-                ResultCode::OPERATIONS_ERROR,
-            );
-        }
     }
 }

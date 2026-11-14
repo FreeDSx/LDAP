@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
+use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\AccessControl\Read\UnrestrictedReadScope;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
@@ -56,6 +57,7 @@ use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestFingerprint;
 use FreeDSx\Ldap\Server\Paging\PagingSession;
 use FreeDSx\Ldap\Server\Paging\PagingSessions;
+use FreeDSx\Ldap\Server\Paging\PagingSessionTracker;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
@@ -1400,9 +1402,14 @@ class ServerPagingHandlerTest extends TestCase
         $backend ??= $this->mockBackend;
 
         return new ServerPagingHandler(
-            backend: $backend,
-            accessControl: $accessControl,
-            pagingSessions: $this->pagingSessions,
+            matchedDnFilter: new MatchedDnFilter(
+                $backend,
+                $accessControl,
+            ),
+            sessions: new PagingSessionTracker(
+                $this->pagingSessions,
+                $limits->maxPagingSessions() ?? 0,
+            ),
             schema: $this->schema,
             pageFiller: new PageFiller(
                 $backend,
@@ -1420,7 +1427,6 @@ class ServerPagingHandlerTest extends TestCase
                 $this->schema,
                 $limits,
             ),
-            limits: $limits,
         );
     }
 

@@ -19,10 +19,8 @@ use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler\MatchedDnAccessFilterTrait;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -41,12 +39,10 @@ use Throwable;
 final readonly class ResponseWriterMiddleware implements MiddlewareInterface
 {
     use FailureAnswerTrait;
-    use MatchedDnAccessFilterTrait;
 
     public function __construct(
         private ResponseWriter $writer,
-        private ReadBackendInterface $backend,
-        private AccessControlInterface $accessControl,
+        private MatchedDnFilter $matchedDnFilter,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
@@ -86,14 +82,12 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
                 $context->message,
                 $exception->getCode(),
                 $exception->getMessage(),
-                $this->filterMatchedDn(
+                $this->matchedDnFilter->filter(
                     self::asProvided(
                         $exception->getMatchedDn(),
                         $context->message->getRequest(),
                     ),
                     $context->tokenOrFail(),
-                    $this->backend,
-                    $this->accessControl,
                 ),
                 [],
                 ...$exception->controls()->toArray(),

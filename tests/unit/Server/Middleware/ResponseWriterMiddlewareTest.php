@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -102,8 +103,10 @@ final class ResponseWriterMiddlewareTest extends TestCase
                 ),
                 new OutOfSequenceResponder($this->mockQueue),
             ),
-            $this->mockBackend,
-            $this->mockAccessControl,
+            new MatchedDnFilter(
+                $this->mockBackend,
+                $this->mockAccessControl,
+            ),
         );
     }
 

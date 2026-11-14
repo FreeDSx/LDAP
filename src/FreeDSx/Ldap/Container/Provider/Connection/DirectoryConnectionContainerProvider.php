@@ -45,6 +45,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
@@ -380,8 +381,7 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
     {
         return new ResponseWriterMiddleware(
             $container->get(ResponseWriter::class),
-            $container->get(ReadBackendInterface::class),
-            $container->get(AccessControlInterface::class),
+            $container->get(MatchedDnFilter::class),
         );
     }
 
