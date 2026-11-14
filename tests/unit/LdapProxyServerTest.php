@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapProxyServer;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -25,6 +26,8 @@ use PHPUnit\Framework\TestCase;
 class LdapProxyServerTest extends TestCase
 {
     private ProxyOptions $options;
+
+    private ServerInitialization&MockObject $initialization;
 
     private ServerRunnerInterface&MockObject $mockServerRunner;
 
@@ -36,12 +39,16 @@ class LdapProxyServerTest extends TestCase
             new ProxyServerOptions(),
             new ClientOptions(['localhost']),
         );
+        $this->initialization = $this->createMock(ServerInitialization::class);
         $this->mockServerRunner = $this->createMock(ServerRunnerInterface::class);
         $this->subject = new LdapProxyServer(
             $this->options,
             Container::forProxy(
                 $this->options,
-                [ServerRunnerInterface::class => $this->mockServerRunner],
+                [
+                    ServerInitialization::class => $this->initialization,
+                    ServerRunnerInterface::class => $this->mockServerRunner,
+                ],
             ),
         );
     }
@@ -61,5 +68,29 @@ class LdapProxyServerTest extends TestCase
             ->method('run');
 
         $this->subject->run();
+    }
+
+    public function test_running_initializes_the_proxy_before_its_runner_starts(): void
+    {
+        $calls = [];
+        $this->initialization
+            ->expects(self::once())
+            ->method('start')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'start';
+            });
+        $this->mockServerRunner
+            ->expects(self::once())
+            ->method('run')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'run';
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            ['start', 'run'],
+            $calls,
+        );
     }
 }

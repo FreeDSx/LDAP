@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Server\AccessControl\ReloadableAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
+use FreeDSx\Ldap\Server\Initialization\AdvisoryInterface;
+use FreeDSx\Ldap\Server\Initialization\RequirementInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -31,6 +33,8 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
     /**
      * @param ResettableInterface $resettable Dropped per fork, so no child keeps a connection opened before it.
      * @param array<class-string, object> $reloadInstances
+     * @param list<RequirementInterface> $requirements
+     * @param list<AdvisoryInterface> $advisories
      */
     public function __construct(
         private ResettableInterface $resettable,
@@ -38,6 +42,8 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
         private StorageConfigInterface $storageConfig,
         private ReloadableAccessControl $accessControl,
         private AclRuleNames $aclRuleNames,
+        private array $requirements,
+        private array $advisories,
     ) {}
 
     public function forkResettable(): ResettableInterface
@@ -69,5 +75,15 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
         $this->accessControl->replace(new RuleBasedAccessControl(
             $this->aclRuleNames->canonicalize($reloaded->getAclRules()),
         ));
+    }
+
+    public function requirements(): array
+    {
+        return $this->requirements;
+    }
+
+    public function advisories(): array
+    {
+        return $this->advisories;
     }
 }

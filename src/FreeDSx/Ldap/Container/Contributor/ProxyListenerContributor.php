@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Initialization\RequirementInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
@@ -22,8 +23,13 @@ use FreeDSx\Ldap\ServerListenerOptionsInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class ProxyListenerContributor implements ListenerContributorInterface
+final readonly class ProxyListenerContributor implements ListenerContributorInterface
 {
+    /**
+     * @param list<RequirementInterface> $requirements
+     */
+    public function __construct(private array $requirements) {}
+
     public function forkResettable(): ResettableInterface
     {
         return new NonResettable();
@@ -51,4 +57,14 @@ final class ProxyListenerContributor implements ListenerContributorInterface
     }
 
     public function applyReload(ServerListenerOptionsInterface $reloaded): void {}
+
+    public function requirements(): array
+    {
+        return $this->requirements;
+    }
+
+    public function advisories(): array
+    {
+        return [];
+    }
 }

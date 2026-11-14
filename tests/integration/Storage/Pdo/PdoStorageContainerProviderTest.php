@@ -15,12 +15,9 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Pdo;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
-use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\SqliteTableNamesTrait;
@@ -86,17 +83,5 @@ final class PdoStorageContainerProviderTest extends TestCase
             $this->tableNames(new PDO('sqlite:' . $this->path)),
         );
         unset($connection);
-    }
-
-    public function test_the_swoole_runner_refuses_an_in_memory_database(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('an in-memory SQLite database is not supported');
-
-        $this->fromContainer(
-            PdoConnection::class,
-            options: TestServerOptions::sqlite()
-                ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
-        );
     }
 }

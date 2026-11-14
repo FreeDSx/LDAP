@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -139,18 +140,67 @@ class LdapServerTest extends TestCase
         $this->subject->schemaDdl();
     }
 
-    /**
-     * Rejected while the runner is assembled, which is before it binds anything.
-     */
+    public function test_running_initializes_the_server_before_its_runner_starts(): void
+    {
+        $initialization = $this->createMock(ServerInitialization::class);
+        $runner = $this->createMock(ServerRunnerInterface::class);
+        $calls = [];
+        $initialization
+            ->expects(self::once())
+            ->method('start')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'start';
+            });
+        $runner
+            ->expects(self::once())
+            ->method('run')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'run';
+            });
+        $options = TestServerOptions::defaults();
+
+        (new LdapServer(
+            $options,
+            Container::forServer(
+                $options,
+                [
+                    ServerInitialization::class => $initialization,
+                    ServerRunnerInterface::class => $runner,
+                ],
+            ),
+        ))->run();
+
+        self::assertSame(
+            ['start', 'run'],
+            $calls,
+        );
+    }
+
+    public function test_a_custom_runner_runs_without_initializing_the_server(): void
+    {
+        $initialization = $this->createMock(ServerInitialization::class);
+        $initialization
+            ->expects(self::never())
+            ->method('start');
+        $this->mockServerRunner
+            ->expects(self::once())
+            ->method('run');
+
+        (new LdapServer(
+            $this->options,
+            Container::forServer(
+                $this->options,
+                [ServerInitialization::class => $initialization],
+            ),
+        ))->run();
+    }
+
     #[DataProvider('nonPdoReplicaStorageDataProvider')]
-    public function test_building_the_runner_throws_for_a_replica_on_non_pdo_storage(
+    public function test_initialization_refuses_a_replica_on_non_pdo_storage(
         StorageConfigInterface $storageConfig,
         RunnerMode $runner,
     ): void {
-        if ($runner === RunnerMode::Swoole) {
-            $this->requireSwoole();
-        }
-
+        $this->requireRunnerExtensions($runner);
         $options = (new ServerOptions(
             $storageConfig,
             networkConfig: NetworkConfig::withPort(33389),
@@ -159,54 +209,25 @@ class LdapServerTest extends TestCase
             ->setRunnerConfig(new RunnerConfig($runner));
 
         $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('A read-only replica requires PDO storage');
 
-        Container::forServer($options)->get(ServerRunnerInterface::class);
+        Container::forServer($options)->get(ServerInitialization::class)->start();
     }
 
-    public function test_run_does_not_throw_for_a_replica_on_pdo_storage(): void
-    {
-        $this->options
-            ->setReplicationConfig(ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())))
-            ->setStorageConfig(PdoConfig::forSqlite(':memory:'));
-
-        $this->mockServerRunner
-            ->expects(self::once())
-            ->method('run');
-
-        $this->subject->run();
-    }
-
-    /**
-     * Swoole shares one process, so storage that a fork would not carry is sound there.
-     */
-    public function test_run_does_not_throw_for_a_non_replica_on_unshared_storage_under_swoole(): void
-    {
-        $this->options
-            ->setStorageConfig(new InMemoryStorageConfig())
-            ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole));
-
-        $this->mockServerRunner
-            ->expects(self::once())
-            ->method('run');
-
-        $this->subject->run();
-    }
-
-    /**
-     * A forking runner gives each connection its own copy, so a write would answer success and then be lost.
-     */
     #[DataProvider('unsharedStorageDataProvider')]
-    public function test_building_the_runner_throws_for_unshared_storage_under_a_forking_runner(
+    public function test_initialization_refuses_unshared_storage_under_a_forking_runner(
         StorageConfigInterface $storageConfig,
     ): void {
+        $this->requireRunnerExtensions(RunnerMode::Pcntl);
         $options = (new ServerOptions(
             $storageConfig,
             networkConfig: NetworkConfig::withPort(33389),
         ))->setRunnerConfig(new RunnerConfig(RunnerMode::Pcntl));
 
         $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The Pcntl runner forks per connection');
 
-        Container::forServer($options)->get(ServerRunnerInterface::class);
+        Container::forServer($options)->get(ServerInitialization::class)->start();
     }
 
     /**
@@ -639,5 +660,17 @@ class LdapServerTest extends TestCase
     private function storage(): ReadEntryInterface
     {
         return $this->container->get(ReadEntryInterface::class);
+    }
+
+    private function requireRunnerExtensions(RunnerMode $runner): void
+    {
+        if ($runner === RunnerMode::Swoole) {
+            $this->requireSwoole();
+
+            return;
+        }
+
+        $this->requirePcntl();
+        $this->requirePosix();
     }
 }

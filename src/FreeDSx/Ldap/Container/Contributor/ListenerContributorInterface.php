@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Initialization\AdvisoryInterface;
+use FreeDSx\Ldap\Server\Initialization\RequirementInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
@@ -50,4 +52,18 @@ interface ListenerContributorInterface
      * Applies the parts of a reloaded configuration that connections already open must follow too.
      */
     public function applyReload(ServerListenerOptionsInterface $reloaded): void;
+
+    /**
+     * What this server type's configuration must meet for the server to start with it or adopt it on a reload.
+     *
+     * @return list<RequirementInterface>
+     */
+    public function requirements(): array;
+
+    /**
+     * What this server type should warn about its configuration when the server starts.
+     *
+     * @return list<AdvisoryInterface>
+     */
+    public function advisories(): array;
 }

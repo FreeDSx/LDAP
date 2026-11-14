@@ -25,14 +25,15 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\PasswordHashing;
 use FreeDSx\Ldap\Server\Config\PasswordHashLimits;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
-use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
@@ -41,6 +42,8 @@ use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
  */
 final class PasswordHashLimitsTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     use ServerContainerTrait;
 
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
@@ -108,6 +111,8 @@ final class PasswordHashLimitsTest extends TestCase
 
     public function test_a_manager_password_hash_over_the_limits_is_refused_at_startup(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $container = $this->containerFor(
             EntryFixture::inMemoryStorage(),
             TestServerOptions::defaults()->setManager(new ManagerIdentity(
@@ -122,7 +127,7 @@ final class PasswordHashLimitsTest extends TestCase
             . 'configured limits allow.',
         );
 
-        $container->get(ServerProtocolFactoryInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_the_server_verifies_its_own_hashes_when_its_hashing_asks_for_more_than_the_limits(): void

@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\Contributor\DirectoryListenerContributor;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
@@ -121,8 +120,14 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Initialization\Advisory\BlockingSqliteAdvisory;
+use FreeDSx\Ldap\Server\Initialization\Requirement\CoroutineSafeStorageRequirement;
+use FreeDSx\Ldap\Server\Initialization\Requirement\ForkSafeStorageRequirement;
+use FreeDSx\Ldap\Server\Initialization\Requirement\ManagerPasswordRequirement;
+use FreeDSx\Ldap\Server\Initialization\Requirement\PasswordHashingRequirement;
+use FreeDSx\Ldap\Server\Initialization\Requirement\ReplicaStorageRequirement;
+use FreeDSx\Ldap\Server\Initialization\RequirementInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\ReplayWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
@@ -160,9 +165,6 @@ use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use Psr\Log\NullLogger;
-
-use function constant;
-use function defined;
 
 /**
  * Registers the local-directory services.
@@ -646,55 +648,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeServerProtocolFactory(Container $container): ServerProtocolFactory
     {
-        $this->refuseUnusablePasswordHashing($container);
-        $this->refuseUnverifiableManagerPassword($container);
-
         return new ServerProtocolFactory($container->get(ConnectionHandlerBuilderInterface::class));
-    }
-
-    private function refuseUnusablePasswordHashing(Container $container): void
-    {
-        $hashing = $container->get(ServerOptions::class)
-            ->getPasswordConfig()
-            ->getHashing();
-
-        if ($hashing->getScheme() !== PasswordHashScheme::Argon2) {
-            return;
-        }
-        if (!defined('PASSWORD_ARGON2ID')) {
-            throw new RuntimeException(
-                'This PHP build cannot hash argon2id; add ext-sodium or libargon2, or configure bcrypt hashing.',
-            );
-        }
-        if (constant('PASSWORD_ARGON2_PROVIDER') !== 'sodium' || $hashing->getArgon2Threads() === 1) {
-            return;
-        }
-
-        throw new RuntimeException('This PHP build hashes argon2id with libsodium, which supports one thread only.');
-    }
-
-    /**
-     * Refuses a manager password that no bind could ever verify.
-     */
-    private function refuseUnverifiableManagerPassword(Container $container): void
-    {
-        $manager = $container->get(ServerOptions::class)->getManager();
-
-        if ($manager === null) {
-            return;
-        }
-
-        try {
-            $container->get(PasswordHashService::class)->assertVerifiable($manager->hashedPassword());
-        } catch (InvalidArgumentException $e) {
-            throw new RuntimeException(
-                sprintf(
-                    'The manager password can never be verified. %s',
-                    $e->getMessage(),
-                ),
-                previous: $e,
-            );
-        }
     }
 
     private function makeServerProtocolHandlerFactory(Container $container): ServerProtocolHandlerFactory
@@ -704,54 +658,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
     {
-        $options = $container->get(ServerOptions::class);
-        $this->requirePdoStorageForReplica($options);
-        $this->requireSharedStorageWhenForking($options);
-
-        return $options->isRunnerMode(RunnerMode::Swoole)
+        return $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
             ? $this->makeSwooleBackgroundTasks($container)
             : $this->makePcntlBackgroundTasks($container);
-    }
-
-    /**
-     * The PCNTL runner forks per connection, so storage only that process can see makes a write vanish with the
-     * connection that made it while still answering success. Swoole is exempt, since its workers share memory.
-     *
-     * @throws RuntimeException when a forking runner is paired with storage it cannot share
-     */
-    private function requireSharedStorageWhenForking(ServerOptions $options): void
-    {
-        $storageConfig = $options->getStorageConfig();
-
-        if ($options->isRunnerMode(RunnerMode::Swoole) || $storageConfig->isMultiProcessSafe()) {
-            return;
-        }
-
-        throw new RuntimeException(sprintf(
-            'The %s runner forks per connection, so "%s" is not safe to use. See the docs for more details.',
-            RunnerMode::Pcntl->name,
-            $storageConfig::class,
-        ));
-    }
-
-    /**
-     * Checked here rather than where the daemon is built, since the PCNTL runner only builds it after forking.
-     *
-     * @throws RuntimeException when a replica is configured without a database behind it
-     */
-    private function requirePdoStorageForReplica(ServerOptions $options): void
-    {
-        $storageConfig = $options->getStorageConfig();
-
-        if ($options->getConsumerConfig() === null || $storageConfig instanceof PdoConfig) {
-            return;
-        }
-
-        // The write-heavy apply path and the cross-process password-policy state both need a database.
-        throw new RuntimeException(sprintf(
-            'A read-only replica requires PDO storage, but "%s" is configured.',
-            $storageConfig::class,
-        ));
     }
 
     /**
@@ -805,7 +714,28 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(ServerOptions::class)->getStorageConfig(),
             $accessControl,
             $container->get(AclRuleNames::class),
+            $this->makeRequirements($container),
+            [new BlockingSqliteAdvisory($container->get(ServerOptions::class))],
         );
+    }
+
+    /**
+     * @return list<RequirementInterface>
+     */
+    private function makeRequirements(Container $container): array
+    {
+        $options = $container->get(ServerOptions::class);
+
+        return [
+            new PasswordHashingRequirement($options->getPasswordConfig()->getHashing()),
+            new ManagerPasswordRequirement(
+                $options->getManager(),
+                $container->get(PasswordHashService::class),
+            ),
+            new ReplicaStorageRequirement($options),
+            new ForkSafeStorageRequirement($options),
+            new CoroutineSafeStorageRequirement($options),
+        ];
     }
 
     /**

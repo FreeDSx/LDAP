@@ -16,12 +16,12 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Initialization\Requirement\UpstreamConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
@@ -42,34 +42,23 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
         return [
             ServerProtocolFactoryInterface::class => $this->makeProtocolFactory(...),
             BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
-            ListenerContributorInterface::class => static fn(): ListenerContributorInterface => new ProxyListenerContributor(),
+            ListenerContributorInterface::class => $this->makeListenerContributor(...),
         ];
+    }
+
+    private function makeListenerContributor(Container $container): ListenerContributorInterface
+    {
+        return new ProxyListenerContributor([
+            new UpstreamConfidentialityRequirement($container->get(ProxyOptions::class)),
+        ]);
     }
 
     private function makeProtocolFactory(Container $container): ServerProtocolFactoryInterface
     {
-        $options = $container->get(ProxyOptions::class);
-        self::assertUpstreamIsConfidentialIfRequired($options);
-
         return new ProxyProtocolFactory(
-            $options,
+            $container->get(ProxyOptions::class),
             $container->get(RequestMessageDecoder::class),
             $container->get(RequestBudget::class),
-        );
-    }
-
-    private static function assertUpstreamIsConfidentialIfRequired(ProxyOptions $options): void
-    {
-        if (!$options->getRequireUpstreamConfidentiality()) {
-            return;
-        }
-
-        if ($options->getClientOptions()->isUseSsl() || $options->getUseStartTls()) {
-            return;
-        }
-
-        throw new RuntimeException(
-            'The upstream connection is not encrypted. Set useSsl or useStartTls on it, or unset requireUpstreamConfidentiality.',
         );
     }
 

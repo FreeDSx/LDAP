@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Initialization\AdvisoryInterface;
+use FreeDSx\Ldap\Server\Initialization\RequirementInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
@@ -36,12 +38,18 @@ final class DirectoryListenerContributorTest extends TestCase
 
     private ReloadableAccessControl $accessControl;
 
+    private RequirementInterface $requirement;
+
+    private AdvisoryInterface $advisory;
+
     private DirectoryListenerContributor $subject;
 
     protected function setUp(): void
     {
         $this->options = TestServerOptions::forStorage(PdoConfig::forSqlite('/var/lib/ldap.sqlite'));
         $this->accessControl = new ReloadableAccessControl(new RuleBasedAccessControl(AclRules::fromEmpty()));
+        $this->requirement = $this->createStub(RequirementInterface::class);
+        $this->advisory = $this->createStub(AdvisoryInterface::class);
 
         $this->subject = new DirectoryListenerContributor(
             new NonResettable(),
@@ -49,6 +57,16 @@ final class DirectoryListenerContributorTest extends TestCase
             $this->options->getStorageConfig(),
             $this->accessControl,
             new AclRuleNames($this->options->getSchema()),
+            [$this->requirement],
+            [$this->advisory],
+        );
+    }
+
+    public function test_it_contributes_the_checks_it_was_given(): void
+    {
+        self::assertSame(
+            [[$this->requirement], [$this->advisory]],
+            [$this->subject->requirements(), $this->subject->advisories()],
         );
     }
 

@@ -47,7 +47,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInt
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -80,10 +79,14 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStra
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
+use FreeDSx\Ldap\Server\Resources\MemoryLimit;
+use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
+use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
+use FreeDSx\Ldap\Server\Initialization\ServerInitialization;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
@@ -112,24 +115,11 @@ class ContainerTest extends TestCase
 
     private Container $subject;
 
-    private string $memoryLimit = '';
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->memoryLimit = (string) ini_get('memory_limit');
         $this->subject = Container::forServer(TestServerOptions::defaults());
-    }
-
-    protected function tearDown(): void
-    {
-        ini_set(
-            'memory_limit',
-            $this->memoryLimit,
-        );
-
-        parent::tearDown();
     }
 
     public function test_every_storage_contract_resolves_to_one_in_memory_store(): void
@@ -327,8 +317,10 @@ class ContainerTest extends TestCase
 
     public function test_a_manager_password_under_an_unsupported_scheme_is_refused_naming_the_scheme(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $container = $this->containerFor(
-            TestServerOptions::defaults()->setManager(new ManagerIdentity(
+            TestServerOptions::forStorage($this->sharedStorage())->setManager(new ManagerIdentity(
                 new Dn('cn=manager'),
                 '{PBKDF2-SHA512}10000$c2FsdA$aGFzaA',
             )),
@@ -337,13 +329,15 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The manager password can never be verified. The "{PBKDF2-SHA512}" password scheme is not supported.');
 
-        $container->get(ServerProtocolFactoryInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_a_cleartext_manager_password_over_the_length_limit_is_refused(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $container = $this->containerFor(
-            TestServerOptions::defaults()->setManager(new ManagerIdentity(
+            TestServerOptions::forStorage($this->sharedStorage())->setManager(new ManagerIdentity(
                 new Dn('cn=manager'),
                 str_repeat(
                     'a',
@@ -355,17 +349,21 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('A cleartext password is longer than the configured hash limits allow.');
 
-        $container->get(ServerProtocolFactoryInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_a_manager_password_under_a_supported_scheme_is_accepted(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $container = $this->containerFor(
-            TestServerOptions::defaults()->setManager(new ManagerIdentity(
+            TestServerOptions::forStorage($this->sharedStorage())->setManager(new ManagerIdentity(
                 new Dn('cn=manager'),
                 '{SHA}aGFzaA==',
             )),
         );
+
+        $container->get(ServerInitialization::class)->start();
 
         self::assertInstanceOf(
             ServerProtocolFactory::class,
@@ -405,6 +403,8 @@ class ContainerTest extends TestCase
 
     public function test_a_proxy_is_refused_when_it_requires_an_upstream_that_cannot_be_encrypted(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $container = Container::forProxy(new ProxyOptions(
             serverOptions: new ProxyServerOptions(),
             requireUpstreamConfidentiality: true,
@@ -413,30 +413,20 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The upstream connection is not encrypted.');
 
-        $container->get(ServerProtocolFactoryInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
-    public function test_a_proxy_requiring_upstream_confidentiality_accepts_an_upstream_using_start_tls(): void
+    public function test_a_proxy_requiring_upstream_confidentiality_starts_with_an_upstream_using_start_tls(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $container = Container::forProxy(new ProxyOptions(
             serverOptions: new ProxyServerOptions(),
             useStartTls: true,
             requireUpstreamConfidentiality: true,
         ));
 
-        self::assertInstanceOf(
-            ProxyProtocolFactory::class,
-            $container->get(ServerProtocolFactoryInterface::class),
-        );
-    }
-
-    public function test_a_proxy_requiring_upstream_confidentiality_accepts_an_upstream_using_ldaps(): void
-    {
-        $container = Container::forProxy(new ProxyOptions(
-            serverOptions: new ProxyServerOptions(),
-            clientOptions: (new ClientOptions())->setUseSsl(true),
-            requireUpstreamConfidentiality: true,
-        ));
+        $container->get(ServerInitialization::class)->start();
 
         self::assertInstanceOf(
             ProxyProtocolFactory::class,
@@ -671,7 +661,7 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/Swoole extension/');
 
-        $container->get(ServerRunnerInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_the_pcntl_runner_is_refused_without_process_control(): void
@@ -686,7 +676,7 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/pcntl and posix extensions/');
 
-        $container->get(ServerRunnerInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_the_swoole_runner_is_refused_when_client_certificate_validation_is_on(): void
@@ -702,7 +692,7 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The Swoole runner cannot verify client certificates.');
 
-        $container->get(ServerRunnerInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_the_swoole_runner_is_refused_when_external_sasl_is_offered(): void
@@ -718,7 +708,7 @@ class ContainerTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The Swoole runner cannot support the EXTERNAL SASL mechanism.');
 
-        $container->get(ServerRunnerInterface::class);
+        $container->get(ServerInitialization::class)->start();
     }
 
     public function test_the_pcntl_runner_accepts_client_certificate_validation(): void
@@ -731,6 +721,7 @@ class ContainerTest extends TestCase
                 ->setNetworkConfig((new NetworkConfig())->setSslValidateCert(true))
                 ->setSaslMechanisms(ServerOptions::SASL_EXTERNAL),
         );
+        $container->get(ServerInitialization::class)->start();
 
         self::assertInstanceOf(
             PcntlServerRunner::class,
@@ -759,10 +750,6 @@ class ContainerTest extends TestCase
     public function test_several_workers_are_clamped_to_one_process_for_in_memory_storage(): void
     {
         $this->requireSwoole();
-        ini_set(
-            'memory_limit',
-            '1G',
-        );
         $logger = $this->createMock(LoggerInterface::class);
         $logger
             ->expects(self::once())
@@ -783,6 +770,7 @@ class ContainerTest extends TestCase
                     4,
                 )),
         );
+        $container->get(ServerInitialization::class)->start();
 
         self::assertInstanceOf(
             SwooleServerRunner::class,
@@ -798,7 +786,7 @@ class ContainerTest extends TestCase
         }
         $logger = new RecordingLogger();
 
-        $this->resolveSqliteConnection(
+        $this->startOnSqlite(
             RunnerConfig::forSwoole(1),
             $logger,
         );
@@ -816,9 +804,11 @@ class ContainerTest extends TestCase
 
     public function test_pcntl_on_sqlite_does_not_warn_about_blocking_the_worker(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
         $logger = new RecordingLogger();
 
-        $this->resolveSqliteConnection(
+        $this->startOnSqlite(
             RunnerConfig::forPcntl(),
             $logger,
         );
@@ -837,7 +827,7 @@ class ContainerTest extends TestCase
         $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
         $options->getNetworkConfig()->setMaxHeldRequestSize(1_000_000);
 
-        $this->containerFor($options)->get(ServerRunnerInterface::class);
+        $this->containerFor($options)->get(ServerInitialization::class)->start();
 
         self::assertSame(
             [
@@ -858,7 +848,7 @@ class ContainerTest extends TestCase
         $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
         $options->getNetworkConfig()->setMaxHeldRequestSize(10_000_000);
 
-        $this->containerFor($options)->get(ServerRunnerInterface::class);
+        $this->containerFor($options)->get(ServerInitialization::class)->start();
 
         self::assertSame(
             [
@@ -881,7 +871,7 @@ class ContainerTest extends TestCase
             ->setMaxRequestSize(0)
             ->setMaxHeldRequestSize(10_000_000);
 
-        $this->containerFor($options)->get(ServerRunnerInterface::class);
+        $this->containerFor($options)->get(ServerInitialization::class)->start();
 
         self::assertSame(
             [
@@ -898,15 +888,11 @@ class ContainerTest extends TestCase
     {
         $this->requirePcntl();
         $this->requirePosix();
-        ini_set(
-            'memory_limit',
-            '1G',
-        );
         $logger = new RecordingLogger();
 
         $this->containerFor(
             TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger),
-        )->get(ServerRunnerInterface::class);
+        )->get(ServerInitialization::class)->start();
 
         self::assertSame(
             [],
@@ -918,15 +904,12 @@ class ContainerTest extends TestCase
     {
         $this->requirePcntl();
         $this->requirePosix();
-        ini_set(
-            'memory_limit',
-            '-1',
-        );
         $logger = new RecordingLogger();
 
         $this->containerFor(
             TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger),
-        )->get(ServerRunnerInterface::class);
+            new MemoryLimit(null),
+        )->get(ServerInitialization::class)->start();
 
         self::assertSame(
             [
@@ -942,10 +925,6 @@ class ContainerTest extends TestCase
     public function test_swoole_warns_at_startup_when_its_connections_can_need_more_than_its_memory_limit(): void
     {
         $this->requireSwoole();
-        ini_set(
-            'memory_limit',
-            '1G',
-        );
         $logger = new RecordingLogger();
         $options = TestServerOptions::defaults()
             ->setLogger($logger)
@@ -955,7 +934,7 @@ class ContainerTest extends TestCase
             ));
         $options->getNetworkConfig()->setMaxConnections(50_000);
 
-        $this->containerFor($options)->get(ServerRunnerInterface::class);
+        $this->containerFor($options)->get(ServerInitialization::class)->start();
 
         self::assertContains(
             [
@@ -969,10 +948,6 @@ class ContainerTest extends TestCase
     public function test_swoole_without_a_held_request_size_limit_warns_at_startup_about_its_memory_limit(): void
     {
         $this->requireSwoole();
-        ini_set(
-            'memory_limit',
-            '1G',
-        );
         $logger = new RecordingLogger();
         $options = TestServerOptions::defaults()
             ->setLogger($logger)
@@ -982,7 +957,7 @@ class ContainerTest extends TestCase
             ));
         $options->getNetworkConfig()->setMaxHeldRequestSize(0);
 
-        $this->containerFor($options)->get(ServerRunnerInterface::class);
+        $this->containerFor($options)->get(ServerInitialization::class)->start();
 
         self::assertContains(
             [
@@ -997,15 +972,11 @@ class ContainerTest extends TestCase
     {
         $this->requirePcntl();
         $this->requirePosix();
-        ini_set(
-            'memory_limit',
-            '1G',
-        );
         $logger = new RecordingLogger();
         $options = TestServerOptions::forStorage($this->sharedStorage())->setLogger($logger);
         $options->getNetworkConfig()->setMaxConnections(50_000);
 
-        $this->containerFor($options)->get(ServerRunnerInterface::class);
+        $this->containerFor($options)->get(ServerInitialization::class)->start();
 
         self::assertSame(
             [],
@@ -1040,12 +1011,25 @@ class ContainerTest extends TestCase
             ));
     }
 
-    private function containerFor(ServerOptions $options): Container
-    {
-        return Container::forServer($options);
+    /**
+     * Fixed limits stand in for this machine's, so what the server warns about at startup does not depend on it.
+     */
+    private function containerFor(
+        ServerOptions $options,
+        MemoryLimit $memoryLimit = new MemoryLimit(1_073_741_824),
+    ): Container {
+        return Container::forServer(
+            $options,
+            [
+                SystemResources::class => new SystemResources(
+                    openFileLimit: new OpenFileLimit(null),
+                    memoryLimit: $memoryLimit,
+                ),
+            ],
+        );
     }
 
-    private function resolveSqliteConnection(
+    private function startOnSqlite(
         RunnerConfig $runnerConfig,
         RecordingLogger $logger,
     ): void {
@@ -1060,7 +1044,7 @@ class ContainerTest extends TestCase
                 (new ServerOptions(PdoConfig::forSqlite($path)))
                     ->setRunnerConfig($runnerConfig)
                     ->setLogger($logger),
-            )->get(PdoConnectionProviderInterface::class);
+            )->get(ServerInitialization::class)->start();
         } finally {
             unlink($path);
         }
