@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
@@ -707,6 +708,7 @@ class ContainerTest extends TestCase
         return [
             [ServerAuthorization::class],
             [RequestLimits::class],
+            [IdentityShare::class],
             [RequestArrival::class],
             [EventLogger::class],
             [ServerQueue::class],
@@ -750,6 +752,7 @@ class ContainerTest extends TestCase
         return [
             [ServerAuthorization::class],
             [RequestLimits::class],
+            [IdentityShare::class],
             [RequestArrival::class],
             [EventLogger::class],
             [ServerQueue::class],

@@ -83,6 +83,59 @@ trait SharedRequestBudgetTestsTrait
         }
     }
 
+    public function testAnIdentityHoldingItsWholeShareIsAnsweredBusyWhileAnotherIdentityIsAnswered(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--max-held-request-size=1000000',
+                '--max-request-size=60000',
+                '--max-request-elements=1000',
+            ],
+        );
+        $stalled = [
+            $this->stalledClient(45_000),
+            $this->stalledClient(45_000),
+            $this->stalledClient(45_000),
+        ];
+        $anonymous = $this->rawQueue();
+        $bound = $this->boundRawQueue();
+
+        try {
+            $anonymous->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchHoldingManyElements(),
+            ));
+            $bound->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchHoldingManyElements(),
+            ));
+
+            self::assertSame(
+                [
+                    [2 => ResultCode::BUSY],
+                    [2 => ResultCode::SUCCESS],
+                ],
+                [
+                    $this->resultCodesFor(
+                        $anonymous,
+                        2,
+                    ),
+                    $this->resultCodesFor(
+                        $bound,
+                        2,
+                    ),
+                ],
+            );
+        } finally {
+            $anonymous->close();
+            $bound->close();
+            foreach ($stalled as $client) {
+                fclose($client);
+            }
+        }
+    }
+
     /**
      * @return iterable<string, array{RequestInterface}>
      */

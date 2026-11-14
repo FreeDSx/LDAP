@@ -22,7 +22,7 @@ use function intdiv;
 use function microtime;
 
 /**
- * The bytes of the requests every connection of a process holds at once.
+ * The bytes of the requests every connection of a process holds at once, in total and for each identity's share.
  *
  * @internal
  *
@@ -38,6 +38,13 @@ class RequestBudget
     private const ROOM_POLL_SECONDS = 0.05;
 
     private int $held = 0;
+
+    /**
+     * The bytes counted for each share that holds any, by its key.
+     *
+     * @var array<string, int>
+     */
+    private array $heldByShare = [];
 
     public function __construct(
         private readonly SleeperInterface $sleeper = new BlockingSleeper(),
@@ -63,32 +70,40 @@ class RequestBudget
     }
 
     /**
-     * Counts the bytes when they fit within the limit in bytes, reclaiming memory once before giving up.
+     * Counts the bytes when they fit within the limit in bytes and the share, reclaiming memory once before giving up.
      */
     public function reserve(
         int $bytes,
         int $limit,
+        BudgetShare $share,
     ): ?BudgetReservation {
-        if (!$this->take($bytes, $limit) && !$this->takeOnceReclaimed($bytes, $limit)) {
+        if (!$this->take($bytes, $limit, $share) && !$this->takeOnceReclaimed($bytes, $limit, $share)) {
             return null;
         }
 
         return new BudgetReservation(
             $this,
             $bytes,
+            $share->key,
         );
     }
 
     /**
-     * Counts the bytes whether or not they fit.
+     * Counts the bytes under the share whether or not they fit.
      */
-    public function reserveAnyway(int $bytes): BudgetReservation
-    {
-        $this->held += $bytes;
+    public function reserveAnyway(
+        int $bytes,
+        BudgetShare $share,
+    ): BudgetReservation {
+        $this->count(
+            $bytes,
+            $share->key,
+        );
 
         return new BudgetReservation(
             $this,
             $bytes,
+            $share->key,
         );
     }
 
@@ -122,44 +137,74 @@ class RequestBudget
     }
 
     /**
-     * Whether adding the bytes keeps the count within the limit, where 0 means no limit.
+     * The bytes counted now under the share.
+     */
+    public function heldBy(BudgetShare $share): int
+    {
+        return $this->heldByShare[$share->key] ?? 0;
+    }
+
+    /**
+     * Whether adding the bytes keeps the count within the limit and the share, where a limit of 0 means no limit.
      */
     public function fits(
         int $bytes,
         int $limit,
+        BudgetShare $share,
     ): bool {
         return $limit <= 0
-            || $this->held + $bytes <= $limit;
+            || ($this->held + $bytes <= $limit && $this->heldBy($share) + $bytes <= $share->limit);
     }
 
-    public function release(int $bytes): void
-    {
+    public function release(
+        int $bytes,
+        string $shareKey,
+    ): void {
         $this->held -= $bytes;
+        $this->heldByShare[$shareKey] = ($this->heldByShare[$shareKey] ?? 0) - $bytes;
+
+        // Dropping a share that holds nothing keeps the count from growing with every identity ever seen.
+        if ($this->heldByShare[$shareKey] === 0) {
+            unset($this->heldByShare[$shareKey]);
+        }
+    }
+
+    private function count(
+        int $bytes,
+        string $shareKey,
+    ): void {
+        $this->held += $bytes;
+        $this->heldByShare[$shareKey] = ($this->heldByShare[$shareKey] ?? 0) + $bytes;
     }
 
     /**
-     * Adds to the count when the result fits within the limit, where 0 means no limit.
+     * Adds to the count when the result fits within the limit and the share, where a limit of 0 means no limit.
      */
     private function take(
         int $bytes,
         int $limit,
+        BudgetShare $share,
     ): bool {
-        if (!$this->fits($bytes, $limit)) {
+        if (!$this->fits($bytes, $limit, $share)) {
             return false;
         }
-        $this->held += $bytes;
+        $this->count(
+            $bytes,
+            $share->key,
+        );
 
         return true;
     }
 
     /**
-     * Memory is reclaimed only for bytes that could fit within the whole limit.
+     * Memory is reclaimed only for bytes that could fit within the whole limit and the share.
      */
     private function takeOnceReclaimed(
         int $bytes,
         int $limit,
+        BudgetShare $share,
     ): bool {
-        if ($bytes > $limit) {
+        if ($bytes > $limit || $bytes > $share->limit) {
             return false;
         }
         $this->reclaim();
@@ -167,6 +212,7 @@ class RequestBudget
         return $this->take(
             $bytes,
             $limit,
+            $share,
         );
     }
 

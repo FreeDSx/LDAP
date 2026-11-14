@@ -19,7 +19,9 @@ use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\Queue\Budget\BudgetShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
@@ -42,6 +44,8 @@ final class RequestArrivalTest extends TestCase
 
     private RequestBudget $budget;
 
+    private BudgetShare $otherIdentity;
+
     protected function setUp(): void
     {
         $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
@@ -51,6 +55,10 @@ final class RequestArrivalTest extends TestCase
                 static fn(): null => usleep(100_000),
             ),
             $this->resources,
+        );
+        $this->otherIdentity = new BudgetShare(
+            'dn:cn=other,dc=foo,dc=bar',
+            PHP_INT_MAX,
         );
     }
 
@@ -181,7 +189,10 @@ final class RequestArrivalTest extends TestCase
             readTimeout: 30,
             heldSize: 100_000,
         );
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $subject->readTimeout(true);
         $subject->arriving(50_000);
         $this->resources
@@ -208,7 +219,10 @@ final class RequestArrivalTest extends TestCase
     public function test_it_waits_to_admit_a_request_until_memory_is_reclaimed(): void
     {
         $subject = $this->arrivalWith(heldSize: 100_000);
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $subject->arriving(50_000);
         $this->resources
             ->expects(self::once())
@@ -233,7 +247,10 @@ final class RequestArrivalTest extends TestCase
             readTimeout: 1,
             heldSize: 100_000,
         );
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $subject->arriving(50_000);
 
         self::expectException(ReadTimeoutException::class);
@@ -248,7 +265,10 @@ final class RequestArrivalTest extends TestCase
             heldSize: 100_000,
             idleTimeout: 1,
         );
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $subject->arriving(50_000);
 
         self::expectException(IdleTimeoutException::class);
@@ -302,7 +322,10 @@ final class RequestArrivalTest extends TestCase
             readTimeout: 30,
             heldSize: 100_000,
         );
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $subject->arriving(50_000);
         $this->resources
             ->method('reclaimMemory')
@@ -346,7 +369,10 @@ final class RequestArrivalTest extends TestCase
     public function test_a_decoded_request_the_process_has_no_room_to_hold_is_not_held(): void
     {
         $subject = $this->arrivalWith(heldSize: 100_000);
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
 
         self::assertFalse($subject->hold(
             new LdapMessageRequest(
@@ -373,7 +399,10 @@ final class RequestArrivalTest extends TestCase
     public function test_requests_are_not_read_ahead_once_the_process_holds_all_it_may(): void
     {
         $subject = $this->arrivalWith(heldSize: 100_000);
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
 
         self::assertFalse($subject->hasRoomToReadAhead());
     }
@@ -395,6 +424,10 @@ final class RequestArrivalTest extends TestCase
             new HeldRequests(
                 $this->budget,
                 $heldSize,
+                new IdentityShare(
+                    $this->authorization,
+                    $heldSize,
+                ),
             ),
         );
     }

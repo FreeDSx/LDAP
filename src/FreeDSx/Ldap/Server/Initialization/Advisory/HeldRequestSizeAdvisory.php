@@ -19,9 +19,6 @@ use FreeDSx\Ldap\Server\Initialization\AdvisoryInterface;
 use FreeDSx\Ldap\Server\Initialization\InitializationWarning;
 use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
 
-use function intdiv;
-use function min;
-
 /**
  * A held request size smaller than what the largest request allowed holds refuses that request every time.
  *
@@ -41,7 +38,12 @@ readonly class HeldRequestSizeAdvisory implements AdvisoryInterface
 
     public function warnings(): array
     {
-        if ($this->heldRequestSize === 0 || $this->largestHeld() <= $this->heldRequestSize) {
+        $largestHeld = HeldRequests::largestHeld(
+            $this->network->getMaxRequestSize(),
+            $this->network->getMaxRequestElements(),
+        );
+
+        if ($this->heldRequestSize === 0 || $largestHeld <= $this->heldRequestSize) {
             return [];
         }
 
@@ -54,41 +56,5 @@ readonly class HeldRequestSizeAdvisory implements AdvisoryInterface
                 ],
             ),
         ];
-    }
-
-    /**
-     * What the largest request allowed holds once decoded, without bound when requests have no size limit.
-     */
-    private function largestHeld(): int
-    {
-        $maxRequestSize = $this->network->getMaxRequestSize();
-
-        if ($maxRequestSize === 0) {
-            return PHP_INT_MAX;
-        }
-
-        return HeldRequests::estimate(
-            $maxRequestSize,
-            $this->mostElements(),
-        );
-    }
-
-    /**
-     * The most elements the largest request allowed can carry, at most one for every two of its bytes.
-     */
-    private function mostElements(): int
-    {
-        $mostBySize = intdiv(
-            $this->network->getMaxRequestSize(),
-            2,
-        );
-        $maxElements = $this->network->getMaxRequestElements();
-
-        return $maxElements === 0
-            ? $mostBySize
-            : min(
-                $maxElements,
-                $mostBySize,
-            );
     }
 }

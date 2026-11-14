@@ -21,24 +21,37 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Budget\BudgetReservation;
+use FreeDSx\Ldap\Protocol\Queue\Budget\BudgetShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Resources\SystemResources;
+use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Socket\Exception\ConnectionException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 final class HeldRequestsTest extends TestCase
 {
     private const LIMIT = 100_000;
 
+    private const SHARE_LIMIT = 40_000;
+
     private SystemResources&MockObject $resources;
 
     private RequestBudget $budget;
 
+    private ServerAuthorization $authorization;
+
+    private IdentityShare $share;
+
     private HeldRequests $subject;
+
+    private HeldRequests $shareLimited;
 
     protected function setUp(): void
     {
@@ -47,9 +60,51 @@ final class HeldRequestsTest extends TestCase
             new CallbackSleeper(),
             $this->resources,
         );
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
+        $this->share = new IdentityShare(
+            $this->authorization,
+            self::LIMIT,
+        );
         $this->subject = new HeldRequests(
             $this->budget,
             self::LIMIT,
+            $this->share,
+        );
+        $this->shareLimited = new HeldRequests(
+            $this->budget,
+            self::LIMIT,
+            new IdentityShare(
+                $this->authorization,
+                self::SHARE_LIMIT,
+            ),
+        );
+    }
+
+    public function test_the_largest_request_allowed_holds_its_bytes_and_one_element_for_every_two_bytes(): void
+    {
+        self::assertSame(
+            [81_150, 17_150],
+            [
+                HeldRequests::largestHeld(
+                    1_000,
+                    0,
+                ),
+                HeldRequests::largestHeld(
+                    1_000,
+                    100,
+                ),
+            ],
+        );
+    }
+
+    public function test_the_largest_request_allowed_holds_without_bound_when_requests_have_no_size_limit(): void
+    {
+        self::assertSame(
+            PHP_INT_MAX,
+            HeldRequests::largestHeld(
+                0,
+                100,
+            ),
         );
     }
 
@@ -156,6 +211,7 @@ final class HeldRequestsTest extends TestCase
         $subject = new HeldRequests(
             $this->budget,
             0,
+            $this->share,
         );
         $otherConnections = $this->fillTheBudget();
 
@@ -252,6 +308,10 @@ final class HeldRequestsTest extends TestCase
         $subject = new HeldRequests(
             $this->budget,
             1_000,
+            new IdentityShare(
+                $this->authorization,
+                1_000,
+            ),
         );
 
         self::assertSame(
@@ -407,6 +467,7 @@ final class HeldRequestsTest extends TestCase
         $subject = new HeldRequests(
             $this->budget,
             0,
+            $this->share,
         );
         $request = self::request(7);
 
@@ -441,6 +502,7 @@ final class HeldRequestsTest extends TestCase
         $subject = new HeldRequests(
             $this->budget,
             0,
+            $this->share,
         );
         $otherConnections = $this->fillTheBudget();
 
@@ -487,12 +549,128 @@ final class HeldRequestsTest extends TestCase
         );
     }
 
+    public function test_a_request_is_not_admitted_at_once_while_its_identity_holds_its_whole_share(): void
+    {
+        $identityConnections = $this->fillTheShare();
+
+        self::assertSame(
+            [false, self::SHARE_LIMIT],
+            [
+                $this->shareLimited->tryAdmit(5_000),
+                $this->budget->held(),
+            ],
+        );
+    }
+
+    public function test_a_request_at_the_floor_is_admitted_while_its_identity_holds_its_whole_share(): void
+    {
+        $identityConnections = $this->fillTheShare();
+
+        self::assertTrue($this->shareLimited->tryAdmit(3_283));
+    }
+
+    public function test_a_request_is_admitted_while_another_identity_holds_as_much_as_a_share(): void
+    {
+        $otherConnections = $this->fillTheBudget(self::SHARE_LIMIT);
+
+        self::assertTrue($this->shareLimited->tryAdmit(5_000));
+    }
+
+    public function test_a_request_is_not_held_while_its_identity_holds_its_whole_share(): void
+    {
+        $identityConnections = $this->fillTheShare();
+
+        self::assertFalse($this->shareLimited->hold(
+            self::request(7),
+            10_000,
+            0,
+        ));
+    }
+
+    public function test_requests_are_not_read_ahead_once_the_identity_holds_its_whole_share(): void
+    {
+        $identityConnections = $this->fillTheShare();
+
+        self::assertFalse($this->shareLimited->hasRoomToReadAhead());
+    }
+
+    public function test_a_request_its_identity_has_no_room_to_hold_is_refused_as_busy_for_the_identity(): void
+    {
+        $identityConnections = $this->fillTheShare();
+
+        try {
+            $this->shareLimited->refuse(
+                7,
+                10,
+                10_000,
+                0,
+            );
+        } catch (RequestRefusedException $e) {
+            self::assertSame(
+                [ResultCode::BUSY, 'The server holds as much as it allows one identity to.'],
+                [$e->getResultCode(), $e->getMessage()],
+            );
+        }
+    }
+
+    public function test_a_request_larger_than_its_identity_may_hold_is_refused_as_past_the_admin_limit(): void
+    {
+        try {
+            $this->shareLimited->refuse(
+                7,
+                10,
+                self::SHARE_LIMIT,
+                0,
+            );
+        } catch (RequestRefusedException $e) {
+            self::assertSame(
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e->getResultCode(),
+            );
+        }
+    }
+
+    public function test_what_a_request_reserved_before_a_bind_is_released_from_the_share_it_was_taken_under(): void
+    {
+        $anonymous = $this->share->current();
+        $this->subject->admit(
+            50_000,
+            null,
+        );
+        $this->authorization->setToken(BindToken::fromDn('cn=user,dc=foo,dc=bar'));
+        $heldBeforeArriving = $this->budget->heldBy($anonymous);
+
+        $this->subject->arrived();
+
+        self::assertSame(
+            [57_820, 0, 0],
+            [$heldBeforeArriving, $this->budget->heldBy($anonymous), $this->budget->held()],
+        );
+    }
+
     /**
-     * What the process's other connections hold, counted for as long as the reservation is kept.
+     * What the process's connections bound as another identity hold, counted for as long as the reservation is kept.
      */
     private function fillTheBudget(int $bytes = self::LIMIT): BudgetReservation
     {
-        return $this->budget->reserveAnyway($bytes);
+        return $this->budget->reserveAnyway(
+            $bytes,
+            new BudgetShare(
+                'dn:cn=other,dc=foo,dc=bar',
+                PHP_INT_MAX,
+            ),
+        );
+    }
+
+    /**
+     * What the identity's other connections hold, counted for as long as the reservation is kept.
+     */
+    private function fillTheShare(): BudgetReservation
+    {
+        return $this->budget->reserveAnyway(
+            self::SHARE_LIMIT,
+            $this->share->current(),
+        );
     }
 
     private static function request(int $messageId): LdapMessageRequest

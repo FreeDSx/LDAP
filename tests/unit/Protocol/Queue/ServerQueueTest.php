@@ -47,7 +47,9 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestRefusedException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Protocol\Queue\Budget\BudgetShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\RequestLimits;
@@ -100,6 +102,8 @@ final class ServerQueueTest extends TestCase
 
     private RequestBudget $budget;
 
+    private BudgetShare $otherIdentity;
+
     protected function setUp(): void
     {
         $this->mockSocket = $this->createMock(Socket::class);
@@ -111,6 +115,10 @@ final class ServerQueueTest extends TestCase
         $this->budget = new RequestBudget(
             new CallbackSleeper(),
             $this->resources,
+        );
+        $this->otherIdentity = new BudgetShare(
+            'dn:cn=other,dc=foo,dc=bar',
+            PHP_INT_MAX,
         );
 
         $this->subject = new ServerQueue(
@@ -552,7 +560,10 @@ final class ServerQueueTest extends TestCase
             $socket,
             heldSize: 100_000,
         );
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $this->resources
             ->expects(self::once())
             ->method('reclaimMemory')
@@ -571,7 +582,10 @@ final class ServerQueueTest extends TestCase
 
     public function test_a_request_the_process_has_no_room_to_hold_is_refused_as_busy_on_its_message_id(): void
     {
-        $otherConnections = $this->budget->reserveAnyway(1_000_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            1_000_000,
+            $this->otherIdentity,
+        );
         $queue = $this->queueReading(
             [self::encodedRequestPastTheReadAheadBytes()],
             heldSize: 1_000_000,
@@ -607,7 +621,10 @@ final class ServerQueueTest extends TestCase
             heldSize: 100_000,
         );
         $queue->peekForCancelSignal(2);
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
         $this->resources
             ->expects(self::once())
             ->method('reclaimMemory')
@@ -643,7 +660,10 @@ final class ServerQueueTest extends TestCase
 
     public function test_the_request_after_a_refused_one_is_still_read(): void
     {
-        $otherConnections = $this->budget->reserveAnyway(1_000_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            1_000_000,
+            $this->otherIdentity,
+        );
         $queue = $this->queueReading(
             [self::encodedRequestPastTheReadAheadBytes() . self::encodedDelete(6)],
             heldSize: 1_000_000,
@@ -678,7 +698,10 @@ final class ServerQueueTest extends TestCase
     public function test_a_request_read_ahead_that_the_process_has_no_room_to_hold_is_refused_on_its_message_id(
         Closure $readAhead,
     ): void {
-        $otherConnections = $this->budget->reserveAnyway(999_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            999_000,
+            $this->otherIdentity,
+        );
         $queue = $this->queueReading(
             [self::encodedRequestPastTheReadAheadBytes()],
             heldSize: 1_000_000,
@@ -711,7 +734,10 @@ final class ServerQueueTest extends TestCase
             heldSize: 100_000,
             timeouts: $reads,
         );
-        $otherConnections = $this->budget->reserveAnyway(60_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            60_000,
+            $this->otherIdentity,
+        );
         $this->resources
             ->expects(self::never())
             ->method('reclaimMemory');
@@ -736,7 +762,10 @@ final class ServerQueueTest extends TestCase
             ),
             heldSize: 100_000,
         );
-        $otherConnections = $this->budget->reserveAnyway(100_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            100_000,
+            $this->otherIdentity,
+        );
 
         self::assertSame(
             [null, 0],
@@ -793,7 +822,10 @@ final class ServerQueueTest extends TestCase
             'zend.exception_ignore_args',
             '0',
         );
-        $otherConnections = $this->budget->reserveAnyway(1_000_000);
+        $otherConnections = $this->budget->reserveAnyway(
+            1_000_000,
+            $this->otherIdentity,
+        );
         $queue = $this->queueReading(
             [self::encodedRequestPastTheReadAheadBytes()],
             heldSize: 1_000_000,
@@ -1588,6 +1620,10 @@ final class ServerQueueTest extends TestCase
             new HeldRequests(
                 $this->budget,
                 $heldSize,
+                new IdentityShare(
+                    $this->authorization,
+                    $heldSize,
+                ),
             ),
         );
     }
