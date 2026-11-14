@@ -29,7 +29,13 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\Budget\BudgetShare;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponse;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponses;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\Response\OutOfSequenceResponder;
+use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
@@ -66,11 +72,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationResult;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
+use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
@@ -96,6 +104,10 @@ class ServerPagingHandlerTest extends TestCase
 
     private Schema $schema;
 
+    private RequestBudget $budget;
+
+    private ServerAuthorization $authorization;
+
     /**
      * @var list<LdapMessageResponse>
      */
@@ -110,6 +122,11 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
         $this->pagingSessions = new PagingSessions();
         $this->schema = SchemaResource::Core->load();
+        $this->budget = new RequestBudget(
+            new CallbackSleeper(),
+            $this->createMock(SystemResources::class),
+        );
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
         $this->sentMessages = [];
 
         $this->mockFilterEvaluator
@@ -1334,15 +1351,292 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
-    private function drive(
-        ServerPagingHandler $subject,
-        LdapMessageRequest $message,
-    ): OperationResult {
+    public function test_a_page_ends_early_with_a_cookie_once_the_identity_has_no_room_for_its_next_entry(): void
+    {
+        $entries = self::numberedEntries(10);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $subject = $this->makeHandler(
+            limits: new SearchLimits(maxSearchPageSize: 10),
+            heldResponses: $this->heldResponses(
+                100_000,
+                3 * HeldResponse::estimate($entries[0]) + 500,
+            ),
+        );
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(size: 10),
+        );
+        $done = $this->doneMessage()->getResponse();
+
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            [['cn=1,dc=foo,dc=bar', 'cn=2,dc=foo,dc=bar', 'cn=3,dc=foo,dc=bar'], ResultCode::SUCCESS],
+            [$this->entryDns(), $done->getResultCode()],
+        );
+        self::assertNotSame(
+            '',
+            $this->donePagingControl()->getCookie(),
+        );
+    }
+
+    public function test_the_page_after_one_that_ended_early_resumes_from_its_last_entry(): void
+    {
+        $entries = self::numberedEntries(10);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $subject = $this->makeHandler(
+            limits: new SearchLimits(maxSearchPageSize: 10),
+            heldResponses: $this->heldResponses(
+                100_000,
+                3 * HeldResponse::estimate($entries[0]) + 500,
+            ),
+        );
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(size: 10),
+        );
+        $cookie = $this->donePagingControl()->getCookie();
+        $this->sentMessages = [];
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(
+                size: 10,
+                cookie: $cookie,
+            ),
+        );
+
+        self::assertSame(
+            ['cn=4,dc=foo,dc=bar', 'cn=5,dc=foo,dc=bar', 'cn=6,dc=foo,dc=bar'],
+            $this->entryDns(),
+        );
+    }
+
+    public function test_a_page_with_no_room_for_its_first_entry_is_busy_and_keeps_its_session_and_cookie(): void
+    {
+        $entries = self::numberedEntries(3);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $shareLimit = 2 * HeldResponse::estimate($entries[0]);
+        $subject = $this->makeHandler(heldResponses: $this->heldResponses(
+            100_000,
+            $shareLimit,
+        ));
+        $this->makeExistingSession();
+        $identityConnections = $this->budget->reserveAnyway(
+            $shareLimit,
+            new BudgetShare(
+                '',
+                $shareLimit,
+            ),
+        );
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(cookie: 'foo'),
+        );
+        $done = $this->doneMessage()->getResponse();
+
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            [ResultCode::BUSY, [], true, 'foo'],
+            [
+                $done->getResultCode(),
+                $this->entryDns(),
+                $this->pagingSessions->has('foo'),
+                $this->donePagingControl()->getCookie(),
+            ],
+        );
+    }
+
+    public function test_a_first_page_refused_as_busy_returns_an_empty_cookie(): void
+    {
+        $entries = self::numberedEntries(3);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $shareLimit = 2 * HeldResponse::estimate($entries[0]);
+        $subject = $this->makeHandler(heldResponses: $this->heldResponses(
+            100_000,
+            $shareLimit,
+        ));
+        $identityConnections = $this->budget->reserveAnyway(
+            $shareLimit,
+            new BudgetShare(
+                '',
+                $shareLimit,
+            ),
+        );
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(),
+        );
+        $done = $this->doneMessage()->getResponse();
+
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            [ResultCode::BUSY, ''],
+            [
+                $done->getResultCode(),
+                $this->donePagingControl()->getCookie(),
+            ],
+        );
+    }
+
+    public function test_the_cookie_a_busy_page_returns_resumes_where_the_refused_page_would_have_started(): void
+    {
+        $entries = self::numberedEntries(3);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $shareLimit = 3 * HeldResponse::estimate($entries[0]) + 500;
+        $subject = $this->makeHandler(heldResponses: $this->heldResponses(
+            100_000,
+            $shareLimit,
+        ));
+        $this->pagingSessions->add(new PagingSession(
+            $this->fingerprintOf($this->makeSearchRequest()),
+            'foo',
+            PageCursor::afterEntry(1),
+        ));
+        $identityConnections = $this->budget->reserveAnyway(
+            $shareLimit,
+            new BudgetShare(
+                '',
+                $shareLimit,
+            ),
+        );
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(cookie: 'foo'),
+        );
+        $cookie = $this->donePagingControl()->getCookie();
+        unset($identityConnections);
+        $this->sentMessages = [];
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(cookie: $cookie),
+        );
+        $done = $this->doneMessage()->getResponse();
+
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            [ResultCode::SUCCESS, ['cn=2,dc=foo,dc=bar', 'cn=3,dc=foo,dc=bar']],
+            [
+                $done->getResultCode(),
+                $this->entryDns(),
+            ],
+        );
+    }
+
+    public function test_an_entry_larger_than_the_identity_may_hold_is_refused_as_past_the_admin_limit(): void
+    {
+        $entries = self::numberedEntries(3);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $subject = $this->makeHandler(heldResponses: $this->heldResponses(
+            100_000,
+            HeldResponse::estimate($entries[0]) - 1,
+        ));
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(),
+        );
+        $done = $this->doneMessage()->getResponse();
+
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $done->getResultCode(),
+        );
+    }
+
+    public function test_what_a_page_holds_is_counted_until_the_page_is_written(): void
+    {
+        $entries = self::numberedEntries(3);
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+        $subject = $this->makeHandler(heldResponses: $this->heldResponses(
+            100_000,
+            100_000,
+        ));
+        $message = $this->makeSearchMessage();
+
         $stream = $subject->handleRequest(
             $message,
             $this->mockToken,
         );
+        $heldBeforeWriting = $this->budget->held();
+        $this->write(
+            $stream,
+            $message,
+        );
+        unset($stream);
 
+        self::assertSame(
+            [3 * HeldResponse::estimate($entries[0]), 0],
+            [$heldBeforeWriting, $this->budget->held()],
+        );
+    }
+
+    /**
+     * @return list<Entry>
+     */
+    private static function numberedEntries(int $count): array
+    {
+        $entries = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $entries[] = Entry::create(
+                "cn=$i,dc=foo,dc=bar",
+                ['cn' => (string) $i],
+            );
+        }
+
+        return $entries;
+    }
+
+    private function drive(
+        ServerPagingHandler $subject,
+        LdapMessageRequest $message,
+    ): OperationResult {
+        return $this->write(
+            $subject->handleRequest(
+                $message,
+                $this->mockToken,
+            ),
+            $message,
+        );
+    }
+
+    private function write(
+        ResponseStream $stream,
+        LdapMessageRequest $message,
+    ): OperationResult {
         return (new ResponseWriter(
             $this->mockQueue,
             new DecodeFailureResponder(
@@ -1396,10 +1690,15 @@ class ServerPagingHandlerTest extends TestCase
         ?SearchLimits $limits = null,
         ?FilterEvaluatorInterface $filterEvaluator = null,
         ?ReadBackendInterface $backend = null,
+        ?HeldResponses $heldResponses = null,
     ): ServerPagingHandler {
         $accessControl ??= $this->mockAccessControl;
         $limits ??= new SearchLimits();
         $backend ??= $this->mockBackend;
+        $heldResponses ??= $this->heldResponses(
+            0,
+            0,
+        );
 
         return new ServerPagingHandler(
             matchedDnFilter: new MatchedDnFilter(
@@ -1425,7 +1724,25 @@ class ServerPagingHandlerTest extends TestCase
                 ),
                 $accessControl,
                 $this->schema,
+                $heldResponses,
                 $limits,
+            ),
+        );
+    }
+
+    /**
+     * What the connection's pages may hold: the process limit and the identity's share, or 0 for no limit.
+     */
+    private function heldResponses(
+        int $limit,
+        int $shareLimit,
+    ): HeldResponses {
+        return new HeldResponses(
+            $this->budget,
+            $limit,
+            new IdentityShare(
+                $this->authorization,
+                $shareLimit,
             ),
         );
     }

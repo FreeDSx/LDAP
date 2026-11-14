@@ -98,6 +98,40 @@ final class RequestBudgetTest extends TestCase
         );
     }
 
+    public function test_it_takes_bytes_that_fit_without_a_reservation_to_free(): void
+    {
+        self::assertSame(
+            [true, 600, 600],
+            [
+                $this->subject->take(
+                    600,
+                    1_000,
+                    $this->share,
+                ),
+                $this->subject->held(),
+                $this->subject->heldBy($this->share),
+            ],
+        );
+    }
+
+    public function test_it_does_not_take_bytes_past_the_share(): void
+    {
+        self::assertSame(
+            [false, 0],
+            [
+                $this->subject->take(
+                    600,
+                    1_000,
+                    new BudgetShare(
+                        'dn:cn=user,dc=foo,dc=bar',
+                        500,
+                    ),
+                ),
+                $this->subject->held(),
+            ],
+        );
+    }
+
     public function test_it_refuses_bytes_past_the_limit(): void
     {
         $held = $this->subject->reserve(

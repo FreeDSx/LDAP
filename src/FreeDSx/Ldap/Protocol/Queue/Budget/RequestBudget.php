@@ -77,7 +77,7 @@ class RequestBudget
         int $limit,
         BudgetShare $share,
     ): ?BudgetReservation {
-        if (!$this->take($bytes, $limit, $share) && !$this->takeOnceReclaimed($bytes, $limit, $share)) {
+        if (!$this->take($bytes, $limit, $share)) {
             return null;
         }
 
@@ -85,6 +85,25 @@ class RequestBudget
             $this,
             $bytes,
             $share->key,
+        );
+    }
+
+    /**
+     * Counts the bytes under the share when they fit within the limit and the share, reclaiming memory once first.
+     */
+    public function take(
+        int $bytes,
+        int $limit,
+        BudgetShare $share,
+    ): bool {
+        if ($this->takeIfFits($bytes, $limit, $share)) {
+            return true;
+        }
+
+        return $this->takeOnceReclaimed(
+            $bytes,
+            $limit,
+            $share,
         );
     }
 
@@ -180,7 +199,7 @@ class RequestBudget
     /**
      * Adds to the count when the result fits within the limit and the share, where a limit of 0 means no limit.
      */
-    private function take(
+    private function takeIfFits(
         int $bytes,
         int $limit,
         BudgetShare $share,
@@ -209,7 +228,7 @@ class RequestBudget
         }
         $this->reclaim();
 
-        return $this->take(
+        return $this->takeIfFits(
             $bytes,
             $limit,
             $share,

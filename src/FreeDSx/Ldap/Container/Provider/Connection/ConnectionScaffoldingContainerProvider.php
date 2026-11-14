@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\Queue\Budget\HeldRequests;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponses;
 use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
 use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
@@ -53,6 +54,7 @@ class ConnectionScaffoldingContainerProvider implements ContainerProviderInterfa
             ServerAuthorization::class => $this->makeServerAuthorization(...),
             RequestLimits::class => $this->makeRequestLimits(...),
             IdentityShare::class => $this->makeIdentityShare(...),
+            HeldResponses::class => $this->makeHeldResponses(...),
             RequestArrival::class => $this->makeRequestArrival(...),
             EventLogger::class => $this->makeEventLogger(...),
             DecodeFailureResponder::class => $this->makeDecodeFailureResponder(...),
@@ -98,6 +100,15 @@ class ConnectionScaffoldingContainerProvider implements ContainerProviderInterfa
                     $networkConfig->getMaxRequestElements(),
                 ),
             ),
+        );
+    }
+
+    private function makeHeldResponses(Container $container): HeldResponses
+    {
+        return new HeldResponses(
+            $container->get(RequestBudget::class),
+            $this->heldRequestLimit($container),
+            $container->get(IdentityShare::class),
         );
     }
 

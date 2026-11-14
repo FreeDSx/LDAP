@@ -168,6 +168,10 @@ disable paging for every client that sets none.
 
 The size limit bounds each page rather than the whole paged operation. RFC 2696 never states which.
 
+A page can hold fewer entries than the client asked for when the memory it may hold runs out, which RFC 2696 allows.
+A page refused with `busy` returns the cookie it was sent, for the client to send again once the server has room,
+although RFC 2696 section 3 says both sides should assume the result set is closed after an error.
+
 ## Password Policy on Compare
 
 Section 8.1 of `draft-behera-ldap-password-policy-10` counts a failed Compare against the password

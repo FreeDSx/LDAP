@@ -537,6 +537,44 @@ final class LdapServerTest extends ServerTestCase
         $this->assertCount(5000, $allEntries);
     }
 
+    public function testAPagedSearchUnderASmallHeldSizeReturnsEveryEntryInPagesThatEndEarly(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--entries=200',
+                '--max-held-request-size=200000',
+                '--max-request-size=40000',
+                '--max-request-elements=100',
+            ],
+        );
+        $this->authenticateUser();
+
+        $allEntries = [];
+        $iterations = 0;
+
+        $search = Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar');
+        $paging = $this->ldapClient()->paging($search);
+
+        while ($paging->hasEntries()) {
+            $iterations++;
+            $allEntries = array_merge(
+                $allEntries,
+                $paging->getEntries(100)->toArray(),
+            );
+        }
+
+        $this->assertCount(
+            200,
+            $allEntries,
+        );
+        $this->assertGreaterThan(
+            2,
+            $iterations,
+        );
+    }
+
     public function testPagedSearchHonorsAGenerousSeparatePagedLookthroughLimit(): void
     {
         $this->stopServer();

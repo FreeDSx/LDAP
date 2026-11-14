@@ -14,6 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Paging;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Protocol\Queue\Budget\BudgetShare;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponse;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Paging\FillingPage;
 use FreeDSx\Ldap\Server\Paging\SliceEnd;
@@ -217,7 +220,20 @@ final class FillingPageTest extends TestCase
             PageCursor::afterEntry(3),
         );
 
-        $collected = $this->subject->collected(false, true);
+        $held = new HeldResponse(
+            new RequestBudget(),
+            0,
+            new BudgetShare(
+                '',
+                0,
+            ),
+        );
+
+        $collected = $this->subject->collected(
+            false,
+            true,
+            $held,
+        );
 
         self::assertCount(
             1,
@@ -228,6 +244,25 @@ final class FillingPageTest extends TestCase
         self::assertEquals(
             PageCursor::afterEntry(3),
             $collected->cursor,
+        );
+        self::assertSame(
+            $held,
+            $collected->held,
+        );
+    }
+
+    public function test_it_is_empty_until_an_entry_is_placed(): void
+    {
+        $wasEmpty = $this->subject->isEmpty();
+
+        $this->subject->add(
+            Entry::create('cn=1,dc=foo,dc=bar'),
+            PageCursor::afterEntry(3),
+        );
+
+        self::assertSame(
+            [true, false],
+            [$wasEmpty, $this->subject->isEmpty()],
         );
     }
 

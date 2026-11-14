@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Paging;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponse;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponses;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\Admission\SearchResultGate;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AttributeProjection;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchTrait;
@@ -47,6 +50,7 @@ final readonly class PageFiller
         private StrippedEntryMatcher $strippedMatcher,
         private AccessControlInterface $accessControl,
         private Schema $schema,
+        private HeldResponses $heldResponses,
         private SearchLimits $limits = new SearchLimits(),
     ) {}
 
@@ -62,6 +66,7 @@ final readonly class PageFiller
     ): CollectedPage {
         $request = $pagingRequest->getSearchRequest();
         $page = $this->startPage($pagingRequest, $resumeFrom);
+        $held = $this->heldResponses->start();
         $budget = $this->budgetFor($request);
         $gate = SearchResultGate::forRequest(
             $this->accessControl,
@@ -92,12 +97,18 @@ final readonly class PageFiller
                 $page,
                 $isFilling,
                 $gate,
+                $held,
             );
 
             // The stream was abandoned mid-slice and can say nothing about where it stopped.
             if ($end === SliceEnd::FurtherMatch) {
                 $hasFurtherMatch = true;
 
+                break;
+            }
+
+            // The page ends early with what it holds and resumes from the last entry it placed, as RFC 2696 allows.
+            if ($end === SliceEnd::OutOfRoom) {
                 break;
             }
 
@@ -116,7 +127,11 @@ final readonly class PageFiller
             $budget->spend($read->rows ?? 0);
         }
 
-        return $page->collected($exhausted, $hasFurtherMatch);
+        return $page->collected(
+            $exhausted,
+            $hasFurtherMatch,
+            $held,
+        );
     }
 
     /**
@@ -130,7 +145,10 @@ final readonly class PageFiller
         FillingPage $page,
         bool $isFilling,
         SearchResultGate $gate,
+        HeldResponse $held,
     ): SliceEnd {
+        $unheld = null;
+
         try {
             foreach ($entries as $fetched) {
                 $kept = $gate->admit($fetched->entry);
@@ -151,6 +169,12 @@ final readonly class PageFiller
                     return SliceEnd::Unplaceable;
                 }
 
+                if (!$held->hold($kept)) {
+                    $unheld = $kept;
+
+                    break;
+                }
+
                 $page->add(
                     $kept,
                     $fetched->cursor,
@@ -165,7 +189,32 @@ final readonly class PageFiller
             return SliceEnd::PageFull;
         }
 
+        if ($unheld !== null) {
+            return $this->outOfRoom(
+                $page,
+                $held,
+                $unheld,
+            );
+        }
+
         return SliceEnd::Complete;
+    }
+
+    /**
+     * A page with no room for its next entry ends with what it holds, or is refused when it holds nothing yet.
+     *
+     * @throws OperationException
+     */
+    private function outOfRoom(
+        FillingPage $page,
+        HeldResponse $held,
+        Entry $entry,
+    ): SliceEnd {
+        if ($page->isEmpty()) {
+            $held->refuse($entry);
+        }
+
+        return SliceEnd::OutOfRoom;
     }
 
     private function startPage(

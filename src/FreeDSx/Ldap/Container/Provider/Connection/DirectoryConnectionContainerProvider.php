@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponses;
 use FreeDSx\Ldap\Protocol\Queue\ReadAheadBuffer;
 use FreeDSx\Ldap\Protocol\Queue\RequestArrival;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
@@ -356,6 +357,7 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
             connection: $container->get(ServerQueue::class),
             eventLogger: $container->get(EventLogger::class),
             pagingSessions: new PagingSessions(),
+            heldResponses: $container->get(HeldResponses::class),
             passwordPolicyContext: $container->get(PasswordPolicyContext::class),
         );
     }

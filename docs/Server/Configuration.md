@@ -430,6 +430,11 @@ One identity may hold a quarter of it, but never less than what the largest requ
 * Every connection that has not bound, bound anonymously or failed its last bind counts as one identity. Anonymous
   clients can make each other wait.
 * With no request size limit, one identity may hold all of it.
+* While an identity holds all it may, its connections stop reading ahead, so an Abandon or Cancel sent during one of
+  their searches is not seen until that search ends.
+
+The entries a page of a paged search collects before it is written count too. A page ends early with a cookie to
+continue from when there is no room for its next entry, and is answered with `BUSY` when there is no room for its first.
 
 ```php
 $options->getNetworkConfig()->setMaxHeldRequestSize(134_217_728);
@@ -916,7 +921,8 @@ code.
 #### setMaxSearchPageSize
 
 The maximum number of entries the server will return per page in a paged search. When the client requests a larger page size
-(or sends `0` meaning "server decides"), this cap is applied.
+(or sends `0` meaning "server decides"), this cap is applied. A page can also hold fewer entries when the memory its
+client may hold runs out ([setMaxHeldRequestSize](#setmaxheldrequestsize)).
 
 **Default**: `1000`
 

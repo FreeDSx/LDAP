@@ -41,4 +41,9 @@ enum SliceEnd
      * A match arrived with no position to resume from. Nothing further may be taken from this read.
      */
     case Unplaceable;
+
+    /**
+     * Neither the process nor the identity has room for the next match. The page ends with what it holds.
+     */
+    case OutOfRoom;
 }

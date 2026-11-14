@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Paging;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponse;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 
@@ -57,6 +58,11 @@ final class FillingPage
     {
         return $this->pageLimit === null
             || count($this->entries) < $this->pageLimit;
+    }
+
+    public function isEmpty(): bool
+    {
+        return $this->entries === [];
     }
 
     /**
@@ -129,11 +135,13 @@ final class FillingPage
     public function collected(
         bool $isResultExhausted,
         bool $hasFurtherMatch,
+        HeldResponse $held,
     ): CollectedPage {
         return new CollectedPage(
             $this->entries,
             $isResultExhausted,
             $hasFurtherMatch,
+            $held,
             $this->cursor,
         );
     }
