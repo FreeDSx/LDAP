@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnsupportedExtendedHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -55,6 +56,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Paging\PageFiller;
+use FreeDSx\Ldap\Server\Paging\PagingSessionTracker;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyComponentFactory;
@@ -76,6 +78,10 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     {
         return [
             ProtocolHandlerFactoryMap::class => $this->makeFactoryMap(...),
+            MatchedDnFilter::class => static fn(Container $c): MatchedDnFilter => new MatchedDnFilter(
+                $c->get(ReadBackendInterface::class),
+                $c->get(AccessControlInterface::class),
+            ),
         ];
     }
 
@@ -291,9 +297,12 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $limits = $searchLimits ?? $options->makeSearchLimits();
 
         return new ServerPagingHandler(
-            backend: $backend,
-            accessControl: $accessControl,
-            pagingSessions: $context->pagingSessions,
+            matchedDnFilter: $container->get(MatchedDnFilter::class),
+            sessions: new PagingSessionTracker(
+                $context->pagingSessions,
+                $limits->maxPagingSessions() ?? 0,
+                $context->eventLogger,
+            ),
             schema: $options->getSchema(),
             pageFiller: new PageFiller(
                 $backend,
@@ -302,8 +311,6 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 $options->getSchema(),
                 $limits,
             ),
-            limits: $limits,
-            eventLogger: $context->eventLogger,
         );
     }
 

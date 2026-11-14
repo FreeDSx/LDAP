@@ -11,34 +11,40 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace FreeDSx\Ldap\Server\AccessControl;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
  * Applies the RFC 4511 §4.1.9 "subject to access controls" rule to a candidate matchedDN.
+ *
+ * @internal
+ *
+ * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-trait MatchedDnAccessFilterTrait
+readonly class MatchedDnFilter
 {
+    public function __construct(
+        private ReadBackendInterface $backend,
+        private AccessControlInterface $accessControl,
+    ) {}
+
     /**
-     * Returns $matchedDn when the token may see the ancestor entry.
+     * The matched DN when the token may see that entry, an empty DN when it may not, or null when there is none.
      */
-    private function filterMatchedDn(
+    public function filter(
         ?Dn $matchedDn,
         TokenInterface $token,
-        ReadBackendInterface $backend,
-        AccessControlInterface $accessControl,
     ): ?Dn {
         if ($matchedDn === null) {
             return null;
         }
 
         try {
-            $entry = $backend->get($matchedDn);
+            $entry = $this->backend->get($matchedDn);
         } catch (OperationException) {
             return new Dn('');
         }
@@ -47,7 +53,7 @@ trait MatchedDnAccessFilterTrait
             return new Dn('');
         }
 
-        $visible = $accessControl->isEntryVisible(
+        $visible = $this->accessControl->isEntryVisible(
             $token,
             $entry,
         );
