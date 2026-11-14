@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponses;
 use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Paging\PagingSessions;
@@ -30,6 +31,7 @@ final readonly class HandlerContext
         public ConnectionControl $connection,
         public EventLogger $eventLogger,
         public PagingSessions $pagingSessions,
+        public HeldResponses $heldResponses,
         public ?PasswordPolicyContext $passwordPolicyContext = null,
     ) {}
 }

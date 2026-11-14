@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
@@ -32,6 +34,7 @@ use FreeDSx\Ldap\Server\Paging\PagingSession;
 use FreeDSx\Ldap\Server\Paging\PagingSessionTracker;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use Generator;
 
 /**
  * Handles paged searches, resuming each from the session it left unfinished on the connection.
@@ -70,6 +73,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $searchRequest = $pagingRequest->getSearchRequest();
 
         $response = null;
+        $collected = null;
         $controls = [];
         $entriesReturned = 0;
         $failure = null;
@@ -80,11 +84,18 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 $sortResponse,
             );
 
-            $response = $this->handlePaging(
+            $collected = $this->collectPage(
                 $pagingRequest,
                 $session,
                 $token,
             );
+            $response = $collected === null
+                ? PagingResponse::makeFinal(new Entries())
+                : $this->buildPagingResponse(
+                    $collected,
+                    $pagingRequest,
+                    $session,
+                );
             if ($response->isSizeLimitExceeded()) {
                 $searchResult = SearchResult::makeSizeLimitResult($response->getEntries());
                 $controls[] = new PagingControl(0, '');
@@ -109,7 +120,13 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                     : '',
                 $e->getMessage(),
             );
-            $controls[] = new PagingControl(0, '');
+            $controls[] = new PagingControl(
+                0,
+                $this->cookieAfterFailure(
+                    $e,
+                    $session,
+                ),
+            );
         }
 
         if ($sortResponse !== null) {
@@ -125,9 +142,11 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
          *     assume the paged result set is closed and no longer resumable.
          *
          * If a search result is anything other than success, or the paging is complete, end the session it resumed.
+         * A page refused as busy keeps it for the same cookie to be sent again once the server has room.
          */
+        $resultCode = $searchResult->getState()->resultCode;
         $isClosed = ($response && $response->isComplete())
-            || $searchResult->getState()->resultCode !== ResultCode::SUCCESS;
+            || ($resultCode !== ResultCode::SUCCESS && $resultCode !== ResultCode::BUSY);
         if ($session !== null && $isClosed) {
             $this->sessions->end($session);
         }
@@ -144,89 +163,80 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
         // A page is pre-collected and bounded, so it is bulk-sent without mid-page cancel polling.
         return ResponseStream::of(
-            $this->buildResponseStream(
-                $searchResult,
-                $message->getMessageId(),
-                new Cancellation(),
-                ...$controls,
+            $this->heldUntilWritten(
+                $this->buildResponseStream(
+                    $searchResult,
+                    $message->getMessageId(),
+                    new Cancellation(),
+                    ...$controls,
+                ),
+                $collected?->held,
             ),
             $outcome,
         );
     }
 
     /**
+     * Keeps what the page holds counted until the writer has taken the page's last message.
+     *
+     * @param Generator<LdapMessageResponse> $stream
+     * @return Generator<LdapMessageResponse>
+     */
+    private function heldUntilWritten(
+        Generator $stream,
+        ?HeldResponse $held,
+    ): Generator {
+        yield from $stream;
+
+        unset($held);
+    }
+
+    /**
+     * The cookie a failed page returns, which is its kept session's own when the page was only refused as busy.
+     */
+    private function cookieAfterFailure(
+        OperationException $failure,
+        ?PagingSession $session,
+    ): string {
+        if ($session === null || $failure->getCode() !== ResultCode::BUSY) {
+            return '';
+        }
+
+        return $session->nextCookie();
+    }
+
+    /**
+     * The page the request asks for, or null when it gives up its paged search.
+     *
      * @throws OperationException
      * @throws ProtocolException
      */
-    private function handlePaging(
+    private function collectPage(
         PagingRequest $pagingRequest,
         ?PagingSession $session,
         TokenInterface $token,
-    ): PagingResponse {
-        if ($session !== null) {
-            return $this->handleExistingCookie(
+    ): ?CollectedPage {
+        if ($session === null) {
+            return $this->pageFiller->fill(
                 $pagingRequest,
-                $session,
                 $token,
+                null,
             );
         }
-
-        return $this->handlePagingStart(
-            $pagingRequest,
-            $token,
-        );
-    }
-
-    /**
-     * @throws OperationException
-     * @throws ProtocolException
-     */
-    private function handlePagingStart(
-        PagingRequest $pagingRequest,
-        TokenInterface $token,
-    ): PagingResponse {
-        $collected = $this->pageFiller->fill(
-            $pagingRequest,
-            $token,
-            null,
-        );
-
-        return $this->buildPagingResponse(
-            $collected,
-            $pagingRequest,
-            null,
-        );
-    }
-
-    /**
-     * @throws OperationException
-     * @throws ProtocolException
-     */
-    private function handleExistingCookie(
-        PagingRequest $pagingRequest,
-        PagingSession $session,
-        TokenInterface $token,
-    ): PagingResponse {
         $this->sessions->assertSameSearch(
             $pagingRequest,
             $session,
         );
 
         if ($pagingRequest->isAbandonRequest()) {
-            return PagingResponse::makeFinal(new Entries());
+            return null;
         }
 
         // The page is filled from the request just received, which a matching fingerprint vouches for.
-        $collected = $this->pageFiller->fill(
+        return $this->pageFiller->fill(
             $pagingRequest,
             $token,
             $session->cursor(),
-        );
-
-        return $this->buildPagingResponse(
-            $collected,
-            $pagingRequest,
-            $session,
         );
     }
 

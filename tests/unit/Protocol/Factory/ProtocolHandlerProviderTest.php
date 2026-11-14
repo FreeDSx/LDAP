@@ -29,7 +29,11 @@ use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\Queue\Budget\HeldResponses;
+use FreeDSx\Ldap\Protocol\Queue\Budget\IdentityShare;
+use FreeDSx\Ldap\Protocol\Queue\Budget\RequestBudget;
 use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerCompareHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
@@ -273,6 +277,14 @@ final class ProtocolHandlerProviderTest extends TestCase
             connection: $this->createMock(ConnectionControl::class),
             eventLogger: new EventLogger(null),
             pagingSessions: new PagingSessions(),
+            heldResponses: new HeldResponses(
+                new RequestBudget(),
+                0,
+                new IdentityShare(
+                    new ServerAuthorization(TestServerOptions::defaults()),
+                    0,
+                ),
+            ),
             passwordPolicyContext: $passwordPolicyContext,
         );
     }

@@ -309,6 +309,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 $this->makeStrippedEntryMatcher($container),
                 $accessControl,
                 $options->getSchema(),
+                $context->heldResponses,
                 $limits,
             ),
         );
