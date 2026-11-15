@@ -70,7 +70,7 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
                         return $recorded->changes->changes;
                     },
                 ),
-                WriteContext::system(
+                WriteContext::bookkeeping(
                     new SystemToken(),
                     new ControlBag(),
                 ),

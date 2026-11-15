@@ -35,6 +35,7 @@ final readonly class WriteContext
         private ?BulkLoadOptions $bulkLoad = null,
         private ?WriteControlEvaluator $controlEvaluator = null,
         private ControlBag $responseControls = new ControlBag(),
+        private bool $keepsModifyMetadata = false,
     ) {}
 
     /**
@@ -48,6 +49,21 @@ final readonly class WriteContext
             $token,
             $controls,
             isSystem: true,
+        );
+    }
+
+    /**
+     * Build a context for a system write recording server-maintained state that leaves the modify metadata as it was.
+     */
+    public static function bookkeeping(
+        TokenInterface $token,
+        ControlBag $controls,
+    ): self {
+        return new self(
+            $token,
+            $controls,
+            isSystem: true,
+            keepsModifyMetadata: true,
         );
     }
 
@@ -91,6 +107,14 @@ final readonly class WriteContext
     public function isSystem(): bool
     {
         return $this->isSystem;
+    }
+
+    /**
+     * Whether the write leaves modifyTimestamp and modifiersName as they were.
+     */
+    public function keepsModifyMetadata(): bool
+    {
+        return $this->keepsModifyMetadata;
     }
 
     public function getControls(): ControlBag
@@ -142,6 +166,7 @@ final readonly class WriteContext
             $this->bulkLoad,
             null,
             $this->responseControls,
+            $this->keepsModifyMetadata,
         );
     }
 }

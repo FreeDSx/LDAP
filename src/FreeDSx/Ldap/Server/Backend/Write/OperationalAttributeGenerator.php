@@ -125,7 +125,7 @@ final readonly class OperationalAttributeGenerator
     }
 
     /**
-     * Updates modifyTimestamp and modifiersName unless the changes supply them, and restamps the implied classes.
+     * Updates modifyTimestamp and modifiersName unless supplied or kept by the context, and restamps implied classes.
      *
      * @param list<Change> $changes
      * @throws OperationException when a supplied timestamp is in the future or out of order
@@ -142,14 +142,15 @@ final readonly class OperationalAttributeGenerator
             ),
             true,
         );
+        $stampsMetadata = !$context->keepsModifyMetadata();
 
-        if (!self::keepsSupplied($entry, $supplied, AttributeTypeOid::NAME_MODIFY_TIMESTAMP)) {
+        if ($stampsMetadata && !self::keepsSupplied($entry, $supplied, AttributeTypeOid::NAME_MODIFY_TIMESTAMP)) {
             $entry->set(
                 AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
                 $this->generateTimestamp(),
             );
         }
-        if (!self::keepsSupplied($entry, $supplied, AttributeTypeOid::NAME_MODIFIERS_NAME)) {
+        if ($stampsMetadata && !self::keepsSupplied($entry, $supplied, AttributeTypeOid::NAME_MODIFIERS_NAME)) {
             $entry->set(
                 AttributeTypeOid::NAME_MODIFIERS_NAME,
                 $context->getBoundDn() ?? '',
