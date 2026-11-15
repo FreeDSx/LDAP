@@ -6,27 +6,32 @@ set -e
 
 DATA="/var/lib/ldap"
 RUN="/var/run/slapd"
-CONF="/etc/ldap/slapd.conf"
+CONF="/tmp/slapd.conf"
+CONFIG_DIR="/etc/ldap/slapd.d"
 
-mkdir -p "$RUN" "$DATA"
-rm -rf "${DATA:?}"/*
+mkdir -p "$RUN" "$DATA" "$CONFIG_DIR"
 
 ROOTPW=$(slappasswd -s 'P@ssword12345' -h '{SSHA}')
 
 cat > "$CONF" <<EOF
-include         /etc/ldap/schema/core.schema
-include         /etc/ldap/schema/cosine.schema
-include         /etc/ldap/schema/inetorgperson.schema
-include         /etc/ldap/schema/nis.schema
+include         /usr/local/etc/openldap/schema/core.schema
+include         /usr/local/etc/openldap/schema/cosine.schema
+include         /usr/local/etc/openldap/schema/inetorgperson.schema
+include         /usr/local/etc/openldap/schema/nis.schema
 
 pidfile         /var/run/slapd/slapd.pid
 argsfile        /var/run/slapd/slapd.args
 
-modulepath      /usr/lib/ldap
-moduleload      back_mdb
+modulepath      /usr/local/libexec/openldap
 moduleload      memberof
 
 loglevel        none
+
+# The admin manages cn=config, where access rules can be changed at runtime.
+database        config
+access to *
+        by dn.exact="cn=admin,dc=example,dc=com" manage
+        by * none
 
 database        mdb
 suffix          "dc=example,dc=com"
@@ -70,13 +75,21 @@ objectClass: domain
 dc: example
 EOF
 
-slapadd -f "$CONF" -l /tmp/base.ldif
+# Only an empty data directory is seeded with the base entry, before the config conversion opens the database.
+if [[ ! -f "$DATA/data.mdb" ]]; then
+    slapadd -f "$CONF" -l /tmp/base.ldif
+fi
 
-chown -R openldap:openldap "$DATA" "$RUN" "$CONF"
+# An existing config directory is kept along with any changes made through cn=config.
+if [[ ! -f "$CONFIG_DIR/cn=config.ldif" ]]; then
+    slaptest -f "$CONF" -F "$CONFIG_DIR"
+fi
 
-exec /usr/sbin/slapd \
+chown -R openldap:openldap "$DATA" "$RUN" "$CONFIG_DIR"
+
+exec /usr/local/libexec/slapd \
     -d 0 \
     -u openldap \
     -g openldap \
-    -f "$CONF" \
+    -F "$CONFIG_DIR" \
     -h "ldap:///"

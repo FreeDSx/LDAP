@@ -7,12 +7,13 @@
 #
 #   composer compare-ldap -- [--source=freedsx|openldap|opendj|389ds] [--target=freedsx|openldap|opendj|389ds]
 #       [--seed-entries=2000] [--seed-groups=0] [--seed-group-size=0] [--cpus=4] [--storage=sqlite] [--runner=pcntl] [--mix=default]
-#       [--search-value=seed-1] [--duration=15] [--warmup=3] [--clients=8] [--driver-processes=1] [--keep-up]
+#       [--search-value=seed-1] [--duration=15] [--warmup=3] [--clients=8] [--driver-processes=1] [--keep-up] [--persistent]
 #       [--swoole-workers=0] [--server-cpuset=0-3] [--driver-cpuset=4-7] [--jit=function]
 #
 # --storage/--runner/--jit apply only to a freedsx side.
 # --jit (function, tracing, or off) is the same for every runner, so a runner comparison is not also a JIT one.
 # --search-value is the cn prefix the subtree searches filter on (--search-value=seed- matches all).
+# --persistent keeps every server's data in a named volume instead of memory.
 #
 # Every side seeds as its root identity but runs the workload as a non-root bench administrator held to its own access
 # control: a group with full access and userPassword withheld from everyone, mirroring FreeDSx's secure default.
@@ -31,7 +32,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
-COMPOSE="tests/profile/docker-compose.yml"
+COMPOSE=(-f tests/profile/docker-compose.yml)
 
 SOURCE=freedsx
 TARGET=openldap
@@ -74,7 +75,8 @@ for arg in "$@"; do
         --driver-cpuset=*)    DRIVER_CPUSET="${arg#*=}" ;;
         --jit=*)              JIT="${arg#*=}" ;;
         --keep-up)            KEEP_UP=1 ;;
-        -h|--help)            sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --persistent)         COMPOSE+=(-f tests/profile/docker-compose.persistent.yml) ;;
+        -h|--help)            sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)                    echo "unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
@@ -186,7 +188,7 @@ load_ldif() {
     "$@" >>"$SETUP_LOG" 2>&1 || true
 }
 
-# slapd.conf already grants the group write and lifts its limits, while withholding userPassword.
+# The bootstrap config already grants the group write and lifts its limits, while withholding userPassword.
 setup_openldap() {
     local bind="$1" pw="$2" base="$3"
     echo "==> adding the bench administrator to openldap"
@@ -247,17 +249,9 @@ setup_opendj() {
             -h localhost -p 1389 -D "$bind" -w "$pw"
 }
 
-# The image creates the instance but not the suffix, so create the backend, silence the per-op access log, and raise
-# the scan limits past the 4000 default so search-list stays indexed.
+# Silences the per-op access log and raises the scan limits past the 4000 default for an indexed search-list.
 setup_389ds() {
     local bind="$1" pw="$2" base="$3" uri="ldap://localhost:3389"
-    if ! docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend suffix list 2>/dev/null \
-        | grep -qi "$base"; then
-        echo "==> creating 389ds backend for $base"
-        docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend create \
-            --suffix "$base" --be-name userRoot --create-suffix
-    fi
-
     if ! docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" plugin memberof show 2>/dev/null \
         | grep -qi "nsslapd-pluginEnabled: on"; then
         echo "==> enabling the 389ds memberOf plugin"
@@ -265,11 +259,6 @@ setup_389ds() {
             config replace nsslapd-dynamic-plugins=on >/dev/null
         docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" plugin memberof enable
     fi
-
-    # The bench OpenLDAP indexes memberOf, so without this one side seeks where the other scans.
-    docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend index add \
-        --attr memberOf --index-type eq --be-name userRoot >/dev/null 2>&1 \
-    || true
 
     echo "==> tuning 389ds (disable access log; raise ID list + lookthrough limits)"
     docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" \
@@ -298,19 +287,19 @@ run_setup() {
 
 # The OpenLDAP image bakes in its bootstrap, whose access rules a stale image would not have.
 if [[ "$SOURCE" == "openldap" || "$TARGET" == "openldap" ]]; then
-    docker compose -f "$COMPOSE" build openldap
+    docker compose "${COMPOSE[@]}" build openldap
 fi
 
 # The 389DS image is built locally from Fedora packages, so a first run has to build it.
 if [[ "$SOURCE" == "389ds" || "$TARGET" == "389ds" ]]; then
-    docker compose -f "$COMPOSE" build 389ds
+    docker compose "${COMPOSE[@]}" build 389ds
 fi
 
 echo "==> up $SRC_LABEL ($SRC_SVC) + $TGT_LABEL ($TGT_SVC) (cpuset=$SERVER_CPUSET each, driver on $DRIVER_CPUSET, seed=$SEED)"
 # Sharing cores with the driver can reverse which server looks faster, so each side is pinned to its own.
 PROFILE_CPUS="$CPUS" FREEDSX_STORAGE="$STORAGE" FREEDSX_RUNNER="$RUNNER" SEED_ENTRIES=0 \
 SERVER_CPUSET="$SERVER_CPUSET" SWOOLE_WORKERS="$WORKERS" FREEDSX_JIT="$JIT" \
-    docker compose -f "$COMPOSE" up -d --wait "$SRC_SVC" "$TGT_SVC"
+    docker compose "${COMPOSE[@]}" up -d --wait "$SRC_SVC" "$TGT_SVC"
 
 mkdir -p "$(dirname "$SETUP_LOG")"
 : >"$SETUP_LOG"
@@ -337,7 +326,7 @@ docker run --rm --network "$NET" --cpuset-cpus="$DRIVER_CPUSET" -v "$PWD":/app -
 
 if [[ "$KEEP_UP" -eq 0 ]]; then
     echo "==> tearing down (pass --keep-up to skip)"
-    docker compose -f "$COMPOSE" down
+    docker compose "${COMPOSE[@]}" down
 fi
 
 exit "$STATUS"

@@ -1,7 +1,13 @@
-# Current 389 Directory Server from Fedora packages, since the published images stopped at 2.4 for arm64.
-FROM fedora:44
+# check=skip=InvalidDefaultArgInFrom
 
-RUN dnf install -y --setopt=install_weak_deps=0 389-ds-base openldap-clients \
+ARG FEDORA_VERSION
+
+# Current 389 Directory Server from Fedora packages, since the published images stopped at 2.4 for arm64.
+FROM fedora:${FEDORA_VERSION}
+
+ARG DS_VERSION
+
+RUN dnf install -y --setopt=install_weak_deps=0 "389-ds-base-${DS_VERSION}" openldap-clients \
     && dnf clean all
 
 # Fedora does not package the container entrypoint, so it comes from the source tag of the installed release.

@@ -324,6 +324,12 @@ final class LdapBackendStorageCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Seed without schema validation, for fixtures the configured schema deliberately does not cover',
+            )
+            ->addOption(
+                'keep-storage',
+                null,
+                InputOption::VALUE_NONE,
+                'Keep what sqlite or mysql storage already holds and seed only the entries it is missing',
             );
     }
 
@@ -352,6 +358,7 @@ final class LdapBackendStorageCommand extends Command
         $seedAttributes = (int) $this->getStringOption($input, 'seed-attributes');
         $seedGroups = (int) $this->getStringOption($input, 'seed-groups');
         $seedGroupSize = (int) $this->getStringOption($input, 'seed-group-size');
+        $keepStorage = (bool) $input->getOption('keep-storage');
 
         if (!in_array($storage, ['memory', 'sqlite', 'mysql'], true)) {
             $io->error("Invalid --storage value: {$storage}. Expected one of: memory, sqlite, mysql.");
@@ -425,7 +432,10 @@ final class LdapBackendStorageCommand extends Command
             ->setSocketAcceptTimeout(0.1);
 
         $serverOptions = (new ServerOptions(
-            $this->createStorageConfig($storage),
+            $this->createStorageConfig(
+                $storage,
+                $keepStorage,
+            ),
             networkConfig: $network,
             schemaConfig: $this->buildSchemaConfig(
                 $validationMode,
@@ -535,10 +545,14 @@ final class LdapBackendStorageCommand extends Command
             $seedEntries,
             $seedGroups,
             $seedGroupSize,
+            $keepStorage,
         ): void {
             $server->seed(
                 new FileLdifLoader($seedLdif),
-                new SeedOptions(ignoreValidation: !$validateSeed),
+                new SeedOptions(
+                    ignoreValidation: !$validateSeed,
+                    skipExisting: $keepStorage,
+                ),
             );
 
             // Only a profile built to satisfy the schema is validated; the others exist to widen the return path.
@@ -549,7 +563,10 @@ final class LdapBackendStorageCommand extends Command
                     $seedGroups,
                     $seedGroupSize,
                 ),
-                new SeedOptions(ignoreValidation: !$generator->isSchemaValid()),
+                new SeedOptions(
+                    ignoreValidation: !$generator->isSchemaValid(),
+                    skipExisting: $keepStorage,
+                ),
             );
         };
 
@@ -625,30 +642,68 @@ final class LdapBackendStorageCommand extends Command
     }
 
     /**
-     * Wipes whatever the previous run left behind, so each server starts from the seed alone.
+     * Clears whatever a previous run left behind unless the storage is kept.
      */
-    private function createStorageConfig(string $storage): StorageConfigInterface
-    {
+    private function createStorageConfig(
+        string $storage,
+        bool $keepStorage,
+    ): StorageConfigInterface {
         if ($storage === 'memory') {
             return new InMemoryStorageConfig();
         }
-
         if ($storage === 'sqlite') {
-            $dbPath = TestWorker::path('backend_storage.sqlite');
-
-            foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
-                if (file_exists($path)) {
-                    unlink($path);
-                }
-            }
-
-            return PdoConfig::forSqlite($dbPath);
+            return $this->createSqliteConfig($keepStorage);
         }
 
+        return $this->createMysqlConfig($keepStorage);
+    }
+
+    private function createSqliteConfig(bool $keepStorage): PdoConfig
+    {
+        $dbPath = TestWorker::path('backend_storage.sqlite');
+
+        if (!$keepStorage) {
+            $this->removeSqliteFiles($dbPath);
+        }
+
+        return PdoConfig::forSqlite($dbPath);
+    }
+
+    private function createMysqlConfig(bool $keepStorage): PdoConfig
+    {
         $dsn = getenv('MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=3306;dbname=freedsx';
         $user = getenv('MYSQL_USER') ?: 'root';
         $password = getenv('MYSQL_PASSWORD') ?: 'root';
 
+        if (!$keepStorage) {
+            $this->dropMysqlTables(
+                $dsn,
+                $user,
+                $password,
+            );
+        }
+
+        return PdoConfig::forMysql(
+            $dsn,
+            $user,
+            $password,
+        );
+    }
+
+    private function removeSqliteFiles(string $dbPath): void
+    {
+        foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    private function dropMysqlTables(
+        string $dsn,
+        string $user,
+        string $password,
+    ): void {
         $cleanup = new PDO(
             $dsn,
             $user,
@@ -664,9 +719,6 @@ final class LdapBackendStorageCommand extends Command
         $cleanup->exec('DROP TABLE IF EXISTS ldap_change_journal');
         $cleanup->exec('DROP TABLE IF EXISTS ldap_change_journal_seq');
         $cleanup->exec('DROP TABLE IF EXISTS ldap_schema_version');
-        unset($cleanup);
-
-        return PdoConfig::forMysql($dsn, $user, $password);
     }
 
     /**

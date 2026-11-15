@@ -1,0 +1,43 @@
+# Keeps every server's data in a named volume instead of memory.
+services:
+  freedsx:
+    volumes:
+      - freedsx-data:/tmp
+
+  freedsx-server:
+    tmpfs: !reset []
+    environment:
+      FREEDSX_SERVER_ARGS: "--keep-storage"
+    volumes:
+      - freedsx-server-data:/tmp
+
+  mysql:
+    tmpfs: !reset []
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  openldap:
+    tmpfs: !reset []
+    volumes:
+      - openldap-data:/var/lib/ldap
+      - openldap-config:/etc/ldap/slapd.d
+
+  # The database is unusable without the instance config beside it.
+  389ds:
+    tmpfs: !reset []
+    volumes:
+      - 389ds-data:/data
+
+  opendj:
+    tmpfs: !reset []
+    volumes:
+      - opendj-data:/opt/opendj/data
+
+volumes:
+  freedsx-data:
+  freedsx-server-data:
+  mysql-data:
+  openldap-data:
+  openldap-config:
+  389ds-data:
+  opendj-data:

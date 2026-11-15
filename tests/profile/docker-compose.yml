@@ -54,7 +54,7 @@ services:
         exec php -d opcache.enable_cli=1 -d opcache.jit_buffer_size=100M -d opcache.jit=${FREEDSX_JIT:-function} tests/bin/ldap-backend-storage.php
         --transport=tcp --storage=${FREEDSX_STORAGE:-sqlite} --runner=${FREEDSX_RUNNER:-pcntl}
         --swoole-workers=${SWOOLE_WORKERS:-1}
-        --port=10389 --seed-entries=${SEED_ENTRIES:-25000}
+        --port=10389 --seed-entries=${SEED_ENTRIES:-25000} $${FREEDSX_SERVER_ARGS:-}
     # Ready only once seeding finishes and the server listens, so `up --wait` blocks until then.
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/10389'"]
@@ -86,7 +86,11 @@ services:
     build:
       context: .
       dockerfile: openldap.Dockerfile
-    image: freedsx-profile-openldap:latest
+      args:
+        UBUNTU_VERSION: ${UBUNTU_VERSION:?set in tests/profile/.env}
+        OPENLDAP_VERSION: ${OPENLDAP_VERSION:?set in tests/profile/.env}
+        OPENLDAP_SHA3_512: ${OPENLDAP_SHA3_512:?set in tests/profile/.env}
+    image: freedsx-profile-openldap:${OPENLDAP_VERSION:?set in tests/profile/.env}
     container_name: freedsx-profile-openldap
     cpus: ${PROFILE_CPUS:-4}
     # Pinned to the same cores as freedsx-server so a comparison measures the server, not core contention.
@@ -101,12 +105,16 @@ services:
     # Every compared server keeps its data in memory, so disk speed and fsync policy stay out of the comparison.
     tmpfs:
       - /var/lib/ldap
+      - /etc/ldap/slapd.d
 
   389ds:
     build:
       context: .
       dockerfile: 389ds.Dockerfile
-    image: freedsx-profile-389ds:latest
+      args:
+        FEDORA_VERSION: ${FEDORA_VERSION:?set in tests/profile/.env}
+        DS_VERSION: ${DS_VERSION:?set in tests/profile/.env}
+    image: freedsx-profile-389ds:${DS_VERSION:?set in tests/profile/.env}
     container_name: freedsx-profile-389ds
     cpus: ${PROFILE_CPUS:-4}
     # Pinned to the same cores as freedsx-server so a comparison measures the server, not core contention.
@@ -127,27 +135,8 @@ services:
       retries: 60
       start_period: 20s
 
-  # The image creates the instance but not the suffix, so the backend is added once the instance answers.
-  389ds-init:
-    build:
-      context: .
-      dockerfile: 389ds.Dockerfile
-    image: freedsx-profile-389ds:latest
-    container_name: freedsx-profile-389ds-init
-    depends_on:
-      389ds:
-        condition: service_healthy
-    restart: on-failure
-    entrypoint:
-      - bash
-      - -lc
-      - >
-        dsconf -D "cn=Directory Manager" -w "P@ssword12345" ldap://389ds:3389 backend suffix list 2>/dev/null | grep -q "dc=example,dc=com"
-        || dsconf -D "cn=Directory Manager" -w "P@ssword12345" ldap://389ds:3389 backend create
-        --suffix "dc=example,dc=com" --be-name userRoot --create-suffix
-
   opendj:
-    image: openidentityplatform/opendj:latest
+    image: openidentityplatform/opendj:${OPENDJ_VERSION:?set in tests/profile/.env}
     container_name: freedsx-profile-opendj
     cpus: ${PROFILE_CPUS:-4}
     # Pinned to the same cores as freedsx-server so a comparison measures the server, not core contention.
@@ -161,8 +150,9 @@ services:
     # Every compared server keeps its data in memory; OpenDJ runs as uid 1001 and executes a script from here.
     tmpfs:
       - /opt/opendj/data:uid=1001,gid=1001,mode=0755,exec
+    # The image's own probe waits out the server restart at the end of its first-start bootstrap.
     healthcheck:
-      test: ["CMD-SHELL", "/opt/opendj/bin/ldapsearch -h localhost -p 1389 -D 'cn=Directory Manager' -w 'P@ssword12345' -b '' -s base '(objectClass=*)' 1.1 >/dev/null 2>&1"]
+      test: ["CMD", "/opt/opendj/healthcheck.sh"]
       interval: 5s
       timeout: 5s
       retries: 60
