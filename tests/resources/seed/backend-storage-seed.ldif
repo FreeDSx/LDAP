@@ -20,6 +20,9 @@ telephoneNumber: +1 408 555 1212
 x121Address: 1111 2222
 # description declares no ORDERING rule, and these two sort one way as text and the other as numbers.
 description: 9
+# Policy state the identity itself may not read. No policy governs this entry.
+pwdChangedTime: 20260101000000Z
+pwdLastSuccess: 20260104000000Z
 
 # Administrator, a member of the group the harness configures via setAdministrators()
 dn: cn=admin,dc=foo,dc=bar
@@ -31,7 +34,7 @@ seeAlso: cn=admin,dc=foo,dc=bar
 telephoneNumber: +1-408-555-1212
 x121Address: 11112222
 description: 10
-# A prior password, which no one may read whatever policy recorded it.
+# A prior password no one may read.
 pwdHistory: 20260101000000Z#1.3.6.1.4.1.1466.115.121.1.40#6#old-pw
 
 dn: cn=admins,dc=foo,dc=bar
@@ -39,9 +42,21 @@ objectClass: groupOfNames
 cn: admins
 member: cn=admin,dc=foo,dc=bar
 
+# Password policy state on an entry that never binds. It doubles as the policy its own pwdPolicySubentry names.
 dn: ou=people,dc=foo,dc=bar
 objectClass: organizationalUnit
+objectClass: pwdPolicy
 ou: people
+pwdAttribute: userPassword
+pwdChangedTime: 20260101000000Z
+pwdAccountLockedTime: 20260102000000Z
+pwdFailureTime: 20260102000000.000001Z
+pwdGraceUseTime: 20260103000000.000001Z
+pwdStartTime: 20250101000000Z
+pwdEndTime: 20300101000000Z
+pwdLastSuccess: 20260104000000Z
+pwdReset: TRUE
+pwdPolicySubentry: ou=people,dc=foo,dc=bar
 
 dn: cn=alice,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson

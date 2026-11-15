@@ -58,6 +58,26 @@ final readonly class AclRules
     ];
 
     /**
+     * The confidential password policy state attributes the credential protection grants to the administrator.
+     *
+     * @var list<string>
+     *
+     * @see self::withCredentialProtection()
+     * @see self::withPasswordPolicyStateAccess()
+     */
+    public const PASSWORD_POLICY_STATE_ATTRIBUTES = [
+        PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+        PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+        PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+        PasswordPolicyOid::NAME_PWD_GRACE_USE_TIME,
+        PasswordPolicyOid::NAME_PWD_START_TIME,
+        PasswordPolicyOid::NAME_PWD_END_TIME,
+        PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
+        PasswordPolicyOid::NAME_PWD_RESET,
+        PasswordPolicyOid::NAME_PWD_POLICY_SUBENTRY,
+    ];
+
+    /**
      * @param OperationRule[] $operations Evaluated in order; first match wins.
      * @param AttributeRule[] $attributes Evaluated per attribute in order; first match wins.
      * @param ControlRule[] $controls Evaluated per control in order; first match wins.
@@ -471,6 +491,19 @@ final readonly class AclRules
     }
 
     /**
+     * Append a grant letting $subject read the password policy state attributes, alongside any grant already made.
+     *
+     * @see self::PASSWORD_POLICY_STATE_ATTRIBUTES
+     */
+    public function withPasswordPolicyStateAccess(SubjectMatcherInterface $subject): self
+    {
+        return $this->appendConfidentialAccess(ConfidentialAccessRule::allow(
+            $subject,
+            ...self::PASSWORD_POLICY_STATE_ATTRIBUTES,
+        ));
+    }
+
+    /**
      * Restrict searches of the subschema subentry to $subject, replacing any earlier rule for that entry.
      */
     public function withSubschemaAccess(?SubjectMatcherInterface $subject): self
@@ -529,6 +562,7 @@ final readonly class AclRules
      *
      * - userPassword is writable by self and the administrator, and readable by no one.
      * - pwdHistory, which holds prior passwords, is readable by no one.
+     * - The password policy state attributes are readable by the administrator only.
      * - PasswordModify is permitted for self and the administrator, denied to everyone else.
      * - Privileged controls are allowed to the administrator (otherwise the default deny applies).
      * - Privileged extended operations are allowed to the administrator (otherwise the default deny applies).
@@ -553,6 +587,7 @@ final readonly class AclRules
         ];
         $controls = [];
         $extendedOps = [];
+        $confidential = [];
 
         if ($administrators !== null) {
             $passwordModify[] = OperationRule::allow(
@@ -567,6 +602,10 @@ final readonly class AclRules
             )->forWrite();
             $controls[] = ControlRule::allow($administrators);
             $extendedOps[] = ExtendedOperationRule::allow($administrators);
+            $confidential[] = ConfidentialAccessRule::allow(
+                $administrators,
+                ...self::PASSWORD_POLICY_STATE_ATTRIBUTES,
+            );
         }
 
         $passwordModify[] = OperationRule::deny(
@@ -590,7 +629,8 @@ final readonly class AclRules
             ->prependOperationRules(...$passwordModify)
             ->prependAttributeRules(...$credentials)
             ->prependControlRules(...$controls)
-            ->prependExtendedOperationRules(...$extendedOps);
+            ->prependExtendedOperationRules(...$extendedOps)
+            ->prependConfidentialAccess(...$confidential);
     }
 
     /**

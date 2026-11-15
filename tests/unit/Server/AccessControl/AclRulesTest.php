@@ -154,6 +154,90 @@ final class AclRulesTest extends TestCase
         );
     }
 
+    #[DataProvider('passwordPolicyStateAttributeProvider')]
+    public function test_secureDefault_grants_only_the_administrator_the_password_policy_state(string $attribute): void
+    {
+        self::assertTrue($this->subject->hasConfidentialAccess(
+            $this->admin(),
+            $attribute,
+        ));
+        self::assertFalse($this->subject->hasConfidentialAccess(
+            $this->user(),
+            $attribute,
+        ));
+    }
+
+    #[DataProvider('passwordPolicyStateAttributeProvider')]
+    public function test_secureDefault_without_an_administrator_grants_no_one_the_password_policy_state(
+        string $attribute,
+    ): void {
+        $subject = new RuleBasedAccessControl(AclRules::secureDefault());
+
+        self::assertFalse($subject->hasConfidentialAccess(
+            $this->admin(),
+            $attribute,
+        ));
+        self::assertFalse($subject->hasConfidentialAccess(
+            $this->user(),
+            $attribute,
+        ));
+    }
+
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function test_secureDefault_grants_the_administrator_no_password_value(string $attribute): void
+    {
+        self::assertFalse($this->subject->hasConfidentialAccess(
+            $this->admin(),
+            $attribute,
+        ));
+    }
+
+    #[DataProvider('passwordPolicyStateAttributeProvider')]
+    public function test_withPasswordPolicyStateAccess_grants_the_subject_alongside_the_administrator(
+        string $attribute,
+    ): void {
+        $subject = new RuleBasedAccessControl(
+            AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+                ->withPasswordPolicyStateAccess(Subject::dn(self::OTHER_DN)),
+        );
+
+        self::assertTrue($subject->hasConfidentialAccess(
+            BindToken::fromDn(self::OTHER_DN),
+            $attribute,
+        ));
+        self::assertTrue($subject->hasConfidentialAccess(
+            $this->admin(),
+            $attribute,
+        ));
+        self::assertFalse($subject->hasConfidentialAccess(
+            $this->user(),
+            $attribute,
+        ));
+    }
+
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function test_withPasswordPolicyStateAccess_grants_no_password_value(string $attribute): void
+    {
+        $subject = new RuleBasedAccessControl(
+            AclRules::fromEmpty()->withPasswordPolicyStateAccess(Subject::dn(self::OTHER_DN)),
+        );
+
+        self::assertFalse($subject->hasConfidentialAccess(
+            BindToken::fromDn(self::OTHER_DN),
+            $attribute,
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function passwordPolicyStateAttributeProvider(): iterable
+    {
+        foreach (AclRules::PASSWORD_POLICY_STATE_ATTRIBUTES as $attribute) {
+            yield $attribute => [$attribute];
+        }
+    }
+
     public function test_withReplicaGrants_appends_to_existing_control_rules(): void
     {
         $existing = ControlRule::allow(Subject::dn(self::ADMIN_DN));

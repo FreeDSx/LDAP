@@ -135,6 +135,7 @@ final class PasswordPolicySchemaResourceTest extends TestCase
             'pwdMinDelay' => [PasswordPolicyOid::NAME_PWD_MIN_DELAY],
             'pwdMaxDelay' => [PasswordPolicyOid::NAME_PWD_MAX_DELAY],
             'pwdMaxIdle' => [PasswordPolicyOid::NAME_PWD_MAX_IDLE],
+            'pwdMaxRecordedFailure' => [PasswordPolicyOid::NAME_PWD_MAX_RECORDED_FAILURE],
         ];
     }
 
@@ -150,9 +151,27 @@ final class PasswordPolicySchemaResourceTest extends TestCase
         self::assertFalse($type->singleValue);
     }
 
-    public function test_pwd_history_is_confidential(): void
+    #[DataProvider('operationalAttributeProvider')]
+    public function test_operational_attributes_are_confidential(string $name): void
     {
-        self::assertTrue($this->schema->isConfidential(PasswordPolicyOid::NAME_PWD_HISTORY));
+        self::assertTrue($this->schema->isConfidential($name));
+    }
+
+    #[DataProvider('policyConfigAttributeProvider')]
+    public function test_policy_config_attributes_are_not_confidential(string $name): void
+    {
+        self::assertFalse($this->schema->isConfidential($name));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function operationalAttributeProvider(): array
+    {
+        return [
+            ...self::userStateAttributeProvider(),
+            'pwdReset' => [PasswordPolicyOid::NAME_PWD_RESET],
+        ];
     }
 
     public function test_pwd_failure_time_is_multi_valued(): void

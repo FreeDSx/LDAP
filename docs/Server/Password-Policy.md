@@ -378,10 +378,14 @@ clients:
 
 `pwdPolicySubentry`, `pwdStartTime`, and `pwdEndTime` are read from the user entry but managed by the operator.
 
+All of these are confidential in the schema, as section 12 of the draft recommends. Under the secure default only the
+administrator can read or filter on them, except `pwdHistory`, which no one can read. A client that requests the
+password policy response control on bind still learns whether the account is locked or must change its password, how
+many grace logins remain, and, within `pwdExpireWarning`, when the password expires. See
+[Confidential Attributes](Access-Control.md#confidential-attributes).
+
 ## Not Yet Enforced / Limitations
 
 - Policy is assumed to apply to `userPassword`. Custom password attributes are not supported.
 - A plain `ldapmodify` stores the submitted value verbatim. Pre-hashed values cannot be inspected, and only
   administrators may supply them by default.
-- The password policy response control is returned whenever there is something to report, regardless of whether the
-  client sent the request control.
