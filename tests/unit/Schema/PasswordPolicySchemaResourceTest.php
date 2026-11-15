@@ -150,6 +150,11 @@ final class PasswordPolicySchemaResourceTest extends TestCase
         self::assertFalse($type->singleValue);
     }
 
+    public function test_pwd_history_is_confidential(): void
+    {
+        self::assertTrue($this->schema->isConfidential(PasswordPolicyOid::NAME_PWD_HISTORY));
+    }
+
     public function test_pwd_failure_time_is_multi_valued(): void
     {
         $type = $this->schema->getAttributeType(PasswordPolicyOid::NAME_PWD_FAILURE_TIME);

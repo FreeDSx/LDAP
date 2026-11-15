@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AclRulesTest extends TestCase
@@ -393,7 +394,8 @@ final class AclRulesTest extends TestCase
         );
     }
 
-    public function test_secureDefault_strips_userPassword_from_another_users_read(): void
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function test_secureDefault_strips_a_password_value_from_another_users_read(string $attribute): void
     {
         $scope = $this->subject->readScope($this->user());
         $entry = $this->entry(self::OTHER_DN);
@@ -402,17 +404,35 @@ final class AclRulesTest extends TestCase
 
         $readable = $scope->readable($entry);
 
-        self::assertNull($readable->get('userPassword'));
+        self::assertNull($readable->get($attribute));
         self::assertNotNull($readable->get('cn'));
     }
 
-    public function test_secureDefault_strips_userPassword_from_self_read(): void
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function test_secureDefault_strips_a_password_value_from_self_read(string $attribute): void
     {
         $scope = $this->subject->readScope($this->user());
         $entry = $this->entry(self::USER_DN);
 
         self::assertTrue($scope->isEntryVisible($entry));
-        self::assertNull($scope->readable($entry)->get('userPassword'));
+        self::assertNull($scope->readable($entry)->get($attribute));
+    }
+
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function test_secureDefault_strips_a_password_value_from_the_administrators_read(string $attribute): void
+    {
+        $scope = $this->subject->readScope($this->admin());
+
+        self::assertNull($scope->readable($this->entry(self::OTHER_DN))->get($attribute));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function passwordValueAttributeProvider(): iterable
+    {
+        yield 'userPassword' => ['userPassword'];
+        yield 'pwdHistory' => [PasswordPolicyOid::NAME_PWD_HISTORY];
     }
 
     public function test_secureDefault_lets_self_write_but_not_read_its_userPassword(): void
@@ -665,6 +685,10 @@ final class AclRulesTest extends TestCase
             new Dn($dn),
             new Attribute('cn', 'x'),
             new Attribute('userPassword', '{SHA}secret'),
+            new Attribute(
+                PasswordPolicyOid::NAME_PWD_HISTORY,
+                '20260101000000Z#1.3.6.1.4.1.1466.115.121.1.40#6#old-pw',
+            ),
         );
     }
 }

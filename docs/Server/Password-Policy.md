@@ -211,6 +211,10 @@ With `pwdInHistory` set, the server retains that many superseded values in `pwdH
 matches any of them, or the current password, with `passwordInHistory` (`CONSTRAINT_VIOLATION`). The value recorded is
 the one being replaced, so the window is the current password plus that many previous ones.
 
+`pwdHistory` carries the same protection as `userPassword`, as section 12 of the draft requires. It is confidential in
+the schema and readable by no one under the secure default. See
+[Confidential Attributes](Access-Control.md#confidential-attributes).
+
 ### Minimum Age
 
 `pwdMinAge` rejects a change attempted within that many seconds of the last change (`pwdChangedTime`) with
@@ -367,7 +371,7 @@ clients:
 | `pwdChangedTime`       | Time of the last password change; drives age and expiration.     |
 | `pwdFailureTime`       | Timestamps of recent failed binds.                               |
 | `pwdAccountLockedTime` | Time the account was locked.                                     |
-| `pwdHistory`           | Previous password values retained for `pwdInHistory`.            |
+| `pwdHistory`           | Previous passwords kept for `pwdInHistory`; confidential.        |
 | `pwdGraceUseTime`      | Timestamps of grace logins used after expiration.                |
 | `pwdLastSuccess`       | Time of the last successful bind.                                |
 | `pwdReset`             | Set when an administrative reset requires a change at next bind. |

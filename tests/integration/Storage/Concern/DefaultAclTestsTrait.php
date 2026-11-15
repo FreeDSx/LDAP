@@ -18,7 +18,9 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Behavior enforced by the shipped default ACL, across the search, paging and write paths.
@@ -56,6 +58,51 @@ trait DefaultAclTestsTrait
             0,
             $entries,
         );
+    }
+
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function testAnAttributeHoldingAPasswordValueIsNotReturnedToAnotherUser(string $attribute): void
+    {
+        $this->authenticateUser();
+
+        $admin = $this->ldapClient()->read(
+            'cn=admin,dc=foo,dc=bar',
+            [
+                $attribute,
+                '*',
+                '+',
+            ],
+        );
+
+        self::assertNotNull($admin);
+        self::assertNotNull($admin->get('cn'));
+        self::assertNull($admin->get($attribute));
+    }
+
+    #[DataProvider('passwordValueAttributeProvider')]
+    public function testFilteringOnAnAttributeHoldingAPasswordValueMatchesNothing(string $attribute): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present($attribute))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $entries,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function passwordValueAttributeProvider(): iterable
+    {
+        yield 'userPassword' => ['userPassword'];
+        yield 'pwdHistory' => [PasswordPolicyOid::NAME_PWD_HISTORY];
     }
 
     public function testNegatingAWithheldAssertionMatchesEveryEntry(): void

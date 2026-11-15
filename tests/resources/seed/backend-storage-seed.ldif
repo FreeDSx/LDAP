@@ -31,6 +31,8 @@ seeAlso: cn=admin,dc=foo,dc=bar
 telephoneNumber: +1-408-555-1212
 x121Address: 11112222
 description: 10
+# A prior password, which no one may read whatever policy recorded it.
+pwdHistory: 20260101000000Z#1.3.6.1.4.1.1466.115.121.1.40#6#old-pw
 
 dn: cn=admins,dc=foo,dc=bar
 objectClass: groupOfNames

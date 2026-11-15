@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Query;
 
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
@@ -35,6 +36,7 @@ trait EntryReadTestsTrait
         'createTimestamp' => '/^\d{14}Z$/',
         'entryUUID' => '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/',
         'modifyTimestamp' => '/^\d{14}Z$/',
+        'pwdChangedTime' => '/^\d{14}Z$/',
     ];
 
     private const READ_GENERATED_VALUE = 'a generated value';
@@ -110,16 +112,35 @@ trait EntryReadTestsTrait
     }
 
     /**
-     * A person holding values of every kind a read must return, and a group naming it.
+     * A person holding every kind of value a read returns or withholds, and a group naming it.
      *
      * @return array{string, string} The person's DN and the group's.
      */
     private function seedReadEntry(string $name): array
     {
-        $dn = "cn={$name},ou=people,dc=foo,dc=bar";
+        $area = $this->readAreaDn($name);
+        $dn = $this->readEntryDn($name);
         $group = "cn={$name}-group,dc=foo,dc=bar";
 
-        $this->asAdmin(function (LdapClient $admin) use ($name, $dn, $group): void {
+        $this->asAdmin(function (LdapClient $admin) use ($name, $area, $dn, $group): void {
+            $admin->create(Entry::fromArray(
+                $area,
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => $name,
+                    'administrativeRole' => '2.5.23.4',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                "cn=password-policy,{$area}",
+                [
+                    'objectClass' => ['subentry', 'pwdPolicy'],
+                    'cn' => 'password-policy',
+                    'subtreeSpecification' => '{}',
+                    'pwdAttribute' => 'userPassword',
+                    'pwdInHistory' => '1',
+                ],
+            ));
             $admin->create(Entry::fromArray(
                 $dn,
                 [
@@ -134,6 +155,14 @@ trait EntryReadTestsTrait
                     'seeAlso' => 'CN=Smith\, John, DC=Foo, DC=Bar',
                     'userPassword' => 'secret',
                 ],
+            ));
+            // The policy moves the replaced password into pwdHistory.
+            $admin->send(Operations::modify(
+                $dn,
+                Change::replace(
+                    'userPassword',
+                    'secret-changed',
+                ),
             ));
             $admin->create(Entry::fromArray(
                 $group,
@@ -182,6 +211,7 @@ trait EntryReadTestsTrait
             'memberOf' => [$group],
             'modifiersName' => ['cn=admin,dc=foo,dc=bar'],
             'modifyTimestamp' => [self::READ_GENERATED_VALUE],
+            'pwdChangedTime' => [self::READ_GENERATED_VALUE],
             'structuralObjectClass' => ['inetOrgPerson'],
             'subschemaSubentry' => ['cn=Subschema'],
         ];
@@ -194,7 +224,7 @@ trait EntryReadTestsTrait
     ): Entry {
         $request = $scope === SearchRequest::SCOPE_BASE_OBJECT
             ? Operations::read(
-                "cn={$name},ou=people,dc=foo,dc=bar",
+                $this->readEntryDn($name),
                 ...$attributes,
             )
             : Operations::search(
@@ -212,6 +242,16 @@ trait EntryReadTestsTrait
         );
 
         return $entries->first() ?? self::fail('The read returned no entry.');
+    }
+
+    private function readAreaDn(string $name): string
+    {
+        return "ou={$name},ou=people,dc=foo,dc=bar";
+    }
+
+    private function readEntryDn(string $name): string
+    {
+        return "cn={$name},{$this->readAreaDn($name)}";
     }
 
     /**
