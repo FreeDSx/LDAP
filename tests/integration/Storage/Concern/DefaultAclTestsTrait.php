@@ -16,10 +16,12 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -105,6 +107,123 @@ trait DefaultAclTestsTrait
         yield 'pwdHistory' => [PasswordPolicyOid::NAME_PWD_HISTORY];
     }
 
+    #[DataProvider('passwordPolicyStateAttributeProvider')]
+    public function testAPasswordPolicyStateAttributeIsWithheldFromAnotherUser(string $attribute): void
+    {
+        $this->authenticateUser();
+
+        $entry = $this->ldapClient()->read(
+            'ou=people,dc=foo,dc=bar',
+            [
+                $attribute,
+                '*',
+                '+',
+            ],
+        );
+        $matched = $this->ldapClient()->search(
+            Operations::search(Filters::present($attribute))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertNotNull($entry);
+        self::assertNull($entry->get($attribute));
+        self::assertCount(
+            0,
+            $matched,
+        );
+    }
+
+    #[DataProvider('passwordPolicyStateAttributeProvider')]
+    public function testTheAdministratorReadsAndFiltersOnAPasswordPolicyStateAttribute(string $attribute): void
+    {
+        $this->authenticateAdmin();
+
+        $entry = $this->ldapClient()->read(
+            'ou=people,dc=foo,dc=bar',
+            [$attribute],
+        );
+        $matched = $this->ldapClient()->search(
+            Operations::search(
+                Filters::present($attribute),
+                '1.1',
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertNotNull($entry?->get($attribute));
+        self::assertContains(
+            'ou=people,dc=foo,dc=bar',
+            array_map(
+                static fn(Entry $match): string => $match->getDn()->toString(),
+                $matched->toArray(),
+            ),
+        );
+    }
+
+    public function testAnIdentityCannotReadItsOwnPasswordPolicyState(): void
+    {
+        $attributes = [
+            PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+            PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
+        ];
+        $asAdministrator = $this->asAdmin(fn(LdapClient $admin): ?Entry => $admin->read(
+            'cn=user,dc=foo,dc=bar',
+            $attributes,
+        ));
+
+        $asSelf = $this->ldapClient()->read(
+            'cn=user,dc=foo,dc=bar',
+            [
+                ...$attributes,
+                '+',
+            ],
+        );
+
+        self::assertNotNull($asSelf);
+        foreach ($attributes as $attribute) {
+            self::assertNotNull($asAdministrator?->get($attribute));
+            self::assertNull($asSelf->get($attribute));
+        }
+    }
+
+    #[DataProvider('storedPasswordPolicyStateProvider')]
+    public function testTheAdministratorMatchesTheStoredPasswordPolicyState(
+        string $attribute,
+        string $dn,
+        string $value,
+    ): void {
+        $this->authenticateAdmin();
+
+        $matched = $this->ldapClient()->search(
+            Operations::search(
+                Filters::equal(
+                    $attribute,
+                    $value,
+                ),
+                '1.1',
+            )
+                ->base($dn)
+                ->useBaseScope(),
+        );
+
+        self::assertCount(
+            1,
+            $matched,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function passwordPolicyStateAttributeProvider(): iterable
+    {
+        foreach (AclRules::PASSWORD_POLICY_STATE_ATTRIBUTES as $attribute) {
+            yield $attribute => [$attribute];
+        }
+    }
+
     public function testNegatingAWithheldAssertionMatchesEveryEntry(): void
     {
         $this->authenticateUser();
@@ -125,6 +244,76 @@ trait DefaultAclTestsTrait
             count($all),
             $negated,
         );
+    }
+
+    #[DataProvider('storedWithheldValueProvider')]
+    #[DataProvider('storedPasswordPolicyStateProvider')]
+    public function testNegatingTheStoredValueOfAWithheldAttributeStillMatchesTheEntry(
+        string $attribute,
+        string $dn,
+        string $value,
+    ): void {
+        $this->authenticateUser();
+
+        $negated = $this->ldapClient()->search(
+            Operations::search(
+                Filters::not(Filters::equal(
+                    $attribute,
+                    $value,
+                )),
+                '1.1',
+            )
+                ->base($dn)
+                ->useBaseScope(),
+        );
+
+        self::assertCount(
+            1,
+            $negated,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function storedWithheldValueProvider(): iterable
+    {
+        yield 'userPassword' => [
+            'userPassword',
+            'cn=admin,dc=foo,dc=bar',
+            '{SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=',
+        ];
+        yield 'pwdHistory' => [
+            PasswordPolicyOid::NAME_PWD_HISTORY,
+            'cn=admin,dc=foo,dc=bar',
+            '20260101000000Z#1.3.6.1.4.1.1466.115.121.1.40#6#old-pw',
+        ];
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function storedPasswordPolicyStateProvider(): iterable
+    {
+        $stored = [
+            PasswordPolicyOid::NAME_PWD_CHANGED_TIME => '20260101000000Z',
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME => '20260102000000Z',
+            PasswordPolicyOid::NAME_PWD_FAILURE_TIME => '20260102000000.000001Z',
+            PasswordPolicyOid::NAME_PWD_GRACE_USE_TIME => '20260103000000.000001Z',
+            PasswordPolicyOid::NAME_PWD_START_TIME => '20250101000000Z',
+            PasswordPolicyOid::NAME_PWD_END_TIME => '20300101000000Z',
+            PasswordPolicyOid::NAME_PWD_LAST_SUCCESS => '20260104000000Z',
+            PasswordPolicyOid::NAME_PWD_RESET => 'TRUE',
+            PasswordPolicyOid::NAME_PWD_POLICY_SUBENTRY => 'ou=people,dc=foo,dc=bar',
+        ];
+
+        foreach ($stored as $attribute => $value) {
+            yield $attribute => [
+                $attribute,
+                'ou=people,dc=foo,dc=bar',
+                $value,
+            ];
+        }
     }
 
     public function testAConjunctionWithAWithheldAssertionMatchesNothing(): void

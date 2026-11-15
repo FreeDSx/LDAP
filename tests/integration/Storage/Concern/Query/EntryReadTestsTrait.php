@@ -36,7 +36,6 @@ trait EntryReadTestsTrait
         'createTimestamp' => '/^\d{14}Z$/',
         'entryUUID' => '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/',
         'modifyTimestamp' => '/^\d{14}Z$/',
-        'pwdChangedTime' => '/^\d{14}Z$/',
     ];
 
     private const READ_GENERATED_VALUE = 'a generated value';
@@ -211,7 +210,6 @@ trait EntryReadTestsTrait
             'memberOf' => [$group],
             'modifiersName' => ['cn=admin,dc=foo,dc=bar'],
             'modifyTimestamp' => [self::READ_GENERATED_VALUE],
-            'pwdChangedTime' => [self::READ_GENERATED_VALUE],
             'structuralObjectClass' => ['inetOrgPerson'],
             'subschemaSubentry' => ['cn=Subschema'],
         ];

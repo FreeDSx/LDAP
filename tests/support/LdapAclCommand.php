@@ -262,13 +262,14 @@ class LdapAclCommand extends Command
                                 Target::subtree('ou=people,dc=foo,dc=bar'),
                             )->forWrite(),
                         )
-                        // userPassword ships confidential, so reading it needs a grant on top of the rules above.
+                        // Reading userPassword or the password policy state needs a confidential grant.
                         ->replaceConfidentialAccess(
                             ConfidentialAccessRule::allow(
                                 Subject::group('cn=admins,dc=foo,dc=bar'),
                                 'userPassword',
                             ),
                         )
+                        ->withPasswordPolicyStateAccess(Subject::group('cn=admins,dc=foo,dc=bar'))
                         // The read deny above still leaves the value guessable through a filter, so pair it with this.
                         ->replaceFilterAccess(
                             FilterAccessRule::deny(
