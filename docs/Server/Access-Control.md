@@ -48,6 +48,7 @@ With no access control configured, the server applies a secure default (`AclRule
 - Writes require a grant. An identity may modify its own entry, limited to a small set of personal attributes.
 - Everything else is left to the administrator, when one is configured.
 - `userPassword` can be changed only by the entry owner and the administrator, and is never returned in search results.
+- `pwdHistory`, which holds prior passwords, is never returned in search results.
 - Password Modify (RFC 3062) is limited to self and the administrator.
 - Privileged controls and extended operations are limited to the administrator.
 
@@ -250,7 +251,7 @@ replacing them, so they compose on `secureDefault()` or on a policy built from `
 |-----------------------------------------------------------|-----------------------------------------------------------------------------------|
 | `withFullAccess($subject, $target = new AnyTargetMatcher())`   | Every operation, every attribute write, and relocation over the target            |
 | `withSelfServiceWrites($attributes = AclRules::SELF_WRITABLE_ATTRIBUTES)` | Modify on an identity's own entry, limited to the given attributes |
-| `withCredentialProtection($administrators = null)`        | The `userPassword` and Password Modify rules, plus privileged controls and extended operations for the administrator |
+| `withCredentialProtection($administrators = null)`        | The `userPassword`, `pwdHistory` and Password Modify rules, plus privileged controls and extended operations for the administrator |
 | `withReplicaGrants($replica, $target = new AnyTargetMatcher())` | The content-sync control, the ppolicy-forward extended operation, and the policy-state writes that forward needs |
 
 `AclRules::secureDefault()` is built from the first three. `withFullAccess()` is what it applies to the configured
@@ -467,7 +468,8 @@ rule if that matters to you.
 ## Confidential Attributes
 
 An attribute the schema marks `X-CONFIDENTIAL` is withheld from anyone without an explicit grant, both in results and
-in search filters. `userPassword` ships this way, so out of the box it is writable by its owner and readable by no one.
+in search filters. `userPassword` and `pwdHistory` ship this way. Out of the box `userPassword` is writable by its owner
+and readable by no one, and `pwdHistory` is readable by no one.
 
 A withheld attribute behaves as though it is not present on the entry. Filtering on one matches nothing, and it never
 appears in a result:

@@ -528,6 +528,7 @@ final readonly class AclRules
      * Prepend the credential-protection rules to this rule set so they take precedence (first match wins):
      *
      * - userPassword is writable by self and the administrator, and readable by no one.
+     * - pwdHistory, which holds prior passwords, is readable by no one.
      * - PasswordModify is permitted for self and the administrator, denied to everyone else.
      * - Privileged controls are allowed to the administrator (otherwise the default deny applies).
      * - Privileged extended operations are allowed to the administrator (otherwise the default deny applies).
@@ -543,7 +544,7 @@ final readonly class AclRules
                 OperationType::PasswordModify,
             ),
         ];
-        $userPassword = [
+        $credentials = [
             AttributeRule::allow(
                 Subject::self(),
                 $anyTarget,
@@ -559,7 +560,7 @@ final readonly class AclRules
                 $anyTarget,
                 OperationType::PasswordModify,
             );
-            $userPassword[] = AttributeRule::allow(
+            $credentials[] = AttributeRule::allow(
                 $administrators,
                 $anyTarget,
                 'userPassword',
@@ -573,20 +574,21 @@ final readonly class AclRules
             $anyTarget,
             OperationType::PasswordModify,
         );
-        $userPassword[] = AttributeRule::deny(
+        $credentials[] = AttributeRule::deny(
             Subject::anyone(),
             $anyTarget,
             'userPassword',
         )->forWrite();
-        $userPassword[] = AttributeRule::deny(
+        $credentials[] = AttributeRule::deny(
             Subject::anyone(),
             $anyTarget,
             'userPassword',
+            PasswordPolicyOid::NAME_PWD_HISTORY,
         )->forRead();
 
         return $this
             ->prependOperationRules(...$passwordModify)
-            ->prependAttributeRules(...$userPassword)
+            ->prependAttributeRules(...$credentials)
             ->prependControlRules(...$controls)
             ->prependExtendedOperationRules(...$extendedOps);
     }
