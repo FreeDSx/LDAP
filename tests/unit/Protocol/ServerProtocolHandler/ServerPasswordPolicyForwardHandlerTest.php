@@ -111,6 +111,34 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         );
     }
 
+    public function test_a_forwarded_state_is_written_without_restamping_the_modify_metadata(): void
+    {
+        $this->storeTarget(['cn' => ['user']]);
+        $this->writes
+            ->expects(self::once())
+            ->method('handle')
+            ->with(
+                self::isInstanceOf(ComputeUpdateCommand::class),
+                self::callback(static fn(WriteContext $context): bool => $context->keepsModifyMetadata()),
+            );
+
+        $stream = $this->subject->handleRequest(
+            $this->messageFor(new ForwardPasswordPolicyStateRequest(
+                self::UUID,
+                [new DateTimeImmutable(
+                    '2026-05-20 11:59:00',
+                    new DateTimeZone('UTC'),
+                )],
+            )),
+            $this->createMock(TokenInterface::class),
+        );
+
+        self::assertCount(
+            1,
+            [...$stream->messages],
+        );
+    }
+
     public function test_a_forwarded_success_clears_the_superseded_failures(): void
     {
         $success = new DateTimeImmutable(

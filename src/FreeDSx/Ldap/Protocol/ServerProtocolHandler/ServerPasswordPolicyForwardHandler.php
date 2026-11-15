@@ -162,7 +162,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
                     return $changes;
                 },
             ),
-            WriteContext::system(
+            WriteContext::bookkeeping(
                 new SystemToken(),
                 new ControlBag(),
             ),

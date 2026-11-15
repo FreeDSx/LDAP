@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use FreeDSx\Ldap\Server\Token\SystemToken;
 use PHPUnit\Framework\TestCase;
 
 final class OperationalAttributeGeneratorTest extends TestCase
@@ -516,6 +517,53 @@ final class OperationalAttributeGeneratorTest extends TestCase
         self::assertSame(
             'cn=Admin,dc=example,dc=com',
             $this->entry->get('modifiersName')?->getValues()[0],
+        );
+    }
+
+    public function test_apply_for_modify_under_a_bookkeeping_context_keeps_the_modify_metadata(): void
+    {
+        $this->entry->set(
+            'modifyTimestamp',
+            '20200101000000Z',
+        );
+        $this->entry->set(
+            'modifiersName',
+            'cn=Admin,dc=example,dc=com',
+        );
+
+        $this->subject->applyForModify(
+            $this->entry,
+            WriteContext::bookkeeping(
+                new SystemToken(),
+                new ControlBag(),
+            ),
+        );
+
+        self::assertSame(
+            ['20200101000000Z'],
+            $this->entry->get('modifyTimestamp')?->getValues(),
+        );
+        self::assertSame(
+            ['cn=Admin,dc=example,dc=com'],
+            $this->entry->get('modifiersName')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_modify_under_a_bookkeeping_context_still_supplies_implied_classes(): void
+    {
+        $entry = $this->personEntry('inetOrgPerson');
+
+        $this->classAwareGenerator()->applyForModify(
+            $entry,
+            WriteContext::bookkeeping(
+                new SystemToken(),
+                new ControlBag(),
+            ),
+        );
+
+        self::assertSame(
+            ['inetOrgPerson', 'person', 'top'],
+            $entry->get('objectClass')?->getValues(),
         );
     }
 

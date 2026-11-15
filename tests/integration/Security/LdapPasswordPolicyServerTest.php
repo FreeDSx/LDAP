@@ -354,6 +354,56 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         );
     }
 
+    public function testRecordingBindStateLeavesTheModifyMetadataAsItWas(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=inside-user,ou=secure,dc=foo,dc=bar';
+        $before = $this->modifyMetadataOf($dn);
+
+        $this->ldapClient()->bind(
+            $dn,
+            self::PASSWORD,
+        );
+        $this->failBinds(
+            $dn,
+            self::MAX_FAILURE,
+        );
+
+        self::assertSame(
+            $before,
+            $this->modifyMetadataOf($dn),
+        );
+        $this->expectException(BindException::class);
+
+        $this->ldapClient()->bind(
+            $dn,
+            self::PASSWORD,
+        );
+    }
+
+    /**
+     * @return array{array<string>|null, array<string>|null}
+     */
+    private function modifyMetadataOf(string $dn): array
+    {
+        $this->ldapClient()->bind(
+            'cn=outside-user,dc=foo,dc=bar',
+            self::PASSWORD,
+        );
+        $entry = $this->ldapClient()->read(
+            $dn,
+            [
+                'modifyTimestamp',
+                'modifiersName',
+            ],
+        );
+
+        return [
+            $entry?->get('modifyTimestamp')?->getValues(),
+            $entry?->get('modifiersName')?->getValues(),
+        ];
+    }
+
     /**
      * No policy is configured in PHP for this run, so enforcement can only come from the DIT.
      */

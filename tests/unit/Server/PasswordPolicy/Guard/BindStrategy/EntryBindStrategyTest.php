@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -83,6 +84,22 @@ final class EntryBindStrategyTest extends TestCase
                 $this->attempt(),
                 fn(UserPasswordState $state): RecordedOutcome => $locked,
             ),
+        );
+    }
+
+    public function test_the_state_is_recorded_without_restamping_the_modify_metadata(): void
+    {
+        $this->writes
+            ->expects(self::once())
+            ->method('handle')
+            ->with(
+                self::isInstanceOf(ComputeUpdateCommand::class),
+                self::callback(static fn(WriteContext $context): bool => $context->keepsModifyMetadata()),
+            );
+
+        $this->subject->record(
+            $this->attempt(),
+            fn(UserPasswordState $state): RecordedOutcome => $this->allowed(),
         );
     }
 
