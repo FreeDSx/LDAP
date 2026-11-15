@@ -90,7 +90,8 @@
     "compare-ldap": "tests/profile/compare-ldap.sh",
     "profile": "tests/profile/profile.sh",
     "profile-up": "docker compose -f tests/profile/docker-compose.yml up -d --build --wait",
-    "profile-down": "docker compose -f tests/profile/docker-compose.yml down",
+    "profile-up-persistent": "docker compose -f tests/profile/docker-compose.yml -f tests/profile/docker-compose.persistent.yml up -d --build --wait",
+    "profile-down": "docker compose -f tests/profile/docker-compose.yml -f tests/profile/docker-compose.persistent.yml down",
     "analyse": [
       "phpstan --memory-limit=-1 analyse"
     ],

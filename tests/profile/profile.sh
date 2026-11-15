@@ -4,11 +4,11 @@
 #                            [--duration=30] [--warmup=3] [--seed-entries=2000]
 #                            [--cpus=4] [--rate=249] [--port=10389]
 #                            [--mix=search-sub=100]
-#                            [--keep-up] [--no-build]
+#                            [--keep-up] [--no-build] [--persistent]
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
-COMPOSE_FILE="tests/profile/docker-compose.yml"
+COMPOSE=(-f tests/profile/docker-compose.yml)
 SERVICE="freedsx"
 CONTAINER="freedsx-profile"
 
@@ -39,6 +39,7 @@ for arg in "$@"; do
         --mix=*)          MIX="${arg#*=}" ;;
         --keep-up)        KEEP_UP=1 ;;
         --no-build)       BUILD_ARG="" ;;
+        --persistent)     COMPOSE+=(-f tests/profile/docker-compose.persistent.yml) ;;
         -h|--help)
             sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
@@ -59,7 +60,7 @@ OUT_DIR="tests/profile/out"
 mkdir -p "$OUT_DIR"
 
 echo "==> bringing up profile stack (cpus=$CPUS)"
-PROFILE_CPUS="$CPUS" docker compose -f "$COMPOSE_FILE" up -d $BUILD_ARG --wait "$SERVICE"
+PROFILE_CPUS="$CPUS" docker compose "${COMPOSE[@]}" up -d $BUILD_ARG --wait "$SERVICE"
 
 echo "==> ensuring composer deps are installed"
 docker exec "$CONTAINER" bash -lc 'test -f vendor/autoload.php || composer install --no-interaction --no-progress'
@@ -122,7 +123,7 @@ docker exec "$CONTAINER" bash -lc "pkill -f 'ldap-backend-storage\.php' || true"
 
 if [[ "$KEEP_UP" -eq 0 ]]; then
     echo "==> tearing down profile stack (pass --keep-up to skip)"
-    docker compose -f "$COMPOSE_FILE" down
+    docker compose "${COMPOSE[@]}" down
 fi
 
 echo
