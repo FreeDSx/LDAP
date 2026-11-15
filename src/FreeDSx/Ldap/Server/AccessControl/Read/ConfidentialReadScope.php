@@ -53,7 +53,15 @@ final class ConfidentialReadScope implements ReadScopeInterface
             return $verdict;
         }
 
-        return ReadVerdict::PerEntry;
+        // A confidential grant depends on the identity alone and needs no per-entry check.
+        $withheld = $this->policy->isWithheldFromResult(
+            $name,
+            $this->token,
+        );
+
+        return $withheld
+            ? ReadVerdict::Deny
+            : $verdict;
     }
 
     public function isReadableOn(

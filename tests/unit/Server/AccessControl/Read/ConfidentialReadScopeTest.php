@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\AccessControl\Read\ReadScopeInterface;
 use FreeDSx\Ldap\Server\AccessControl\Read\ReadVerdict;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -67,17 +68,52 @@ final class ConfidentialReadScopeTest extends TestCase
         );
     }
 
-    public function test_a_confidential_attribute_the_inner_scope_allows_is_decided_on_each_entry(): void
+    public function test_a_confidential_attribute_is_denied_outright_for_an_identity_without_a_grant(): void
     {
         $this->inner
             ->method('verdict')
             ->with('userpassword')
             ->willReturn(ReadVerdict::Allow);
+        $this->accessControl
+            ->expects(self::once())
+            ->method('hasConfidentialAccess')
+            ->with(
+                $this->user,
+                'userpassword',
+            )
+            ->willReturn(false);
 
         self::assertSame(
-            ReadVerdict::PerEntry,
+            ReadVerdict::Deny,
             $this->subject->verdict('userpassword'),
         );
+    }
+
+    #[DataProvider('innerVerdictProvider')]
+    public function test_a_confidential_attribute_keeps_the_inner_verdict_for_an_identity_with_a_grant(
+        ReadVerdict $inner,
+    ): void {
+        $this->inner
+            ->method('verdict')
+            ->with('userpassword')
+            ->willReturn($inner);
+        $this->accessControl
+            ->method('hasConfidentialAccess')
+            ->willReturn(true);
+
+        self::assertSame(
+            $inner,
+            $this->subject->verdict('userpassword'),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{ReadVerdict}>
+     */
+    public static function innerVerdictProvider(): iterable
+    {
+        yield 'allow' => [ReadVerdict::Allow];
+        yield 'per entry' => [ReadVerdict::PerEntry];
     }
 
     public function test_an_attribute_that_is_not_confidential_keeps_the_inner_verdict(): void
