@@ -78,14 +78,15 @@ final readonly class PasswordPolicyAwareAuthenticator implements PasswordAuthent
             state: UserPasswordState::fromEntry($entry),
             policy: $policy,
         );
-        $this->guard->preBind($attempt);
 
+        // Checking the lock only after the password keeps a refused account as costly to answer as a wrong password.
         try {
             $token = $this->decoratedAuthenticator->authenticate(
                 $name,
                 $password,
             );
         } catch (OperationException $cause) {
+            $this->guard->preBind($attempt);
             if ($cause->getCode() === ResultCode::INVALID_CREDENTIALS) {
                 $this->guard->recordFailure($attempt);
             }
@@ -93,6 +94,7 @@ final readonly class PasswordPolicyAwareAuthenticator implements PasswordAuthent
             throw $cause;
         }
 
+        $this->guard->preBind($attempt);
         $this->guard->recordSuccess($attempt);
 
         if ($attempt->state->mustChangeUnder($policy)) {

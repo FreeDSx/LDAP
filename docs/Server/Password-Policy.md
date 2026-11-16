@@ -270,7 +270,9 @@ In a replicated setup, lockout can apply across the whole cluster so failures ag
 
 When both `pwdMinDelay` and `pwdMaxDelay` are set to positive values, the server delays the response to a failed
 bind to slow brute-force attempts. The delay starts at `pwdMinDelay` seconds on the first consecutive failure and
-doubles with each subsequent failure, capped at `pwdMaxDelay`.
+doubles with each subsequent failure, capped at `pwdMaxDelay`. A bind the policy refuses outright (a locked or idle
+account, or one outside its validity window) also waits `pwdMinDelay`, which keeps it from answering faster than a wrong
+password.
 
 Note: Either value unset or `0` disables the delay (the default).
 

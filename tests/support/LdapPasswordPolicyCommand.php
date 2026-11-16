@@ -74,6 +74,13 @@ final class LdapPasswordPolicyCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Seconds a failed bind waits under the in-PHP policy, doubling up to twice that (0 = no delay)',
                 '0',
+            )
+            ->addOption(
+                'max-failure',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Failed binds that lock an account under the in-PHP policy (0 = no lockout)',
+                '0',
             );
     }
 
@@ -86,7 +93,17 @@ final class LdapPasswordPolicyCommand extends Command
         $useSubentries = $input->getOption('subentry-policy') === true;
         $minDelay = max(
             0,
-            (int) $this->getStringOption($input, 'min-delay'),
+            (int) $this->getStringOption(
+                $input,
+                'min-delay',
+            ),
+        );
+        $maxFailure = max(
+            0,
+            (int) $this->getStringOption(
+                $input,
+                'max-failure',
+            ),
         );
 
         $network = (new NetworkConfig())
@@ -126,6 +143,8 @@ final class LdapPasswordPolicyCommand extends Command
                 ->setPolicy(new PasswordPolicy(
                     change: new PasswordChangeRules(mustChange: true),
                     lockout: new PasswordLockoutRules(
+                        enabled: $maxFailure > 0,
+                        maxFailure: $maxFailure,
                         minDelay: $minDelay,
                         maxDelay: $minDelay * 2,
                     ),
