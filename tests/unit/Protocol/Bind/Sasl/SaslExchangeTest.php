@@ -36,9 +36,6 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
-use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
-use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
@@ -50,15 +47,11 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
-use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
 use FreeDSx\Sasl\Mechanism\MechanismName;
@@ -743,13 +736,6 @@ final class SaslExchangeTest extends TestCase
                     PasswordHashService::class,
                     options: TestServerOptions::cheaplyHashed(),
                 ),
-            ),
-            authzIdResolver: new AuthzIdResolver(
-                $this->createMock(AccessControlInterface::class),
-                $this->createMock(ReadBackendInterface::class),
-                $this->createMock(BindNameResolverInterface::class),
-                new AttributeTypeSpelling(SchemaResource::Core->load()),
-                new EventLogger(null),
             ),
             criticalControls: new CriticalControlValidator(),
             policyContext: $this->policyContext,

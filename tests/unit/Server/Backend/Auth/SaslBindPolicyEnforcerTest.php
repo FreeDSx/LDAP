@@ -67,11 +67,11 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         $enforcer = $this->enforcer(null);
 
         $enforcer->recordFailure(self::USER_DN);
-        $enforcer->enforceSuccess(
+
+        self::assertNull($enforcer->preBind(
             self::USER_DN,
             new Dn(self::USER_DN),
-        );
-
+        ));
         self::assertNull($this->context->getOutcome());
         self::assertNull($this->context->buildResponseControl());
         self::assertFalse($enforcer->mustChangePassword());
@@ -127,7 +127,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         );
     }
 
-    public function test_locked_account_is_denied_on_success(): void
+    public function test_a_locked_account_is_refused_once_the_exchange_completes(): void
     {
         $enforcer = $this->enforcer(
             $this->lockoutPolicy(),
@@ -135,7 +135,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         );
 
         try {
-            $enforcer->enforceSuccess(
+            $enforcer->preBind(
                 self::USER_DN,
                 new Dn(self::USER_DN),
             );
@@ -162,10 +162,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
             [PasswordPolicyOid::NAME_PWD_RESET => 'TRUE'],
         );
 
-        $enforcer->enforceSuccess(
-            self::USER_DN,
-            new Dn(self::USER_DN),
-        );
+        $this->succeed($enforcer);
 
         self::assertTrue($enforcer->mustChangePassword());
 
@@ -184,13 +181,21 @@ final class SaslBindPolicyEnforcerTest extends TestCase
     {
         $enforcer = $this->enforcer(new PasswordPolicy());
 
-        $enforcer->enforceSuccess(
-            self::USER_DN,
-            new Dn(self::USER_DN),
-        );
+        $this->succeed($enforcer);
 
         self::assertNull($this->context->buildResponseControl());
         self::assertFalse($enforcer->mustChangePassword());
+    }
+
+    private function succeed(SaslBindPolicyEnforcer $enforcer): void
+    {
+        $attempt = $enforcer->preBind(
+            self::USER_DN,
+            new Dn(self::USER_DN),
+        );
+        self::assertNotNull($attempt);
+
+        $enforcer->recordSuccess($attempt);
     }
 
     /**

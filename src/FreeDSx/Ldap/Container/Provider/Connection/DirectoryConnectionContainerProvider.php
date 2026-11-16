@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ExternalMechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderInterface;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
@@ -116,6 +117,9 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
             SaslBindPolicyEnforcer::class => $this->makeSaslBindPolicyEnforcer(...),
             MechanismOptionsBuilderFactory::class => $this->makeMechanismOptionsBuilderFactory(...),
             SaslExchange::class => $this->makeSaslExchange(...),
+            SaslAuthorizer::class => static fn(Container $container): SaslAuthorizer => new SaslAuthorizer(
+                $container->get(AuthzIdResolver::class),
+            ),
             SaslBind::class => $this->makeSaslBind(...),
             Authenticator::class => $this->makeAuthenticator(...),
             DispatchAuthorizer::class => $this->makeDispatchAuthorizer(...),
@@ -287,7 +291,6 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
             $container->get(DecodeFailureResponder::class),
             new ResponseFactory(),
             $container->get(MechanismOptionsBuilderFactory::class),
-            $container->get(AuthzIdResolver::class),
             $container->get(CriticalControlValidator::class),
             $container->get(PasswordPolicyContext::class),
         );
@@ -300,6 +303,7 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
         return new SaslBind(
             queue: $container->get(ServerQueue::class),
             exchange: $container->get(SaslExchange::class),
+            authorizer: $container->get(SaslAuthorizer::class),
             sasl: new Sasl(new SaslOptions(supported: $this->parseKnownMechanisms($mechanisms))),
             mechanisms: $mechanisms,
             eventLogger: $container->get(EventLogger::class),

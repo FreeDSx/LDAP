@@ -58,6 +58,15 @@ sn: User
 userPassword: 12345
 pwdPolicySubentry: cn=lenient,dc=foo,dc=bar
 
+# The harness's administrator, which may assume other identities, made lockable by pointing at the lockout policy
+dn: cn=admin,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: admin
+uid: admin
+sn: Admin
+userPassword: 12345
+pwdPolicySubentry: cn=policy,ou=secure,dc=foo,dc=bar
+
 dn: ou=exempt,ou=secure,dc=foo,dc=bar
 objectClass: organizationalUnit
 ou: exempt

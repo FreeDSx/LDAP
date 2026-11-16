@@ -32,7 +32,6 @@ final readonly class SaslExchangeResult
         private LdapMessageRequest $lastMessage,
         private ?string $username,
         private ?Dn $resolvedDn = null,
-        private ?Dn $authorizingDn = null,
         private ?string $serverFinal = null,
     ) {}
 
@@ -59,10 +58,5 @@ final readonly class SaslExchangeResult
     public function getResolvedDn(): ?Dn
     {
         return $this->resolvedDn;
-    }
-
-    public function getAuthorizingDn(): ?Dn
-    {
-        return $this->authorizingDn;
     }
 }
