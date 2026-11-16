@@ -433,6 +433,35 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         }
     }
 
+    public function testALockedAccountWaitsTheFailedBindDelayBeforeRefusing(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            ['--min-delay=1', '--max-failure=1'],
+        );
+        $dn = 'cn=user,dc=foo,dc=bar';
+        $this->failBinds(
+            $dn,
+            1,
+        );
+        $started = hrtime(true);
+
+        $refused = $this->policyBind(
+            $dn,
+            self::PASSWORD,
+        );
+
+        self::assertGreaterThanOrEqual(
+            1.0,
+            (hrtime(true) - $started) / 1e9,
+        );
+        self::assertSame(
+            [ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.', null],
+            $refused,
+        );
+    }
+
     /**
      * @return array{int, string, ?int}
      */

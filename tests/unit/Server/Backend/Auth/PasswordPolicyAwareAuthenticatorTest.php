@@ -101,20 +101,83 @@ final class PasswordPolicyAwareAuthenticatorTest extends TestCase
         self::assertNull($this->context->getOutcome());
     }
 
-    public function test_locked_account_is_denied_before_inner_runs(): void
+    public function test_a_locked_account_is_refused_after_its_password_is_checked(): void
     {
         $this->nameResolver
             ->method('resolve')
-            ->willReturn($this->entry([
-                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME => PasswordPolicyOid::PERMANENT_LOCK_SENTINEL,
-            ]));
+            ->willReturn($this->lockedEntry());
         $this->inner
-            ->expects(self::never())
-            ->method('authenticate');
+            ->expects(self::once())
+            ->method('authenticate')
+            ->willReturn(BindToken::fromDn(self::DN));
 
-        $this->expectException(OperationException::class);
+        try {
+            $this->authenticator(new PasswordPolicy())->authenticate(
+                'foo',
+                'secret',
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                [ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.'],
+                [$e->getCode(), $e->getMessage()],
+            );
+        }
 
-        $this->authenticator(new PasswordPolicy())->authenticate(
+        self::assertSame(
+            [],
+            $this->writes,
+        );
+    }
+
+    public function test_a_wrong_password_for_a_locked_account_is_refused_without_recording_a_failure(): void
+    {
+        $this->nameResolver
+            ->method('resolve')
+            ->willReturn($this->lockedEntry());
+        $this->inner
+            ->expects(self::once())
+            ->method('authenticate')
+            ->willThrowException(new OperationException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+            ));
+
+        try {
+            $this->authenticator($this->lockoutPolicy())->authenticate(
+                'foo',
+                'wrong',
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                [ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.'],
+                [$e->getCode(), $e->getMessage()],
+            );
+        }
+
+        self::assertSame(
+            [],
+            $this->writes,
+        );
+        self::assertTrue($this->context->getOutcome()?->denied);
+    }
+
+    public function test_a_locked_account_is_refused_even_when_the_password_check_fails_otherwise(): void
+    {
+        $this->nameResolver
+            ->method('resolve')
+            ->willReturn($this->lockedEntry());
+        $this->inner
+            ->method('authenticate')
+            ->willThrowException(new OperationException(
+                'Server is busy.',
+                ResultCode::BUSY,
+            ));
+
+        $this->expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->authenticator($this->lockoutPolicy())->authenticate(
             'foo',
             'secret',
         );
@@ -256,6 +319,13 @@ final class PasswordPolicyAwareAuthenticatorTest extends TestCase
             new Dn(self::DN),
             $attributes + ['entryUUID' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
         );
+    }
+
+    private function lockedEntry(): Entry
+    {
+        return $this->entry([
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME => PasswordPolicyOid::PERMANENT_LOCK_SENTINEL,
+        ]);
     }
 
     private function lockoutPolicy(): PasswordPolicy

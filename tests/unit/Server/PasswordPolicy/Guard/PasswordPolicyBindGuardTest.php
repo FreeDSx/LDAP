@@ -127,6 +127,10 @@ final class PasswordPolicyBindGuardTest extends TestCase
 
         self::assertNull($this->context->getOutcome());
         self::assertTrue($this->recordedChanges->isEmpty());
+        self::assertSame(
+            [],
+            $this->sleeper->durations,
+        );
     }
 
     public function test_preBind_denies_a_locked_account_as_a_wrong_password(): void
@@ -146,13 +150,35 @@ final class PasswordPolicyBindGuardTest extends TestCase
         $this->assertEventRecorded(ServerEvent::PasswordPolicyAccountLocked);
     }
 
+    public function test_preBind_waits_the_first_failure_delay_before_refusing(): void
+    {
+        try {
+            $this->subject->preBind($this->attempt(
+                new UserPasswordState(permanentlyLocked: true),
+                new PasswordPolicy(
+                    lockout: new PasswordLockoutRules(
+                        enabled: true,
+                        minDelay: 2,
+                        maxDelay: 4,
+                    ),
+                ),
+            ));
+            self::fail('Expected an OperationException.');
+        } catch (OperationException) {
+        }
+
+        self::assertSame(
+            [2.0],
+            $this->sleeper->durations,
+        );
+    }
+
     public function test_preBind_reports_a_locked_account_when_configured(): void
     {
         try {
             $this->reportingSubject->preBind($this->attempt(new UserPasswordState(permanentlyLocked: true)));
             self::fail('Expected an OperationException.');
         } catch (OperationException) {
-            // Expected: the refusal is what carries the reason.
         }
 
         self::assertSame(

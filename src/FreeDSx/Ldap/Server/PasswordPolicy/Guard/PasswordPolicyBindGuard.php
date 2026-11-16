@@ -57,6 +57,8 @@ final readonly class PasswordPolicyBindGuard
             ServerEvent::PasswordPolicyAccountLocked,
             $this->subjectFor($attempt),
         );
+        // Otherwise a refused account answers measurably faster than a name that does not exist.
+        $this->sleeper->sleep($this->engine->initialFailureDelay($attempt->policy));
 
         throw new OperationException(
             $outcome->diagnostic,
