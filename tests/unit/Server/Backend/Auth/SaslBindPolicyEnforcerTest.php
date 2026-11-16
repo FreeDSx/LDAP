@@ -31,7 +31,6 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\EntryBindStrategy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
@@ -39,6 +38,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class SaslBindPolicyEnforcerTest extends TestCase
@@ -55,11 +55,14 @@ final class SaslBindPolicyEnforcerTest extends TestCase
 
     private PasswordPolicyContext $context;
 
+    private RecordingSleeper $sleeper;
+
     protected function setUp(): void
     {
         $this->clock = FrozenClock::fromString(self::NOW);
         $this->context = new PasswordPolicyContext();
         $this->context->setResponseRequested(true);
+        $this->sleeper = new RecordingSleeper();
     }
 
     public function test_without_a_policy_it_does_nothing(): void
@@ -79,9 +82,23 @@ final class SaslBindPolicyEnforcerTest extends TestCase
 
     public function test_null_username_failure_is_ignored(): void
     {
-        $this->enforcer($this->lockoutPolicy())->recordFailure(null);
+        $this->enforcer($this->delayPolicy())->recordFailure(null);
 
         self::assertNull($this->context->getOutcome());
+        self::assertSame(
+            [],
+            $this->sleeper->durations,
+        );
+    }
+
+    public function test_a_failure_for_an_unknown_name_is_delayed_as_a_known_one(): void
+    {
+        $this->enforcer($this->delayPolicy())->recordFailure('cn=nobody,dc=foo,dc=bar');
+
+        self::assertSame(
+            [2.0],
+            $this->sleeper->durations,
+        );
     }
 
     public function test_failure_is_recorded_through_the_guard(): void
@@ -237,7 +254,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
             ),
             $this->context,
             new EventLogger(null, EventLogPolicy::all()),
-            new BlockingSleeper(),
+            $this->sleeper,
             reportAccountLock: true,
         );
 
@@ -260,6 +277,16 @@ final class SaslBindPolicyEnforcerTest extends TestCase
             lockout: new PasswordLockoutRules(
                 enabled: true,
                 maxFailure: 1,
+            ),
+        );
+    }
+
+    private function delayPolicy(): PasswordPolicy
+    {
+        return new PasswordPolicy(
+            lockout: new PasswordLockoutRules(
+                minDelay: 2,
+                maxDelay: 4,
             ),
         );
     }

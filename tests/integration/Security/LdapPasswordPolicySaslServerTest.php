@@ -262,6 +262,26 @@ final class LdapPasswordPolicySaslServerTest extends ServerTestCase
         );
     }
 
+    public function testAFailedSaslBindForAnUnknownNameWaitsTheFailedBindDelay(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            ['--min-delay=1'],
+        );
+        $started = hrtime(true);
+
+        $this->failedPlainBind(
+            'nobody',
+            'not-the-password',
+        );
+
+        self::assertGreaterThanOrEqual(
+            1.0,
+            (hrtime(true) - $started) / 1e9,
+        );
+    }
+
     /**
      * @return array{int, string}
      */
