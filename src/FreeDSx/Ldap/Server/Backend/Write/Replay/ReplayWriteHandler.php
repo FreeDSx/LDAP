@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
+use FreeDSx\Ldap\Server\Backend\Write\WriteMode;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
@@ -71,7 +72,7 @@ final readonly class ReplayWriteHandler implements MiddlewareHandlerInterface
             new WriteContext(
                 $token,
                 $controls,
-                isSystem: true,
+                WriteMode::system(),
                 controlEvaluator: new WriteControlEvaluator(
                     $this->assertions,
                     $token,

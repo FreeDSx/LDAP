@@ -27,16 +27,21 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 final readonly class WriteContext
 {
+    private WriteMode $mode;
+
+    /**
+     * @param WriteMode|null $mode The kind of write, a client's when omitted.
+     */
     public function __construct(
         private TokenInterface $token,
         private ControlBag $controls,
-        private bool $isSystem = false,
+        ?WriteMode $mode = null,
         private SchemaViolations $schemaViolations = new SchemaViolations(),
-        private ?BulkLoadOptions $bulkLoad = null,
         private ?WriteControlEvaluator $controlEvaluator = null,
         private ControlBag $responseControls = new ControlBag(),
-        private bool $keepsModifyMetadata = false,
-    ) {}
+    ) {
+        $this->mode = $mode ?? WriteMode::client();
+    }
 
     /**
      * Build a context for a server-initiated write that bypasses {@see SchemaValidator}.
@@ -48,7 +53,7 @@ final readonly class WriteContext
         return new self(
             $token,
             $controls,
-            isSystem: true,
+            WriteMode::system(),
         );
     }
 
@@ -62,8 +67,7 @@ final readonly class WriteContext
         return new self(
             $token,
             $controls,
-            isSystem: true,
-            keepsModifyMetadata: true,
+            WriteMode::bookkeeping(),
         );
     }
 
@@ -78,8 +82,7 @@ final readonly class WriteContext
         return new self(
             $token,
             $controls,
-            isSystem: true,
-            bulkLoad: $bulkLoad,
+            WriteMode::bulkLoad($bulkLoad),
         );
     }
 
@@ -106,7 +109,7 @@ final readonly class WriteContext
 
     public function isSystem(): bool
     {
-        return $this->isSystem;
+        return $this->mode->isSystem();
     }
 
     /**
@@ -114,7 +117,7 @@ final readonly class WriteContext
      */
     public function keepsModifyMetadata(): bool
     {
-        return $this->keepsModifyMetadata;
+        return $this->mode->keepsModifyMetadata();
     }
 
     public function getControls(): ControlBag
@@ -132,7 +135,7 @@ final readonly class WriteContext
      */
     public function bulkLoadOptions(): ?BulkLoadOptions
     {
-        return $this->bulkLoad;
+        return $this->mode->bulkLoadOptions();
     }
 
     /**
@@ -161,12 +164,10 @@ final readonly class WriteContext
         return new self(
             $this->token,
             $this->controls,
-            $this->isSystem,
+            $this->mode,
             $this->schemaViolations,
-            $this->bulkLoad,
             null,
             $this->responseControls,
-            $this->keepsModifyMetadata,
         );
     }
 }
