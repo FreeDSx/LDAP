@@ -119,7 +119,7 @@ final class RangeRetrievalTest extends TestCase
                 $this->callback(function ($attr) {
                     /** @var Attribute[] $attr */
                     return $attr[0]->getOptions()->first()?->getLowRange() == '1501'
-                        && $attr[0]->getOptions()->first()?->getHighRange() == '*';
+                        && $attr[0]->getOptions()->first()->getHighRange() == '*';
                 }),
             )
             ->willReturn($entry);
