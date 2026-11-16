@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
@@ -46,12 +47,19 @@ use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
+use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
+use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -73,6 +81,7 @@ final class SaslBindTest extends TestCase
         $this->subject = new SaslBind(
             queue: $this->mockQueue,
             exchange: $this->makeExchange(),
+            authorizer: new SaslAuthorizer($this->authzIdResolver()),
             mechanisms: [ServerOptions::SASL_PLAIN],
         );
     }
@@ -201,6 +210,117 @@ final class SaslBindTest extends TestCase
         );
     }
 
+    public function test_a_proxied_bind_applies_the_password_policy_to_the_authenticating_identity(): void
+    {
+        $attempt = $this->attempt();
+        $enforcer = $this->createMock(SaslBindPolicyEnforcer::class);
+        $enforcer
+            ->expects(self::once())
+            ->method('preBind')
+            ->with(
+                'cn=admin,dc=foo,dc=bar',
+                self::callback(static fn(Dn $dn): bool => $dn->toString() === 'cn=admin,dc=foo,dc=bar'),
+            )
+            ->willReturn($attempt);
+        $enforcer
+            ->expects(self::once())
+            ->method('recordSuccess')
+            ->with($attempt);
+
+        $token = $this->proxiedPlainBind($enforcer);
+
+        self::assertSame(
+            'cn=alice,dc=foo,dc=bar',
+            $token->getResolvedDn()->toString(),
+        );
+    }
+
+    public function test_a_locked_identity_is_refused_before_its_authz_id_is_considered(): void
+    {
+        $enforcer = $this->createMock(SaslBindPolicyEnforcer::class);
+        $enforcer
+            ->method('preBind')
+            ->willThrowException(new OperationException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+            ));
+        $accessControl = $this->createMock(AccessControlInterface::class);
+        $accessControl
+            ->expects(self::never())
+            ->method('mayUseControl');
+
+        self::expectException(ResponseAlreadySentException::class);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->refusedAuthzIdBind(
+            $accessControl,
+            $enforcer,
+        );
+    }
+
+    public function test_a_refused_authz_id_records_no_success(): void
+    {
+        $enforcer = $this->createMock(SaslBindPolicyEnforcer::class);
+        $enforcer
+            ->method('preBind')
+            ->willReturn($this->attempt());
+        $enforcer
+            ->expects(self::never())
+            ->method('recordSuccess');
+
+        self::expectException(ResponseAlreadySentException::class);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->refusedAuthzIdBind(
+            $this->createMock(AccessControlInterface::class),
+            $enforcer,
+        );
+    }
+
+    public function test_a_refused_authz_id_logs_the_failure_against_the_authenticating_identity(): void
+    {
+        $logger = new RecordingLogger();
+
+        try {
+            $this->refusedAuthzIdBind(
+                $this->createMock(AccessControlInterface::class),
+                eventLogger: new EventLogger(
+                    $logger,
+                    EventLogPolicy::all(),
+                ),
+            );
+            self::fail('Expected the bind to be refused.');
+        } catch (ResponseAlreadySentException) {
+        }
+
+        $failures = array_values(array_filter(
+            $logger->records,
+            static fn(array $record): bool => ($record['context'][EventContext::EVENT] ?? null)
+                === ServerEvent::BindFailure->value,
+        ));
+        self::assertCount(
+            1,
+            $failures,
+        );
+        self::assertSame(
+            [EventContext::USERNAME => 'cn=admin,dc=foo,dc=bar'],
+            $failures[0]['context'][EventContext::SUBJECT] ?? null,
+        );
+    }
+
+    public function test_an_identity_that_must_change_its_password_may_not_assume_another(): void
+    {
+        $enforcer = $this->createMock(SaslBindPolicyEnforcer::class);
+        $enforcer
+            ->method('mustChangePassword')
+            ->willReturn(true);
+
+        self::expectException(ResponseAlreadySentException::class);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->proxiedPlainBind($enforcer);
+    }
+
     public function test_a_proxy_authz_id_without_the_grant_is_refused_as_invalid_credentials(): void
     {
         $credentials = "dn:cn=alice,dc=foo,dc=bar\x00cn=admin,dc=foo,dc=bar\x0012345";
@@ -213,12 +333,11 @@ final class SaslBindTest extends TestCase
         $accessControl = $this->createMock(AccessControlInterface::class);
         $accessControl->method('mayUseControl')->willReturn(false);
 
-        // The deny occurs after the exchange authenticated; the dispatcher sends the error, not us.
         $this->mockQueue
-            ->expects(self::never())
+            ->expects(self::once())
             ->method('sendMessage');
 
-        self::expectException(OperationException::class);
+        self::expectException(ResponseAlreadySentException::class);
         self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
 
         $this->subjectWith($this->resolverWith(
@@ -241,10 +360,10 @@ final class SaslBindTest extends TestCase
             ->willReturn($identity);
 
         $this->mockQueue
-            ->expects(self::never())
+            ->expects(self::once())
             ->method('sendMessage');
 
-        self::expectException(OperationException::class);
+        self::expectException(ResponseAlreadySentException::class);
         self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
 
         $this->subject->bind(new LdapMessageRequest(
@@ -283,6 +402,7 @@ final class SaslBindTest extends TestCase
         $subject = new SaslBind(
             queue: $this->mockQueue,
             exchange: $this->makeExchange(),
+            authorizer: new SaslAuthorizer($this->authzIdResolver()),
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
         );
 
@@ -332,6 +452,7 @@ final class SaslBindTest extends TestCase
         $subject = new SaslBind(
             queue: $this->mockQueue,
             exchange: $this->makeExchange(),
+            authorizer: new SaslAuthorizer($this->authzIdResolver()),
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
             policyEnforcer: $enforcer,
         );
@@ -406,6 +527,7 @@ final class SaslBindTest extends TestCase
         $subject = new SaslBind(
             queue: $this->mockQueue,
             exchange: $this->makeExchange(),
+            authorizer: new SaslAuthorizer($this->authzIdResolver()),
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
         );
 
@@ -430,7 +552,7 @@ final class SaslBindTest extends TestCase
         ));
     }
 
-    private function makeExchange(?AuthzIdResolver $authzIdResolver = null): SaslExchange
+    private function makeExchange(): SaslExchange
     {
         return new SaslExchange(
             $this->mockQueue,
@@ -446,7 +568,6 @@ final class SaslBindTest extends TestCase
                     options: TestServerOptions::cheaplyHashed(),
                 ),
             ),
-            $authzIdResolver ?? $this->authzIdResolver(),
             new CriticalControlValidator(),
             new PasswordPolicyContext(),
         );
@@ -473,12 +594,103 @@ final class SaslBindTest extends TestCase
         );
     }
 
-    private function subjectWith(AuthzIdResolver $resolver): SaslBind
-    {
+    private function subjectWith(
+        AuthzIdResolver $resolver,
+        ?SaslBindPolicyEnforcer $enforcer = null,
+        ?EventLogger $eventLogger = null,
+    ): SaslBind {
         return new SaslBind(
             queue: $this->mockQueue,
-            exchange: $this->makeExchange($resolver),
+            exchange: $this->makeExchange(),
+            authorizer: new SaslAuthorizer($resolver),
             mechanisms: [ServerOptions::SASL_PLAIN],
+            eventLogger: $eventLogger ?? new EventLogger(null),
+            policyEnforcer: $enforcer,
         );
+    }
+
+    /**
+     * Binds cn=admin by PLAIN with the right password and an authzid naming cn=alice, which it has no grant to assume.
+     *
+     * @throws OperationException
+     */
+    private function refusedAuthzIdBind(
+        AccessControlInterface $accessControl,
+        ?SaslBindPolicyEnforcer $enforcer = null,
+        ?EventLogger $eventLogger = null,
+    ): void {
+        $this->mockAuthenticator
+            ->method('getSaslIdentity')
+            ->willReturn(new SaslIdentity(
+                '12345',
+                new Dn('cn=admin,dc=foo,dc=bar'),
+            ));
+
+        $this->subjectWith(
+            $this->resolverWith(
+                $accessControl,
+                $this->createMock(ReadBackendInterface::class),
+            ),
+            $enforcer,
+            $eventLogger,
+        )->bind(new LdapMessageRequest(
+            1,
+            new SaslBindRequest(
+                'PLAIN',
+                "dn:cn=alice,dc=foo,dc=bar\x00cn=admin,dc=foo,dc=bar\x0012345",
+            ),
+        ));
+    }
+
+    private function attempt(): PasswordBindAttempt
+    {
+        return new PasswordBindAttempt(
+            name: 'cn=admin,dc=foo,dc=bar',
+            dn: new Dn('cn=admin,dc=foo,dc=bar'),
+            uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            state: new UserPasswordState(),
+            policy: new PasswordPolicy(),
+        );
+    }
+
+    /**
+     * Binds cn=admin by PLAIN with an authzid naming cn=alice, under a grant to assume it.
+     */
+    private function proxiedPlainBind(SaslBindPolicyEnforcer $enforcer): BindToken
+    {
+        $this->mockAuthenticator
+            ->method('getSaslIdentity')
+            ->willReturn(new SaslIdentity(
+                '12345',
+                new Dn('cn=admin,dc=foo,dc=bar'),
+            ));
+        $accessControl = $this->createMock(AccessControlInterface::class);
+        $accessControl
+            ->method('mayUseControl')
+            ->willReturn(true);
+        $backend = $this->createMock(ReadBackendInterface::class);
+        $backend
+            ->method('get')
+            ->willReturn(new Entry(new Dn('cn=alice,dc=foo,dc=bar')));
+
+        $token = $this->subjectWith(
+            $this->resolverWith(
+                $accessControl,
+                $backend,
+            ),
+            $enforcer,
+        )->bind(new LdapMessageRequest(
+            1,
+            new SaslBindRequest(
+                'PLAIN',
+                "dn:cn=alice,dc=foo,dc=bar\x00cn=admin,dc=foo,dc=bar\x0012345",
+            ),
+        ));
+        self::assertInstanceOf(
+            BindToken::class,
+            $token,
+        );
+
+        return $token;
     }
 }

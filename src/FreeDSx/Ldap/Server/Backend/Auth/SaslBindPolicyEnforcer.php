@@ -68,21 +68,36 @@ readonly class SaslBindPolicyEnforcer
     }
 
     /**
-     * @throws OperationException when the account is locked or the password is expired without grace.
+     * Refuses a locked account that completed an exchange, returning the attempt to record once the bind succeeds.
+     *
+     * @throws OperationException when the account is locked.
      */
-    public function enforceSuccess(
+    public function preBind(
         string $username,
         Dn $resolvedDn,
-    ): void {
+    ): ?PasswordBindAttempt {
         $entry = $this->backend->get($resolvedDn);
-        $attempt = $entry !== null
-            ? $this->attemptFor($username, $entry)
-            : null;
+        if ($entry === null) {
+            return null;
+        }
+        $attempt = $this->attemptFor(
+            $username,
+            $entry,
+        );
         if ($attempt === null) {
-            return;
+            return null;
         }
 
         $this->guard->preBind($attempt);
+
+        return $attempt;
+    }
+
+    /**
+     * @throws OperationException when the password is expired without grace.
+     */
+    public function recordSuccess(PasswordBindAttempt $attempt): void
+    {
         $this->guard->recordSuccess($attempt);
     }
 

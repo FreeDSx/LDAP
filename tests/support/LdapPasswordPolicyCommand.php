@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
+use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
@@ -22,6 +25,8 @@ final class LdapPasswordPolicyCommand extends Command
     use ConsoleOptionsTrait;
 
     private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
+
+    private const RESET_PROXY_DN = 'cn=reset-proxy,dc=foo,dc=bar';
 
     private const SSL_KEY = __DIR__ . '/../resources/cert/slapd.key';
 
@@ -96,6 +101,11 @@ final class LdapPasswordPolicyCommand extends Command
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
         $options->getPasswordConfig()->setReportAccountLock($input->getOption('report-account-lock') === true);
+        $options->setAclRules($options->getAclRules()->appendControlRules(ControlRule::allow(
+            Subject::dn(self::RESET_PROXY_DN),
+            Target::any(),
+            Control::OID_PROXY_AUTHORIZATION,
+        )));
 
         // Left unset for the subentry run, so any enforcement observed can only come from the DIT.
         if (!$useSubentries) {

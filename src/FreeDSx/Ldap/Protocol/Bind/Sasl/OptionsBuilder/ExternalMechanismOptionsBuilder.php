@@ -62,8 +62,7 @@ final class ExternalMechanismOptionsBuilder implements MechanismOptionsBuilderIn
     }
 
     /**
-     * Validates the channel and resolves the certificate's authentication identity. A client-supplied
-     * authzId is honored later, uniformly, by the SASL exchange.
+     * Validates the channel and resolves the certificate's authentication identity, leaving any authzid to the bind.
      *
      * @throws OperationException when the channel is unsuitable for EXTERNAL
      */

@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\PlainOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -133,6 +134,132 @@ final class LdapPasswordPolicySaslServerTest extends ServerTestCase
                 'not-the-password',
             ),
         );
+
+        $this->ldapClient()->bind(
+            'cn=admin,dc=foo,dc=bar',
+            '12345',
+        );
+        $entry = $this->ldapClient()->read(
+            'cn=inside-user,ou=secure,dc=foo,dc=bar',
+            [PasswordPolicyOid::NAME_PWD_FAILURE_TIME],
+        );
+
+        self::assertNotNull($entry);
+        self::assertCount(
+            self::MAX_FAILURE,
+            $entry->get(PasswordPolicyOid::NAME_PWD_FAILURE_TIME)?->getValues() ?? [],
+        );
+    }
+
+    public function testAProxiedSaslBindByALockedIdentityIsRefusedAsAWrongPassword(): void
+    {
+        $this->useSubentryPolicyServer();
+        $this->failBinds(
+            'cn=admin,dc=foo,dc=bar',
+            self::MAX_FAILURE,
+        );
+        $authzId = 'dn:cn=inside-user,ou=secure,dc=foo,dc=bar';
+
+        $right = $this->failedPlainBind(
+            'admin',
+            '12345',
+            $authzId,
+        );
+
+        self::assertSame(
+            ResultCode::INVALID_CREDENTIALS,
+            $right[0],
+        );
+        self::assertSame(
+            $right,
+            $this->failedPlainBind(
+                'admin',
+                'not-the-password',
+                $authzId,
+            ),
+        );
+    }
+
+    public function testALockedIdentityIsRefusedBeforeItsAuthzIdIsConsidered(): void
+    {
+        $this->useSubentryPolicyServer(['--report-account-lock']);
+        $this->failBinds(
+            'cn=inside-user,ou=secure,dc=foo,dc=bar',
+            self::MAX_FAILURE,
+        );
+
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new SaslBindRequest(
+                MechanismName::PLAIN->value,
+                "dn:cn=nobody,dc=foo,dc=bar\x00inside-user\x0012345",
+            ),
+            Controls::pwdPolicy(),
+        ));
+        $message = $queue->getMessage(1);
+        $queue->close();
+
+        self::assertSame(
+            ResultCode::INVALID_CREDENTIALS,
+            $this->resultCodeOf($message),
+        );
+        self::assertSame(
+            PwdPolicyError::ACCOUNT_LOCKED,
+            $message->controls()->getByClass(PwdPolicyResponseControl::class)?->getError(),
+        );
+    }
+
+    public function testAProxiedSaslBindRecordsNothingOnTheAssumedIdentity(): void
+    {
+        $this->useSubentryPolicyServer();
+        $target = 'cn=inside-user,ou=secure,dc=foo,dc=bar';
+
+        $this->ldapClient()->bindSasl(
+            (new PlainOptions())->setUsername('admin')->setPassword('12345')->setAuthzId('dn:' . $target),
+            MechanismName::PLAIN,
+        );
+
+        self::assertSame(
+            'dn:' . $target,
+            $this->ldapClient()->whoami(),
+        );
+
+        $this->ldapClient()->bind(
+            'cn=admin,dc=foo,dc=bar',
+            '12345',
+        );
+        $entry = $this->ldapClient()->read(
+            $target,
+            [PasswordPolicyOid::NAME_PWD_LAST_SUCCESS],
+        );
+
+        self::assertNotNull($entry);
+        self::assertNull($entry->get(PasswordPolicyOid::NAME_PWD_LAST_SUCCESS));
+    }
+
+    public function testAnIdentityThatMustChangeItsPasswordMayNotAssumeAnother(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new SaslBindRequest(
+                MechanismName::PLAIN->value,
+                "dn:cn=user,dc=foo,dc=bar\x00reset-proxy\x0012345",
+            ),
+            Controls::pwdPolicy(),
+        ));
+        $message = $queue->getMessage(1);
+        $queue->close();
+
+        self::assertSame(
+            ResultCode::INVALID_CREDENTIALS,
+            $this->resultCodeOf($message),
+        );
+        self::assertSame(
+            PwdPolicyError::CHANGE_AFTER_RESET,
+            $message->controls()->getByClass(PwdPolicyResponseControl::class)?->getError(),
+        );
     }
 
     /**
@@ -141,10 +268,11 @@ final class LdapPasswordPolicySaslServerTest extends ServerTestCase
     private function failedPlainBind(
         string $user,
         string $password,
+        string $authzId = '',
     ): array {
         try {
             $this->ldapClient()->bindSasl(
-                (new PlainOptions())->setUsername($user)->setPassword($password),
+                (new PlainOptions())->setUsername($user)->setPassword($password)->setAuthzId($authzId),
                 MechanismName::PLAIN,
             );
         } catch (BindException $e) {

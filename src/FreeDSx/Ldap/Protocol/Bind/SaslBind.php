@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
@@ -21,6 +22,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeResult;
@@ -33,6 +35,7 @@ use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Operation\FailureAnswerTrait;
+use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
@@ -40,6 +43,7 @@ use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Sasl;
+use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\SaslInterface;
 
 /**
@@ -58,6 +62,7 @@ class SaslBind implements BindInterface
     public function __construct(
         private readonly ServerQueue $queue,
         private readonly SaslExchange $exchange,
+        private readonly SaslAuthorizer $authorizer,
         private readonly SaslInterface $sasl = new Sasl(),
         private readonly array $mechanisms = [],
         private readonly ResponseFactory $responseFactory = new ResponseFactory(),
@@ -229,7 +234,8 @@ class SaslBind implements BindInterface
                 );
             }
 
-            $this->policyEnforcer?->enforceSuccess(
+            $token = $this->authorize(
+                $result->getContext(),
                 $username,
                 $resolvedDn,
             );
@@ -251,13 +257,45 @@ class SaslBind implements BindInterface
             ),
         ));
 
-        $token = BindToken::fromSasl(
-            $username,
-            $resolvedDn,
-            authorizingDn: $result->getAuthorizingDn(),
-        );
         if ($mustChangePassword) {
             $token->markMustChangePassword();
+        }
+
+        return $token;
+    }
+
+    /**
+     * Applies the password policy to the authenticated identity around deciding which identity the bind acts as.
+     *
+     * @throws OperationException
+     */
+    private function authorize(
+        SaslContext $context,
+        string $username,
+        Dn $resolvedDn,
+    ): AuthenticatedTokenInterface {
+        // Checking the lock first keeps a refused authzid from answering a locked account faster than a wrong password.
+        $attempt = $this->policyEnforcer?->preBind(
+            $username,
+            $resolvedDn,
+        );
+        $token = $this->authorizer->authorize(
+            $context,
+            BindToken::fromSasl(
+                $username,
+                $resolvedDn,
+            ),
+        );
+        if ($attempt !== null) {
+            $this->policyEnforcer?->recordSuccess($attempt);
+        }
+
+        // An identity that must change its password may not act as another until it has.
+        if ($token->getAuthorizingDn() !== null && $this->policyEnforcer?->mustChangePassword() === true) {
+            throw new OperationException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+            );
         }
 
         return $token;

@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Protocol\Authorization\DispatchAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
@@ -730,6 +731,7 @@ class ContainerTest extends TestCase
             [SaslBindPolicyEnforcer::class],
             [MechanismOptionsBuilderFactory::class],
             [SaslExchange::class],
+            [SaslAuthorizer::class],
             [SaslBind::class],
             [Authenticator::class],
             [DispatchAuthorizer::class],
