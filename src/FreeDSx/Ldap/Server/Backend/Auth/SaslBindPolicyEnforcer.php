@@ -42,6 +42,8 @@ readonly class SaslBindPolicyEnforcer
     ) {}
 
     /**
+     * Records a failed exchange, refusing a locked account first as a simple bind does.
+     *
      * @throws AnswerableExceptionInterface
      */
     public function recordFailure(?string $username): void
@@ -61,6 +63,7 @@ readonly class SaslBindPolicyEnforcer
             return;
         }
 
+        $this->guard->preBind($attempt);
         $this->guard->recordFailure($attempt);
     }
 

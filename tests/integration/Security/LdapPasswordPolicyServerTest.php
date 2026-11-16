@@ -27,10 +27,12 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\PasswordPolicyServerTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class LdapPasswordPolicyServerTest extends ServerTestCase
 {
+    use PasswordPolicyServerTrait;
     use RawClientQueueTrait;
 
     private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
@@ -38,11 +40,6 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
     private const PASSWORD = '12345';
 
     private const WRONG_PASSWORD = 'nope';
-
-    /**
-     * The pwdMaxFailure the subentry seed configures.
-     */
-    private const MAX_FAILURE = 2;
 
     public function setUp(): void
     {
@@ -402,32 +399,5 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
             $entry?->get('modifyTimestamp')?->getValues(),
             $entry?->get('modifiersName')?->getValues(),
         ];
-    }
-
-    /**
-     * No policy is configured in PHP for this run, so enforcement can only come from the DIT.
-     */
-    private function useSubentryPolicyServer(): void
-    {
-        $this->stopServer();
-        $this->createServerProcess(
-            'tcp',
-            ['--subentry-policy'],
-        );
-    }
-
-    private function failBinds(
-        string $dn,
-        int $times,
-    ): void {
-        for ($i = 0; $i < $times; $i++) {
-            try {
-                $this->ldapClient()->bind($dn, self::WRONG_PASSWORD);
-
-                self::fail('A bind with the wrong password should not succeed.');
-            } catch (BindException) {
-                // Expected: the point is to accumulate failures.
-            }
-        }
     }
 }
