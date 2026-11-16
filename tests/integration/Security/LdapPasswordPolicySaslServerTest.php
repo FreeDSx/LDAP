@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -25,10 +26,12 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\PlainOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\PasswordPolicyServerTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class LdapPasswordPolicySaslServerTest extends ServerTestCase
 {
+    use PasswordPolicyServerTrait;
     use RawClientQueueTrait;
 
     public function setUp(): void
@@ -104,6 +107,54 @@ final class LdapPasswordPolicySaslServerTest extends ServerTestCase
         );
 
         $this->assertFalse($response->controls()->has(Control::OID_PWD_POLICY));
+    }
+
+    public function testASaslBindToALockedAccountAnswersTheSameForTheRightAndAWrongPassword(): void
+    {
+        $this->useSubentryPolicyServer();
+        $this->failBinds(
+            'cn=inside-user,ou=secure,dc=foo,dc=bar',
+            self::MAX_FAILURE,
+        );
+
+        $right = $this->failedPlainBind(
+            'inside-user',
+            '12345',
+        );
+
+        self::assertSame(
+            ResultCode::INVALID_CREDENTIALS,
+            $right[0],
+        );
+        self::assertSame(
+            $right,
+            $this->failedPlainBind(
+                'inside-user',
+                'not-the-password',
+            ),
+        );
+    }
+
+    /**
+     * @return array{int, string}
+     */
+    private function failedPlainBind(
+        string $user,
+        string $password,
+    ): array {
+        try {
+            $this->ldapClient()->bindSasl(
+                (new PlainOptions())->setUsername($user)->setPassword($password),
+                MechanismName::PLAIN,
+            );
+        } catch (BindException $e) {
+            return [
+                $e->getCode(),
+                $e->getMessage(),
+            ];
+        }
+
+        self::fail('The SASL bind should have been refused.');
     }
 
     private function completePlainExchange(

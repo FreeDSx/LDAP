@@ -99,6 +99,34 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         );
     }
 
+    public function test_a_failed_exchange_on_a_locked_account_is_refused_without_recording_a_failure(): void
+    {
+        $enforcer = $this->enforcer(
+            $this->lockoutPolicy(),
+            [PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME => PasswordPolicyOid::PERMANENT_LOCK_SENTINEL],
+        );
+
+        try {
+            $enforcer->recordFailure(self::USER_DN);
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_CREDENTIALS,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            PwdPolicyError::ACCOUNT_LOCKED,
+            $this->context->getOutcome()?->errorCode,
+        );
+        self::assertNull(
+            $this->backend
+                ->get(new Dn(self::USER_DN))
+                ?->get(PasswordPolicyOid::NAME_PWD_FAILURE_TIME),
+        );
+    }
+
     public function test_locked_account_is_denied_on_success(): void
     {
         $enforcer = $this->enforcer(
