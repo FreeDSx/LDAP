@@ -55,6 +55,12 @@ final class LdapPasswordPolicyCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Seed a pwdPolicy subentry under an administrative point instead of configuring a policy in PHP',
+            )
+            ->addOption(
+                'report-account-lock',
+                null,
+                InputOption::VALUE_NONE,
+                'Report a locked account in the password policy response control',
             );
     }
 
@@ -89,6 +95,7 @@ final class LdapPasswordPolicyCommand extends Command
             ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
+        $options->getPasswordConfig()->setReportAccountLock($input->getOption('report-account-lock') === true);
 
         // Left unset for the subentry run, so any enforcement observed can only come from the DIT.
         if (!$useSubentries) {

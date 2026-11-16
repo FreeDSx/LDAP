@@ -180,6 +180,41 @@ final class PasswordPolicyEngineTest extends TestCase
         self::assertTrue($outcome->denied);
     }
 
+    public function test_every_pre_bind_refusal_answers_like_a_wrong_password(): void
+    {
+        $refusals = [
+            'locked' => [
+                new UserPasswordState(permanentlyLocked: true),
+                new PasswordPolicy(lockout: new PasswordLockoutRules(enabled: true)),
+            ],
+            'idle' => [
+                new UserPasswordState(lastSuccess: $this->minutesAgo(120)),
+                new PasswordPolicy(expiration: new PasswordExpirationRules(maxIdle: 3600)),
+            ],
+            'not yet valid' => [
+                new UserPasswordState(startTime: $this->clock->now()->add(new DateInterval('PT1H'))),
+                new PasswordPolicy(),
+            ],
+            'no longer valid' => [
+                new UserPasswordState(endTime: $this->clock->now()),
+                new PasswordPolicy(),
+            ],
+        ];
+
+        foreach ($refusals as $refusal => [$state, $policy]) {
+            $outcome = $this->subject->evaluatePreBind(
+                $state,
+                $policy,
+            );
+
+            self::assertSame(
+                [true, ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.'],
+                [$outcome->denied, $outcome->ldapResultCode, $outcome->diagnostic],
+                $refusal,
+            );
+        }
+    }
+
     /**
      * §7.1 locks when the current time reaches pwdEndTime, not the second after it.
      */

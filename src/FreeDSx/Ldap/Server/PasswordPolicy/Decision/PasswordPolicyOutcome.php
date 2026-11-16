@@ -81,6 +81,21 @@ final readonly class PasswordPolicyOutcome
         );
     }
 
+    /**
+     * The same decision without its error, for a client that is not told why it was refused.
+     */
+    public function withoutError(): self
+    {
+        return new self(
+            $this->denied,
+            $this->ldapResultCode,
+            null,
+            $this->timeBeforeExpiration,
+            $this->graceRemaining,
+            $this->diagnostic,
+        );
+    }
+
     public function hasResponseControlPayload(): bool
     {
         return $this->errorCode !== null

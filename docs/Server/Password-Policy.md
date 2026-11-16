@@ -259,7 +259,9 @@ The number kept is the largest of `pwdMaxFailure`, `pwdMaxRecordedFailure`, and 
 - A positive value: the lock expires after that many seconds. The next bind attempt clears the stale lock. Failures
   then accumulate again and can re-lock the account.
 
-A locked bind returns `INVALID_CREDENTIALS` with the `accountLocked` error.
+A locked bind returns `INVALID_CREDENTIALS` with the same diagnostic as a wrong password. The response control carries
+the `accountLocked` error only with
+[PasswordConfig:setReportAccountLock](Configuration.md#passwordconfigsetreportaccountlock).
 
 In a replicated setup, lockout can apply across the whole cluster so failures against a replica count too. See
 [Password Policy](Replication.md#password-policy) under Replication.
@@ -274,9 +276,9 @@ Note: Either value unset or `0` disables the delay (the default).
 
 ### Idle Lockout
 
-When `pwdMaxIdle` is set, an account with no successful bind within that many seconds is locked, returning
-`INVALID_CREDENTIALS` with `accountLocked`. Idleness is measured from `pwdLastSuccess` (stamped on each successful
-bind), falling back to `pwdChangedTime` when no successful bind has been recorded yet.
+When `pwdMaxIdle` is set, an account with no successful bind within that many seconds is locked and answers as a locked
+account does. Idleness is measured from `pwdLastSuccess` (stamped on each successful bind), falling back to
+`pwdChangedTime` when no successful bind has been recorded yet.
 
 ### Change After Reset
 
@@ -295,7 +297,8 @@ sets `pwdReset` and nothing enforces it.
 ### Validity Window
 
 `pwdStartTime` and `pwdEndTime` on a user entry bound the period the password may be used to authenticate. A bind before
-`pwdStartTime` or after `pwdEndTime` fails with `INVALID_CREDENTIALS` (the latter also reports `passwordExpired`).
+`pwdStartTime` or after `pwdEndTime` fails as a locked account does (the latter reports `passwordExpired` where a lock
+is reported).
 
 ## Custom Quality Checker
 
@@ -380,8 +383,9 @@ clients:
 
 All of these are confidential in the schema, as section 12 of the draft recommends. Under the secure default only the
 administrator can read or filter on them, except `pwdHistory`, which no one can read. A client that requests the
-password policy response control on bind still learns whether the account is locked or must change its password, how
-many grace logins remain, and, within `pwdExpireWarning`, when the password expires. See
+password policy response control on bind still learns whether it must change its password, how many grace logins
+remain, and, within `pwdExpireWarning`, when the password expires. It learns that the account is locked only with
+[PasswordConfig:setReportAccountLock](Configuration.md#passwordconfigsetreportaccountlock). See
 [Confidential Attributes](Access-Control.md#confidential-attributes).
 
 ## Not Yet Enforced / Limitations

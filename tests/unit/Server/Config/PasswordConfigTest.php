@@ -47,6 +47,18 @@ final class PasswordConfigTest extends TestCase
         self::assertNull($this->subject->getDefaultPolicyDn());
     }
 
+    public function test_an_account_lock_is_not_reported_by_default(): void
+    {
+        self::assertFalse($this->subject->isReportAccountLock());
+    }
+
+    public function test_reporting_an_account_lock_is_round_tripped(): void
+    {
+        $this->subject->setReportAccountLock(true);
+
+        self::assertTrue($this->subject->isReportAccountLock());
+    }
+
     public function test_the_in_memory_policy_is_retained(): void
     {
         $policy = new PasswordPolicy(quality: new PasswordQualityRules(minLength: 8));

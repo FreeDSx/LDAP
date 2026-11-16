@@ -175,6 +175,7 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
             $container->get(PasswordPolicyContext::class),
             $container->get(EventLogger::class),
             $container->get(SleeperInterface::class),
+            $container->get(ServerOptions::class)->getPasswordConfig()->isReportAccountLock(),
         );
     }
 

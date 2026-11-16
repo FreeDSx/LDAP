@@ -477,8 +477,10 @@ and readable by no one, and `pwdHistory` is readable by no one.
 
 The password policy state attributes ship confidential too. The secure default grants them to the administrator and to
 no one else, the entry's owner included. A client that requests the password policy response control on bind learns
-whether the account is locked or must change its password, how many grace logins remain, and, within
-`pwdExpireWarning`, when the password expires. To let another group read the state attributes as well:
+whether it must change its password, how many grace logins remain, and, within `pwdExpireWarning`, when the password
+expires. It learns that the account is locked only with
+[PasswordConfig:setReportAccountLock](Configuration.md#passwordconfigsetreportaccountlock). To let another group read
+the state attributes as well:
 
 ```php
 AclRules::secureDefault($administrators)

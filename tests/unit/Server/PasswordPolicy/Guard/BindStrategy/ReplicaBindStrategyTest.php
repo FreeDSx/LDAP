@@ -93,6 +93,7 @@ final class ReplicaBindStrategyTest extends TestCase
                 EventLogPolicy::all(),
             ),
             $this->sleeper,
+            reportAccountLock: true,
         );
     }
 

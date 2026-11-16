@@ -43,6 +43,7 @@ LDAP Server Configuration
     * [PasswordConfig:setHashing](#passwordconfigsethashing)
     * [PasswordConfig:setHashLimits](#passwordconfigsethashlimits)
     * [PasswordConfig:setAllowPreHashedPasswords](#passwordconfigsetallowprehashedpasswords)
+    * [PasswordConfig:setReportAccountLock](#passwordconfigsetreportaccountlock)
     * [PasswordConfig:setMaxPasswordValues](#passwordconfigsetmaxpasswordvalues)
 * [Schema](#schema)
     * [SchemaConfig:setSources](#schemaconfigsetsources)
@@ -801,6 +802,27 @@ memory times passes of 1 GiB and 4 threads, and passwords of 512 bytes
 
 Whether any writer may store a pre-hashed `userPassword` value, one starting with a `{SCHEME}` prefix. When off, only
 [administrators](Access-Control.md#administrators), the manager and server writes (such as seeding) may.
+
+**Default**: `false`
+
+------------------
+#### PasswordConfig:setReportAccountLock
+
+Whether a refused bind reports its reason in the password policy response control. That covers a bind to an account
+that is locked or idle (`accountLocked`) or past its `pwdEndTime` (`passwordExpired`), and the failed bind that locks
+the account (`accountLocked`). A bind before `pwdStartTime` has no reason to report either way. The diagnostic message
+is the same as for a wrong password regardless, and the server logs every refusal.
+
+It is off by default because the reason goes to any client that asks, before its password is checked. With it on,
+anyone can learn that a name belongs to a real account and that the account is locked, which confirms that an attempt
+to lock it out worked. Section 12 of the password policy draft warns about exactly this.
+
+Turn it on when your clients need to tell a person why they cannot sign in, for example a login page that shows "your
+account is locked, contact the help desk" instead of a generic failure.
+
+```php
+$options->getPasswordConfig()->setReportAccountLock(true);
+```
 
 **Default**: `false`
 

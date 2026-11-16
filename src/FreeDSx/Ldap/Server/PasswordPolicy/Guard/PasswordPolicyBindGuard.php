@@ -39,6 +39,7 @@ final readonly class PasswordPolicyBindGuard
         private PasswordPolicyContext $context,
         private EventLogger $eventLogger,
         private SleeperInterface $sleeper,
+        private bool $reportAccountLock = false,
     ) {}
 
     /**
@@ -51,7 +52,7 @@ final readonly class PasswordPolicyBindGuard
             return;
         }
 
-        $this->context->setOutcome($outcome);
+        $this->context->setOutcome($this->lockAsReported($outcome));
         $this->eventLogger->record(
             ServerEvent::PasswordPolicyAccountLocked,
             $this->subjectFor($attempt),
@@ -90,7 +91,7 @@ final readonly class PasswordPolicyBindGuard
         );
 
         if ($recorded->outcome->denied) {
-            $this->context->setOutcome($recorded->outcome);
+            $this->context->setOutcome($this->lockAsReported($recorded->outcome));
             $this->eventLogger->record(
                 ServerEvent::PasswordPolicyAccountLocked,
                 $this->subjectFor($attempt),
@@ -165,6 +166,16 @@ final readonly class PasswordPolicyBindGuard
                 $subject,
             );
         }
+    }
+
+    /**
+     * A refusal before the password is proven reaches the response control without its reason unless reporting it.
+     */
+    private function lockAsReported(PasswordPolicyOutcome $outcome): PasswordPolicyOutcome
+    {
+        return $this->reportAccountLock
+            ? $outcome
+            : $outcome->withoutError();
     }
 
     /**

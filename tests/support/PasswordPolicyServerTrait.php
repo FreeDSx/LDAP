@@ -26,14 +26,19 @@ trait PasswordPolicyServerTrait
     private const MAX_FAILURE = 2;
 
     /**
-     * No policy is configured in PHP for this run, so enforcement can only come from the DIT.
+     * Restarts the server with no policy configured in PHP, leaving the DIT as the only source of enforcement.
+     *
+     * @param list<string> $options
      */
-    private function useSubentryPolicyServer(): void
+    private function useSubentryPolicyServer(array $options = []): void
     {
         $this->stopServer();
         $this->createServerProcess(
             'tcp',
-            ['--subentry-policy'],
+            [
+                '--subentry-policy',
+                ...$options,
+            ],
         );
     }
 
