@@ -733,6 +733,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             $this->context,
             $eventLogger,
             $this->sleeper,
+            reportAccountLock: true,
         );
 
         return new PasswordPolicyAwareAuthenticator(

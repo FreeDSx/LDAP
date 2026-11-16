@@ -39,6 +39,11 @@ final readonly class PasswordPolicyEngine
      */
     private const DEFAULT_MAX_RECORDED_FAILURE = 16;
 
+    /**
+     * The diagnostic for a refused account, identical to a wrong password's.
+     */
+    private const REFUSED = 'Invalid credentials.';
+
     private UniquePolicyTimeFactory $uniqueTimes;
 
     public function __construct(
@@ -403,7 +408,7 @@ final readonly class PasswordPolicyEngine
         return PasswordPolicyOutcome::deny(
             PwdPolicyError::ACCOUNT_LOCKED,
             ResultCode::INVALID_CREDENTIALS,
-            'Account is locked due to inactivity.',
+            self::REFUSED,
         );
     }
 
@@ -418,7 +423,7 @@ final readonly class PasswordPolicyEngine
             return new PasswordPolicyOutcome(
                 denied: true,
                 ldapResultCode: ResultCode::INVALID_CREDENTIALS,
-                diagnostic: 'Password is not yet valid.',
+                diagnostic: self::REFUSED,
             );
         }
         // draft-behera-11 §7.1 locks at the instant pwdEndTime is reached, not the second after it.
@@ -426,7 +431,7 @@ final readonly class PasswordPolicyEngine
             return PasswordPolicyOutcome::deny(
                 PwdPolicyError::PASSWORD_EXPIRED,
                 ResultCode::INVALID_CREDENTIALS,
-                'Password is no longer valid.',
+                self::REFUSED,
             );
         }
 
@@ -788,7 +793,7 @@ final readonly class PasswordPolicyEngine
         return PasswordPolicyOutcome::deny(
             PwdPolicyError::ACCOUNT_LOCKED,
             ResultCode::INVALID_CREDENTIALS,
-            'Account is locked.',
+            self::REFUSED,
         );
     }
 }

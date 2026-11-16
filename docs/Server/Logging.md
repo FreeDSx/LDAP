@@ -62,7 +62,7 @@ Each event's log message is defined next to its case in `ServerEvent`; the table
 | `ldap.paging.session_evicted`         | on      | notice  | A connection hit `setMaxPagingSessions`, so its least recently started paged search was discarded |
 | `ldap.sync.entry_skipped`             | on      | warning | An entry with an unusable entryUUID was left out of a content synchronization |
 | `ldap.subtree.deleted`                | on      | info    | A subtree delete removed entries, carrying how many and whether it completed |
-| `ldap.password_policy.account_locked` | on      | warning | Failed binds locked an account                            |
+| `ldap.password_policy.account_locked` | on      | warning | Failed binds locked an account, or a bind was refused as locked, idle, or outside its validity window |
 | `ldap.password_policy.account_unlocked` | on    | info    | A locked account bound again once its lockout lapsed      |
 | `ldap.password_policy.expired`        | on      | notice  | A bind was refused because the password expired           |
 | `ldap.password_policy.must_change`    | on      | info    | A bind succeeded with a reset password that must be changed first |

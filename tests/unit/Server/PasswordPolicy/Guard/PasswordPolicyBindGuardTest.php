@@ -63,6 +63,8 @@ final class PasswordPolicyBindGuardTest extends TestCase
 
     private PasswordPolicyBindGuard $subject;
 
+    private PasswordPolicyBindGuard $reportingSubject;
+
     protected function setUp(): void
     {
         $this->clock = FrozenClock::fromString(self::NOW);
@@ -106,6 +108,17 @@ final class PasswordPolicyBindGuardTest extends TestCase
             ),
             $this->sleeper,
         );
+        $this->reportingSubject = new PasswordPolicyBindGuard(
+            $this->engine,
+            $strategy,
+            $this->context,
+            new EventLogger(
+                $this->logger,
+                EventLogPolicy::all(),
+            ),
+            $this->sleeper,
+            reportAccountLock: true,
+        );
     }
 
     public function test_preBind_allows_an_unlocked_account(): void
@@ -116,23 +129,36 @@ final class PasswordPolicyBindGuardTest extends TestCase
         self::assertTrue($this->recordedChanges->isEmpty());
     }
 
-    public function test_preBind_denies_a_locked_account(): void
+    public function test_preBind_denies_a_locked_account_as_a_wrong_password(): void
     {
         try {
             $this->subject->preBind($this->attempt(new UserPasswordState(permanentlyLocked: true)));
             self::fail('Expected an OperationException.');
         } catch (OperationException $e) {
             self::assertSame(
-                ResultCode::INVALID_CREDENTIALS,
-                $e->getCode(),
+                [ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.'],
+                [$e->getCode(), $e->getMessage()],
             );
+        }
+
+        self::assertTrue($this->context->getOutcome()?->denied);
+        self::assertNull($this->context->getOutcome()->errorCode);
+        $this->assertEventRecorded(ServerEvent::PasswordPolicyAccountLocked);
+    }
+
+    public function test_preBind_reports_a_locked_account_when_configured(): void
+    {
+        try {
+            $this->reportingSubject->preBind($this->attempt(new UserPasswordState(permanentlyLocked: true)));
+            self::fail('Expected an OperationException.');
+        } catch (OperationException) {
+            // Expected: the refusal is what carries the reason.
         }
 
         self::assertSame(
             PwdPolicyError::ACCOUNT_LOCKED,
             $this->context->getOutcome()?->errorCode,
         );
-        $this->assertEventRecorded(ServerEvent::PasswordPolicyAccountLocked);
     }
 
     public function test_recordFailure_below_threshold_writes_without_locking(): void
@@ -154,25 +180,22 @@ final class PasswordPolicyBindGuardTest extends TestCase
 
     public function test_recordFailure_trips_lockout_at_threshold(): void
     {
-        $this->subject->recordFailure($this->attempt(
-            new UserPasswordState(failureTimes: [
-                $this->minutesAgo(3),
-                $this->minutesAgo(2),
-            ]),
-            new PasswordPolicy(
-                lockout: new PasswordLockoutRules(
-                    enabled: true,
-                    maxFailure: 3,
-                ),
-            ),
-        ));
+        $this->subject->recordFailure($this->attemptAtThreshold());
+
+        self::assertTrue($this->context->getOutcome()?->denied);
+        self::assertNull($this->context->getOutcome()->errorCode);
+        $this->assertWroteAttribute(PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME);
+        $this->assertEventRecorded(ServerEvent::PasswordPolicyAccountLocked);
+    }
+
+    public function test_recordFailure_reports_the_lock_it_trips_when_configured(): void
+    {
+        $this->reportingSubject->recordFailure($this->attemptAtThreshold());
 
         self::assertSame(
             PwdPolicyError::ACCOUNT_LOCKED,
             $this->context->getOutcome()?->errorCode,
         );
-        $this->assertWroteAttribute(PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME);
-        $this->assertEventRecorded(ServerEvent::PasswordPolicyAccountLocked);
     }
 
     public function test_recordFailure_delays_the_response_by_the_configured_delay(): void
@@ -306,6 +329,22 @@ final class PasswordPolicyBindGuardTest extends TestCase
             uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             state: $state,
             policy: $policy,
+        );
+    }
+
+    private function attemptAtThreshold(): PasswordBindAttempt
+    {
+        return $this->attempt(
+            new UserPasswordState(failureTimes: [
+                $this->minutesAgo(3),
+                $this->minutesAgo(2),
+            ]),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(
+                    enabled: true,
+                    maxFailure: 3,
+                ),
+            ),
         );
     }
 

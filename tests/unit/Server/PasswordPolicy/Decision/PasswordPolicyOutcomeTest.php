@@ -103,4 +103,19 @@ final class PasswordPolicyOutcomeTest extends TestCase
         );
         self::assertTrue($outcome->hasResponseControlPayload());
     }
+
+    public function test_without_error_keeps_the_decision_but_drops_the_error(): void
+    {
+        $outcome = PasswordPolicyOutcome::deny(
+            PwdPolicyError::ACCOUNT_LOCKED,
+            ResultCode::INVALID_CREDENTIALS,
+            'Invalid credentials.',
+        )->withoutError();
+
+        self::assertSame(
+            [true, ResultCode::INVALID_CREDENTIALS, null, 'Invalid credentials.'],
+            [$outcome->denied, $outcome->ldapResultCode, $outcome->errorCode, $outcome->diagnostic],
+        );
+        self::assertFalse($outcome->hasResponseControlPayload());
+    }
 }

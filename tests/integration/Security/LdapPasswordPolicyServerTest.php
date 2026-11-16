@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -376,6 +377,91 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
             $dn,
             self::PASSWORD,
         );
+    }
+
+    public function testALockedAccountAnswersAsAnUnknownNameDoes(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=inside-user,ou=secure,dc=foo,dc=bar';
+        $this->failBinds(
+            $dn,
+            self::MAX_FAILURE,
+        );
+
+        $unknown = $this->policyBind(
+            'cn=nobody,ou=secure,dc=foo,dc=bar',
+            self::PASSWORD,
+        );
+
+        self::assertSame(
+            [ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.', null],
+            $unknown,
+        );
+        self::assertSame(
+            $unknown,
+            $this->policyBind(
+                $dn,
+                self::PASSWORD,
+            ),
+        );
+        self::assertSame(
+            $unknown,
+            $this->policyBind(
+                $dn,
+                self::WRONG_PASSWORD,
+            ),
+        );
+    }
+
+    public function testALockedAccountIsReportedInTheResponseControlWhenConfigured(): void
+    {
+        $this->useSubentryPolicyServer(['--report-account-lock']);
+        $dn = 'cn=inside-user,ou=secure,dc=foo,dc=bar';
+        $this->failBinds(
+            $dn,
+            self::MAX_FAILURE,
+        );
+
+        foreach ([self::PASSWORD, self::WRONG_PASSWORD] as $password) {
+            self::assertSame(
+                [ResultCode::INVALID_CREDENTIALS, 'Invalid credentials.', PwdPolicyError::ACCOUNT_LOCKED],
+                $this->policyBind(
+                    $dn,
+                    $password,
+                ),
+            );
+        }
+    }
+
+    /**
+     * @return array{int, string, ?int}
+     */
+    private function policyBind(
+        string $dn,
+        string $password,
+    ): array {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::bind(
+                $dn,
+                $password,
+            ),
+            Controls::pwdPolicy(),
+        ));
+        $message = $queue->getMessage(1);
+        $queue->close();
+        $response = $message->getResponse();
+        self::assertInstanceOf(
+            BindResponse::class,
+            $response,
+        );
+
+        return [
+            $response->getResultCode(),
+            $response->getDiagnosticMessage(),
+            $message->controls()->getByClass(PwdPolicyResponseControl::class)?->getError(),
+        ];
     }
 
     /**

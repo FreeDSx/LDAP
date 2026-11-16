@@ -233,6 +233,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
             $this->context,
             new EventLogger(null, EventLogPolicy::all()),
             new BlockingSleeper(),
+            reportAccountLock: true,
         );
 
         return new SaslBindPolicyEnforcer(

@@ -19,6 +19,7 @@ Conformance
     * [Attributes Have a Value Ceiling](#attributes-have-a-value-ceiling)
     * [Paging and the Client Size Limit](#paging-and-the-client-size-limit)
     * [Password Policy on Compare](#password-policy-on-compare)
+    * [A Locked Account Is Not Reported by Default](#a-locked-account-is-not-reported-by-default)
     * [Replication Sends Full Entries](#replication-sends-full-entries)
 * [Not Implemented](#not-implemented)
 
@@ -179,6 +180,17 @@ attribute toward the failure counter.
 
 However, `userPassword` is confidential in the schema. Comparing it is denied and nothing reaches the policy. This is
 also the only place the draft asks for policy on something that is not a bind.
+
+## A Locked Account Is Not Reported by Default
+
+Section 8.1.3.2 of `draft-behera-ldap-password-policy-11` says a failed bind that locks the account "includes the
+passwordPolicyResponse ... with the error: accountLocked (1)", and section 8.1.1 lets the server report the same for a
+bind to an account already locked.
+
+By default the server reports neither. A locked account answers with the same result code and diagnostic as a wrong
+password, since section 12 warns that the error tells a denial of service attacker it has succeeded, and the control is
+sent to a client that has not proven its password.
+[PasswordConfig:setReportAccountLock](Configuration.md#passwordconfigsetreportaccountlock) turns the report on.
 
 ## Replication Sends Full Entries
 

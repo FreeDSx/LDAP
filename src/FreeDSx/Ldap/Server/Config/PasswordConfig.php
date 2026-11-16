@@ -34,6 +34,8 @@ final class PasswordConfig
 
     private ?PasswordQualityCheckerInterface $qualityChecker = null;
 
+    private bool $reportAccountLock = false;
+
     /**
      * @param positive-int $maxPasswordValues
      *
@@ -120,6 +122,21 @@ final class PasswordConfig
     public function setAllowPreHashedPasswords(bool $allow): self
     {
         $this->allowPreHashedPasswords = $allow;
+
+        return $this;
+    }
+
+    /**
+     * Whether a bind refused as locked, idle or outside its validity window reports why in a requested response control.
+     */
+    public function isReportAccountLock(): bool
+    {
+        return $this->reportAccountLock;
+    }
+
+    public function setReportAccountLock(bool $report): self
+    {
+        $this->reportAccountLock = $report;
 
         return $this;
     }
