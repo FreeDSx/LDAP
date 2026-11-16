@@ -56,9 +56,18 @@ readonly class SaslBindPolicyEnforcer
             $username,
             $this->backend,
         );
-        $attempt = $entry !== null
-            ? $this->attemptFor($username, $entry)
-            : null;
+
+        if ($entry === null) {
+            // Otherwise a name that exists is measurably slower to refuse than one that does not.
+            $this->guard->delayUnknownIdentity($this->resolver->resolveDefault());
+
+            return;
+        }
+        $attempt = $this->attemptFor(
+            $username,
+            $entry,
+        );
+
         if ($attempt === null) {
             return;
         }

@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -66,6 +67,13 @@ final class LdapPasswordPolicyCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Report a locked account in the password policy response control',
+            )
+            ->addOption(
+                'min-delay',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds a failed bind waits under the in-PHP policy, doubling up to twice that (0 = no delay)',
+                '0',
             );
     }
 
@@ -76,6 +84,10 @@ final class LdapPasswordPolicyCommand extends Command
         $transport = $this->getStringOption($input, 'transport');
         $port = (int) $this->getStringOption($input, 'port');
         $useSubentries = $input->getOption('subentry-policy') === true;
+        $minDelay = max(
+            0,
+            (int) $this->getStringOption($input, 'min-delay'),
+        );
 
         $network = (new NetworkConfig())
             ->setPort($port)
@@ -113,6 +125,10 @@ final class LdapPasswordPolicyCommand extends Command
                 // pwdMustChange is what makes the seeded pwdReset binding, per draft-behera-11 7.2.
                 ->setPolicy(new PasswordPolicy(
                     change: new PasswordChangeRules(mustChange: true),
+                    lockout: new PasswordLockoutRules(
+                        minDelay: $minDelay,
+                        maxDelay: $minDelay * 2,
+                    ),
                 ));
         }
 
