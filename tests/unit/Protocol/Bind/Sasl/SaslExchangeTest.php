@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
+use FreeDSx\Ldap\Exception\RequestRefusedException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
@@ -621,6 +622,66 @@ final class SaslExchangeTest extends TestCase
                     new SaslBindRequest(self::MECH, 'creds'),
                 ),
             );
+
+        $result = $this->subject->run($this->makeInput());
+
+        self::assertSame(
+            3,
+            $result->getLastMessage()->getMessageId(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function noResponseOperationTags(): iterable
+    {
+        yield 'an abandon' => [16];
+        yield 'an unbind' => [2];
+    }
+
+    #[DataProvider('noResponseOperationTags')]
+    public function test_a_request_with_no_response_refused_for_room_mid_exchange_is_passed_over(
+        int $operationTag,
+    ): void {
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturnOnConsecutiveCalls(
+                $this->makeContext(
+                    isComplete: false,
+                    response: 'server-challenge',
+                ),
+                $this->makeContext(
+                    isComplete: true,
+                    response: 'server-final',
+                ),
+            );
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $reads = 0;
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturnCallback(static function () use (&$reads, $operationTag): LdapMessageRequest {
+                if ($reads++ === 0) {
+                    throw new RequestRefusedException(
+                        2,
+                        $operationTag,
+                        'The request is larger than the server will hold.',
+                        resultCode: ResultCode::ADMIN_LIMIT_EXCEEDED,
+                    );
+                }
+
+                return new LdapMessageRequest(
+                    3,
+                    new SaslBindRequest(
+                        self::MECH,
+                        'creds',
+                    ),
+                );
+            });
 
         $result = $this->subject->run($this->makeInput());
 

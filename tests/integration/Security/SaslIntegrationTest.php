@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -433,6 +435,73 @@ final class SaslIntegrationTest extends ServerTestCase
                     new SaslBindRequest(
                         'CRAM-MD5',
                         'user ' . hash_hmac('md5', (string) $challenge->getSaslCredentials(), '12345'),
+                    ),
+                ),
+            );
+
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $this->resultCodeOf($queue->getMessage(3)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function noResponseRequestProvider(): iterable
+    {
+        yield 'abandon' => [new AbandonRequest(1)];
+        yield 'unbind' => [new UnbindRequest()];
+    }
+
+    #[DataProvider('noResponseRequestProvider')]
+    public function testARequestWithNoResponseRefusedForRoomMidNegotiationIsPassedOver(RequestInterface $request): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--sasl',
+                '--max-held-request-size=5000',
+            ],
+        );
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            $challenge = $queue->getMessage(1)->getResponse();
+            self::assertInstanceOf(
+                BindResponse::class,
+                $challenge,
+            );
+
+            $queue->sendMessage(
+                new LdapMessageRequest(
+                    2,
+                    $request,
+                    ...array_map(
+                        static fn(int $i): Control => new Control('1.3.6.1.4.1.99999.' . $i),
+                        range(
+                            1,
+                            60,
+                        ),
+                    ),
+                ),
+                new LdapMessageRequest(
+                    3,
+                    new SaslBindRequest(
+                        'CRAM-MD5',
+                        'user ' . hash_hmac(
+                            'md5',
+                            (string) $challenge->getSaslCredentials(),
+                            '12345',
+                        ),
                     ),
                 ),
             );

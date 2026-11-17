@@ -42,11 +42,11 @@ final readonly class DecodeFailureResponder
     /**
      * @throws EncoderException
      */
-    public function answer(MessageDecodeException $e): bool
+    public function answer(MessageDecodeException $e): DecodeFailureOutcome
     {
         // A response on the reserved message ID 0 would read as an unsolicited notification.
         if ($e->getMessageId() === 0) {
-            return false;
+            return DecodeFailureOutcome::Unanswerable;
         }
 
         $response = $this->responseFactory->getDecodeFailureResponse(
@@ -69,20 +69,20 @@ final readonly class DecodeFailureResponder
         $this->record($e);
         $this->queue->sendMessage($response);
 
-        return true;
+        return DecodeFailureOutcome::Answered;
     }
 
     /**
      * A request refused for room that takes no response is recorded and dropped instead of ending the session.
      */
-    private function dropRefused(MessageDecodeException $e): bool
+    private function dropRefused(MessageDecodeException $e): DecodeFailureOutcome
     {
         if (!$e instanceof RequestRefusedException) {
-            return false;
+            return DecodeFailureOutcome::Unanswerable;
         }
         $this->record($e);
 
-        return true;
+        return DecodeFailureOutcome::Dropped;
     }
 
     private function record(MessageDecodeException $e): void

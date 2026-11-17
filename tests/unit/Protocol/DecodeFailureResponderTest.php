@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\RequestRefusedException;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\DecodeFailureOutcome;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -71,12 +72,15 @@ final class DecodeFailureResponderTest extends TestCase
                 ),
             )));
 
-        self::assertTrue($this->subject->answer(new RequestRefusedException(
-            3,
-            3,
-            'The server is too busy to hold the request.',
-            resultCode: ResultCode::BUSY,
-        )));
+        self::assertSame(
+            DecodeFailureOutcome::Answered,
+            $this->subject->answer(new RequestRefusedException(
+                3,
+                3,
+                'The server is too busy to hold the request.',
+                resultCode: ResultCode::BUSY,
+            )),
+        );
     }
 
     public function test_a_request_refused_for_room_is_recorded_as_a_refused_operation(): void
@@ -114,7 +118,7 @@ final class DecodeFailureResponderTest extends TestCase
             ->method('sendMessage');
 
         self::assertSame(
-            [true, [ServerEvent::OperationRefused->value]],
+            [DecodeFailureOutcome::Dropped, [ServerEvent::OperationRefused->value]],
             [
                 $this->subject->answer(new RequestRefusedException(
                     3,
@@ -134,11 +138,14 @@ final class DecodeFailureResponderTest extends TestCase
             ->expects(self::never())
             ->method('sendMessage');
 
-        self::assertFalse($this->subject->answer(new MessageDecodeException(
-            3,
-            $operationTag,
-            'The request is malformed.',
-        )));
+        self::assertSame(
+            DecodeFailureOutcome::Unanswerable,
+            $this->subject->answer(new MessageDecodeException(
+                3,
+                $operationTag,
+                'The request is malformed.',
+            )),
+        );
     }
 
     public function test_a_malformed_request_is_recorded_as_a_decode_failure(): void
@@ -168,11 +175,14 @@ final class DecodeFailureResponderTest extends TestCase
                 ),
             )));
 
-        self::assertTrue($this->subject->answer(new MessageDecodeException(
-            3,
-            3,
-            'The search request is malformed.',
-        )));
+        self::assertSame(
+            DecodeFailureOutcome::Answered,
+            $this->subject->answer(new MessageDecodeException(
+                3,
+                3,
+                'The search request is malformed.',
+            )),
+        );
     }
 
     public function test_a_malformed_request_carrying_message_id_zero_is_not_answered(): void
@@ -181,11 +191,14 @@ final class DecodeFailureResponderTest extends TestCase
             ->expects(self::never())
             ->method('sendMessage');
 
-        self::assertFalse($this->subject->answer(new MessageDecodeException(
-            0,
-            3,
-            'The search request is malformed.',
-        )));
+        self::assertSame(
+            DecodeFailureOutcome::Unanswerable,
+            $this->subject->answer(new MessageDecodeException(
+                0,
+                3,
+                'The search request is malformed.',
+            )),
+        );
     }
 
     public function test_a_bind_that_fails_to_decode_leaves_the_session_anonymous(): void
