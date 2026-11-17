@@ -51,6 +51,24 @@ final readonly class SubtreeEnumerator
     }
 
     /**
+     * The base and everything beneath it, each entry before its children, streamed with every value it holds.
+     *
+     * @return Generator<int, Entry>
+     */
+    public function parentsFirst(Dn $base): Generator
+    {
+        $bases = $this->lister->entriesAt(
+            [$base],
+            EntryProjection::unbounded(),
+        );
+
+        foreach ($bases as $entry) {
+            yield $entry;
+            yield from $this->childrenAfter($entry->getDn());
+        }
+    }
+
+    /**
      * Children of the entries that are not themselves among them, which removing the entries would strand.
      *
      * @param list<string> $dns canonical DNs
@@ -119,6 +137,34 @@ final readonly class SubtreeEnumerator
         }
 
         yield $dn;
+    }
+
+    /**
+     * Streamed one level at a time, which holds about one batch per level, as nothing here writes against the result.
+     *
+     * @return Generator<int, Entry>
+     */
+    private function childrenAfter(Dn $parent): Generator
+    {
+        $children = $this->lister->list(StorageListOptions::matchAll(
+            $parent,
+            subtree: false,
+            projection: new EntryProjection(
+                linkCap: null,
+                withHasSubordinates: true,
+            ),
+        ));
+
+        foreach ($children->entries() as $child) {
+            $hasChildren = $child->get(AttributeTypeOid::NAME_HAS_SUBORDINATES)?->getValues() === ['TRUE'];
+            $child->reset(AttributeTypeOid::NAME_HAS_SUBORDINATES);
+
+            yield $child;
+
+            if ($hasChildren) {
+                yield from $this->childrenAfter($child->getDn());
+            }
+        }
     }
 
     /**

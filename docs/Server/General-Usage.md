@@ -663,6 +663,9 @@ the full request pipeline. Supported changetypes: `add`, `delete`, `modify` (`ad
 Operational attributes (`entryUUID`, `createTimestamp`, etc.) are preserved. So `dump()` then `seed()` restores the
 entries exactly as they were, since seeding keeps the ones its source supplies rather than stamping new.
 
+**Note**: Running dump on a directory that is not being written to produces the best results. A move during the dump can
+skip or repeat part of a subtree.
+
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Output\FileLdifOutput;

@@ -1,0 +1,19 @@
+version: 1
+
+# An entry created before the container it is then moved under, which leaves it stored ahead of its new parent.
+dn: cn=mover,dc=foo,dc=bar
+changetype: add
+objectClass: inetOrgPerson
+cn: mover
+sn: Mover
+
+dn: ou=later,dc=foo,dc=bar
+changetype: add
+objectClass: organizationalUnit
+ou: later
+
+dn: cn=mover,dc=foo,dc=bar
+changetype: modrdn
+newrdn: cn=mover
+deleteoldrdn: 0
+newsuperior: ou=later,dc=foo,dc=bar

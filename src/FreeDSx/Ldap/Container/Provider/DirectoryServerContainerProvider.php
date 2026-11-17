@@ -387,9 +387,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeDirectoryDumper(Container $container): DirectoryDumper
     {
         return new DirectoryDumper(
-            $container->get(ListEntryInterface::class),
+            $container->get(SubtreeEnumerator::class),
             $container->get(ReadEntryInterface::class)->namingContexts(),
             $container->get(FilterEvaluatorInterface::class),
+            $container->get(LinkedLeafWitness::class),
         );
     }
 

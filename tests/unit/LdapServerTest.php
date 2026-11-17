@@ -68,6 +68,20 @@ class LdapServerTest extends TestCase
         sn: Bar
         LDIF;
 
+    private const MOVE_UNDER_NEWER_PARENT_LDIF = <<<'LDIF'
+        dn: ou=later,dc=example,dc=com
+        changetype: add
+        objectClass: top
+        objectClass: organizationalUnit
+        ou: later
+
+        dn: cn=foo,dc=example,dc=com
+        changetype: modrdn
+        newrdn: cn=foo
+        deleteoldrdn: 0
+        newsuperior: ou=later,dc=example,dc=com
+        LDIF;
+
     private const SUBTREE_LDIF = <<<'LDIF'
         dn: ou=people,dc=example,dc=com
         objectClass: top
@@ -629,6 +643,30 @@ class LdapServerTest extends TestCase
         self::assertSame(
             $originalTimestamp,
             $restoredFoo->get('createTimestamp')?->firstValue(),
+        );
+    }
+
+    public function test_a_dump_seeds_back_an_entry_moved_under_a_newer_parent(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+        $this->subject->applyChanges(new StringLdifLoader(self::MOVE_UNDER_NEWER_PARENT_LDIF));
+
+        $output = new StringLdifOutput();
+        $this->subject->dump(
+            $output,
+            (new DumpOptions())->setBaseDn(new Dn('dc=example,dc=com')),
+        );
+        $restoreOptions = TestServerOptions::defaults();
+        $restoreContainer = Container::forServer($restoreOptions);
+        (new LdapServer(
+            $restoreOptions,
+            $restoreContainer,
+        ))->seed(new StringLdifLoader($output->getLdif()));
+
+        self::assertNotNull(
+            $restoreContainer
+                ->get(ReadEntryInterface::class)
+                ->find(new Dn('cn=foo,ou=later,dc=example,dc=com')),
         );
     }
 
