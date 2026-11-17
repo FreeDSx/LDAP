@@ -71,6 +71,7 @@ final class ServerControlRegistry
 
     private const SYNC_CONTROLS = [
         Control::OID_SYNC_REQUEST,
+        Control::OID_ASSERTION,
     ];
 
     /**

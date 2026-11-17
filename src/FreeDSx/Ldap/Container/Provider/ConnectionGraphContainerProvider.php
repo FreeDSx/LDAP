@@ -198,7 +198,10 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
 
     private function makeAssertionMiddleware(Container $container): AssertionMiddleware
     {
-        return new AssertionMiddleware($container->get(AssertionEvaluator::class));
+        return new AssertionMiddleware(
+            $container->get(AssertionEvaluator::class),
+            $container->get(ServerProtocolHandlerFactory::class),
+        );
     }
 
     private function makeResourceLimitMiddleware(Container $container): ResourceLimitMiddleware

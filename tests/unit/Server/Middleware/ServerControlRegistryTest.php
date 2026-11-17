@@ -51,6 +51,23 @@ final class ServerControlRegistryTest extends TestCase
         );
     }
 
+    public function test_sync_supports_the_assertion_alongside_its_own_control(): void
+    {
+        self::assertSame(
+            [
+                Control::OID_PROXY_AUTHORIZATION,
+                Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
+                Control::OID_SYNC_REQUEST,
+                Control::OID_ASSERTION,
+            ],
+            $this->subject->supportedControlsFor(
+                HandlerId::Sync,
+                self::searchRequest(),
+            ),
+        );
+    }
+
     public function test_paging_supports_expected_controls(): void
     {
         self::assertSame(

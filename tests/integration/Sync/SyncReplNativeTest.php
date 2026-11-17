@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
@@ -159,6 +160,66 @@ final class SyncReplNativeTest extends ServerTestCase
             } while (!$message->getResponse() instanceof SearchResultDone);
 
             self::assertNotNull($message->controls()->get(Control::OID_SYNC_DONE));
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * @return iterable<string, array{Control, int}>
+     */
+    public static function assertionProvider(): iterable
+    {
+        yield 'a critical assertion that fails' => [
+            Controls::assertion(Filters::equal(
+                'dc',
+                'nope',
+            )),
+            ResultCode::ASSERTION_FAILED,
+        ];
+        yield 'a critical assertion that holds' => [
+            Controls::assertion(Filters::equal(
+                'dc',
+                'foo',
+            )),
+            ResultCode::SUCCESS,
+        ];
+        yield 'a non-critical assertion that fails' => [
+            Controls::assertion(
+                Filters::equal(
+                    'dc',
+                    'nope',
+                ),
+                false,
+            ),
+            ResultCode::ASSERTION_FAILED,
+        ];
+    }
+
+    #[DataProvider('assertionProvider')]
+    public function testASyncSearchHonorsTheAssertionControl(
+        Control $assertion,
+        int $resultCode,
+    ): void {
+        $queue = $this->boundRawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                new SyncRequestControl(),
+                $assertion,
+            ));
+            do {
+                $message = $queue->getMessage(2);
+            } while (!$message->getResponse() instanceof SearchResultDone);
+
+            self::assertSame(
+                $resultCode,
+                $message->getResponse()->getResultCode(),
+            );
         } finally {
             $queue->close();
         }
