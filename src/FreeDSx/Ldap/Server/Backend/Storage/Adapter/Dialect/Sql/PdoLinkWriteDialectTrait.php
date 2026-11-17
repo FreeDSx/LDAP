@@ -42,6 +42,20 @@ trait PdoLinkWriteDialectTrait
         SQL;
     }
 
+    public function queryHeldLinkTargets(int $count): string
+    {
+        $markers = SqlFilterUtility::markers($count);
+
+        return <<<SQL
+            SELECT l.target_entry_id
+            FROM entries o
+            JOIN entry_attribute_links l ON l.owner_entry_id = o.entry_id
+            WHERE o.lc_dn = ?
+              AND l.attr_name_lower = ?
+              AND l.target_entry_id IN ($markers)
+        SQL;
+    }
+
     public function queryInsertLinks(int $count): string
     {
         $rows = SqlFilterUtility::markers(
