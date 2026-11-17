@@ -28,6 +28,8 @@ use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\DecodeContext;
@@ -56,7 +58,7 @@ final class RequestMessageDecoderTest extends TestCase
     {
         $message = $this->subject->decode(self::received(new LdapMessageRequest(
             2,
-            new DeleteRequest('dc=foo,dc=bar'),
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
             new PagingControl(
                 10,
                 'cookie',
@@ -69,11 +71,81 @@ final class RequestMessageDecoderTest extends TestCase
             [2, 'dc=foo,dc=bar', 10, 'cookie'],
             [
                 $message->getMessageId(),
-                $message->getRequest() instanceof DeleteRequest ? $message->getRequest()->getDn()->toString() : null,
+                $message->getRequest() instanceof SearchRequest ? (string) $message->getRequest()->getBaseDn() : null,
                 $paging?->getSize(),
                 $paging?->getCookie(),
             ],
         );
+    }
+
+    #[DataProvider('controlsTheOperationDoesNotTake')]
+    public function testAMalformedControlTheOperationDoesNotTakeIsLeftGeneric(
+        RequestInterface $request,
+        string $oid,
+    ): void {
+        $message = $this->subject->decode(self::received(new LdapMessageRequest(
+            2,
+            $request,
+            new Control(
+                $oid,
+                true,
+                "\x01\x02\x03",
+            ),
+        )));
+
+        self::assertSame(
+            Control::class,
+            get_debug_type($message->controls()->get($oid)),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface, string}>
+     */
+    public static function controlsTheOperationDoesNotTake(): iterable
+    {
+        yield 'paging on a compare' => [
+            Operations::compare(
+                'dc=foo,dc=bar',
+                'dc',
+                'foo',
+            ),
+            Control::OID_PAGING,
+        ];
+        yield 'paging on a delete' => [
+            new DeleteRequest('dc=foo,dc=bar'),
+            Control::OID_PAGING,
+        ];
+        yield 'pre-read on a bind' => [
+            Operations::bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ),
+            Control::OID_PRE_READ,
+        ];
+        yield 'proxied authorization on a bind' => [
+            Operations::bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ),
+            Control::OID_PROXY_AUTHORIZATION,
+        ];
+        yield 'post-read on a delete' => [
+            new DeleteRequest('dc=foo,dc=bar'),
+            Control::OID_POST_READ,
+        ];
+        yield 'paging on an abandon' => [
+            Operations::abandon(1),
+            Control::OID_PAGING,
+        ];
+        yield 'paging on an unbind' => [
+            Operations::unbind(),
+            Control::OID_PAGING,
+        ];
+        yield 'paging on an extended operation' => [
+            Operations::whoami(),
+            Control::OID_PAGING,
+        ];
     }
 
     public function testItLeavesThePasswordPolicyControlGenericOnARequest(): void
@@ -214,7 +286,7 @@ final class RequestMessageDecoderTest extends TestCase
     {
         $e = $this->decodeFailureOf(self::received(new LdapMessageRequest(
             7,
-            new DeleteRequest('dc=foo,dc=bar'),
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
             new Control(
                 Control::OID_PAGING,
                 false,
@@ -223,7 +295,7 @@ final class RequestMessageDecoderTest extends TestCase
         )));
 
         self::assertSame(
-            [7, 10, ResultCode::PROTOCOL_ERROR],
+            [7, 3, ResultCode::PROTOCOL_ERROR],
             [$e->getMessageId(), $e->getProtocolOpTag(), $e->getResultCode()],
         );
     }

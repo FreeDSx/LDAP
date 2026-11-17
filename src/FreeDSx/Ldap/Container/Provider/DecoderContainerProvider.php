@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\Decoder\Control\ProxyAuthorizationControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\PwdPolicyResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\ReadEntryResponseControlDecoder;
+use FreeDSx\Ldap\Protocol\Decoder\Control\RequestControlDecoders;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SortingResponseControlDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\Control\SubentriesControlDecoder;
@@ -82,6 +83,7 @@ use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
+use FreeDSx\Ldap\Server\Middleware\ServerControlRegistry;
 
 /**
  * Registers the decoders that turn received messages into requests and responses.
@@ -265,26 +267,29 @@ final class DecoderContainerProvider implements ContainerProviderInterface
     }
 
     /**
-     * Types only the controls a client sends, holding any other OID to RFC 4511 4.1.11 criticality.
+     * Types only the controls a request's operation takes, holding any other to RFC 4511 4.1.11 criticality.
      */
-    private function makeRequestControlDecoder(Container $container): ControlDecoder
+    private function makeRequestControlDecoder(Container $container): RequestControlDecoders
     {
-        return new ControlDecoder([
-            Control::OID_PAGING => $container->get(PagingControlDecoder::class),
-            Control::OID_SORTING => $container->get(SortingControlDecoder::class),
-            Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
-            Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
-            Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
-            Control::OID_PRE_READ => new ReadEntryControlDecoder(
-                PreReadControl::class,
-                $container->get(AttributeSelectionDecoder::class),
-            ),
-            Control::OID_POST_READ => new ReadEntryControlDecoder(
-                PostReadControl::class,
-                $container->get(AttributeSelectionDecoder::class),
-            ),
-            Control::OID_SUBENTRIES => $container->get(SubentriesControlDecoder::class),
-        ]);
+        return new RequestControlDecoders(
+            [
+                Control::OID_PAGING => $container->get(PagingControlDecoder::class),
+                Control::OID_SORTING => $container->get(SortingControlDecoder::class),
+                Control::OID_SYNC_REQUEST => $container->get(SyncRequestControlDecoder::class),
+                Control::OID_PROXY_AUTHORIZATION => $container->get(ProxyAuthorizationControlDecoder::class),
+                Control::OID_ASSERTION => $container->get(AssertionControlDecoder::class),
+                Control::OID_PRE_READ => new ReadEntryControlDecoder(
+                    PreReadControl::class,
+                    $container->get(AttributeSelectionDecoder::class),
+                ),
+                Control::OID_POST_READ => new ReadEntryControlDecoder(
+                    PostReadControl::class,
+                    $container->get(AttributeSelectionDecoder::class),
+                ),
+                Control::OID_SUBENTRIES => $container->get(SubentriesControlDecoder::class),
+            ],
+            new ServerControlRegistry(),
+        );
     }
 
     /**

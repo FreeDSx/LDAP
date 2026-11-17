@@ -533,7 +533,7 @@ final class ServerQueueTest extends TestCase
         self::assertSame(
             HeldRequests::estimate(
                 strlen($request),
-                10,
+                18,
             ),
             $this->budget->held(),
         );
@@ -1322,7 +1322,7 @@ final class ServerQueueTest extends TestCase
             [self::encodedSortRequest()],
             new RequestLimits(
                 authorization: $this->authorization,
-                maxElements: 9,
+                maxElements: 17,
             ),
         );
 
@@ -1343,7 +1343,7 @@ final class ServerQueueTest extends TestCase
             [self::encodedSortRequest()],
             new RequestLimits(
                 authorization: $this->authorization,
-                maxElements: 10,
+                maxElements: 18,
             ),
         );
 
@@ -1860,7 +1860,7 @@ final class ServerQueueTest extends TestCase
     {
         return (new LdapEncoder())->encode((new LdapMessageRequest(
             5,
-            new DeleteRequest('dc=foo,dc=bar'),
+            Operations::search(Filters::present('cn'))->base('dc=foo,dc=bar'),
             new SortingControl(
                 new SortKey('cn'),
                 new SortKey('sn'),

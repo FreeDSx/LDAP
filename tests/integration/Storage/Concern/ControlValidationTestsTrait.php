@@ -20,7 +20,9 @@ use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -243,5 +245,128 @@ trait ControlValidationTestsTrait
             SyncStateControl::STATE_ADD,
             str_repeat("\x11", 16),
         )];
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface, Control, int, string}>
+     */
+    public static function malformedControlTheOperationDoesNotTake(): iterable
+    {
+        $bind = Operations::bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $compare = Operations::compare(
+            'cn=user,dc=foo,dc=bar',
+            'cn',
+            'user',
+        );
+
+        yield 'non-critical paging on a bind' => [
+            $bind,
+            self::malformed(
+                Control::OID_PAGING,
+                false,
+            ),
+            ResultCode::SUCCESS,
+            'dn:cn=user,dc=foo,dc=bar',
+        ];
+        yield 'critical paging on a bind' => [
+            $bind,
+            self::malformed(
+                Control::OID_PAGING,
+                true,
+            ),
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            '',
+        ];
+        yield 'non-critical pre-read on a bind' => [
+            $bind,
+            self::malformed(
+                Control::OID_PRE_READ,
+                false,
+            ),
+            ResultCode::SUCCESS,
+            'dn:cn=user,dc=foo,dc=bar',
+        ];
+        yield 'non-critical paging on a compare' => [
+            $compare,
+            self::malformed(
+                Control::OID_PAGING,
+                false,
+            ),
+            ResultCode::COMPARE_TRUE,
+            'dn:cn=user,dc=foo,dc=bar',
+        ];
+        yield 'critical paging on a compare' => [
+            $compare,
+            self::malformed(
+                Control::OID_PAGING,
+                true,
+            ),
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            'dn:cn=user,dc=foo,dc=bar',
+        ];
+        yield 'non-critical pre-read on a compare' => [
+            $compare,
+            self::malformed(
+                Control::OID_PRE_READ,
+                false,
+            ),
+            ResultCode::COMPARE_TRUE,
+            'dn:cn=user,dc=foo,dc=bar',
+        ];
+    }
+
+    #[DataProvider('malformedControlTheOperationDoesNotTake')]
+    public function testAMalformedControlTheOperationDoesNotTakeIsJudgedByItsCriticality(
+        RequestInterface $request,
+        Control $control,
+        int $resultCode,
+        string $identity,
+    ): void {
+        $this->authenticateUser();
+
+        self::assertSame(
+            [$resultCode, $identity],
+            [
+                $this->resultCodeOf(
+                    $request,
+                    $control,
+                ),
+                $this->ldapClient()->whoami(),
+            ],
+        );
+    }
+
+    private static function malformed(
+        string $oid,
+        bool $criticality,
+    ): Control {
+        return new Control(
+            $oid,
+            $criticality,
+            "\x01\x02\x03",
+        );
+    }
+
+    private function resultCodeOf(
+        RequestInterface $request,
+        Control $control,
+    ): int {
+        try {
+            $response = $this->ldapClient()
+                ->sendAndReceive(
+                    $request,
+                    $control,
+                )
+                ->getResponse();
+        } catch (OperationException|BindException $e) {
+            return $e->getCode();
+        }
+
+        return $response instanceof LdapResult
+            ? $response->getResultCode()
+            : -1;
     }
 }
