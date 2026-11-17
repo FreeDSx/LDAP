@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Queue\Response;
 
 use FreeDSx\Ldap\Exception\MessageDecodeException;
+use FreeDSx\Ldap\Protocol\DecodeFailureOutcome;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -151,7 +152,7 @@ final readonly class ResponseWriter
                 ? $this->outOfSequence->signalOrRefuse($messageId)
                 : $this->queue->peekForCancelSignal($messageId);
         } catch (MessageDecodeException $e) {
-            if ($this->decodeFailures->answer($e)) {
+            if ($this->decodeFailures->answer($e) !== DecodeFailureOutcome::Unanswerable) {
                 return null;
             }
 

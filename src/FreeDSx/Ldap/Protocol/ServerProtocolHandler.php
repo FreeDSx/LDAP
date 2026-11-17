@@ -147,7 +147,7 @@ readonly class ServerProtocolHandler
             return $this->queue->getMessage();
         } catch (MessageDecodeException $e) {
             # A message whose envelope parsed is answered by its ID, and the stream is already past it.
-            if ($this->decodeFailures->answer($e)) {
+            if ($this->decodeFailures->answer($e) !== DecodeFailureOutcome::Unanswerable) {
                 return null;
             }
 

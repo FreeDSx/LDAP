@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\UsernameExtractor\SaslUsernameExtractorFactory;
+use FreeDSx\Ldap\Protocol\DecodeFailureOutcome;
 use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -297,33 +298,35 @@ final class SaslExchange
             $message = $this->readMessage();
 
             // Continuations skip the validation middleware, and the challenge echoes back whatever ID arrives.
-            if ($message->getMessageId() === 0) {
+            if ($message?->getMessageId() === 0) {
                 throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
             }
-        } while ($message->getRequest() instanceof AbandonRequest);
+        } while ($message === null || $message->getRequest() instanceof AbandonRequest);
 
         return $message;
     }
 
     /**
+     * Reads a message, or null when a refused request that takes no response was dropped.
+     *
      * @throws ResponseAlreadySentException when a message that fails to decode is answered on its own ID.
      * @throws MessageDecodeException when a message that fails to decode cannot be answered.
      */
-    private function readMessage(): LdapMessageRequest
+    private function readMessage(): ?LdapMessageRequest
     {
         try {
             return $this->queue->getMessage();
         } catch (MessageDecodeException $e) {
-            if (!$this->decodeFailures->answer($e)) {
-                throw $e;
-            }
-
-            // The bind ends with the message that broke it, which is already answered.
-            throw new ResponseAlreadySentException(
-                $e->getMessage(),
-                $e->getResultCode(),
-                $e,
-            );
+            return match ($this->decodeFailures->answer($e)) {
+                DecodeFailureOutcome::Dropped => null,
+                // The bind ends with the message that broke it, which is already answered.
+                DecodeFailureOutcome::Answered => throw new ResponseAlreadySentException(
+                    $e->getMessage(),
+                    $e->getResultCode(),
+                    $e,
+                ),
+                DecodeFailureOutcome::Unanswerable => throw $e,
+            };
         }
     }
 
