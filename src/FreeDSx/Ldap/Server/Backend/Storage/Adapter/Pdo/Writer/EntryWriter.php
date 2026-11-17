@@ -180,24 +180,32 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
                 $to,
                 $base->getDn()->toString(),
             );
-
-            $this->translatingRefusal(function () use ($rename): void {
-                $this->connection->execute(
-                    $this->dialect->queryRenameDescendants(),
-                    $this->renameDescendantParams($rename),
-                );
-            });
+            // Either clash names the new base, since a descendant's name can only be taken where the base exists.
+            $landsOn = $to->normalize();
 
             $this->translatingRefusal(
-                function () use ($rename, $to): void {
-                    $this->connection->execute($this->dialect->queryRenameEntry(), [
-                        $rename->toDisplay,
-                        $rename->lcTo,
-                        $to->normalize()->getParent()?->toString() ?? '',
-                        $rename->lcFrom,
-                    ]);
+                function () use ($rename): void {
+                    $this->connection->execute(
+                        $this->dialect->queryRenameDescendants(),
+                        $this->renameDescendantParams($rename),
+                    );
                 },
-                $to->normalize(),
+                $landsOn,
+            );
+
+            $this->translatingRefusal(
+                function () use ($rename, $landsOn): void {
+                    $this->connection->execute(
+                        $this->dialect->queryRenameEntry(),
+                        [
+                            $rename->toDisplay,
+                            $rename->lcTo,
+                            $landsOn->getParent()?->toString() ?? '',
+                            $rename->lcFrom,
+                        ],
+                    );
+                },
+                $landsOn,
             );
 
             // A moved subtree can put many DNs in place at once, so nothing narrows which parked values may settle.
@@ -329,7 +337,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
      * Runs a write, turning the driver failures the dialect recognises into the directory conditions they mean.
      *
      * @param Closure(): void $write
-     * @param ?Dn $landsOn The DN written, where the write lands on exactly one.
+     * @param ?Dn $landsOn The DN the write lands on, or under.
      * @throws EntryAlreadyExistsException
      * @throws EntryUuidTakenException
      * @throws DnTooLongException
