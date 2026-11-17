@@ -28,6 +28,8 @@ final class LdapDumpServerTest extends ServerTestCase
 {
     private const SEED_LDIF = __DIR__ . '/../../resources/seed/seed-test.ldif';
 
+    private const CHANGES_LDIF = __DIR__ . '/../../resources/changes/dump-move-test.ldif';
+
     private static string $dumpPath;
 
     public static function setUpBeforeClass(): void
@@ -50,6 +52,7 @@ final class LdapDumpServerTest extends ServerTestCase
             [
                 '--storage=sqlite',
                 '--seed=' . self::SEED_LDIF,
+                '--changes=' . self::CHANGES_LDIF,
                 '--dump=' . self::$dumpPath,
             ],
         );
@@ -131,6 +134,24 @@ final class LdapDumpServerTest extends ServerTestCase
         self::assertSame(
             ['Builder'],
             $bob->get('sn')?->getValues(),
+        );
+    }
+
+    public function test_an_entry_moved_under_a_newer_parent_seeds_back_under_it(): void
+    {
+        $options = TestServerOptions::defaults();
+        $container = Container::forServer($options);
+        (new LdapServer(
+            $options,
+            $container,
+        ))->seed(new StringLdifLoader((string) file_get_contents(self::$dumpPath)));
+
+        self::assertSame(
+            ['mover'],
+            $container->get(ReadEntryInterface::class)
+                ->find(new Dn('cn=mover,ou=later,dc=foo,dc=bar'))
+                ?->get('cn')
+                ?->getValues(),
         );
     }
 

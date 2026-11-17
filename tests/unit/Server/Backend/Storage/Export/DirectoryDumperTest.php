@@ -18,16 +18,15 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Ldif\LdifOutputOptions;
 use FreeDSx\Ldap\Ldif\LdifWriter;
-use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use Generator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
@@ -144,102 +143,67 @@ final class DirectoryDumperTest extends TestCase
         );
     }
 
-    public function test_it_re_evaluates_the_filter_when_the_stream_is_not_preFiltered(): void
+    public function test_a_filter_writes_only_the_entries_it_matches(): void
     {
-        $alice = Entry::create(
-            'cn=alice,dc=foo,dc=bar',
-            ['cn' => 'alice'],
-        );
-        $bob = Entry::create(
-            'cn=bob,dc=foo,dc=bar',
-            ['cn' => 'bob'],
-        );
-        $storage = $this->createMock(ListEntryInterface::class);
-        $storage->method('list')->willReturn(EntryStream::of(
-            entries: (function () use ($alice, $bob): Generator {
-                yield $alice;
-                yield $bob;
-
-                return null;
-            })(),
-            isPreFiltered: false,
-        ));
-        $evaluator = $this->createMock(FilterEvaluatorInterface::class);
-        $evaluator->method('evaluate')->willReturnCallback(
-            fn(Entry $entry, FilterInterface $filter): bool
-                => $entry->getDn()->toString() === 'cn=alice,dc=foo,dc=bar',
-        );
-
         $dumper = $this->makeDumper(
-            $storage,
-            $evaluator,
-            new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
+            writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
 
-        $ldif = implode('', iterator_to_array(
-            $dumper->dump((new DumpOptions())->setFilter(Filters::equal('cn', 'alice'))),
-            false,
-        ));
-
-        self::assertStringContainsString(
-            'cn=alice,dc=foo,dc=bar',
-            $ldif,
-        );
-        self::assertStringNotContainsString(
-            'cn=bob,dc=foo,dc=bar',
-            $ldif,
+        self::assertSame(
+            ['cn=alice,dc=foo,dc=bar'],
+            $this->dnsIn($dumper->dump((new DumpOptions())->setFilter(Filters::equal(
+                'cn',
+                'alice',
+            )))),
         );
     }
 
-    public function test_it_does_not_re_evaluate_the_filter_when_the_stream_is_preFiltered(): void
+    public function test_it_writes_a_parent_before_a_child_stored_ahead_of_it(): void
     {
-        $alice = Entry::create('cn=alice,dc=foo,dc=bar', ['cn' => 'alice']);
-        $storage = $this->createMock(ListEntryInterface::class);
-        $storage->method('list')->willReturn(EntryStream::of(
-            entries: (function () use ($alice): Generator {
-                yield $alice;
-
-                return null;
-            })(),
-            isPreFiltered: true,
-        ));
-        $evaluator = $this->createMock(FilterEvaluatorInterface::class);
-        $evaluator->expects(self::never())->method('evaluate');
-
         $dumper = $this->makeDumper(
-            $storage,
-            $evaluator,
+            $this->storageWithAMovedEntry(),
             new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
 
-        iterator_to_array(
-            $dumper->dump((new DumpOptions())->setFilter(Filters::equal('cn', 'alice'))),
-            false,
+        self::assertSame(
+            [
+                'dc=foo,dc=bar',
+                'ou=later,dc=foo,dc=bar',
+                'cn=mover,ou=later,dc=foo,dc=bar',
+            ],
+            $this->dnsIn($dumper->dump(new DumpOptions())),
         );
     }
 
-    public function test_it_passes_match_all_to_storage_when_no_filter_is_set(): void
+    public function test_a_filter_still_reaches_a_match_below_a_container_it_does_not_match(): void
     {
-        $storage = $this->createMock(ListEntryInterface::class);
-        $storage->expects(self::once())
-            ->method('list')
-            ->with(self::callback(
-                fn(StorageListOptions $opts): bool
-                    => $opts->scope->subtree === true && $opts->scope->baseDn->toString() === 'dc=foo,dc=bar',
-            ))
-            ->willReturn(EntryStream::of(
-                entries: (function (): Generator {
-                    yield from [];
+        $dumper = $this->makeDumper(
+            $this->storageWithAMovedEntry(),
+            new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
+        );
 
-                    return null;
-                })(),
-            ));
+        self::assertSame(
+            ['cn=mover,ou=later,dc=foo,dc=bar'],
+            $this->dnsIn($dumper->dump((new DumpOptions())->setFilter(Filters::equal(
+                'cn',
+                'mover',
+            )))),
+        );
+    }
 
-        $dumper = $this->makeDumper($storage);
+    public function test_a_filter_on_a_back_link_writes_the_entries_it_names(): void
+    {
+        $dumper = $this->makeDumper(
+            $this->storageWithAGroup(),
+            new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
+        );
 
-        iterator_to_array(
-            $dumper->dump(new DumpOptions()),
-            false,
+        self::assertSame(
+            ['cn=alice,dc=foo,dc=bar'],
+            $this->dnsIn($dumper->dump((new DumpOptions())->setFilter(Filters::equal(
+                'memberOf',
+                'cn=staff,dc=foo,dc=bar',
+            )))),
         );
     }
 
@@ -247,16 +211,117 @@ final class DirectoryDumperTest extends TestCase
      * The subject, with only the collaborator a test cares about supplied.
      */
     private function makeDumper(
-        ?ListEntryInterface $storage = null,
-        ?FilterEvaluatorInterface $filterEvaluator = null,
+        ?InMemoryStorage $storage = null,
         ?LdifWriter $writer = null,
     ): DirectoryDumper {
+        $storage ??= $this->storageWithEntries();
+
         return new DirectoryDumper(
-            $storage ?? $this->storageWithEntries(),
+            new SubtreeEnumerator($storage),
             [new Dn('dc=foo,dc=bar')],
-            $filterEvaluator ?? $this->fromContainer(FilterEvaluatorInterface::class),
+            $this->fromContainer(FilterEvaluatorInterface::class),
+            $this->fromContainer(
+                LinkedLeafWitness::class,
+                [LinkedValueLookupInterface::class => $storage],
+            ),
             $writer ?? new LdifWriter(),
         );
+    }
+
+    /**
+     * Holds the child ahead of the parent it was moved under, as storage order leaves a move.
+     */
+    private function storageWithAMovedEntry(): InMemoryStorage
+    {
+        return EntryFixture::inMemoryStorage(
+            new Entry(
+                new Dn('dc=foo,dc=bar'),
+                new Attribute(
+                    'dc',
+                    'foo',
+                ),
+            ),
+            new Entry(
+                new Dn('cn=mover,ou=later,dc=foo,dc=bar'),
+                new Attribute(
+                    'cn',
+                    'mover',
+                ),
+            ),
+            new Entry(
+                new Dn('ou=later,dc=foo,dc=bar'),
+                new Attribute(
+                    'ou',
+                    'later',
+                ),
+            ),
+        );
+    }
+
+    /**
+     * Keeps member values as links, which is where a back-link is read from.
+     */
+    private function storageWithAGroup(): InMemoryStorage
+    {
+        return new InMemoryStorage(
+            EntryFixture::allWithUuid(
+                new Entry(
+                    new Dn('dc=foo,dc=bar'),
+                    new Attribute(
+                        'dc',
+                        'foo',
+                    ),
+                ),
+                new Entry(
+                    new Dn('cn=alice,dc=foo,dc=bar'),
+                    new Attribute(
+                        'cn',
+                        'alice',
+                    ),
+                ),
+                new Entry(
+                    new Dn('cn=bob,dc=foo,dc=bar'),
+                    new Attribute(
+                        'cn',
+                        'bob',
+                    ),
+                ),
+                new Entry(
+                    new Dn('cn=staff,dc=foo,dc=bar'),
+                    new Attribute(
+                        'cn',
+                        'staff',
+                    ),
+                    new Attribute(
+                        'member',
+                        'cn=alice,dc=foo,dc=bar',
+                    ),
+                ),
+            ),
+            linkedAttributes: $this->fromContainer(LinkedAttributes::class),
+        );
+    }
+
+    /**
+     * @param iterable<string> $chunks
+     *
+     * @return list<string>
+     */
+    private function dnsIn(iterable $chunks): array
+    {
+        preg_match_all(
+            '/^dn: (.+)$/m',
+            implode(
+                '',
+                iterator_to_array(
+                    $chunks,
+                    false,
+                ),
+            ),
+            $matches,
+        );
+
+        return $matches[1];
     }
 
     private function storageWithEntries(): InMemoryStorage

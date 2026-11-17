@@ -17,8 +17,10 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 
+use function array_filter;
 use function array_map;
 use function array_search;
 use function count;
@@ -138,6 +140,129 @@ trait SubtreeWalkStorageContractTests
         );
     }
 
+    public function test_the_parents_first_walk_yields_the_base_first_and_each_entry_after_its_parent(): void
+    {
+        $walked = $this->dnsOf($this->walkParentsFirst(
+            $this->walkContainer(),
+            'ou=people,dc=foo,dc=bar',
+        ));
+
+        self::assertSame(
+            'ou=people,dc=foo,dc=bar',
+            $walked[0],
+        );
+        self::assertLessThan(
+            $this->positionOf(
+                $walked,
+                'cn=laptop,cn=alice,ou=people,dc=foo,dc=bar',
+            ),
+            $this->positionOf(
+                $walked,
+                'cn=alice,ou=people,dc=foo,dc=bar',
+            ),
+        );
+    }
+
+    public function test_the_parents_first_walk_yields_each_entry_beneath_the_base_once(): void
+    {
+        $walked = $this->dnsOf($this->walkParentsFirst(
+            $this->walkContainer(),
+            'ou=people,dc=foo,dc=bar',
+        ));
+        sort($walked);
+
+        self::assertSame(
+            [
+                'cn=alice,ou=people,dc=foo,dc=bar',
+                'cn=bob,ou=people,dc=foo,dc=bar',
+                'cn=laptop,cn=alice,ou=people,dc=foo,dc=bar',
+                'cn=link,ou=people,dc=foo,dc=bar',
+                'cn=policy,ou=people,dc=foo,dc=bar',
+                'ou=people,dc=foo,dc=bar',
+            ],
+            $walked,
+        );
+    }
+
+    public function test_the_parents_first_walk_finishes_a_container_after_descending_into_its_first_child(): void
+    {
+        $children = array_map(
+            static fn(int $i): Entry => new Entry(new Dn("cn=c$i,ou=wide,dc=foo,dc=bar")),
+            range(
+                0,
+                1000,
+            ),
+        );
+        $container = $this->makeStorageContainer(...[
+            new Entry(new Dn('dc=foo,dc=bar')),
+            new Entry(new Dn('ou=Wide,dc=foo,dc=bar')),
+            ...$children,
+            new Entry(new Dn('cn=Below,cn=c0,ou=wide,dc=foo,dc=bar')),
+        ]);
+        $walked = $this->dnsOf($this->walkParentsFirst(
+            $container,
+            'ou=wide,dc=foo,dc=bar',
+        ));
+
+        self::assertCount(
+            1003,
+            $walked,
+        );
+        self::assertLessThan(
+            $this->positionOf(
+                $walked,
+                'cn=below,cn=c0,ou=wide,dc=foo,dc=bar',
+            ),
+            $this->positionOf(
+                $walked,
+                'cn=c0,ou=wide,dc=foo,dc=bar',
+            ),
+        );
+    }
+
+    public function test_the_parents_first_walk_does_not_reach_an_entry_stored_under_a_missing_parent(): void
+    {
+        $container = $this->makeStorageContainer(
+            new Entry(new Dn('dc=foo,dc=bar')),
+            new Entry(new Dn('cn=Orphan,ou=Missing,dc=foo,dc=bar')),
+        );
+
+        self::assertSame(
+            ['dc=foo,dc=bar'],
+            $this->dnsOf($this->walkParentsFirst(
+                $container,
+                'dc=foo,dc=bar',
+            )),
+        );
+    }
+
+    public function test_the_parents_first_walk_of_a_missing_base_yields_nothing(): void
+    {
+        self::assertSame(
+            [],
+            $this->walkParentsFirst(
+                $this->walkContainer(),
+                'ou=missing,dc=foo,dc=bar',
+            ),
+        );
+    }
+
+    public function test_no_entry_the_parents_first_walk_yields_carries_the_child_flag(): void
+    {
+        $flagged = array_filter(
+            $this->walkParentsFirst(
+                $this->walkContainer(),
+                'dc=foo,dc=bar',
+            ),
+            static fn(Entry $entry): bool => $entry->has(AttributeTypeOid::NAME_HAS_SUBORDINATES),
+        );
+
+        self::assertSame(
+            [],
+            $flagged,
+        );
+    }
+
     public function test_children_outside_are_the_children_not_among_the_entries_given(): void
     {
         $subtree = $this->walkContainer()->get(SubtreeEnumerator::class);
@@ -211,6 +336,32 @@ trait SubtreeWalkStorageContractTests
         return iterator_to_array(
             $container->get(SubtreeEnumerator::class)->leavesFirst(new Dn($base)),
             false,
+        );
+    }
+
+    /**
+     * @return list<Entry>
+     */
+    private function walkParentsFirst(
+        Container $container,
+        string $base,
+    ): array {
+        return iterator_to_array(
+            $container->get(SubtreeEnumerator::class)->parentsFirst(new Dn($base)),
+            false,
+        );
+    }
+
+    /**
+     * @param list<Entry> $entries
+     *
+     * @return list<string>
+     */
+    private function dnsOf(array $entries): array
+    {
+        return array_map(
+            static fn(Entry $entry): string => $entry->getDn()->normalizedString(),
+            $entries,
         );
     }
 
