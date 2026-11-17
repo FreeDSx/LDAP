@@ -236,14 +236,21 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     }
 
     /**
-     * Releases what a request the upgrade discards reserved while arriving.
+     * Discards the requests read ahead of the upgrade and releases what they reserved.
      */
     public function encrypt(): static
     {
         $this->arrival->arrived();
+        $this->readAhead->clear();
         parent::encrypt();
 
         return $this;
+    }
+
+    public function hasBufferedInput(): bool
+    {
+        return parent::hasBufferedInput()
+            || !$this->readAhead->isEmpty();
     }
 
     /**

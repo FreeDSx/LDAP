@@ -1068,6 +1068,39 @@ final class ServerQueueTest extends TestCase
         $queue->getMessage();
     }
 
+    public function test_encrypt_discards_requests_read_ahead_behind_the_upgrade(): void
+    {
+        $queue = $this->queueReading([self::encodedDelete(5)]);
+        $queue->peekForCancelSignal(2);
+
+        self::assertTrue($queue->hasBufferedInput());
+
+        $queue->encrypt();
+
+        self::assertFalse($queue->hasBufferedInput());
+
+        $this->expectException(ConnectionException::class);
+
+        $queue->getMessage();
+    }
+
+    public function test_a_request_read_ahead_and_discarded_by_the_upgrade_releases_what_it_held(): void
+    {
+        $queue = $this->queueReading(
+            [self::encodedDelete(5)],
+            heldSize: 100_000,
+        );
+        $queue->peekForCancelSignal(2);
+        $held = $this->budget->held();
+
+        $queue->encrypt();
+
+        self::assertSame(
+            [true, 0],
+            [$held > 0, $this->budget->held()],
+        );
+    }
+
     public function test_it_writes_a_message_larger_than_the_send_buffer_without_an_oversized_write(): void
     {
         $encoder = new LdapEncoder();

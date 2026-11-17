@@ -100,6 +100,31 @@ final class ReadAheadBufferTest extends TestCase
         self::assertFalse($this->subject->isFull());
     }
 
+    public function test_it_is_empty_until_a_message_is_held(): void
+    {
+        self::assertTrue($this->subject->isEmpty());
+
+        $this->subject->append(self::message(1));
+
+        self::assertFalse($this->subject->isEmpty());
+    }
+
+    public function test_clearing_it_drops_every_message_and_the_bytes_counted_for_them(): void
+    {
+        $this->subject->append(
+            self::message(1),
+            65_536,
+        );
+        $this->subject->prepend(self::message(2));
+
+        $this->subject->clear();
+
+        self::assertSame(
+            [true, false, null],
+            [$this->subject->isEmpty(), $this->subject->isFull(), $this->subject->take()],
+        );
+    }
+
     private static function message(int $messageId): LdapMessageRequest
     {
         return new LdapMessageRequest(

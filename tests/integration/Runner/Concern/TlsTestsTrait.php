@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Exception\IdleTimeoutException;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
@@ -75,6 +76,63 @@ trait TlsTestsTrait
             $injected,
             'A PDU pipelined ahead of the upgrade must not be answered over the encrypted channel.',
         );
+    }
+
+    public function testItDiscardsRequestsReadAheadOfStartTlsDuringAStreamingSearch(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            ['--entries=300'],
+        );
+        $queue = $this->rawQueue(
+            timeoutRead: 2,
+            validateSslCert: false,
+        );
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ),
+        ));
+        $queue->getMessage(1);
+
+        $queue->sendMessage(
+            new LdapMessageRequest(
+                2,
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+            new LdapMessageRequest(
+                3,
+                Operations::extended(ExtendedRequest::OID_START_TLS),
+            ),
+            new LdapMessageRequest(
+                4,
+                Operations::whoami(),
+            ),
+        );
+
+        $this->assertSame(
+            [2 => ResultCode::SUCCESS, 3 => ResultCode::SUCCESS],
+            $this->resultCodesFor(
+                $queue,
+                2,
+                3,
+            ),
+        );
+
+        $queue->encrypt();
+
+        $this->expectException(IdleTimeoutException::class);
+
+        try {
+            $queue->getMessage();
+        } finally {
+            $queue->close();
+        }
     }
 
     public function testASilentStartTlsClientIsDisconnectedWithoutStallingOtherClients(): void

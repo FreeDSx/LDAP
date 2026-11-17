@@ -85,6 +85,20 @@ class ReadAheadBuffer
     }
 
     /**
+     * Drops every message held, along with the bytes counted for them.
+     */
+    public function clear(): void
+    {
+        $this->messages = [];
+        $this->bytes = 0;
+    }
+
+    public function isEmpty(): bool
+    {
+        return $this->messages === [];
+    }
+
+    /**
      * Whether the buffer holds as many messages, or as many bytes of them, as read-ahead may.
      */
     public function isFull(): bool
