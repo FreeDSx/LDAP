@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\BacklinkReader;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -32,29 +33,20 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class WriteControlEvaluator
 {
-    /**
-     * The controls that read the entry a write targets.
-     *
-     * @var list<string>
-     */
-    private const ENTRY_READING_OIDS = [
-        Control::OID_ASSERTION,
-        Control::OID_PRE_READ,
-        Control::OID_POST_READ,
-    ];
-
     private ?Entry $preReadEntry = null;
 
     private ?Entry $postReadEntry = null;
 
     /**
      * @param ?DerivedResolver $derived Adds the derived attributes a read-entry control asks for; none when null.
+     * @param ?BacklinkReader $backlinks Adds the back-links a read-entry control asks for; none when null.
      */
     public function __construct(
         private readonly AssertionEvaluator $assertions,
         private readonly TokenInterface $token,
         private readonly ControlBag $controls,
         private readonly ?DerivedResolver $derived = null,
+        private readonly ?BacklinkReader $backlinks = null,
     ) {}
 
     /**
@@ -76,7 +68,7 @@ class WriteControlEvaluator
     }
 
     /**
-     * Holds the entry being added to the assertion, as it is the Add's target (RFC 4528 §3), then keeps it for a Post-Read.
+     * Holds the entry being added to the assertion, as it is the Add's target (RFC 4528 §3).
      *
      * @throws OperationException
      */
@@ -87,11 +79,10 @@ class WriteControlEvaluator
             $this->controls,
             $this->token,
         );
-        $this->captureResult($entry);
     }
 
     /**
-     * Keeps the entry as the write stores it, for a Post-Read (RFC 4527 §3.2).
+     * Keeps the entry once the write has stored it, for a Post-Read (RFC 4527 §3.2).
      */
     public function captureResult(Entry $result): void
     {
@@ -106,13 +97,10 @@ class WriteControlEvaluator
      */
     public function inspectsEntry(): bool
     {
-        foreach (self::ENTRY_READING_OIDS as $oid) {
-            if ($this->controls->has($oid)) {
-                return true;
-            }
-        }
-
-        return false;
+        // A read-entry control left generic is one the operation does not take, which is ignored.
+        return $this->controls->has(Control::OID_ASSERTION)
+            || $this->controls->get(Control::OID_PRE_READ) instanceof ReadEntryControl
+            || $this->controls->get(Control::OID_POST_READ) instanceof ReadEntryControl;
     }
 
     /**
@@ -144,7 +132,15 @@ class WriteControlEvaluator
         if (!$control instanceof ReadEntryControl) {
             return null;
         }
+        $selection = array_map(
+            static fn(string $name): Attribute => new Attribute($name),
+            $control->getAttributes(),
+        );
         $kept = $entry->makeCopy();
+        $kept = $this->backlinks?->withSelected(
+            $kept,
+            $selection,
+        ) ?? $kept;
 
         if ($this->derived === null) {
             return $kept;
@@ -152,10 +148,7 @@ class WriteControlEvaluator
 
         return $this->derived->inject(
             $kept,
-            $this->derived->requested(array_map(
-                static fn(string $name): Attribute => new Attribute($name),
-                $control->getAttributes(),
-            )),
+            $this->derived->requested($selection),
         );
     }
 }

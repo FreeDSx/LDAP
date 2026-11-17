@@ -376,6 +376,9 @@ Raise or remove the bound with `maxLinkedValues` on the search limits, including
 rule. A client can read a large attribute either one slice at a time with the range option, covered in
 [Range Retrieval](../Client/Range-Retrieval.md), or as entries through a paged search on the back-link.
 
+The Pre-Read and Post-Read controls return a linked attribute such as `member` in full. They bound a back-link by the
+server's `maxLinkedValues` alone, never by a per-identity rule.
+
 The in-memory backend keeps linked values on the entry as written. It does not refuse a name that resolves to nothing,
 does not follow a rename, does not remove a reference when its target is deleted, and does not bound how many values a
 read returns.

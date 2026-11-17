@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\BacklinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Entry\Entry;
@@ -88,6 +89,10 @@ final class ServerDispatchHandlerTest extends TestCase
                 $this->fromContainer(AssertionControlDecoder::class),
             ),
             derived: new DerivedResolver($this->createMock(ReadEntryInterface::class)),
+            backlinks: new BacklinkReader(
+                $this->createMock(ReadEntryInterface::class),
+                (new LinkedAttributes(new Schema()))->backlinks(),
+            ),
             readEntryControlHandler: new ReadEntryControlHandler(
                 new Schema(),
                 $this->mockAccessControl,

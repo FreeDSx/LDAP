@@ -56,7 +56,6 @@ trait AppliesEntryUpdate
             $updated,
             $command->systemChanges,
         );
-        $context->controlEvaluator()?->captureResult($updated);
 
         return $updated;
     }

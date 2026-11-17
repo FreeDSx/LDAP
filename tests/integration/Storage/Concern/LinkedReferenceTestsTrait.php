@@ -207,6 +207,28 @@ trait LinkedReferenceTestsTrait
         );
     }
 
+    public function testARenamedMembersPostReadCarriesItsBackLinks(): void
+    {
+        $member = $this->seedReferencedMember('link-post-member');
+        $group = $this->seedGroup(
+            'link-post-group',
+            $member,
+        );
+
+        $response = $this->asAdmin(fn(LdapClient $admin): LdapMessageResponse => $admin->sendAndReceive(
+            Operations::rename(
+                $member,
+                'cn=link-post-member-renamed',
+            ),
+            Controls::postRead('memberOf'),
+        ));
+
+        self::assertSame(
+            [$group],
+            $this->postReadOf($response)?->get('memberOf')?->getValues(),
+        );
+    }
+
     private function seedLinkedToItselfAndRenamed(
         string $cn,
         string $newRdn,

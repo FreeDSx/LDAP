@@ -107,15 +107,9 @@ final readonly class StorageListOptionsFactory
         SearchRequest $request,
         ?SearchLimits $effectiveLimits = null,
     ): EntryProjection {
-        $linkCap = ($effectiveLimits ?? $this->limits)->maxLinkedValues();
-
         return new EntryProjection(
             attributes: $this->materializedAttributes($request),
-            linkCap: match ($linkCap) {
-                null => EntryProjection::DEFAULT_LINK_CAP,
-                0 => null,
-                default => $linkCap,
-            },
+            linkCap: EntryProjection::linkCapFor(($effectiveLimits ?? $this->limits)->maxLinkedValues()),
             withHasSubordinates: $this->wantsHasSubordinates($request),
             windows: $this->linkWindows($request),
             backlinks: $this->linked

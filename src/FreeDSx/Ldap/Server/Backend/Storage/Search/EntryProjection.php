@@ -45,6 +45,18 @@ final readonly class EntryProjection
     ) {}
 
     /**
+     * The link cap a configured maximum stands for: the default when unset, and every value at zero.
+     */
+    public static function linkCapFor(?int $maxLinkedValues): ?int
+    {
+        return match ($maxLinkedValues) {
+            null => self::DEFAULT_LINK_CAP,
+            0 => null,
+            default => $maxLinkedValues,
+        };
+    }
+
+    /**
      * Every value of every linked attribute, for callers that write back what they read or hand it to a replica.
      *
      * @param list<string>|null $attributes
@@ -55,6 +67,16 @@ final readonly class EntryProjection
             $attributes,
             null,
         );
+    }
+
+    /**
+     * What a removal loads of its target: every linked value when a control reads the entry, otherwise none.
+     */
+    public static function forRemoval(bool $entryRead): self
+    {
+        return $entryRead
+            ? self::unbounded()
+            : new self(linkCap: 0);
     }
 
     /**

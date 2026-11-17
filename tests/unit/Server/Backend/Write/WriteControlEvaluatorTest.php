@@ -32,8 +32,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\BacklinkReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -108,6 +111,51 @@ final class WriteControlEvaluatorTest extends TestCase
         );
     }
 
+    /**
+     * @param list<Control> $controls
+     */
+    #[DataProvider('entryInspections')]
+    public function test_only_a_control_it_acts_on_inspects_the_entry(
+        array $controls,
+        bool $inspects,
+    ): void {
+        self::assertSame(
+            $inspects,
+            $this->evaluatorFor(...$controls)->inspectsEntry(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{list<Control>, bool}>
+     */
+    public static function entryInspections(): iterable
+    {
+        yield 'an assertion' => [
+            [Controls::assertion(Filters::present('cn'))],
+            true,
+        ];
+        yield 'a pre-read' => [
+            [new PreReadControl('cn')],
+            true,
+        ];
+        yield 'a post-read' => [
+            [new PostReadControl('cn')],
+            true,
+        ];
+        yield 'a post-read the operation does not take' => [
+            [new Control(
+                Control::OID_POST_READ,
+                false,
+                "\x01\x02\x03",
+            )],
+            false,
+        ];
+        yield 'no control' => [
+            [],
+            false,
+        ];
+    }
+
     public function test_a_post_read_reads_the_result(): void
     {
         self::assertTrue($this->evaluatorFor(new PostReadControl('sn'))->readsResult());
@@ -127,7 +175,7 @@ final class WriteControlEvaluatorTest extends TestCase
             ->evaluateAddition($this->entry);
     }
 
-    public function test_an_addition_satisfying_the_assertion_is_kept_for_a_post_read(): void
+    public function test_an_addition_keeps_nothing_for_a_post_read_until_it_is_stored(): void
     {
         $subject = $this->evaluatorFor(
             Controls::assertion(Filters::equal('sn', 'Smith')),
@@ -136,9 +184,36 @@ final class WriteControlEvaluatorTest extends TestCase
 
         $subject->evaluateAddition($this->entry);
 
+        self::assertNull($subject->postReadEntry());
+    }
+
+    public function test_a_pre_read_carries_the_back_links_it_names(): void
+    {
+        $this->storage
+            ->method('find')
+            ->willReturn($this->memberOfAdmins());
+        $subject = $this->evaluatorFor(new PreReadControl('memberOf'));
+
+        $subject->evaluateTarget($this->entry);
+
         self::assertSame(
-            ['Smith'],
-            $subject->postReadEntry()?->get('sn')?->getValues(),
+            ['cn=admins,dc=ex,dc=com'],
+            $subject->preReadEntry()?->get('memberOf')?->getValues(),
+        );
+    }
+
+    public function test_a_post_read_carries_the_back_links_it_names(): void
+    {
+        $this->storage
+            ->method('find')
+            ->willReturn($this->memberOfAdmins());
+        $subject = $this->evaluatorFor(new PostReadControl('memberOf'));
+
+        $subject->captureResult($this->entry);
+
+        self::assertSame(
+            ['cn=admins,dc=ex,dc=com'],
+            $subject->postReadEntry()?->get('memberOf')?->getValues(),
         );
     }
 
@@ -239,6 +314,18 @@ final class WriteControlEvaluatorTest extends TestCase
             BindToken::fromDn('cn=foo,dc=ex,dc=com'),
             new ControlBag(...$controls),
             new DerivedResolver($this->storage),
+            new BacklinkReader(
+                $this->storage,
+                $this->fromContainer(LinkedAttributes::class)->backlinks(),
+            ),
+        );
+    }
+
+    private function memberOfAdmins(): Entry
+    {
+        return Entry::fromArray(
+            'cn=foo,dc=ex,dc=com',
+            ['memberOf' => ['cn=admins,dc=ex,dc=com']],
         );
     }
 }

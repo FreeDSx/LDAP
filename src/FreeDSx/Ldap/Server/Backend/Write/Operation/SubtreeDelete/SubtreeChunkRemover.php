@@ -80,8 +80,7 @@ readonly class SubtreeChunkRemover
                 ),
                 $context,
             ),
-            // Removing an entry takes its links with it.
-            new EntryProjection(linkCap: 0),
+            EntryProjection::forRemoval($context->controlEvaluator()?->inspectsEntry() === true),
             array_map(
                 Dn::fromCanonical(...),
                 $chunk,

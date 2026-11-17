@@ -61,6 +61,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\BacklinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
@@ -103,6 +104,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\RdnAttributeValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -191,6 +193,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             DerivedResolver::class => $this->makeDerivedResolver(...),
+            BacklinkReader::class => $this->makeBacklinkReader(...),
             SchemaValidator::class => $this->buildSchemaValidator(...),
             EqualityComparatorResolver::class => $this->makeEqualityComparatorResolver(...),
             DirectoryDumper::class => $this->makeDirectoryDumper(...),
@@ -337,6 +340,18 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeDerivedResolver(Container $container): DerivedResolver
     {
         return new DerivedResolver($container->get(ReadEntryInterface::class));
+    }
+
+    /**
+     * Back-links are read under the server's default link cap, as a search reads them.
+     */
+    private function makeBacklinkReader(Container $container): BacklinkReader
+    {
+        return new BacklinkReader(
+            $container->get(ReadEntryInterface::class),
+            $container->get(LinkedAttributes::class)->backlinks(),
+            EntryProjection::linkCapFor($container->get(ServerOptions::class)->makeSearchLimits()->maxLinkedValues()),
+        );
     }
 
     /**

@@ -56,6 +56,7 @@ final readonly class TransactionalEntryWrite
 
             $this->writes->insert($entry);
             $this->resolved($entry, $context);
+            $context->controlEvaluator()?->captureResult($entry);
 
             // Journaled within the same transaction, so a record can never outlive the write it describes.
             $this->changeRecorder->recordAdd(
@@ -147,8 +148,7 @@ final readonly class TransactionalEntryWrite
                     $context,
                 );
             },
-            // Removing an entry takes its links with it, so journaling them would only record what is already gone.
-            new EntryProjection(linkCap: 0),
+            EntryProjection::forRemoval($context->controlEvaluator()?->inspectsEntry() === true),
         );
     }
 
@@ -172,6 +172,7 @@ final readonly class TransactionalEntryWrite
             $entry,
             $context,
         );
+        $context->controlEvaluator()?->captureResult($entry);
 
         $this->changeRecorder->recordModify(
             $entry,
