@@ -522,19 +522,22 @@ final class MoveEntryHandlerTest extends TestCase
         );
     }
 
-    public function test_a_new_rdn_naming_a_linked_value_links_it(): void
-    {
-        $this->linkedGraph(...$this->fixture());
+    #[DataProvider('validationModeProvider')]
+    public function test_a_new_rdn_naming_a_linked_attribute_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+    ): void {
+        $this->writeGraph(
+            EntryFixture::inMemoryStorage(...$this->fixture()),
+            TestServerOptions::validatedCore($mode),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
 
         $this->rename(
             self::ALICE,
             'seeAlso=cn=Bob\,ou=People\,dc=example\,dc=com',
             deleteOldRdn: false,
-        );
-
-        self::assertSame(
-            ['cn=Bob,ou=People,dc=example,dc=com'],
-            $this->find(self::LINKED_RDN_DN)?->get('seeAlso')?->getValues(),
         );
     }
 

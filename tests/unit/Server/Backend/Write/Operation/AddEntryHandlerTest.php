@@ -543,6 +543,46 @@ final class AddEntryHandlerTest extends TestCase
         }
     }
 
+    #[DataProvider('linkedRdnProvider')]
+    public function test_an_add_named_by_a_linked_attribute_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+        string $rdn,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                $rdn . ',dc=example,dc=com',
+                [
+                    'objectClass' => ['device', 'extensibleObject'],
+                    'cn' => ['Named'],
+                    'seeAlso' => ['dc=example,dc=com'],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode, string}>
+     */
+    public static function linkedRdnProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield $mode->name . ' seeAlso' => [
+                $mode,
+                'seeAlso=dc=example\,dc=com',
+            ];
+            yield $mode->name . ' seeAlso by OID' => [
+                $mode,
+                '2.5.4.34=dc=example\,dc=com',
+            ];
+        }
+    }
+
     #[DataProvider('validationModeProvider')]
     public function test_an_add_holding_two_entry_uuids_is_refused_in_every_validation_mode(
         SchemaValidationMode $mode,

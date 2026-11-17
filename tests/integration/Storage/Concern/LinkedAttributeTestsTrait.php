@@ -577,43 +577,34 @@ trait LinkedAttributeTestsTrait
         $this->ldapClient()->read($group, ['member;range=9-2']);
     }
 
-    public function testARenameWhoseNewRdnIsALinkedValueLinksIt(): void
+    public function testAnAddNamedByALinkedAttributeIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectOperationCode(ResultCode::NAMING_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'seeAlso=cn=user\,dc=foo\,dc=bar,dc=foo,dc=bar',
+            [
+                'cn' => 'link-rdn-add',
+                'objectClass' => 'person',
+                'seeAlso' => self::LINKED_USER,
+                'sn' => 'link-rdn-add',
+            ],
+        ));
+    }
+
+    public function testARenameOntoALinkedAttributeIsRefused(): void
     {
         $person = $this->seedPerson('link-rdn-new');
+        $this->authenticateAdmin();
 
-        $this->asAdmin(fn(LdapClient $admin) => $admin->rename(
+        $this->expectOperationCode(ResultCode::NAMING_VIOLATION);
+
+        $this->ldapClient()->rename(
             $person,
             'seeAlso=cn=admin\,dc=foo\,dc=bar',
             false,
-        ));
-
-        self::assertSame(
-            [self::LINKED_ADMIN],
-            $this->seeAlsoOf('seeAlso=cn=admin\,dc=foo\,dc=bar,dc=foo,dc=bar'),
-        );
-    }
-
-    public function testARenameDroppingAnRdnThatWasALinkedValueUnlinksIt(): void
-    {
-        $this->asAdmin(function (LdapClient $admin): void {
-            $admin->create(Entry::fromArray(
-                'seeAlso=cn=user\,dc=foo\,dc=bar,dc=foo,dc=bar',
-                [
-                    'cn' => 'link-rdn-old',
-                    'objectClass' => 'person',
-                    'seeAlso' => self::LINKED_USER,
-                    'sn' => 'link-rdn-old',
-                ],
-            ));
-            $admin->rename(
-                'seeAlso=cn=user\,dc=foo\,dc=bar,dc=foo,dc=bar',
-                'cn=link-rdn-old',
-            );
-        });
-
-        self::assertSame(
-            [],
-            $this->seeAlsoOf('cn=link-rdn-old,dc=foo,dc=bar'),
         );
     }
 

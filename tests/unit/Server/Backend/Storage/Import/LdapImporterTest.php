@@ -390,6 +390,38 @@ final class LdapImporterTest extends TestCase
         );
     }
 
+    public function test_importEntries_ignoreValidation_still_refuses_an_entry_named_by_a_linked_attribute(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->importerFor(
+            $this->storage,
+            TestServerOptions::validatedCore(SchemaValidationMode::Strict),
+        )->importEntries(
+            entries: [
+                $this->domain(),
+                new Entry(
+                    new Dn('seeAlso=dc=example\,dc=com,dc=example,dc=com'),
+                    new Attribute(
+                        'objectClass',
+                        'device',
+                        'extensibleObject',
+                    ),
+                    new Attribute(
+                        'cn',
+                        'Named',
+                    ),
+                    new Attribute(
+                        'seeAlso',
+                        'dc=example,dc=com',
+                    ),
+                ),
+            ],
+            ignoreValidation: true,
+        );
+    }
+
     public function test_importEntries_ignoreValidation_still_refuses_an_entry_holding_two_entry_uuids(): void
     {
         self::expectException(OperationException::class);
