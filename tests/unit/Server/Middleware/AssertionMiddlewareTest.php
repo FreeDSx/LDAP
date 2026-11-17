@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -24,6 +25,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Decoder\Control\AssertionControlDecoder;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Search\Filters;
@@ -61,13 +63,16 @@ final class AssertionMiddlewareTest extends TestCase
                 ['cn' => ['foo']],
             ));
 
-        $this->subject = new AssertionMiddleware(new AssertionEvaluator(
-            $this->fromContainer(FilterEvaluatorInterface::class),
-            $this->backend,
-            new RuleBasedAccessControl(AclRules::fromEmpty()),
-            $this->fromContainer(LinkedLeafWitness::class),
-            $this->fromContainer(AssertionControlDecoder::class),
-        ));
+        $this->subject = new AssertionMiddleware(
+            new AssertionEvaluator(
+                $this->fromContainer(FilterEvaluatorInterface::class),
+                $this->backend,
+                new RuleBasedAccessControl(AclRules::fromEmpty()),
+                $this->fromContainer(LinkedLeafWitness::class),
+                $this->fromContainer(AssertionControlDecoder::class),
+            ),
+            $this->fromContainer(ServerProtocolHandlerFactory::class),
+        );
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }
 
@@ -132,6 +137,28 @@ final class AssertionMiddlewareTest extends TestCase
         self::assertNotNull(
             $this->next->received,
             'A non-matching assertion on a continuation page is not re-evaluated, so the chain proceeds.',
+        );
+    }
+
+    public function test_a_sync_search_carrying_a_paging_cookie_still_has_its_assertion_enforced(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->subject->process(
+            $this->contextFor(
+                $this->search(),
+                Controls::assertion(Filters::equal(
+                    'cn',
+                    'nope',
+                )),
+                new PagingControl(
+                    10,
+                    'continuation-cookie',
+                ),
+                new SyncRequestControl(),
+            ),
+            $this->next,
         );
     }
 
