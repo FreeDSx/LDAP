@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -124,7 +125,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
             $normBase,
             $baseDn,
         );
-
+        // Built first, so the absolute false still refuses an attribute selection any other filter would.
         $options = $this->listOptions->make(
             $request,
             $normBase,
@@ -133,6 +134,9 @@ final readonly class StorageReadBackend implements ReadBackendInterface
             $effectiveLimits,
             $slice,
         );
+        if (Filters::isAbsoluteFalse($request->getFilter())) {
+            return self::emptyStream();
+        }
 
         return $this->searchStream->buildForList(
             $this->lister->list($options),

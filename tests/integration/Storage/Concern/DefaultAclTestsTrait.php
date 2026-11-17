@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -20,6 +23,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -383,6 +387,102 @@ trait DefaultAclTestsTrait
         );
     }
 
+    /**
+     * @return iterable<string, array{FilterInterface}>
+     */
+    public static function filterMatchingNothingProvider(): iterable
+    {
+        yield 'a filter no entry matches' => [Filters::equal(
+            'cn',
+            'no-entry-has-this',
+        )];
+        yield 'the absolute false' => [Filters::or()];
+        yield 'a filter on a withheld attribute' => [Filters::present('userPassword')];
+    }
+
+    #[DataProvider('filterMatchingNothingProvider')]
+    public function testAFilterMatchingNothingStillAppliesTheBaseAndEveryControl(FilterInterface $filter): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            [
+                'missing base' => ResultCode::NO_SUCH_OBJECT,
+                'false assertion' => ResultCode::ASSERTION_FAILED,
+                'invented paging cookie' => ResultCode::UNWILLING_TO_PERFORM,
+                'critical sort it cannot do' => ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            ],
+            [
+                'missing base' => $this->searchResultCode(
+                    $filter,
+                    'ou=nope,dc=foo,dc=bar',
+                ),
+                'false assertion' => $this->searchResultCode(
+                    $filter,
+                    'dc=foo,dc=bar',
+                    Controls::assertion(Filters::equal(
+                        'dc',
+                        'no-entry-has-this',
+                    )),
+                ),
+                'invented paging cookie' => $this->searchResultCode(
+                    $filter,
+                    'dc=foo,dc=bar',
+                    Controls::paging(
+                        5,
+                        'invented',
+                    ),
+                ),
+                'critical sort it cannot do' => $this->searchResultCode(
+                    $filter,
+                    'dc=foo,dc=bar',
+                    Controls::sort('description')->setCriticality(true),
+                ),
+            ],
+        );
+    }
+
+    #[DataProvider('filterMatchingNothingProvider')]
+    public function testAFilterMatchingNothingStillRefusesARangeItCannotServe(FilterInterface $filter): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $this->ldapClient()->search(
+            Operations::search(
+                $filter,
+                'cn;range=0-5',
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+    }
+
+    #[DataProvider('filterMatchingNothingProvider')]
+    public function testAPagedFilterMatchingNothingEndsWithAnEmptyPagingCookie(FilterInterface $filter): void
+    {
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::search($filter)
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            Controls::paging(5),
+        );
+        $paging = $response->controls()->get(Control::OID_PAGING);
+
+        self::assertInstanceOf(
+            PagingControl::class,
+            $paging,
+        );
+        self::assertSame(
+            '',
+            $paging->getCookie(),
+        );
+    }
+
     public function testAValueLevelModifyOfAWithheldAttributeOnAnotherEntryIsRefused(): void
     {
         $this->authenticateAdmin();
@@ -454,5 +554,24 @@ trait DefaultAclTestsTrait
             ResultCode::NO_SUCH_ATTRIBUTE,
             $code,
         );
+    }
+
+    private function searchResultCode(
+        FilterInterface $filter,
+        string $base,
+        Control ...$controls,
+    ): int {
+        try {
+            $this->ldapClient()->search(
+                Operations::search($filter)
+                    ->base($base)
+                    ->useSubtreeScope(),
+                ...$controls,
+            );
+        } catch (OperationException $e) {
+            return $e->getCode();
+        }
+
+        return ResultCode::SUCCESS;
     }
 }

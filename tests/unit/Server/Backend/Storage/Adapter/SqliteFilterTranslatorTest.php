@@ -180,6 +180,26 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    public function test_an_empty_or_is_the_absolute_false_and_exact(): void
+    {
+        $result = $this->subject->translate(new OrFilter());
+
+        self::assertSame(
+            ['1 = 0', true],
+            [$result?->sql, $result?->isExact],
+        );
+    }
+
+    public function test_negating_an_empty_or_selects_every_row_exactly(): void
+    {
+        $result = $this->subject->translate(new NotFilter(new OrFilter()));
+
+        self::assertSame(
+            ['NOT (1 = 0)', true],
+            [$result?->sql, $result?->isExact],
+        );
+    }
+
     public function test_not_value_correlated_sql_negates_the_value_exists(): void
     {
         $result = $this->subject->translate(new NotFilter(

@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\SyncRepl;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
@@ -126,6 +127,38 @@ final class SyncReplNativeTest extends ServerTestCase
             $syncDone = $message->controls()->get(Control::OID_SYNC_DONE);
             self::assertNotNull($syncDone);
             self::assertFalse($syncDone->getCriticality());
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * @return iterable<string, array{FilterInterface}>
+     */
+    public static function filterMatchingNothingProvider(): iterable
+    {
+        yield 'the absolute false' => [Filters::or()];
+        yield 'a filter on a withheld attribute' => [Filters::present('userPassword')];
+    }
+
+    #[DataProvider('filterMatchingNothingProvider')]
+    public function testARefreshMatchingNothingStillEndsWithTheSyncDoneControl(FilterInterface $filter): void
+    {
+        $queue = $this->boundRawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                Operations::search($filter)
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                new SyncRequestControl(),
+            ));
+            do {
+                $message = $queue->getMessage(2);
+            } while (!$message->getResponse() instanceof SearchResultDone);
+
+            self::assertNotNull($message->controls()->get(Control::OID_SYNC_DONE));
         } finally {
             $queue->close();
         }

@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
@@ -32,7 +31,6 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
-use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -62,32 +60,28 @@ final class WithheldAttributeMiddlewareTest extends TestCase
         );
     }
 
-    public function test_a_search_on_a_withheld_attribute_succeeds_with_no_entries(): void
+    public function test_a_search_on_a_withheld_attribute_is_passed_on_as_the_absolute_false(): void
     {
-        $this->next
-            ->expects(self::never())
-            ->method('handle');
+        $request = Operations::search(Filters::equal(
+            'userPassword',
+            'secret',
+        ))
+            ->base('dc=foo,dc=bar');
 
-        $stream = $this->subject->process(
-            $this->context(
-                Operations::search(Filters::equal('userPassword', 'secret'))
-                    ->base('dc=foo,dc=bar'),
-            ),
+        $this->next
+            ->expects(self::once())
+            ->method('handle')
+            ->willReturn(ResponseStream::of(
+                [],
+                OperationOutcomeResult::succeeded(),
+            ));
+
+        $this->subject->process(
+            $this->context($request),
             $this->next,
         );
 
-        self::assertSame(
-            OperationOutcome::Succeeded,
-            $stream->outcome()->outcome(),
-        );
-        self::assertSame(
-            ResultCode::SUCCESS,
-            $stream->outcome()->resultCode(),
-        );
-        self::assertCount(
-            1,
-            [...$stream->messages],
-        );
+        self::assertTrue(Filters::isAbsoluteFalse($request->getFilter()));
     }
 
     public function test_a_search_keeping_a_branch_is_rewritten_and_passed_on(): void

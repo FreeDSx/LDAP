@@ -52,6 +52,15 @@ class Filters
     }
 
     /**
+     * Whether the filter is the RFC 4526 absolute false, an 'or' with nothing in it, which no entry satisfies.
+     */
+    public static function isAbsoluteFalse(FilterInterface $filter): bool
+    {
+        return $filter instanceof OrFilter
+            && $filter->get() === [];
+    }
+
+    /**
      * Create a simple equality value check filter.
      */
     public static function equal(

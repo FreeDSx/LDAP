@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
@@ -25,7 +24,6 @@ use FreeDSx\Ldap\Server\AccessControl\WithheldValueModifyGuard;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
-use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 
 /**
  * Withholds attributes from search assertions, sort keys, and value-level modifies, before storage.
@@ -40,7 +38,6 @@ final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
         private WithheldFilterRewriter $rewriter,
         private WithheldSortKeyFilter $sortKeys,
         private WithheldValueModifyGuard $valueModify,
-        private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
     public function process(
@@ -76,19 +73,10 @@ final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
                 $token,
             );
         }
-        $rewritten = $this->rewriter->rewrite(
+        $request->setFilter($this->rewriter->rewrite(
             $request->getFilter(),
             $token,
-        );
-
-        if ($this->rewriter->isAbsoluteFalse($rewritten)) {
-            return ResponseStream::of(
-                [$this->responseFactory->getStandardResponse($context->message)],
-                OperationOutcomeResult::succeeded(),
-            );
-        }
-
-        $request->setFilter($rewritten);
+        ));
 
         return $next->handle($context);
     }

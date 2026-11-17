@@ -50,21 +50,21 @@ final class WithheldFilterRewriterTest extends TestCase
     {
         $rewritten = $this->rewrite(Filters::equal('userPassword', 'secret'));
 
-        self::assertTrue($this->subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_a_substring_assertion_on_a_withheld_attribute_collapses_to_absolute_false(): void
     {
         $rewritten = $this->rewrite(Filters::startsWith('userPassword', '{SHA}a'));
 
-        self::assertTrue($this->subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_a_presence_assertion_on_a_withheld_attribute_collapses_to_absolute_false(): void
     {
         $rewritten = $this->rewrite(Filters::present('userPassword'));
 
-        self::assertTrue($this->subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_a_conjunction_containing_a_withheld_assertion_collapses_to_absolute_false(): void
@@ -74,7 +74,7 @@ final class WithheldFilterRewriterTest extends TestCase
             Filters::equal('userPassword', 'secret'),
         ));
 
-        self::assertTrue($this->subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_a_disjunction_drops_the_withheld_assertion_and_keeps_the_rest(): void
@@ -112,7 +112,7 @@ final class WithheldFilterRewriterTest extends TestCase
             Filters::present('userPassword'),
         ));
 
-        self::assertTrue($this->subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_negating_a_withheld_assertion_matches_every_entry(): void
@@ -134,7 +134,7 @@ final class WithheldFilterRewriterTest extends TestCase
     {
         $rewritten = $this->rewrite(Filters::equal('userPassword;binary', 'secret'));
 
-        self::assertTrue($this->subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_an_assertion_on_a_filter_denied_attribute_collapses_to_absolute_false(): void
@@ -146,7 +146,7 @@ final class WithheldFilterRewriterTest extends TestCase
             $this->token,
         );
 
-        self::assertTrue($subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     /**
@@ -176,7 +176,7 @@ final class WithheldFilterRewriterTest extends TestCase
             $this->token,
         );
 
-        self::assertTrue($subject->isAbsoluteFalse($rewritten));
+        self::assertTrue(Filters::isAbsoluteFalse($rewritten));
     }
 
     public function test_a_filter_deny_leaves_every_other_attribute_alone(): void

@@ -51,6 +51,29 @@ trait SearchLimitTestsTrait
         );
     }
 
+    public function testTheAbsoluteFalseLooksThroughNoEntries(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+                '--max-search-lookthrough=3',
+            ],
+        );
+        $this->authenticateUser();
+
+        self::assertCount(
+            0,
+            $this->ldapClient()->search(
+                Operations::search(Filters::or())
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+        );
+    }
+
     public function testAnIndexAnsweredFilterAlsoTripsTheLookthroughLimit(): void
     {
         $this->stopServer();
