@@ -182,6 +182,39 @@ trait SubtreeRenameStorageContractTests
         self::assertNotNull($this->storedEntry($container, 'cn=carol,ou=groups,dc=foo,dc=bar'));
     }
 
+    public function test_renaming_a_subtree_onto_one_holding_the_same_child_is_refused_and_moves_nothing(): void
+    {
+        $container = $this->makeStorageContainer(
+            new Entry(new Dn('dc=foo,dc=bar')),
+            new Entry(new Dn('ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('ou=dest,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=dest,dc=foo,dc=bar')),
+        );
+
+        try {
+            $container->get(WriteEntryInterface::class)->renameSubtree(
+                new Dn('ou=src,dc=foo,dc=bar'),
+                new Dn('ou=dest,dc=foo,dc=bar'),
+            );
+            self::fail('Renaming onto a subtree holding the same child should have been refused.');
+        } catch (EntryAlreadyExistsException $e) {
+            self::assertSame(
+                [ResultCode::ENTRY_ALREADY_EXISTS, 'Entry already exists: ou=dest,dc=foo,dc=bar'],
+                [$e->getCode(), $e->getMessage()],
+            );
+        }
+
+        self::assertNotNull($this->storedEntry(
+            $container,
+            'cn=x,ou=src,dc=foo,dc=bar',
+        ));
+        self::assertNotNull($this->storedEntry(
+            $container,
+            'cn=x,ou=dest,dc=foo,dc=bar',
+        ));
+    }
+
     /**
      * @param Entry ...$entries Seeded, each given an entryUUID, before the contract runs.
      * @return Container the graph holding the seeded entries, which every storage contract resolves from
