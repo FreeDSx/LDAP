@@ -37,7 +37,6 @@ abstract readonly class MessageDecoder
     public function __construct(
         private MessageEnvelopeReader $envelopes,
         private array $operations,
-        private ControlDecoderInterface $controls,
     ) {}
 
     /**
@@ -58,18 +57,22 @@ abstract readonly class MessageDecoder
 
         [$operation, $controls] = $this->envelopes->answerable(
             $envelope,
-            fn(): array => [
-                $decoder->decode(
+            function () use ($decoder, $envelope, $context): array {
+                $operation = $decoder->decode(
                     $envelope->operation,
                     $context,
-                ),
-                $this->envelopes->controlsOf(
-                    $envelope,
-                    $context,
-                    $this->controls,
-                    $this->maxControls(),
-                ),
-            ],
+                );
+
+                return [
+                    $operation,
+                    $this->envelopes->controlsOf(
+                        $envelope,
+                        $context,
+                        $this->controlsFor($operation),
+                        $this->maxControls(),
+                    ),
+                ];
+            },
         );
 
         return $this->message(
@@ -86,6 +89,13 @@ abstract readonly class MessageDecoder
     {
         return null;
     }
+
+    /**
+     * The decoder for the controls of a decoded operation.
+     *
+     * @param TOperation $operation
+     */
+    abstract protected function controlsFor(ProtocolElementInterface $operation): ControlDecoderInterface;
 
     /**
      * Wraps the decoded operation and its controls in the message this side receives.

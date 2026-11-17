@@ -248,6 +248,87 @@ final class ServerControlRegistryTest extends TestCase
     }
 
     /**
+     * @param list<string> $controls
+     */
+    #[DataProvider('controlsTakenByEachOperation')]
+    public function test_each_operation_takes_the_controls_of_every_route_it_may_take(
+        RequestInterface $request,
+        array $controls,
+    ): void {
+        self::assertSame(
+            $controls,
+            $this->subject->controlsTakenBy($request),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface, list<string>}>
+     */
+    public static function controlsTakenByEachOperation(): iterable
+    {
+        $global = [
+            Control::OID_PROXY_AUTHORIZATION,
+            Control::OID_MANAGE_DSA_IT,
+            Control::OID_PWD_POLICY,
+        ];
+
+        yield 'a search, across the search, paging and sync routes' => [
+            self::searchRequest(),
+            [
+                ...$global,
+                Control::OID_SORTING,
+                Control::OID_ASSERTION,
+                Control::OID_SUBENTRIES,
+                Control::OID_PAGING,
+                Control::OID_SYNC_REQUEST,
+            ],
+        ];
+        yield 'a compare' => [
+            Operations::compare(
+                'cn=foo,dc=bar',
+                'cn',
+                'foo',
+            ),
+            [
+                ...$global,
+                Control::OID_ASSERTION,
+            ],
+        ];
+        yield 'a delete' => [
+            Operations::delete('cn=foo,dc=bar'),
+            [
+                ...$global,
+                Control::OID_RELAX_RULES,
+                Control::OID_ASSERTION,
+                Control::OID_PRE_READ,
+                Control::OID_SUBTREE_DELETE,
+            ],
+        ];
+        yield 'an extended operation' => [
+            Operations::whoami(),
+            $global,
+        ];
+        yield 'a bind' => [
+            Operations::bind(
+                'cn=foo,dc=bar',
+                'secret',
+            ),
+            [
+                Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
+            ],
+        ];
+        yield 'an abandon' => [
+            Operations::abandon(1),
+            [],
+        ];
+        yield 'an unbind' => [
+            Operations::unbind(),
+            [],
+        ];
+    }
+
+    /**
      * A stand-in for the cases that assert on the global set alone, which no request type varies.
      */
     private static function searchRequest(): SearchRequest

@@ -14,13 +14,20 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
+use FreeDSx\Ldap\Operation\Request\BindRequest;
+use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 
+use function array_unique;
+use function array_values;
 use function in_array;
 
 /**
@@ -154,6 +161,33 @@ final class ServerControlRegistry
                 $request,
             ),
         ];
+    }
+
+    /**
+     * The controls a request's operation takes on any of its routes.
+     *
+     * @return list<string>
+     */
+    public function controlsTakenBy(RequestInterface $request): array
+    {
+        return match (true) {
+            $request instanceof BindRequest => self::BIND_CONTROLS,
+            $request instanceof AbandonRequest, $request instanceof UnbindRequest => [],
+            $request instanceof SearchRequest => array_values(array_unique([
+                ...self::GLOBAL_CONTROLS,
+                ...self::SEARCH_CONTROLS,
+                ...self::PAGING_CONTROLS,
+                ...self::SYNC_CONTROLS,
+            ])),
+            $request instanceof CompareRequest => [
+                ...self::GLOBAL_CONTROLS,
+                ...self::COMPARE_CONTROLS,
+            ],
+            default => [
+                ...self::GLOBAL_CONTROLS,
+                ...$this->dispatchControlsFor($request),
+            ],
+        };
     }
 
     /**

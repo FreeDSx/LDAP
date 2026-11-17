@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Protocol\Decoder;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Protocol\Decoder\Control\ControlDecoderInterface;
+use FreeDSx\Ldap\Protocol\Decoder\Control\RequestControlDecoders;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 
@@ -31,6 +33,25 @@ readonly class RequestMessageDecoder extends MessageDecoder
      * The most controls a received request may carry.
      */
     public const MAX_CONTROLS = 100;
+
+    /**
+     * @param array<int, OperationDecoderInterface<RequestInterface>> $operations keyed by protocolOp tag.
+     */
+    public function __construct(
+        MessageEnvelopeReader $envelopes,
+        array $operations,
+        private RequestControlDecoders $controls,
+    ) {
+        parent::__construct(
+            $envelopes,
+            $operations,
+        );
+    }
+
+    protected function controlsFor(ProtocolElementInterface $operation): ControlDecoderInterface
+    {
+        return $this->controls->for($operation);
+    }
 
     protected function maxControls(): int
     {
