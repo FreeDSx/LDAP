@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\BacklinkReader;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
@@ -40,6 +41,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         private WriteRequestRouter $router,
         private AssertionEvaluator $assertions,
         private DerivedResolver $derived,
+        private BacklinkReader $backlinks,
         private ReadEntryControlHandler $readEntryControlHandler,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
@@ -62,6 +64,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
             $token,
             $controls,
             $this->derived,
+            $this->backlinks,
         );
 
         $this->router->route(

@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\BacklinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
@@ -429,6 +430,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
             router: new WriteRequestRouter($policyWriteHandler),
             assertions: $container->get(AssertionEvaluator::class),
             derived: $container->get(DerivedResolver::class),
+            backlinks: $container->get(BacklinkReader::class),
             readEntryControlHandler: new ReadEntryControlHandler(
                 new Schema(),
                 $this->createMock(AccessControlInterface::class),

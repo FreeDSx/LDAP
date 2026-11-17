@@ -16,11 +16,15 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern\Write;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
+use FreeDSx\Ldap\Control\ReadEntry\ReadEntryResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
+
+use function array_values;
 
 /**
  * The pre-read and post-read controls (RFC 4527): the entry as a write found it and as it left it.
@@ -237,5 +241,195 @@ trait ReadEntryControlTestsTrait
 
         $this->authenticateUser();
         self::assertNull($this->ldapClient()->read('cn=child,ou=pre-read-tree,dc=foo,dc=bar'));
+    }
+
+    /**
+     * @return iterable<string, array{list<string>}>
+     */
+    public static function backlinkSelections(): iterable
+    {
+        yield 'named' => [['memberOf']];
+        yield 'operational wildcard' => [['+']];
+    }
+
+    /**
+     * @param list<string> $attributes
+     */
+    #[DataProvider('backlinkSelections')]
+    public function testThePreReadAndPostReadCarryTheBackLinksTheySelect(array $attributes): void
+    {
+        $this->authenticateAdmin();
+        $member = 'cn=read-member,dc=foo,dc=bar';
+        $group = 'cn=read-group,dc=foo,dc=bar';
+        $this->ldapClient()->create(Entry::fromArray(
+            $member,
+            [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => ['read-member'],
+                'sn' => ['Member'],
+            ],
+        ));
+        $this->ldapClient()->create(Entry::fromArray(
+            $group,
+            [
+                'objectClass' => ['groupOfNames'],
+                'cn' => ['read-group'],
+                'member' => [$member, 'cn=user,dc=foo,dc=bar'],
+            ],
+        ));
+
+        $modify = $this->ldapClient()->sendAndReceive(
+            Operations::modify(
+                $member,
+                Change::replace(
+                    'sn',
+                    'Changed',
+                ),
+            ),
+            Controls::preRead(...$attributes),
+            Controls::postRead(...$attributes),
+        );
+        $delete = $this->ldapClient()->sendAndReceive(
+            Operations::delete($member),
+            Controls::preRead(...$attributes),
+        );
+        $this->ldapClient()->delete($group);
+
+        self::assertSame(
+            [[$group], [$group], [$group]],
+            [
+                $this->readEntryValues(
+                    $modify,
+                    Control::OID_PRE_READ,
+                    'memberOf',
+                ),
+                $this->readEntryValues(
+                    $modify,
+                    Control::OID_POST_READ,
+                    'memberOf',
+                ),
+                $this->readEntryValues(
+                    $delete,
+                    Control::OID_PRE_READ,
+                    'memberOf',
+                ),
+            ],
+        );
+    }
+
+    public function testAPostReadCarriesTheBackLinkAWriteGivesItsOwnEntry(): void
+    {
+        $this->authenticateAdmin();
+        $group = 'cn=read-self,dc=foo,dc=bar';
+
+        $add = $this->ldapClient()->sendAndReceive(
+            Operations::add(Entry::fromArray(
+                $group,
+                [
+                    'objectClass' => ['groupOfNames'],
+                    'cn' => ['read-self'],
+                    'member' => [$group, 'cn=user,dc=foo,dc=bar'],
+                ],
+            )),
+            Controls::postRead('memberOf'),
+        );
+        $modify = $this->ldapClient()->sendAndReceive(
+            Operations::modify(
+                $group,
+                Change::delete(
+                    'member',
+                    $group,
+                ),
+            ),
+            Controls::preRead('memberOf'),
+            Controls::postRead('memberOf'),
+        );
+        $this->ldapClient()->delete($group);
+
+        self::assertSame(
+            [[$group], [$group], null],
+            [
+                $this->readEntryValues(
+                    $add,
+                    Control::OID_POST_READ,
+                    'memberOf',
+                ),
+                $this->readEntryValues(
+                    $modify,
+                    Control::OID_PRE_READ,
+                    'memberOf',
+                ),
+                $this->readEntryValues(
+                    $modify,
+                    Control::OID_POST_READ,
+                    'memberOf',
+                ),
+            ],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{list<Control>}>
+     */
+    public static function groupRemovals(): iterable
+    {
+        yield 'delete' => [[]];
+        yield 'subtree delete' => [[Controls::subtreeDelete()]];
+    }
+
+    /**
+     * @param list<Control> $controls
+     */
+    #[DataProvider('groupRemovals')]
+    public function testThePreReadOfARemovedGroupCarriesItsMembers(array $controls): void
+    {
+        $this->authenticateAdmin();
+        $group = 'cn=read-removed,dc=foo,dc=bar';
+        $members = [
+            'cn=user,dc=foo,dc=bar',
+            'cn=admin,dc=foo,dc=bar',
+        ];
+        $this->ldapClient()->create(Entry::fromArray(
+            $group,
+            [
+                'objectClass' => ['groupOfNames'],
+                'cn' => ['read-removed'],
+                'member' => $members,
+            ],
+        ));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::delete($group),
+            Controls::preRead('member'),
+            ...$controls,
+        );
+
+        self::assertEqualsCanonicalizing(
+            $members,
+            $this->readEntryValues(
+                $response,
+                Control::OID_PRE_READ,
+                'member',
+            ),
+        );
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function readEntryValues(
+        LdapMessageResponse $response,
+        string $oid,
+        string $attribute,
+    ): ?array {
+        $control = $response->controls()->get($oid);
+
+        $values = $control instanceof ReadEntryResponseControl
+            ? $control->getEntry()->get($attribute)?->getValues()
+            : null;
+
+        return $values === null
+            ? null
+            : array_values($values);
     }
 }
