@@ -158,7 +158,7 @@ final readonly class SchemaViolationGate
     }
 
     /**
-     * Only a user attribute can name an entry, whatever the mode allows.
+     * Only a user attribute held as written can name an entry, whatever the mode allows.
      *
      * @throws OperationException
      */
@@ -171,18 +171,52 @@ final readonly class SchemaViolationGate
         }
 
         foreach ($dn->getRdn()->getAll() as $component) {
-            if (!$this->schema->isOperational($component->getName())) {
-                continue;
-            }
+            $this->assertCanName($component->getName());
+        }
+    }
 
-            throw new OperationException(
-                sprintf(
-                    'The operational attribute "%s" cannot name an entry.',
-                    $component->getName(),
-                ),
-                ResultCode::NAMING_VIOLATION,
+    /**
+     * @throws OperationException
+     */
+    private function assertCanName(string $name): void
+    {
+        if ($this->schema->isOperational($name)) {
+            self::refuseNaming(
+                'operational',
+                $name,
             );
         }
+        if ($this->isLinkedType($name)) {
+            self::refuseNaming(
+                'linked',
+                $name,
+            );
+        }
+    }
+
+    /**
+     * A linked value follows the entry it names, which would change the RDN without a rename.
+     */
+    private function isLinkedType(string $name): bool
+    {
+        return $this->schema->getAttributeType(Attribute::normalizeName($name))?->isLinked() === true;
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private static function refuseNaming(
+        string $kind,
+        string $name,
+    ): never {
+        throw new OperationException(
+            sprintf(
+                'The %s attribute "%s" cannot name an entry.',
+                $kind,
+                $name,
+            ),
+            ResultCode::NAMING_VIOLATION,
+        );
     }
 
     /**
