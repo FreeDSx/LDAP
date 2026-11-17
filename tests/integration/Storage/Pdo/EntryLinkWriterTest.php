@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -31,10 +32,13 @@ final class EntryLinkWriterTest extends TestCase
 
     private EntryLinkWriter $subject;
 
+    private WriteEntryInterface $storage;
+
     protected function setUp(): void
     {
         $container = Container::forServer(TestServerOptions::sqlite());
         $this->subject = $container->get(EntryLinkWriter::class);
+        $this->storage = $container->get(WriteEntryInterface::class);
 
         $container->get(LdapImporter::class)->importEntries([
             Entry::fromArray(
@@ -77,6 +81,30 @@ final class EntryLinkWriterTest extends TestCase
                 'member',
                 $asked,
             ),
+        );
+    }
+
+    public function test_a_renamed_target_is_held_under_its_new_dn_and_not_its_old_one(): void
+    {
+        $this->storage->renameSubtree(
+            new Dn(self::BOB),
+            new Dn('cn=Robert,' . self::BASE),
+        );
+
+        self::assertSame(
+            [['cn=Robert,' . self::BASE], []],
+            [
+                $this->subject->heldLinkValues(
+                    new Dn(self::ADMINS),
+                    'member',
+                    ['cn=Robert,' . self::BASE],
+                ),
+                $this->subject->heldLinkValues(
+                    new Dn(self::ADMINS),
+                    'member',
+                    [self::BOB],
+                ),
+            ],
         );
     }
 

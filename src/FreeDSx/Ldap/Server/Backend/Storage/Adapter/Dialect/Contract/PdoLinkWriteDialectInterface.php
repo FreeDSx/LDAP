@@ -35,6 +35,13 @@ interface PdoLinkWriteDialectInterface
     public function queryResolveDns(int $count): string;
 
     /**
+     * Which of $count resolved targets one owner links under an attribute.
+     *
+     * Parameters: [owner lc_dn, attr_name_lower, target_entry_id, ...]
+     */
+    public function queryHeldLinkTargets(int $count): string;
+
+    /**
      * INSERT of $count links.
      *
      * Parameters: [owner_entry_id, attr_name_lower, target_entry_id, target_uid per link]

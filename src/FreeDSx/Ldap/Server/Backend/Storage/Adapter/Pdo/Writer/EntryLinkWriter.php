@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
 
 use function array_chunk;
+use function array_filter;
+use function array_intersect_key;
 use function count;
 use function is_array;
 use function ksort;
@@ -151,7 +153,7 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
     }
 
     /**
-     * Which of the named values the owner links, answered on the connection its own write runs on.
+     * Which of the named values the owner links, judged on the same locked targets the write then applies to.
      */
     public function heldLinkValues(
         Dn $owner,
@@ -163,33 +165,21 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         foreach ($values as $value) {
             $asked[Dn::normalized($value)] = $value;
         }
+        // Compared by target id rather than by DN, which a rename committing in between could change.
+        $resolved = $this->resolve([$attribute => array_values($asked)]);
 
-        if ($asked === []) {
+        if ($resolved === []) {
             return [];
         }
-        $held = [];
 
-        $chunks = array_chunk(
-            array_keys($asked),
-            self::DNS_PER_STATEMENT,
-        );
-
-        foreach ($chunks as $chunk) {
-            $rows = $this->rowsOf(
-                $this->dialect->queryHeldLinkValues(count($chunk)),
-                [
-                    $owner->normalizedString(),
-                    Attribute::normalizeName($attribute),
-                    ...$chunk,
-                ],
-            );
-
-            foreach ($rows as $row) {
-                $held[] = $asked[$this->stringColumn($row['lc_dn'] ?? null)] ?? null;
-            }
-        }
-
-        return array_values(array_filter($held));
+        return array_values(array_intersect_key(
+            $asked,
+            $this->heldTargets(
+                $owner,
+                $attribute,
+                $resolved,
+            ),
+        ));
     }
 
     /**
@@ -292,6 +282,45 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         }
 
         return $ids;
+    }
+
+    /**
+     * The resolved targets the owner links under the attribute.
+     *
+     * @param array<string, int> $resolved
+     *
+     * @return array<string, int>
+     */
+    private function heldTargets(
+        Dn $owner,
+        string $attribute,
+        array $resolved,
+    ): array {
+        $held = [];
+        $chunks = array_chunk(
+            array_values($resolved),
+            self::DNS_PER_STATEMENT,
+        );
+
+        foreach ($chunks as $chunk) {
+            $rows = $this->rowsOf(
+                $this->dialect->queryHeldLinkTargets(count($chunk)),
+                [
+                    $owner->normalizedString(),
+                    Attribute::normalizeName($attribute),
+                    ...$chunk,
+                ],
+            );
+
+            foreach ($rows as $row) {
+                $held[$this->intColumn($row['target_entry_id'] ?? null)] = true;
+            }
+        }
+
+        return array_filter(
+            $resolved,
+            static fn(int $id): bool => isset($held[$id]),
+        );
     }
 
     /**
