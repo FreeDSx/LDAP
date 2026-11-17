@@ -457,6 +457,8 @@ A denied assertion is folded away before the query runs, so the attribute behave
 (|(cn=bob)(telephoneNumber=555-0100))     -> the cn=bob match, the other branch drops
 ```
 
+The search itself still runs as usual. Its base must exist and its controls still apply.
+
 This is what stops a value being recovered a guess at a time. Reads are unaffected: denying the filter does not strip
 the value, and denying the read does not stop the filter. Pair the two to get both. A value-level modify on a
 filter-denied attribute is gated the same way; see [Value-Level Modify](#value-level-modify).

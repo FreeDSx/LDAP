@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 use function count;
@@ -51,15 +52,6 @@ final readonly class WithheldFilterRewriter
         return $this->hasWithheldAttribute($filter, $token)
             ? $this->fold($filter, $token)
             : $filter;
-    }
-
-    /**
-     * Whether rewriting collapsed the filter to the RFC 4526 absolute false, which no entry satisfies.
-     */
-    public function isAbsoluteFalse(FilterInterface $filter): bool
-    {
-        return $filter instanceof OrFilter
-            && $filter->get() === [];
     }
 
     /**
@@ -115,7 +107,7 @@ final readonly class WithheldFilterRewriter
         foreach ($filter->get() as $child) {
             $folded = $this->fold($child, $token);
 
-            if ($this->isAbsoluteFalse($folded)) {
+            if (Filters::isAbsoluteFalse($folded)) {
                 return self::never();
             }
 
@@ -137,7 +129,7 @@ final readonly class WithheldFilterRewriter
         foreach ($filter->get() as $child) {
             $folded = $this->fold($child, $token);
 
-            if (!$this->isAbsoluteFalse($folded)) {
+            if (!Filters::isAbsoluteFalse($folded)) {
                 $kept[] = $folded;
             }
         }
@@ -159,7 +151,7 @@ final readonly class WithheldFilterRewriter
     ): FilterInterface {
         $folded = $this->fold($filter->get(), $token);
 
-        return $this->isAbsoluteFalse($folded)
+        return Filters::isAbsoluteFalse($folded)
             ? new AndFilter()
             : new NotFilter($folded);
     }

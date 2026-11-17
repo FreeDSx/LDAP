@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
@@ -830,6 +831,14 @@ trait SqlFilterTranslatorTrait
      */
     private function translateOr(OrFilter $filter): ?SqlFilterResult
     {
+        // RFC 4526 absolute false, which is False rather than Undefined.
+        if (Filters::isAbsoluteFalse($filter)) {
+            return new SqlFilterResult(
+                '1 = 0',
+                [],
+                isExact: true,
+            );
+        }
         $children = [];
         $values = [];
         $isExact = [];

@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
@@ -250,6 +251,57 @@ final class StorageReadBackendTest extends TestCase
             ->base('cn=Missing,dc=example,dc=com')
             ->useSubtreeScope();
         $this->subject->search($request, SubentryVisibility::All);
+    }
+
+    public function test_an_absolute_false_search_returns_nothing_without_listing_storage(): void
+    {
+        $lister = $this->createMock(ListEntryInterface::class);
+        $lister->expects(self::never())
+            ->method('list');
+        $request = (new SearchRequest(new OrFilter()))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
+
+        $stream = $this->backendOver($lister)->search(
+            $request,
+            SubentryVisibility::All,
+        );
+
+        self::assertSame(
+            [],
+            iterator_to_array($stream->entries()),
+        );
+    }
+
+    public function test_an_absolute_false_search_still_needs_its_base_to_exist(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $request = (new SearchRequest(new OrFilter()))
+            ->base('cn=Missing,dc=example,dc=com')
+            ->useSubtreeScope();
+        $this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        );
+    }
+
+    public function test_an_absolute_false_search_still_refuses_a_range_it_cannot_serve(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $request = (new SearchRequest(
+            new OrFilter(),
+            'cn;range=0-5',
+        ))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
+        $this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        );
     }
 
     public function test_search_converts_time_limit_exception_to_operation_exception(): void

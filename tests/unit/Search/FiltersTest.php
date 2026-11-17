@@ -163,4 +163,17 @@ final class FiltersTest extends TestCase
             Filters::raw('(foo=*)'),
         );
     }
+
+    public function test_only_an_empty_or_is_the_absolute_false(): void
+    {
+        self::assertSame(
+            [true, false, false, false],
+            [
+                Filters::isAbsoluteFalse(Filters::or()),
+                Filters::isAbsoluteFalse(Filters::or(Filters::present('cn'))),
+                Filters::isAbsoluteFalse(Filters::and()),
+                Filters::isAbsoluteFalse(Filters::not(Filters::or())),
+            ],
+        );
+    }
 }
