@@ -391,6 +391,7 @@ final class SyncResultProjectorTest extends TestCase
         $result = $this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
             new Dn('cn=a,dc=example,dc=com'),
+            false,
             $this->request(),
         );
 
@@ -408,6 +409,7 @@ final class SyncResultProjectorTest extends TestCase
             $this->deletedDnOf($this->subject->projectDeleted(
                 $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
                 new Dn('cn=a,ou=people,dc=example,dc=com'),
+                false,
                 $this->request(),
             )),
         );
@@ -418,6 +420,7 @@ final class SyncResultProjectorTest extends TestCase
         self::assertNull($this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
             null,
+            true,
             $this->request(),
         ));
     }
@@ -429,6 +432,7 @@ final class SyncResultProjectorTest extends TestCase
         $result = $this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
             new Dn('cn=a,dc=example,dc=com'),
+            false,
             (new SearchRequest(Filters::equal('member', 'cn=a,dc=example,dc=com')))
                 ->base('dc=example,dc=com')
                 ->useSubtreeScope(),
@@ -448,8 +452,24 @@ final class SyncResultProjectorTest extends TestCase
         self::assertNull($this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
             new Dn('cn=a,dc=example,dc=com'),
+            false,
             $this->request(),
         ));
+    }
+
+    public function test_a_delete_after_an_earlier_change_is_sent_whatever_its_pre_image(): void
+    {
+        $this->filterMatches = false;
+
+        self::assertSame(
+            'cn=a,dc=example,dc=com',
+            $this->deletedDnOf($this->subject->projectDeleted(
+                $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+                new Dn('cn=a,dc=example,dc=com'),
+                true,
+                $this->request(),
+            )),
+        );
     }
 
     public function test_a_delete_without_a_pre_image_is_null(): void
@@ -457,6 +477,7 @@ final class SyncResultProjectorTest extends TestCase
         self::assertNull($this->subject->projectDeleted(
             $this->deleteChange(null),
             new Dn('cn=a,dc=example,dc=com'),
+            false,
             $this->request(),
         ));
     }

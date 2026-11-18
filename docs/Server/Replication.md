@@ -68,7 +68,8 @@ sequence number, the configured origin, a timestamp, the entry's UUID and DN, an
 entry.
 
 A consumer presents a cookie, which is a marker of how far it has already read. The server then sends the changes that
-came after that point. The journal is the single source behind sync and change auditing.
+came after that point. The journal is the single source behind sync and change auditing. A consumer can also receive a
+delete for an entry it never held, such as one added and then removed since its cookie, and should ignore it.
 
 ## Linked Attributes
 

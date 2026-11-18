@@ -481,6 +481,80 @@ final class SyncReplNativeTest extends ServerTestCase
         );
     }
 
+    public function testAModifyOutOfTheFilterThenADeleteSendsTheDelete(): void
+    {
+        $dn = 'cn=dropped,' . self::AREA;
+        $filter = Filters::equal(
+            'description',
+            'keep',
+        );
+        $this->createHiddenArea();
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => 'dropped',
+                'sn' => 'Dropped',
+                'description' => 'keep',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        )));
+        $cookie = $this->cookieAfterAFullPollOf(
+            self::AREA,
+            $filter,
+        );
+
+        $this->asAdmin(static function (LdapClient $admin) use ($dn): void {
+            $admin->sendAndReceive(Operations::modify(
+                $dn,
+                Change::replace(
+                    'description',
+                    'drop',
+                ),
+            ));
+            $admin->delete($dn);
+        });
+        $incremental = $this->syncRepl(
+            $filter,
+            self::AREA,
+        );
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [strtolower($dn)],
+            $this->collectDeletedDns($incremental),
+        );
+    }
+
+    public function testAnEntryMovedOutOfTheContentAndDeletedThereIsDeletedWhereItWasVisible(): void
+    {
+        $dn = 'cn=leaver,' . self::AREA;
+        $this->createHiddenArea();
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => 'leaver',
+                'sn' => 'Leaver',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        )));
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static function (LdapClient $admin) use ($dn): void {
+            $admin->move(
+                $dn,
+                'dc=other,dc=test',
+            );
+            $admin->delete('cn=leaver,dc=other,dc=test');
+        });
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [$dn],
+            $this->collectDeletedDns($incremental),
+        );
+    }
+
     public function testACookieReusedForDifferentContentFallsBackToAFullRefresh(): void
     {
         $this->authenticateAdmin();

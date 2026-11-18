@@ -84,7 +84,7 @@ final readonly class SyncPersistStreamer
 
             $result = $this->project(
                 $record->change,
-                $window->lastVisible($record->change->entryUuid),
+                $window,
                 $scope,
                 $request,
                 $token,
@@ -240,15 +240,18 @@ final readonly class SyncPersistStreamer
 
     private function project(
         PendingChange $change,
-        ?Dn $lastVisible,
+        ChangeWindow $window,
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
     ): ?SyncResult {
+        $lastVisible = $window->lastVisible($change->entryUuid);
+
         return $change->changeType === ChangeType::Delete
             ? $this->projector->projectDeleted(
                 $change,
                 $lastVisible,
+                $window->hasEarlierChange($change->entryUuid),
                 $request,
             )
             : $this->fetchAndProject(
@@ -275,9 +278,12 @@ final readonly class SyncPersistStreamer
             $this->projector->fetchProjectionFor($request),
         );
 
-        // Deleted since, and its own journaled delete announces that.
+        // Deleted since, and announced now because a later delete judged by its pre-image alone could be withheld.
         if ($entry === null) {
-            return null;
+            return $this->projector->projectLeft(
+                $change->entryUuid,
+                $lastVisible,
+            );
         }
 
         // RFC 4533 §4.1 wants an entry that left the content deleted rather than sent from where it went.

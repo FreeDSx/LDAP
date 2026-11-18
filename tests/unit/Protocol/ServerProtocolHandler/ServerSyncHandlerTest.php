@@ -467,21 +467,24 @@ final class ServerSyncHandlerTest extends TestCase
         $this->handle($this->cookieAt(0));
 
         self::assertSame(
-            [],
+            [[SyncStateControl::STATE_DELETE, self::UUID_A]],
             $this->states(),
         );
     }
 
-    public function test_a_changed_entry_gone_since_the_change_is_skipped(): void
+    public function test_a_changed_entry_gone_since_the_change_is_deleted_at_its_last_visible_dn(): void
     {
         $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
-        // No live entry registered, so nothing holds its entryUUID.
 
         $this->handle($this->cookieAt(0));
 
         self::assertSame(
-            [],
+            [[SyncStateControl::STATE_DELETE, self::UUID_A]],
             $this->states(),
+        );
+        self::assertSame(
+            ['cn=a,dc=example,dc=com'],
+            $this->sentEntryDns(),
         );
     }
 

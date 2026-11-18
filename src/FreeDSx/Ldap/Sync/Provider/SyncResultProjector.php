@@ -156,25 +156,22 @@ final readonly class SyncResultProjector
     }
 
     /**
-     * A delete, named by the last DN the sync identity could see the entry at, if its pre-image matched the filter.
+     * A delete named by the last DN the identity could see the entry at, unless its pre-image shows it was never held.
      *
      * @param ?Dn $lastVisible The last in-scope DN the sync identity could see the entry at in the window.
      */
     public function projectDeleted(
         PendingChange $change,
         ?Dn $lastVisible,
+        bool $changedEarlier,
         SearchRequest $request,
     ): ?SyncResult {
-        if ($lastVisible === null || $change->preImage === null) {
+        if ($lastVisible === null) {
             return null;
         }
 
-        $preImage = self::at(
-            $change->preImage,
-            $lastVisible,
-        );
-
-        if (!$this->matchedFilter($request, $preImage)) {
+        // After an earlier change in the window, the pre-image no longer shows what the consumer holds.
+        if (!$changedEarlier && !$this->preImageMatched($change, $request)) {
             return null;
         }
 
@@ -200,19 +197,6 @@ final readonly class SyncResultProjector
         return $this->deleteResult(
             $lastVisible,
             $entryUuid,
-        );
-    }
-
-    /**
-     * The entry as it would stand at another DN, for a filter that names the DN.
-     */
-    private static function at(
-        Entry $entry,
-        Dn $dn,
-    ): Entry {
-        return new Entry(
-            $dn,
-            ...$entry->getAttributes(),
         );
     }
 
@@ -277,16 +261,23 @@ final readonly class SyncResultProjector
         );
     }
 
-    private function matchedFilter(
+    private function preImageMatched(
+        PendingChange $change,
         SearchRequest $request,
-        Entry $preImage,
     ): bool {
+        if ($change->preImage === null) {
+            return false;
+        }
+
         // A consumer ignores a delete for an entry it never held, where withholding one leaves it stale forever.
         if ($this->namesSomethingHeldApart($request->getFilter())) {
             return true;
         }
 
-        return $this->filterEvaluator->evaluate($preImage, $request->getFilter());
+        return $this->filterEvaluator->evaluate(
+            $change->preImage,
+            $request->getFilter(),
+        );
     }
 
     /**
