@@ -107,6 +107,12 @@ A sync consumer receives full entries, including attributes that are hidden from
 so grant it only to identities you trust with the whole directory. Attribute read rules like the secure default's
 `userPassword` restriction still apply to normal searches by that identity; they do not trim what replication sends.
 
+Entries the sync identity cannot search are not sent. An entry that becomes hidden from it, or leaves the synced
+content, is sent as a delete named by the last DN where the identity could see it, and not at all if it never could.
+This follows changes to the entry itself. Changing the access rules, or the groups they name, announces nothing. After
+a change that hides or reveals entries for a restricted sync identity, remove the replica's checkpoint to have it
+reload. A sync identity with full access is not affected.
+
 ## Poll vs Listen
 
 The consumer chooses how it reads; the provider supports both:
@@ -252,7 +258,8 @@ A replica requires PDO storage (SQLite or MySQL) on either runner. Any other sto
 
 Access control is enforced independently on each side, and FreeDSx ACL is server configuration that does not replicate:
 
-* On the provider, the read access granted to the replica's bind identity bounds what data reaches the replica.
+* On the provider, the read access granted to the replica's bind identity bounds what data reaches the replica. An
+  entry moved where that identity cannot search is removed from the replica.
 * On the replica, its own access control bounds what clients reading from it may see. A replica with a more permissive
   policy than the provider can expose data the provider would not.
 

@@ -32,6 +32,11 @@ final class LdapReplicaCommand extends Command
     use ConsoleOptionsTrait;
 
     /**
+     * A subtree the provider hides from the replica's sync identity.
+     */
+    public const HIDDEN_FROM_SYNC = 'ou=hidden,ou=people,dc=foo,dc=bar';
+
+    /**
      * Tests assert on forwarded bind state, so they should not wait a production drain for it.
      */
     private const FORWARD_INTERVAL = 0.05;
@@ -135,6 +140,7 @@ final class LdapReplicaCommand extends Command
             '--storage=sqlite',
             '--seed=' . self::SEED,
             '--allow-sync',
+            '--hide-from-sync=' . self::HIDDEN_FROM_SYNC,
         ];
 
         if ($forward) {

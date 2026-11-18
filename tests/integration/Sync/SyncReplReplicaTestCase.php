@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\LdapReplicaCommand;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 use Throwable;
 
@@ -226,6 +227,48 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         self::assertNull(
             $this->waitForReplicaGone('cn=heidi,ou=people,dc=foo,dc=bar'),
             'An entry that left the replicated content must not linger on the replica.',
+        );
+    }
+
+    public function test_an_entry_moved_where_the_sync_identity_cannot_read_leaves_the_replica(): void
+    {
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->create(Entry::fromArray(
+                LdapReplicaCommand::HIDDEN_FROM_SYNC,
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => 'hidden',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                'cn=ivy,ou=people,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'ivy',
+                    'sn' => 'Ivy',
+                    'userPassword' => 'ivypass',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica('cn=ivy,ou=people,dc=foo,dc=bar'));
+        $this->assertBind(
+            'cn=ivy,ou=people,dc=foo,dc=bar',
+            'ivypass',
+            true,
+        );
+
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->move(
+                'cn=ivy,ou=people,dc=foo,dc=bar',
+                LdapReplicaCommand::HIDDEN_FROM_SYNC,
+            );
+        });
+
+        self::assertNull($this->waitForReplicaGone('cn=ivy,ou=people,dc=foo,dc=bar'));
+        $this->assertBind(
+            'cn=ivy,ou=people,dc=foo,dc=bar',
+            'ivypass',
+            false,
         );
     }
 
