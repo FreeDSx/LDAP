@@ -29,7 +29,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -100,20 +99,35 @@ final readonly class SyncResultProjector
     }
 
     /**
+     * Whether the sync identity could see an entry at the DN, which every access rule judges by the DN alone.
+     */
+    public function isVisibleAt(
+        TokenInterface $token,
+        Dn $dn,
+    ): bool {
+        return $this->accessControl->isEntryVisible(
+            $token,
+            new Entry($dn),
+        );
+    }
+
+    /**
      * A freshly fetched changed entry, or a delete once a change scopes it out (RFC 4533 §3.3.1).
+     *
+     * @param ?Dn $lastVisible The last in-scope DN the sync identity could see the entry at in the window.
      */
     public function projectFetched(
         Entry $entry,
-        PendingChange $change,
+        string $entryUuid,
+        bool $isAdded,
+        ?Dn $lastVisible,
         SearchRequest $request,
         TokenInterface $token,
     ): ?SyncResult {
-        // An entry it can no longer see needs the pre-image to know whether announcing it would leak.
         if (!$this->accessControl->isEntryVisible($token, $entry)) {
-            return $this->projectDeleted(
-                $change,
-                $request,
-                $token,
+            return $this->projectLeft(
+                $entryUuid,
+                $lastVisible,
             );
         }
 
@@ -124,58 +138,81 @@ final readonly class SyncResultProjector
             $filter,
         );
 
-        // Still visible, so announcing leaks nothing and no pre-image is needed.
+        // Visible where it is now, so naming it there leaks nothing.
         if (!$this->filterEvaluator->evaluate($judged, $filter)) {
             return $this->deleteResult(
-                $change->dn,
-                $change->entryUuid,
+                $lastVisible ?? $entry->getDn(),
+                $entryUuid,
             );
         }
 
         return $this->addResult(
             $entry,
             $request,
-            $change->changeType === ChangeType::Add
+            $isAdded
                 ? SyncStateControl::STATE_ADD
                 : SyncStateControl::STATE_MODIFY,
         );
     }
 
     /**
-     * A delete, announced only if the consumer could have seen the entry (checked against its pre-image), so a
-     * gone entry never leaks a DN/UUID the read-side ACL would have hidden.
+     * A delete, named by the last DN the sync identity could see the entry at, if its pre-image matched the filter.
+     *
+     * @param ?Dn $lastVisible The last in-scope DN the sync identity could see the entry at in the window.
      */
     public function projectDeleted(
         PendingChange $change,
+        ?Dn $lastVisible,
         SearchRequest $request,
-        TokenInterface $token,
     ): ?SyncResult {
-        if (!$this->wasVisible($request, $token, $change->preImage)) {
+        if ($lastVisible === null || $change->preImage === null) {
+            return null;
+        }
+
+        $preImage = self::at(
+            $change->preImage,
+            $lastVisible,
+        );
+
+        if (!$this->matchedFilter($request, $preImage)) {
             return null;
         }
 
         return $this->deleteResult(
-            $change->dn,
+            $lastVisible,
             $change->entryUuid,
         );
     }
 
     /**
-     * A move out of the consumer's content, announced as a delete at the DN it left (RFC 4533 §4.1).
+     * An entry gone from the consumer's view, named by the last DN the identity could see it at (RFC 4533 §7).
+     *
+     * @param ?Dn $lastVisible The last in-scope DN the sync identity could see the entry at in the window.
      */
-    public function projectMovedOut(
-        Entry $entry,
-        PendingChange $change,
-        TokenInterface $token,
+    public function projectLeft(
+        string $entryUuid,
+        ?Dn $lastVisible,
     ): ?SyncResult {
-        // Still live, so visibility is judged from where it went rather than a pre-image a move never carries.
-        if ($change->previousDn === null || !$this->accessControl->isEntryVisible($token, $entry)) {
+        if ($lastVisible === null) {
             return null;
         }
 
         return $this->deleteResult(
-            $change->previousDn,
-            $change->entryUuid,
+            $lastVisible,
+            $entryUuid,
+        );
+    }
+
+    /**
+     * The entry as it would stand at another DN, for a filter that names the DN.
+     */
+    private static function at(
+        Entry $entry,
+        Dn $dn,
+    ): Entry {
+        return new Entry(
+            $dn,
+            ...$entry->getAttributes(),
         );
     }
 
@@ -240,19 +277,10 @@ final readonly class SyncResultProjector
         );
     }
 
-    private function wasVisible(
+    private function matchedFilter(
         SearchRequest $request,
-        TokenInterface $token,
-        ?Entry $preImage,
+        Entry $preImage,
     ): bool {
-        if ($preImage === null) {
-            return false;
-        }
-
-        if (!$this->accessControl->isEntryVisible($token, $preImage)) {
-            return false;
-        }
-
         // A consumer ignores a delete for an entry it never held, where withholding one leaves it stale forever.
         if ($this->namesSomethingHeldApart($request->getFilter())) {
             return true;

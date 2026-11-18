@@ -70,19 +70,21 @@ final readonly class SyncPersistStreamer
         TokenInterface $token,
     ): iterable {
         $scope = $this->scopeFor($request);
-        $latestSeqs = $this->latestSeqByUuid(
+        $window = $this->windowOf(
             $sinceSeq,
             $throughSeq,
             $scope,
+            $token,
         );
 
         foreach ($this->stream->since($sinceSeq, $scope, $throughSeq) as $record) {
-            if (($latestSeqs[$record->change->entryUuid] ?? null) !== $record->seq) {
+            if (!$window->isLatest($record)) {
                 continue;
             }
 
             $result = $this->project(
                 $record->change,
+                $window->lastVisible($record->change->entryUuid),
                 $scope,
                 $request,
                 $token,
@@ -213,28 +215,32 @@ final readonly class SyncPersistStreamer
     }
 
     /**
-     * The seq of each entry's latest change in range.
-     *
-     * @return array<string, int>
-     *
      * @throws JournalLapsedException
      */
-    private function latestSeqByUuid(
+    private function windowOf(
         int $sinceSeq,
         int $throughSeq,
         ChangeScope $scope,
-    ): array {
-        $latestSeqs = [];
+        TokenInterface $token,
+    ): ChangeWindow {
+        $window = new ChangeWindow(
+            $scope,
+            fn(Dn $dn): bool => $this->projector->isVisibleAt(
+                $token,
+                $dn,
+            ),
+        );
 
         foreach ($this->stream->since($sinceSeq, $scope, $throughSeq) as $record) {
-            $latestSeqs[$record->change->entryUuid] = $record->seq;
+            $window->record($record);
         }
 
-        return $latestSeqs;
+        return $window;
     }
 
     private function project(
         PendingChange $change,
+        ?Dn $lastVisible,
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
@@ -242,11 +248,12 @@ final readonly class SyncPersistStreamer
         return $change->changeType === ChangeType::Delete
             ? $this->projector->projectDeleted(
                 $change,
+                $lastVisible,
                 $request,
-                $token,
             )
             : $this->fetchAndProject(
                 $change,
+                $lastVisible,
                 $scope,
                 $request,
                 $token,
@@ -258,6 +265,7 @@ final readonly class SyncPersistStreamer
      */
     private function fetchAndProject(
         PendingChange $change,
+        ?Dn $lastVisible,
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
@@ -272,18 +280,19 @@ final readonly class SyncPersistStreamer
             return null;
         }
 
-        // Left the content, so RFC 4533 §4.1 wants it deleted rather than sent from where it went.
+        // RFC 4533 §4.1 wants an entry that left the content deleted rather than sent from where it went.
         if (!$scope->contains($entry->getDn())) {
-            return $this->projector->projectMovedOut(
-                $entry,
-                $change,
-                $token,
+            return $this->projector->projectLeft(
+                $change->entryUuid,
+                $lastVisible,
             );
         }
 
         return $this->projector->projectFetched(
             $entry,
-            $change,
+            $change->entryUuid,
+            $change->changeType === ChangeType::Add,
+            $lastVisible,
             $request,
             $token,
         );

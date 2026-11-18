@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -41,6 +42,13 @@ final class SyncReplNativeTest extends ServerTestCase
     use RawClientQueueTrait;
 
     private const SEED_LDIF = __DIR__ . '/../../resources/seed/sync-seed.ldif';
+
+    /**
+     * Content the visibility tests sync, apart from what the other tests poll and count.
+     */
+    private const AREA = 'ou=area,dc=other,dc=test';
+
+    private const HIDDEN = 'ou=hidden,' . self::AREA;
 
     public static function setUpBeforeClass(): void
     {
@@ -56,6 +64,7 @@ final class SyncReplNativeTest extends ServerTestCase
             [
                 '--seed=' . self::SEED_LDIF,
                 '--allow-sync',
+                '--hide-from-sync=' . self::HIDDEN,
             ],
         );
     }
@@ -276,6 +285,202 @@ final class SyncReplNativeTest extends ServerTestCase
         );
     }
 
+    public function testAnEntryMovedWhereTheSyncIdentityCannotSearchIsDeletedWhereItWas(): void
+    {
+        $dn = 'cn=hidee,' . self::AREA;
+        $this->createHiddenArea();
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => 'hidee',
+                'sn' => 'Hidden',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        )));
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->move(
+            $dn,
+            self::HIDDEN,
+        ));
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [$dn],
+            $this->collectDeletedDns($incremental),
+        );
+    }
+
+    public function testASubtreeMovedWhereTheSyncIdentityCannotSearchIsDeletedWithItsChildren(): void
+    {
+        $ou = 'ou=movers,' . self::AREA;
+        $this->createHiddenArea();
+        $uuids = $this->asAdmin(static function (LdapClient $admin) use ($ou): array {
+            $admin->create(Entry::fromArray(
+                $ou,
+                [
+                    'ou' => 'movers',
+                    'objectClass' => 'organizationalUnit',
+                ],
+            ));
+
+            foreach (['one', 'two'] as $name) {
+                $admin->create(Entry::fromArray(
+                    'cn=' . $name . ',' . $ou,
+                    [
+                        'cn' => $name,
+                        'sn' => 'Mover',
+                        'objectClass' => 'inetOrgPerson',
+                    ],
+                ));
+            }
+
+            return array_map(
+                static fn(string $dn): string => (string) $admin->read(
+                    $dn,
+                    ['entryUUID'],
+                )?->get('entryUUID')?->firstValue(),
+                [$ou, 'cn=one,' . $ou, 'cn=two,' . $ou],
+            );
+        });
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->move(
+            $ou,
+            self::HIDDEN,
+        ));
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+        $deleted = $this->collectDeletedUuids($incremental);
+        sort($uuids);
+        sort($deleted);
+
+        self::assertSame(
+            $uuids,
+            $deleted,
+        );
+    }
+
+    public function testAnEntryLeavingTheContentFromWhereTheSyncIdentityCannotSearchIsNeverNamed(): void
+    {
+        $dn = 'cn=secret-name,' . self::HIDDEN;
+        $this->createHiddenArea();
+        $uuid = $this->asAdmin(static function (LdapClient $admin) use ($dn): string {
+            $admin->create(Entry::fromArray(
+                $dn,
+                [
+                    'cn' => 'secret-name',
+                    'sn' => 'Hidden',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+
+            return (string) $admin->read(
+                $dn,
+                ['entryUUID'],
+            )?->get('entryUUID')?->firstValue();
+        });
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->move(
+            $dn,
+            'dc=other,dc=test',
+        ));
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+        $named = $this->collectNamed($incremental);
+
+        self::assertNotContains(
+            strtolower($dn),
+            $named,
+        );
+        self::assertNotContains(
+            $uuid,
+            $named,
+        );
+    }
+
+    public function testAnEntryMovedIntoTheContentAndThenHiddenIsDeletedWhereItWasVisible(): void
+    {
+        $dn = 'cn=arrival,dc=other,dc=test';
+        $this->createHiddenArea();
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => 'arrival',
+                'sn' => 'Arrival',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        )));
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static function (LdapClient $admin) use ($dn): void {
+            $admin->move(
+                $dn,
+                self::AREA,
+            );
+            $admin->move(
+                'cn=arrival,' . self::AREA,
+                self::HIDDEN,
+            );
+        });
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            ['cn=arrival,' . self::AREA],
+            $this->collectDeletedDns($incremental),
+        );
+    }
+
+    public function testAnEntryLeavingTheFilterAfterAMoveOutOfAHiddenPlaceNeverNamesTheHiddenDn(): void
+    {
+        $hiddenDn = 'cn=unfiltered,' . self::HIDDEN;
+        $filter = Filters::equal(
+            'description',
+            'keep',
+        );
+        $this->createHiddenArea();
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $hiddenDn,
+            [
+                'cn' => 'unfiltered',
+                'sn' => 'Unfiltered',
+                'description' => 'keep',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        )));
+        $cookie = $this->cookieAfterAFullPollOf(
+            self::AREA,
+            $filter,
+        );
+
+        $this->asAdmin(static function (LdapClient $admin) use ($hiddenDn): void {
+            $admin->move(
+                $hiddenDn,
+                self::AREA,
+            );
+            $admin->sendAndReceive(Operations::modify(
+                'cn=unfiltered,' . self::AREA,
+                Change::replace(
+                    'description',
+                    'drop',
+                ),
+            ));
+        });
+        $incremental = $this->syncRepl(
+            $filter,
+            self::AREA,
+        );
+        $incremental->useCookie($cookie);
+
+        self::assertNotContains(
+            strtolower($hiddenDn),
+            $this->collectNamed($incremental),
+        );
+    }
+
     public function testACookieReusedForDifferentContentFallsBackToAFullRefresh(): void
     {
         $this->authenticateAdmin();
@@ -403,11 +608,13 @@ final class SyncReplNativeTest extends ServerTestCase
         }
     }
 
-    private function syncRepl(?FilterInterface $filter = null): SyncRepl
-    {
+    private function syncRepl(
+        ?FilterInterface $filter = null,
+        string $baseDn = 'dc=foo,dc=bar',
+    ): SyncRepl {
         $syncRepl = $this->ldapClient()->syncRepl($filter);
         $syncRepl->request()
-            ->base('dc=foo,dc=bar')
+            ->base($baseDn)
             ->useSubtreeScope();
 
         return $syncRepl;
@@ -424,6 +631,107 @@ final class SyncReplNativeTest extends ServerTestCase
         });
 
         return $dns;
+    }
+
+    private function createHiddenArea(): void
+    {
+        $this->asAdmin(static function (LdapClient $admin): void {
+            if ($admin->read(self::HIDDEN) !== null) {
+                return;
+            }
+
+            foreach ([self::AREA => 'area', self::HIDDEN => 'hidden'] as $dn => $ou) {
+                $admin->create(Entry::fromArray(
+                    $dn,
+                    [
+                        'ou' => $ou,
+                        'objectClass' => 'organizationalUnit',
+                    ],
+                ));
+            }
+        });
+    }
+
+    private function cookieAfterAFullPollOf(
+        string $baseDn,
+        ?FilterInterface $filter = null,
+    ): string {
+        $cookie = null;
+        $initial = $this->syncRepl(
+            $filter,
+            $baseDn,
+        );
+        $initial->useCookieHandler(function (string $value) use (&$cookie): void {
+            $cookie = $value;
+        });
+        $initial->poll();
+
+        self::assertNotNull(
+            $cookie,
+            'The refresh phase must hand back a cookie for the next poll.',
+        );
+
+        return $cookie;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectDeletedDns(SyncRepl $syncRepl): array
+    {
+        $dns = [];
+        $syncRepl->poll(function (SyncEntryResult $result) use (&$dns): void {
+            if ($result->isDelete()) {
+                $dns[] = strtolower($result->getEntry()->getDn()->toString());
+            }
+        });
+
+        return $dns;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectDeletedUuids(SyncRepl $syncRepl): array
+    {
+        $uuids = [];
+        $syncRepl->useIdSetHandler(function (SyncIdSetResult $result) use (&$uuids): void {
+            if (!$result->isDeleted()) {
+                return;
+            }
+
+            foreach ($result->getDecodedEntryUuids() as $uuid) {
+                $uuids[] = $uuid;
+            }
+        });
+        $syncRepl->poll(function (SyncEntryResult $result) use (&$uuids): void {
+            if ($result->isDelete()) {
+                $uuids[] = $result->getDecodedEntryUuid();
+            }
+        });
+
+        return $uuids;
+    }
+
+    /**
+     * Every DN and entryUUID a poll names, whether in an entry or in a set of UUIDs.
+     *
+     * @return list<string>
+     */
+    private function collectNamed(SyncRepl $syncRepl): array
+    {
+        $named = [];
+        $syncRepl->useIdSetHandler(function (SyncIdSetResult $result) use (&$named): void {
+            foreach ($result->getDecodedEntryUuids() as $uuid) {
+                $named[] = $uuid;
+            }
+        });
+        $syncRepl->poll(function (SyncEntryResult $result) use (&$named): void {
+            $named[] = strtolower($result->getEntry()->getDn()->toString());
+            $named[] = $result->getDecodedEntryUuid();
+        });
+
+        return $named;
     }
 
     /**

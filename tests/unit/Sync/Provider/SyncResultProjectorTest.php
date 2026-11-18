@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\Sync\Provider\SyncResult;
 use FreeDSx\Ldap\Sync\Provider\SyncResultProjector;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -44,6 +45,8 @@ final class SyncResultProjectorTest extends TestCase
     use ServerContainerTrait;
 
     private const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+    private const HIDDEN = 'ou=hidden,dc=example,dc=com';
 
     private AccessControlInterface&MockObject $accessControl;
 
@@ -67,7 +70,8 @@ final class SyncResultProjectorTest extends TestCase
 
         $this->accessControl
             ->method('isEntryVisible')
-            ->willReturnCallback(fn(TokenInterface $token, Entry $entry): bool => !$this->hidden);
+            ->willReturnCallback(fn(TokenInterface $token, Entry $entry): bool => !$this->hidden
+                && !$entry->getDn()->isDescendantOf(new Dn(self::HIDDEN)));
         $this->filterEvaluator
             ->method('evaluate')
             ->willReturnCallback(function (Entry $entry): bool {
@@ -175,7 +179,9 @@ final class SyncResultProjectorTest extends TestCase
 
         $result = $this->subject->projectFetched(
             $this->entry('cn=a,dc=example,dc=com', self::UUID),
-            $this->change(ChangeType::Modify),
+            self::UUID,
+            false,
+            new Dn('cn=a,dc=example,dc=com'),
             $this->request(),
             $this->token,
         );
@@ -184,6 +190,40 @@ final class SyncResultProjectorTest extends TestCase
         self::assertSame(
             SyncStateControl::STATE_DELETE,
             $result->control->getState(),
+        );
+    }
+
+    public function test_a_fetched_entry_that_leaves_the_filter_is_named_by_its_last_visible_dn(): void
+    {
+        $this->filterMatches = false;
+
+        self::assertSame(
+            'cn=a,ou=people,dc=example,dc=com',
+            $this->deletedDnOf($this->subject->projectFetched(
+                $this->entry('cn=a,ou=staff,dc=example,dc=com', self::UUID),
+                self::UUID,
+                false,
+                new Dn('cn=a,ou=people,dc=example,dc=com'),
+                $this->request(),
+                $this->token,
+            )),
+        );
+    }
+
+    public function test_a_fetched_entry_that_leaves_the_filter_without_a_visible_dn_is_named_where_it_is_now(): void
+    {
+        $this->filterMatches = false;
+
+        self::assertSame(
+            'cn=a,ou=staff,dc=example,dc=com',
+            $this->deletedDnOf($this->subject->projectFetched(
+                $this->entry('cn=a,ou=staff,dc=example,dc=com', self::UUID),
+                self::UUID,
+                false,
+                null,
+                $this->request(),
+                $this->token,
+            )),
         );
     }
 
@@ -204,7 +244,9 @@ final class SyncResultProjectorTest extends TestCase
                 'cn=a,dc=example,dc=com',
                 self::UUID,
             ),
-            $this->change(ChangeType::Modify),
+            self::UUID,
+            false,
+            new Dn('cn=a,dc=example,dc=com'),
             (new SearchRequest(Filters::equal(
                 'memberOf',
                 'cn=staff,dc=example,dc=com',
@@ -245,15 +287,66 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
-    public function test_a_fetched_entry_hidden_by_acl_without_a_pre_image_is_null(): void
+    public function test_an_entry_is_visible_at_a_dn_the_access_rules_allow(): void
     {
-        $this->hidden = true;
+        self::assertSame(
+            [true, false],
+            [
+                $this->subject->isVisibleAt(
+                    $this->token,
+                    new Dn('cn=a,dc=example,dc=com'),
+                ),
+                $this->subject->isVisibleAt(
+                    $this->token,
+                    new Dn('cn=a,ou=hidden,dc=example,dc=com'),
+                ),
+            ],
+        );
+    }
 
+    public function test_an_entry_hidden_now_is_deleted_at_its_last_visible_dn(): void
+    {
+        self::assertSame(
+            'cn=a,ou=people,dc=example,dc=com',
+            $this->deletedDnOf($this->subject->projectFetched(
+                $this->entry('cn=a,ou=hidden,dc=example,dc=com', self::UUID),
+                self::UUID,
+                false,
+                new Dn('cn=a,ou=people,dc=example,dc=com'),
+                $this->request(),
+                $this->token,
+            )),
+        );
+    }
+
+    public function test_an_entry_hidden_now_that_was_never_visible_sends_nothing(): void
+    {
         self::assertNull($this->subject->projectFetched(
-            $this->entry('cn=a,dc=example,dc=com', self::UUID),
-            $this->change(ChangeType::Modify),
+            $this->entry('cn=a,ou=hidden,dc=example,dc=com', self::UUID),
+            self::UUID,
+            true,
+            null,
             $this->request(),
             $this->token,
+        ));
+    }
+
+    public function test_an_entry_that_left_is_deleted_at_its_last_visible_dn(): void
+    {
+        self::assertSame(
+            'cn=a,ou=people,dc=example,dc=com',
+            $this->deletedDnOf($this->subject->projectLeft(
+                self::UUID,
+                new Dn('cn=a,ou=people,dc=example,dc=com'),
+            )),
+        );
+    }
+
+    public function test_an_entry_that_left_without_a_visible_dn_sends_nothing(): void
+    {
+        self::assertNull($this->subject->projectLeft(
+            self::UUID,
+            null,
         ));
     }
 
@@ -261,7 +354,9 @@ final class SyncResultProjectorTest extends TestCase
     {
         $result = $this->subject->projectFetched(
             $this->entry('cn=a,dc=example,dc=com', self::UUID),
-            $this->change(ChangeType::Modify),
+            self::UUID,
+            false,
+            new Dn('cn=a,dc=example,dc=com'),
             $this->request(),
             $this->token,
         );
@@ -277,7 +372,9 @@ final class SyncResultProjectorTest extends TestCase
     {
         $result = $this->subject->projectFetched(
             $this->entry('cn=a,dc=example,dc=com', self::UUID),
-            $this->change(ChangeType::Add),
+            self::UUID,
+            true,
+            new Dn('cn=a,dc=example,dc=com'),
             $this->request(),
             $this->token,
         );
@@ -293,8 +390,8 @@ final class SyncResultProjectorTest extends TestCase
     {
         $result = $this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            new Dn('cn=a,dc=example,dc=com'),
             $this->request(),
-            $this->token,
         );
 
         self::assertNotNull($result);
@@ -304,16 +401,37 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
+    public function test_a_delete_is_named_by_its_last_visible_dn(): void
+    {
+        self::assertSame(
+            'cn=a,ou=people,dc=example,dc=com',
+            $this->deletedDnOf($this->subject->projectDeleted(
+                $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+                new Dn('cn=a,ou=people,dc=example,dc=com'),
+                $this->request(),
+            )),
+        );
+    }
+
+    public function test_a_delete_without_a_visible_dn_is_null(): void
+    {
+        self::assertNull($this->subject->projectDeleted(
+            $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            null,
+            $this->request(),
+        ));
+    }
+
     public function test_a_delete_is_announced_when_the_filter_rests_on_linked_values(): void
     {
         $this->filterMatches = false;
 
         $result = $this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            new Dn('cn=a,dc=example,dc=com'),
             (new SearchRequest(Filters::equal('member', 'cn=a,dc=example,dc=com')))
                 ->base('dc=example,dc=com')
                 ->useSubtreeScope(),
-            $this->token,
         );
 
         self::assertNotNull($result);
@@ -329,21 +447,8 @@ final class SyncResultProjectorTest extends TestCase
 
         self::assertNull($this->subject->projectDeleted(
             $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            new Dn('cn=a,dc=example,dc=com'),
             $this->request(),
-            $this->token,
-        ));
-    }
-
-    public function test_a_delete_hidden_by_access_control_is_withheld_even_with_a_linked_filter(): void
-    {
-        $this->hidden = true;
-
-        self::assertNull($this->subject->projectDeleted(
-            $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
-            (new SearchRequest(Filters::equal('member', 'cn=a,dc=example,dc=com')))
-                ->base('dc=example,dc=com')
-                ->useSubtreeScope(),
-            $this->token,
         ));
     }
 
@@ -351,8 +456,8 @@ final class SyncResultProjectorTest extends TestCase
     {
         self::assertNull($this->subject->projectDeleted(
             $this->deleteChange(null),
+            new Dn('cn=a,dc=example,dc=com'),
             $this->request(),
-            $this->token,
         ));
     }
 
@@ -396,16 +501,6 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
-    private function change(ChangeType $changeType): PendingChange
-    {
-        return new PendingChange(
-            changeType: $changeType,
-            dn: new Dn('cn=a,dc=example,dc=com'),
-            entryUuid: self::UUID,
-            authzId: AuthzId::anonymous(),
-        );
-    }
-
     private function deleteChange(?Entry $preImage): PendingChange
     {
         return new PendingChange(
@@ -415,6 +510,15 @@ final class SyncResultProjectorTest extends TestCase
             authzId: AuthzId::anonymous(),
             preImage: $preImage,
         );
+    }
+
+    private function deletedDnOf(?SyncResult $result): ?string
+    {
+        if ($result === null || !$result->control->isDelete()) {
+            return null;
+        }
+
+        return $result->entry->getEntry()->getDn()->toString();
     }
 
     private function request(string ...$attributes): SearchRequest

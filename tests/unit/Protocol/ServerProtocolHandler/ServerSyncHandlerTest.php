@@ -442,7 +442,7 @@ final class ServerSyncHandlerTest extends TestCase
         );
     }
 
-    public function test_a_changed_entry_moved_out_of_the_content_since_the_change_is_not_sent(): void
+    public function test_a_changed_entry_moved_out_of_the_content_since_the_change_is_deleted_at_its_last_visible_dn(): void
     {
         $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
         $this->liveEntries['cn=a,dc=elsewhere,dc=org'] = $this->entry('cn=a,dc=elsewhere,dc=org', self::UUID_A);
@@ -450,8 +450,12 @@ final class ServerSyncHandlerTest extends TestCase
         $this->handle($this->cookieAt(0));
 
         self::assertSame(
-            [],
+            [[SyncStateControl::STATE_DELETE, self::UUID_A]],
             $this->states(),
+        );
+        self::assertSame(
+            ['cn=a,dc=example,dc=com'],
+            $this->sentEntryDns(),
         );
     }
 

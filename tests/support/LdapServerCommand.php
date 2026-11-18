@@ -12,9 +12,11 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Ldif\Output\FileLdifOutput;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
@@ -280,7 +282,13 @@ final class LdapServerCommand extends Command
                 'allow-sync',
                 null,
                 InputOption::VALUE_NONE,
-                'Grant authenticated identities the (privileged) content-sync control over dc=foo,dc=bar',
+                'Grant cn=user the (privileged) content-sync control over dc=foo,dc=bar and dc=other,dc=test',
+            )
+            ->addOption(
+                'hide-from-sync',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'A subtree cn=user, the sync identity, may not search or compare',
             )
             ->addOption(
                 'allow-ppolicy-forward',
@@ -509,10 +517,32 @@ final class LdapServerCommand extends Command
 
         if ($input->getOption('allow-sync') === true) {
             $options->setAclRules(
-                $options->getAclRules()->appendControlRules(ControlRule::allow(
+                $options->getAclRules()->appendControlRules(
+                    ControlRule::allow(
+                        Subject::dn('cn=user,dc=foo,dc=bar'),
+                        Target::subtree('dc=foo,dc=bar'),
+                        Control::OID_SYNC_REQUEST,
+                    ),
+                    ControlRule::allow(
+                        Subject::dn('cn=user,dc=foo,dc=bar'),
+                        Target::subtree('dc=other,dc=test'),
+                        Control::OID_SYNC_REQUEST,
+                    ),
+                ),
+            );
+        }
+
+        $hiddenFromSync = $this->getStringOption(
+            $input,
+            'hide-from-sync',
+        );
+        if ($hiddenFromSync !== '') {
+            $options->setAclRules(
+                $options->getAclRules()->prependOperationRules(OperationRule::deny(
                     Subject::dn('cn=user,dc=foo,dc=bar'),
-                    Target::subtree('dc=foo,dc=bar'),
-                    Control::OID_SYNC_REQUEST,
+                    Target::subtree($hiddenFromSync),
+                    OperationType::Search,
+                    OperationType::Compare,
                 )),
             );
         }

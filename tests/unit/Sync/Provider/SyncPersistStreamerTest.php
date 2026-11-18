@@ -73,6 +73,8 @@ final class SyncPersistStreamerTest extends TestCase
 
     private const ENTRY_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
+    private const HIDDEN = 'ou=hidden,dc=example,dc=com';
+
     private ServerQueue&MockObject $queue;
 
     private ReadEntryInterface&MockObject $entries;
@@ -103,6 +105,8 @@ final class SyncPersistStreamerTest extends TestCase
     private Closure $onFind;
 
     private ?EntryProjection $readWith = null;
+
+    private int $visibilityChecks = 0;
 
     protected function setUp(): void
     {
@@ -142,7 +146,13 @@ final class SyncPersistStreamerTest extends TestCase
         $accessControl = $this->createMock(AccessControlInterface::class);
         $accessControl
             ->method('isEntryVisible')
-            ->willReturn(true);
+            ->willReturnCallback(function (TokenInterface $token, Entry $entry): bool {
+                $this->visibilityChecks++;
+
+                return !$entry
+                    ->getDn()
+                    ->isDescendantOf(new Dn(self::HIDDEN));
+            });
         $filterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $filterEvaluator
             ->method('evaluate')
@@ -213,6 +223,183 @@ final class SyncPersistStreamerTest extends TestCase
                 static fn(SyncResult $result): string => $result->entry->getEntry()->getDn()->toString(),
                 $results,
             ),
+        );
+    }
+
+    public function test_an_entry_moved_into_a_hidden_place_is_deleted_at_its_last_visible_dn(): void
+    {
+        $this->liveEntries['cn=a,ou=hidden,dc=example,dc=com'] = $this->entryAt(
+            'cn=a,ou=hidden,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,ou=hidden,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=a,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_moved_out_of_the_content_is_deleted_at_its_previous_dn(): void
+    {
+        $this->liveEntries['cn=a,dc=other,dc=com'] = $this->entryAt(
+            'cn=a,dc=other,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,dc=other,dc=com',
+        );
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=a,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_added_and_hidden_in_one_window_is_deleted_where_it_was_added(): void
+    {
+        $this->liveEntries['cn=a,ou=hidden,dc=example,dc=com'] = $this->entryAt(
+            'cn=a,ou=hidden,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,ou=hidden,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=a,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_added_where_the_consumer_cannot_see_it_is_never_named(): void
+    {
+        $this->liveEntries['cn=a,dc=other,dc=com'] = $this->entryAt(
+            'cn=a,dc=other,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,ou=hidden,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendMove(
+            'cn=a,ou=hidden,dc=example,dc=com',
+            'cn=a,dc=other,dc=com',
+        );
+
+        self::assertSame(
+            [],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_delete_after_several_moves_is_named_by_its_dn_at_deletion(): void
+    {
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=b,dc=example,dc=com',
+        );
+        $this->appendMove(
+            'cn=b,dc=example,dc=com',
+            'cn=c,dc=example,dc=com',
+        );
+        $this->appendDelete('cn=c,dc=example,dc=com');
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=c,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_delete_after_a_move_into_a_hidden_place_is_named_where_it_was_last_visible(): void
+    {
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,ou=hidden,dc=example,dc=com',
+        );
+        $this->appendDelete('cn=a,ou=hidden,dc=example,dc=com');
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=a,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_delete_where_the_identity_never_saw_the_entry_is_withheld(): void
+    {
+        $this->appendDelete('cn=a,ou=hidden,dc=example,dc=com');
+
+        self::assertSame(
+            [],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_moved_in_from_outside_then_hidden_is_deleted_where_it_was_visible(): void
+    {
+        $this->liveEntries['cn=a,ou=hidden,dc=example,dc=com'] = $this->entryAt(
+            'cn=a,ou=hidden,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendMove(
+            'cn=a,dc=other,dc=com',
+            'cn=a,dc=example,dc=com',
+        );
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,ou=hidden,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=a,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_hidden_and_visible_again_in_one_window_is_sent_as_a_modify(): void
+    {
+        $this->liveEntries['cn=b,dc=example,dc=com'] = $this->entryAt(
+            'cn=b,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,ou=hidden,dc=example,dc=com',
+        );
+        $this->appendMove(
+            'cn=a,ou=hidden,dc=example,dc=com',
+            'cn=b,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            [[SyncStateControl::STATE_MODIFY, 'cn=b,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_run_of_modifies_checks_visibility_once_in_the_window_and_once_when_sent(): void
+    {
+        $this->liveEntries[self::ENTRY_DN] = $this->entry();
+        $this->append(ChangeType::Modify);
+        $this->append(ChangeType::Modify);
+        $this->append(ChangeType::Modify);
+
+        $this->projected();
+
+        self::assertSame(
+            2,
+            $this->visibilityChecks,
         );
     }
 
@@ -507,6 +694,56 @@ final class SyncPersistStreamerTest extends TestCase
             entryUuid: $uuid,
             authzId: AuthzId::anonymous(),
         ));
+    }
+
+    private function appendMove(
+        string $from,
+        string $to,
+    ): void {
+        $this->journal->append(new PendingChange(
+            changeType: ChangeType::ModRdn,
+            dn: new Dn($to),
+            entryUuid: self::ENTRY_UUID,
+            authzId: AuthzId::anonymous(),
+            previousDn: new Dn($from),
+        ));
+    }
+
+    private function appendDelete(string $dn): void
+    {
+        $this->journal->append(new PendingChange(
+            changeType: ChangeType::Delete,
+            dn: new Dn($dn),
+            entryUuid: self::ENTRY_UUID,
+            authzId: AuthzId::anonymous(),
+            preImage: $this->entryAt(
+                $dn,
+                self::ENTRY_UUID,
+            ),
+        ));
+    }
+
+    /**
+     * @return list<array{int, string}>
+     */
+    private function projected(): array
+    {
+        $results = $this->subject->projectSince(
+            0,
+            $this->journal->latestSeq(),
+            $this->request(),
+            $this->token,
+        );
+        $projected = [];
+
+        foreach ($results as $result) {
+            $projected[] = [
+                $result->control->getState(),
+                $result->entry->getEntry()->getDn()->toString(),
+            ];
+        }
+
+        return $projected;
     }
 
     private function liveEntryHolding(string $uuid): ?Entry
