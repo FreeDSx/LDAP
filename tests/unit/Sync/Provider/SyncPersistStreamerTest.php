@@ -108,6 +108,8 @@ final class SyncPersistStreamerTest extends TestCase
 
     private int $visibilityChecks = 0;
 
+    private bool $filterMatches = true;
+
     protected function setUp(): void
     {
         $this->onSleep = static function (): void {};
@@ -156,7 +158,7 @@ final class SyncPersistStreamerTest extends TestCase
         $filterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $filterEvaluator
             ->method('evaluate')
-            ->willReturn(true);
+            ->willReturnCallback(fn(): bool => $this->filterMatches);
 
         $this->subject = new SyncPersistStreamer(
             entries: $this->entries,
@@ -400,6 +402,67 @@ final class SyncPersistStreamerTest extends TestCase
         self::assertSame(
             2,
             $this->visibilityChecks,
+        );
+    }
+
+    public function test_a_modify_out_of_the_filter_then_a_delete_sends_the_delete(): void
+    {
+        $this->filterMatches = false;
+        $this->append(ChangeType::Modify);
+        $this->appendDelete(self::ENTRY_DN);
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, self::ENTRY_DN]],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_lone_delete_out_of_the_filter_is_withheld(): void
+    {
+        $this->filterMatches = false;
+        $this->appendDelete(self::ENTRY_DN);
+
+        self::assertSame(
+            [],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_changed_entry_gone_when_fetched_is_deleted_at_its_last_visible_dn(): void
+    {
+        $this->append(ChangeType::Modify);
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, self::ENTRY_DN]],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_moved_out_of_the_content_and_deleted_there_is_deleted_at_its_last_visible_dn(): void
+    {
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,dc=other,dc=com',
+        );
+        $this->appendDelete('cn=a,dc=other,dc=com');
+
+        self::assertSame(
+            [[SyncStateControl::STATE_DELETE, 'cn=a,dc=example,dc=com']],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_changed_entry_gone_when_fetched_that_was_never_visible_sends_nothing(): void
+    {
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=a,ou=hidden,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+
+        self::assertSame(
+            [],
+            $this->projected(),
         );
     }
 

@@ -39,6 +39,11 @@ final class ChangeWindow
     private array $lastVisible = [];
 
     /**
+     * @var array<string, true>
+     */
+    private array $changedEarlier = [];
+
+    /**
      * @param Closure(Dn): bool $isVisible
      */
     public function __construct(
@@ -59,6 +64,10 @@ final class ChangeWindow
         );
         $this->latestSeqs[$uuid] = $record->seq;
 
+        if (!$isFirst) {
+            $this->changedEarlier[$uuid] = true;
+        }
+
         if ($isFirst && $change->changeType === ChangeType::ModRdn && $change->previousDn !== null) {
             $this->see(
                 $uuid,
@@ -75,6 +84,14 @@ final class ChangeWindow
     public function isLatest(ChangeRecord $record): bool
     {
         return ($this->latestSeqs[$record->change->entryUuid] ?? null) === $record->seq;
+    }
+
+    /**
+     * Whether the window changed the entry before its latest change.
+     */
+    public function hasEarlierChange(string $entryUuid): bool
+    {
+        return isset($this->changedEarlier[$entryUuid]);
     }
 
     /**
