@@ -244,6 +244,9 @@ preserving the provider's UUIDs and timestamps. It checkpoints its cookie so it 
 deletions on a full refresh, and reconnects with bounded backoff if the connection drops. Changes are applied as a leaf;
 the replica does not re-journal them.
 
+When restoring a provider from a backup, keep its entryUUIDs, as `dump()` and `seed()` do. Replicas match entries by
+entryUUID: a provider with new ones looks like a new directory to them, and their next full refresh replaces every entry.
+
 ### Writes Are Refused
 
 Any client write to a replica (add, modify, delete, rename, password modify) is refused. By default it is returned as a

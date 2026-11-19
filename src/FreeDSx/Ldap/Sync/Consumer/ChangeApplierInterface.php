@@ -35,6 +35,8 @@ interface ChangeApplierInterface
      *
      * During the refresh phase the entry's DN is recorded so {@see self::reconcile()} can find local entries the
      * upstream no longer has.
+     *
+     * @throws UnresolvedReplicaMovesException when an entry in the way cannot be moved aside
      */
     public function apply(
         SyncEntryResult $result,
@@ -50,9 +52,9 @@ interface ChangeApplierInterface
     ): void;
 
     /**
-     * Place what was held back since the last sync point. Called before that sync point is checkpointed.
+     * Check on the entries moved aside for others, before a sync point is checkpointed.
      *
-     * @throws UnresolvedReplicaMovesException when a moved entry's new DN is still held by an entry with no pending move
+     * @throws UnresolvedReplicaMovesException when an entry moved aside is still unplaced at a second sync point
      */
     public function settle(): void;
 

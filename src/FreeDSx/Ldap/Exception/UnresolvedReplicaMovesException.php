@@ -18,17 +18,17 @@ use function implode;
 use function sprintf;
 
 /**
- * Thrown when a replica cannot place moved entries at their new DNs without deleting the entries holding them.
+ * Thrown when a replica cannot move aside an entry in the way of another, or an entry it moved aside is never placed again.
  */
 class UnresolvedReplicaMovesException extends RuntimeException
 {
     /**
-     * @param list<string> $dns The new DNs the moved entries could not be placed at.
+     * @param list<string> $dns The DNs the entries could not be placed at or moved aside from.
      */
     public function __construct(public readonly array $dns)
     {
         parent::__construct(sprintf(
-            '%d replicated move(s) could not be placed, as another entry holds the new DN: %s',
+            '%d replicated entry placement(s) could not be resolved: %s',
             count($dns),
             implode('; ', $dns),
         ));

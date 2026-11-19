@@ -957,8 +957,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(TransactionalWriteInterface::class),
             new ReplicaMoves(
                 $container->get(ReadEntryInterface::class),
+                $container->get(ListEntryInterface::class),
                 $container->get(WriteEntryInterface::class),
-                $container->get(TransactionalWriteInterface::class),
             ),
         );
 

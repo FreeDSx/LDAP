@@ -54,7 +54,6 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     public function beginRefresh(): void
     {
         $this->presentUuids = [];
-        $this->moves->clear();
     }
 
     public function apply(
@@ -62,7 +61,6 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         Session $session,
     ): void {
         $uuid = $result->getDecodedEntryUuid();
-        $this->moves->forget($uuid);
 
         // RFC 4533 §3.6: a delete names its entry by UUID, and its DN may be a past one or empty.
         if ($result->isDelete()) {
@@ -84,19 +82,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             $uuid,
         );
 
+        // RFC 4533 §3.6 keys entries by UUID, which makes the same one arriving elsewhere a move rather than a new entry.
         $this->transaction->atomic(function () use ($entry, $uuid): void {
-            $heldAt = $this->dnHolding($uuid);
-
-            if ($heldAt === null || $heldAt->toString() === $entry->getDn()->normalize()->toString()) {
-                $this->writer->store($entry);
-
-                return;
-            }
-
-            // RFC 4533 §3.6 keys entries by UUID, so the same one arriving elsewhere is a move rather than a new entry.
-            $this->moves->move(
+            $this->moves->place(
                 $uuid,
-                $heldAt,
                 $entry,
             );
         });
@@ -109,9 +98,6 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         $uuids = $result->getDecodedEntryUuids();
 
         if ($result->isDeleted()) {
-            foreach ($uuids as $uuid) {
-                $this->moves->forget($uuid);
-            }
             $this->removeByUuids($uuids);
 
             return;

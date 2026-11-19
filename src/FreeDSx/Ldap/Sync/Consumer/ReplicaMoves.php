@@ -17,20 +17,19 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
-use function array_diff_key;
-use function array_keys;
-use function array_map;
-use function array_values;
-use function count;
+use function ksort;
 use function strtolower;
 
 /**
- * Applies replicated moves as renames and handles deferrals.
+ * Places replicated entries by entryUUID, moving aside any entry in the way rather than overwriting it.
  *
  * @internal
  *
@@ -39,193 +38,280 @@ use function strtolower;
 class ReplicaMoves
 {
     /**
-     * More deferred moves than this in one window is treated as a disagreement which needs a refresh.
+     * @var array<string, string> the DN each entry was moved aside from, keyed by lowercased entryUUID
      */
-    private const LIMIT = 1000;
+    private array $parked = [];
 
     /**
-     * @var array<string, Entry> the entry each deferred move places, keyed by lowercased entryUUID
+     * @var array<string, true> the parked entries already carried over one sync point, keyed by lowercased entryUUID
      */
-    private array $deferred = [];
+    private array $carried = [];
 
     public function __construct(
         private readonly ReadEntryInterface $reader,
+        private readonly ListEntryInterface $lister,
         private readonly WriteEntryInterface $writer,
-        private readonly TransactionalWriteInterface $transaction,
     ) {}
 
     /**
-     * Renames the entry at $heldAt, with its subtree, to the entry's DN, keeping everything that hangs off its identity.
+     * Writes the entry at its DN, renaming the subtree it already heads there when it held another DN.
      *
-     * @throws UnresolvedReplicaMovesException when more moves are deferred than one window may hold
+     * @throws UnresolvedReplicaMovesException when an entry in the way cannot be moved aside
      */
-    public function move(
+    public function place(
         string $uuid,
-        Dn $heldAt,
         Entry $entry,
     ): void {
-        if ($this->reader->exists($entry->getDn())) {
-            $this->defer(
-                $uuid,
-                $entry,
-            );
+        $heldAt = $this->heldAt($uuid);
+
+        if ($heldAt === null) {
+            $this->add($entry);
 
             return;
         }
 
-        $this->relocate(
-            $heldAt,
-            $entry,
-        );
+        $target = $entry->getDn()->normalize();
+        if ($heldAt->toString() !== $target->toString()) {
+            $this->move(
+                $uuid,
+                $heldAt,
+                $target,
+            );
+        }
+
+        $this->writer->store($entry);
+        $this->forget($uuid);
     }
 
     /**
-     * A newer message for the entry supersedes its deferred move.
-     */
-    public function forget(string $uuid): void
-    {
-        unset($this->deferred[strtolower($uuid)]);
-    }
-
-    public function clear(): void
-    {
-        $this->deferred = [];
-    }
-
-    /**
-     * Places every deferred move it can, and reports the rest.
+     * Reports the entries moved aside that no change placed again by their second sync point, as a change can be read a window late.
      *
-     * @throws UnresolvedReplicaMovesException naming the moves whose new DN an entry with no pending move still holds
+     * @throws UnresolvedReplicaMovesException naming the DNs those entries were moved aside from
      */
     public function settle(): void
     {
-        $this->placeResolvable();
+        $unplaced = [];
 
-        $this->throwIfAny();
+        foreach ($this->parked as $uuid => $dn) {
+            if (!$this->isParked($uuid)) {
+                $this->forget($uuid);
+
+                continue;
+            }
+            if (!isset($this->carried[$uuid])) {
+                $this->carried[$uuid] = true;
+
+                continue;
+            }
+
+            $unplaced[] = $dn;
+            $this->forget($uuid);
+        }
+
+        if ($unplaced !== []) {
+            throw new UnresolvedReplicaMovesException($unplaced);
+        }
     }
 
     /**
      * @throws UnresolvedReplicaMovesException
      */
-    private function defer(
-        string $uuid,
-        Entry $entry,
-    ): void {
-        $this->deferred[strtolower($uuid)] = $entry;
+    private function add(Entry $entry): void
+    {
+        try {
+            $this->writer->insert($entry);
 
-        if (count($this->deferred) <= self::LIMIT) {
             return;
+        } catch (EntryAlreadyExistsException) {
+            // Another entry still holds the DN, as its own change has not arrived yet.
         }
 
-        // Placed early, so only moves blocked by an entry with no pending move can fill the window.
-        $this->placeResolvable();
-
-        if (count($this->deferred) <= self::LIMIT) {
-            return;
-        }
-
-        $this->throwIfAny();
+        $this->moveAside($entry->getDn()->normalize());
+        $this->writer->insert($entry);
     }
 
     /**
-     * Places the resolvable moves in one transaction, through temporary DNs so chains and swaps resolve alike.
-     *
-     * @throws UnresolvedReplicaMovesException when malformed data holds a parking DN
+     * @throws UnresolvedReplicaMovesException
      */
-    private function placeResolvable(): void
-    {
-        if ($this->deferred === []) {
+    private function move(
+        string $uuid,
+        Dn $heldAt,
+        Dn $target,
+    ): void {
+        $heldAt = $this->clearTarget(
+            $uuid,
+            $heldAt,
+            $target,
+        );
+
+        try {
+            $this->writer->renameSubtree(
+                $heldAt,
+                $target,
+            );
+
             return;
+        } catch (EntryAlreadyExistsException) {
+            // A descendant lands on an entry outside the subtree, which is rare enough to search for only now.
         }
 
-        $resolvable = $this->resolvable();
-
-        $this->transaction->atomic(function () use ($resolvable): void {
-            foreach (array_keys($resolvable) as $uuid) {
-                // Rolled back whole, so none of the moves was placed.
-                if (!$this->park($uuid)) {
-                    $this->throwIfAny();
-                }
-            }
-            foreach ($resolvable as $uuid => $entry) {
-                $this->relocate(
-                    $this->heldAt($uuid),
-                    $entry,
-                );
-            }
-        });
-
-        $this->deferred = array_diff_key(
-            $this->deferred,
-            $resolvable,
+        $this->moveAsideLandings(
+            $heldAt,
+            $target,
+        );
+        $this->renameOrFail(
+            $uuid,
+            $target,
         );
     }
 
     /**
-     * @throws UnresolvedReplicaMovesException naming every move still deferred
+     * Where the entry moves from once nothing holds the target and the target does not sit under it.
+     *
+     * @throws UnresolvedReplicaMovesException
      */
-    private function throwIfAny(): void
-    {
-        if ($this->deferred === []) {
-            return;
+    private function clearTarget(
+        string $uuid,
+        Dn $heldAt,
+        Dn $target,
+    ): Dn {
+        if ($this->moveAside($target)) {
+            $heldAt = $this->heldAtOrFail(
+                $uuid,
+                $target,
+            );
         }
 
-        $dns = $this->dnsOf($this->deferred);
-        $this->deferred = [];
-
-        throw new UnresolvedReplicaMovesException($dns);
+        // The entry steps aside first, as a subtree cannot move under itself.
+        return $target->isDescendantOf($heldAt)
+            ? $this->park(
+                $uuid,
+                $heldAt,
+            )
+            : $heldAt;
     }
 
     /**
-     * The deferred moves whose new DN is free, already theirs, or held by another of them. Found by dropping the rest
-     * until none is left to drop.
-     *
-     * @return array<string, Entry>
+     * @throws UnresolvedReplicaMovesException when the target or a DN under it is still taken
      */
-    private function resolvable(): array
+    private function renameOrFail(
+        string $uuid,
+        Dn $target,
+    ): void {
+        try {
+            $this->writer->renameSubtree(
+                $this->heldAtOrFail(
+                    $uuid,
+                    $target,
+                ),
+                $target,
+            );
+        } catch (EntryAlreadyExistsException) {
+            throw new UnresolvedReplicaMovesException([$target->toString()]);
+        }
+    }
+
+    /**
+     * Moves aside the entry holding the DN, if any.
+     *
+     * @throws UnresolvedReplicaMovesException
+     */
+    private function moveAside(Dn $dn): bool
     {
-        $resolvable = $this->deferred;
+        $occupant = $this->occupantOf($dn);
+        if ($occupant === null) {
+            return false;
+        }
 
-        do {
-            $dropped = false;
+        $this->park(
+            $occupant,
+            $dn,
+        );
 
-            foreach ($resolvable as $uuid => $entry) {
-                $occupant = $this->occupantOf($entry->getDn());
+        return true;
+    }
 
-                if ($occupant === null || $occupant === $uuid || isset($resolvable[$occupant])) {
-                    continue;
-                }
+    /**
+     * Moves aside each entry a descendant of the subtree would land on, shallowest first.
+     *
+     * @throws UnresolvedReplicaMovesException
+     */
+    private function moveAsideLandings(
+        Dn $heldAt,
+        Dn $target,
+    ): void {
+        // Each depth is read after the last, as moving an occupant aside takes any deeper one with it.
+        foreach ($this->landingsByDepth($heldAt, $target) as $landings) {
+            $occupants = $this->lister->entriesAt(
+                $landings,
+                $this->uuidOnly(),
+            );
 
-                unset($resolvable[$uuid]);
-                $dropped = true;
+            foreach ($occupants as $occupant) {
+                $this->park(
+                    $occupant->getUuidOrFail(),
+                    $occupant->getDn()->normalize(),
+                );
             }
-        } while ($dropped);
-
-        return $resolvable;
+        }
     }
 
     /**
-     * Moves the entry aside to a sibling DN named by its own UUID, false when malformed data already holds it.
+     * Where each descendant the storage would carry lands, grouped by depth, shallowest first.
      *
-     * Only the entry with that UUID can validly be named by it.
+     * @return array<int, list<Dn>>
      */
-    private function park(string $uuid): bool
-    {
-        $heldAt = $this->heldAt($uuid);
-        if ($heldAt === null) {
-            return true;
+    private function landingsByDepth(
+        Dn $heldAt,
+        Dn $target,
+    ): array {
+        $rename = new SubtreeRename(
+            $heldAt,
+            $target,
+            $heldAt->toString(),
+        );
+        // The listing holds what the storage carries, including an entry whose parent is not stored.
+        $options = StorageListOptions::matchAll(
+            $heldAt,
+            subtree: true,
+            projection: $this->uuidOnly(),
+        );
+        $landings = [];
+
+        foreach ($this->lister->list($options)->entries() as $descendant) {
+            $lcDn = $descendant->getDn()->normalizedString();
+
+            if ($lcDn === $rename->lcFrom) {
+                continue;
+            }
+            $landing = Dn::fromCanonical($rename->canonicalFor($lcDn));
+            $landings[$landing->count()][] = $landing;
         }
+        ksort($landings);
 
-        $rdn = 'entryUUID=' . $uuid;
-        $parent = $heldAt->getParent();
-        $slot = new Dn($parent === null ? $rdn : $rdn . ',' . $parent->toString());
+        return $landings;
+    }
 
-        // An entry already named by its own UUID is parked where it is.
-        if ($slot->normalize()->toString() === $heldAt->toString()) {
-            return true;
+    /**
+     * Moves the entry and its subtree aside to a sibling DN named by its own UUID, which only that entry can validly hold.
+     *
+     * @throws UnresolvedReplicaMovesException when another entry already holds that DN
+     */
+    private function park(
+        string $uuid,
+        Dn $heldAt,
+    ): Dn {
+        $slot = $this->slotOf(
+            $uuid,
+            $heldAt,
+        );
+        $this->parked[strtolower($uuid)] = $heldAt->toString();
+
+        if ($slot->toString() === $heldAt->toString()) {
+            return $slot;
         }
         if ($this->reader->exists($slot)) {
-            return false;
+            throw new UnresolvedReplicaMovesException([$heldAt->toString()]);
         }
 
         $this->writer->renameSubtree(
@@ -233,21 +319,43 @@ class ReplicaMoves
             $slot,
         );
 
-        return true;
+        return $slot;
     }
 
-    private function relocate(
-        ?Dn $heldAt,
-        Entry $entry,
-    ): void {
-        if ($heldAt !== null && $heldAt->toString() !== $entry->getDn()->normalize()->toString()) {
-            $this->writer->renameSubtree(
-                $heldAt,
-                $entry->getDn(),
-            );
+    private function isParked(string $uuid): bool
+    {
+        $heldAt = $this->heldAt($uuid);
+
+        if ($heldAt === null) {
+            return false;
         }
 
-        $this->writer->store($entry);
+        $slot = $this->slotOf(
+            $uuid,
+            $heldAt,
+        );
+
+        return $slot->toString() === $heldAt->toString();
+    }
+
+    private function forget(string $uuid): void
+    {
+        $key = strtolower($uuid);
+
+        unset(
+            $this->parked[$key],
+            $this->carried[$key],
+        );
+    }
+
+    private function slotOf(
+        string $uuid,
+        Dn $heldAt,
+    ): Dn {
+        $rdn = 'entryUUID=' . $uuid;
+        $parent = $heldAt->getParent();
+
+        return (new Dn($parent === null ? $rdn : $rdn . ',' . $parent->toString()))->normalize();
     }
 
     private function heldAt(string $uuid): ?Dn
@@ -264,28 +372,33 @@ class ReplicaMoves
             ->normalize();
     }
 
+    /**
+     * Where the entry is after a move aside carried it along.
+     *
+     * @throws UnresolvedReplicaMovesException when the entry is no longer held anywhere
+     */
+    private function heldAtOrFail(
+        string $uuid,
+        Dn $target,
+    ): Dn {
+        return $this->heldAt($uuid) ?? throw new UnresolvedReplicaMovesException([$target->toString()]);
+    }
+
     private function occupantOf(Dn $dn): ?string
     {
         return $this->reader
             ->find(
-                $dn->normalize(),
-                new EntryProjection(
-                    [strtolower(AttributeTypeOid::NAME_ENTRY_UUID)],
-                    linkCap: 0,
-                ),
+                $dn,
+                $this->uuidOnly(),
             )
             ?->getUuid();
     }
 
-    /**
-     * @param array<string, Entry> $moves
-     * @return list<string>
-     */
-    private function dnsOf(array $moves): array
+    private function uuidOnly(): EntryProjection
     {
-        return array_values(array_map(
-            static fn(Entry $entry): string => $entry->getDn()->toString(),
-            $moves,
-        ));
+        return new EntryProjection(
+            [strtolower(AttributeTypeOid::NAME_ENTRY_UUID)],
+            linkCap: 0,
+        );
     }
 }

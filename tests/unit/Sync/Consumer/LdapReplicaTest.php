@@ -311,6 +311,105 @@ final class LdapReplicaTest extends TestCase
         );
     }
 
+    public function test_an_entry_that_cannot_be_placed_during_a_full_refresh_is_logged_and_the_refresh_goes_on(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $subject = $this->replica($logger);
+        $entry = $this->createMock(SyncEntryResult::class);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $syncs = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function (Closure $entryHandler) use ($entry, $session, &$syncs): void {
+                if (++$syncs > 1) {
+                    ($this->shutdown)();
+
+                    return;
+                }
+                $entryHandler($entry, $session);
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->method('apply')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+        $this->applier->expects(self::once())
+            ->method('reconcile');
+        $logger->expects(self::once())
+            ->method('error');
+
+        $subject->run();
+
+        self::assertSame(
+            'cookie-after',
+            $this->checkpoint->read(),
+        );
+    }
+
+    public function test_an_entry_that_cannot_be_placed_once_a_full_refresh_completes_reloads_the_content(): void
+    {
+        $entry = $this->createMock(SyncEntryResult::class);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $syncs = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function (Closure $entryHandler) use ($entry, $session, &$syncs): void {
+                if (++$syncs > 1) {
+                    ($this->shutdown)();
+
+                    return;
+                }
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                $entryHandler($entry, $session);
+            });
+        $this->applier->method('apply')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+
+        $this->subject->run();
+
+        self::assertNull($this->usedCookie);
+    }
+
+    public function test_an_entry_that_cannot_be_placed_after_a_cookie_reloads_the_content(): void
+    {
+        $this->checkpoint->write('resume-me');
+        $entry = $this->createMock(SyncEntryResult::class);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $syncs = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function (Closure $entryHandler) use ($entry, $session, &$syncs): void {
+                if (++$syncs > 1) {
+                    ($this->shutdown)();
+
+                    return;
+                }
+                $entryHandler($entry, $session);
+            });
+        $this->applier->method('apply')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+        $this->sleeper->expects(self::never())
+            ->method('sleep');
+
+        $this->subject->run();
+
+        self::assertNull($this->usedCookie);
+        self::assertSame(
+            'resume-me',
+            $this->checkpoint->read(),
+        );
+    }
+
     public function test_a_present_phase_refresh_applies_reconciles_and_checkpoints(): void
     {
         $entry = $this->createMock(SyncEntryResult::class);

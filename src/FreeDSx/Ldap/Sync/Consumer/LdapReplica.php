@@ -49,9 +49,7 @@ final class LdapReplica
     private ?string $pendingCookie = null;
 
     /**
-     * Set when moves could not be placed.
-     *
-     * The next sync reloads the content.
+     * Set when replicated entries could not be placed, making the next sync reload the content.
      */
     private bool $reload = false;
 
@@ -86,7 +84,7 @@ final class LdapReplica
             } catch (UnresolvedReplicaMovesException $e) {
                 $this->reload = true;
                 $this->logger?->warning(
-                    'Replicated moves could not be placed; reloading the content from the primary.',
+                    'Replicated entries could not be placed; reloading the content from the primary.',
                     ['dns' => $e->dns],
                 );
             } catch (Throwable $e) {
@@ -157,10 +155,17 @@ final class LdapReplica
             throw new CancelRequestException();
         }
 
-        $this->applier->apply(
-            $result,
-            $session,
-        );
+        try {
+            $this->applier->apply(
+                $result,
+                $session,
+            );
+        } catch (UnresolvedReplicaMovesException $e) {
+            $this->logDuringFullRefresh(
+                $e,
+                'A replicated entry could not be placed during a full refresh; skipping it.',
+            );
+        }
     }
 
     private function applyIdSet(
@@ -178,7 +183,7 @@ final class LdapReplica
     }
 
     /**
-     * Moves are settled after reconciling.
+     * Entries moved aside are checked after reconciling, which may have removed them.
      */
     private function reconcileRefresh(Session $session): void
     {
@@ -200,19 +205,34 @@ final class LdapReplica
         try {
             $this->applier->settle();
         } catch (UnresolvedReplicaMovesException $e) {
-            if (!$this->fullRefresh) {
-                throw $e;
-            }
-
-            $this->logger?->error(
-                'Replicated moves could not be placed after a full refresh; leaving those entries where they are.',
-                ['dns' => $e->dns],
+            $this->logDuringFullRefresh(
+                $e,
+                'Replicated entries moved aside were not placed again by a full refresh; leaving them where they are.',
             );
         }
     }
 
     /**
-     * Anything held back is settled first, so the checkpoint never moves past a change that was not applied.
+     * What a full refresh cannot place is logged rather than reloaded, as a reload would replay the same refresh.
+     *
+     * @throws UnresolvedReplicaMovesException unless a full refresh is under way
+     */
+    private function logDuringFullRefresh(
+        UnresolvedReplicaMovesException $e,
+        string $message,
+    ): void {
+        if (!$this->refreshing || !$this->fullRefresh) {
+            throw $e;
+        }
+
+        $this->logger?->error(
+            $message,
+            ['dns' => $e->dns],
+        );
+    }
+
+    /**
+     * Entries moved aside are checked before the checkpoint moves past them.
      */
     private function persistCookie(?string $cookie): void
     {
