@@ -215,6 +215,91 @@ trait SubtreeRenameStorageContractTests
         ));
     }
 
+    public function test_renaming_a_subtree_whose_child_lands_on_an_entry_without_a_parent_is_refused_and_moves_nothing(): void
+    {
+        $container = $this->makeStorageContainer(
+            new Entry(new Dn('dc=foo,dc=bar')),
+            new Entry(new Dn('ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=dest,dc=foo,dc=bar')),
+        );
+
+        $this->assertRenameToDestIsRefused($container);
+
+        self::assertSame(
+            [
+                'ou=src,dc=foo,dc=bar' => true,
+                'cn=x,ou=src,dc=foo,dc=bar' => true,
+                'cn=x,ou=dest,dc=foo,dc=bar' => true,
+            ],
+            $this->presence(
+                $container,
+                'ou=src,dc=foo,dc=bar',
+                'cn=x,ou=src,dc=foo,dc=bar',
+                'cn=x,ou=dest,dc=foo,dc=bar',
+            ),
+        );
+    }
+
+    public function test_renaming_a_subtree_whose_grandchild_lands_on_an_entry_without_a_parent_is_refused_and_moves_nothing(): void
+    {
+        $container = $this->makeStorageContainer(
+            new Entry(new Dn('dc=foo,dc=bar')),
+            new Entry(new Dn('ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=y,cn=x,ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=y,cn=x,ou=dest,dc=foo,dc=bar')),
+        );
+
+        $this->assertRenameToDestIsRefused($container);
+
+        self::assertSame(
+            [
+                'cn=x,ou=src,dc=foo,dc=bar' => true,
+                'cn=y,cn=x,ou=src,dc=foo,dc=bar' => true,
+                'cn=x,ou=dest,dc=foo,dc=bar' => false,
+                'cn=y,cn=x,ou=dest,dc=foo,dc=bar' => true,
+            ],
+            $this->presence(
+                $container,
+                'cn=x,ou=src,dc=foo,dc=bar',
+                'cn=y,cn=x,ou=src,dc=foo,dc=bar',
+                'cn=x,ou=dest,dc=foo,dc=bar',
+                'cn=y,cn=x,ou=dest,dc=foo,dc=bar',
+            ),
+        );
+    }
+
+    public function test_renaming_a_subtree_keeps_an_entry_without_a_parent_that_would_land_on_a_taken_dn(): void
+    {
+        $container = $this->makeStorageContainer(
+            new Entry(new Dn('dc=foo,dc=bar')),
+            new Entry(new Dn('ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=gone,ou=src,dc=foo,dc=bar')),
+            new Entry(new Dn('cn=x,ou=gone,ou=dest,dc=foo,dc=bar')),
+        );
+
+        try {
+            $container->get(WriteEntryInterface::class)->renameSubtree(
+                new Dn('ou=src,dc=foo,dc=bar'),
+                new Dn('ou=dest,dc=foo,dc=bar'),
+            );
+        } catch (EntryAlreadyExistsException) {
+        }
+
+        self::assertSame(
+            [
+                'cn=x,ou=gone,ou=src,dc=foo,dc=bar' => true,
+                'cn=x,ou=gone,ou=dest,dc=foo,dc=bar' => true,
+            ],
+            $this->presence(
+                $container,
+                'cn=x,ou=gone,ou=src,dc=foo,dc=bar',
+                'cn=x,ou=gone,ou=dest,dc=foo,dc=bar',
+            ),
+        );
+    }
+
     /**
      * @param Entry ...$entries Seeded, each given an entryUUID, before the contract runs.
      * @return Container the graph holding the seeded entries, which every storage contract resolves from
@@ -253,6 +338,41 @@ trait SubtreeRenameStorageContractTests
     ): ?Entry {
         return $container->get(ReadEntryInterface::class)
             ->find(new Dn($dn));
+    }
+
+    private function assertRenameToDestIsRefused(Container $container): void
+    {
+        try {
+            $container->get(WriteEntryInterface::class)->renameSubtree(
+                new Dn('ou=src,dc=foo,dc=bar'),
+                new Dn('ou=dest,dc=foo,dc=bar'),
+            );
+            self::fail('Renaming a subtree whose descendant lands on a taken DN should have been refused.');
+        } catch (EntryAlreadyExistsException $e) {
+            self::assertSame(
+                [ResultCode::ENTRY_ALREADY_EXISTS, 'Entry already exists: ou=dest,dc=foo,dc=bar'],
+                [$e->getCode(), $e->getMessage()],
+            );
+        }
+    }
+
+    /**
+     * @return array<string, bool> whether an entry is stored at each DN
+     */
+    private function presence(
+        Container $container,
+        string ...$dns,
+    ): array {
+        $presence = [];
+
+        foreach ($dns as $dn) {
+            $presence[$dn] = $this->storedEntry(
+                $container,
+                $dn,
+            ) !== null;
+        }
+
+        return $presence;
     }
 
     /**
