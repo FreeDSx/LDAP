@@ -52,6 +52,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\OperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -190,6 +191,7 @@ final class ServerSyncHandlerTest extends TestCase
             entries: $this->entries,
             projector: $this->syncProjector,
             stream: $this->changeStream,
+            linked: $this->fromContainer(LinkedAttributes::class),
             sleeper: new CallbackSleeper(),
         );
 

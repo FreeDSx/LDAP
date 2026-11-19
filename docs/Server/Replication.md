@@ -71,6 +71,13 @@ A consumer presents a cookie, which is a marker of how far it has already read. 
 came after that point. The journal is the single source behind sync and change auditing. A consumer can also receive a
 delete for an entry it never held, such as one added and then removed since its cookie, and should ignore it.
 
+Each entry changed since the cookie is sent once, as it is now, in the order of its latest change. An entry that needs
+another one added or renamed since the cookie is sent after it: the entry now holding its parent DN, and those its
+linked attributes name. A parent always comes first: a link leading back beneath a new entry, directly or through
+other new entries, arrives before the entry it names. A link can also name an entry renamed while the changes are sent,
+which arrives with the next ones. A consumer applying changes strictly in order can still meet a conflict when entries
+swap DNs, or when a DN is freed and taken again since the cookie.
+
 ## Linked Attributes
 
 A change record covers only the entry written. Deleting or renaming an entry also changes the

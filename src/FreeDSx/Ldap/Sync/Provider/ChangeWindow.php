@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeScope;
 
 use function array_key_exists;
+use function array_pop;
+use function count;
 
 /**
  * What a window of journal changes says about each entry, such as its latest change and the last DN the consumer saw.
@@ -63,6 +65,18 @@ final class ChangeWindow
      * @var array<string, true>
      */
     private array $sent = [];
+
+    private int $sentHolders = 0;
+
+    /**
+     * @var list<?string> the DN each entry read and waiting to be sent holds, innermost last
+     */
+    private array $awaited = [];
+
+    /**
+     * @var array<string, true> the DNs held by entries waiting to be sent
+     */
+    private array $waiting = [];
 
     /**
      * @var array<string, string> the canonical form of each DN looked up, by the form it was written in
@@ -144,24 +158,62 @@ final class ChangeWindow
     }
 
     /**
-     * The entry added or renamed in the window that now holds the DN's parent, unless it was sent already.
+     * Whether an entry the window added or renamed, and did not delete, is still unsent.
      */
-    public function unsentHolderOfParent(Dn $dn): ?string
+    public function hasUnsentHolders(): bool
     {
-        if ($this->holders === []) {
-            return null;
-        }
+        return count($this->holders) > $this->sentHolders;
+    }
 
-        $parent = $dn->getParent();
+    /**
+     * The unsent entry the window added or renamed that now holds the DN, unless one waiting above it holds it back.
+     */
+    public function unsentHolderOf(string $dn): ?string
+    {
+        // A DN named again, such as a parent shared by siblings, is canonicalized once.
+        $name = $this->canonicalDns[$dn] ??= Dn::normalized($dn);
+        $uuid = $this->holders[$name] ?? null;
 
-        return $parent === null
+        return $uuid === null || $this->wasSent($uuid) || $this->isHeldBack($name)
             ? null
-            : $this->unsentHolderAt($parent->toString());
+            : $uuid;
+    }
+
+    /**
+     * Keeps the entries under the DN this entry holds from being pulled ahead of it until it is released.
+     */
+    public function await(string $entryUuid): void
+    {
+        $dn = $this->heldDnOf($entryUuid);
+        $this->awaited[] = $dn;
+
+        if ($dn !== null) {
+            $this->waiting[$dn] = true;
+        }
+    }
+
+    /**
+     * Releases the entry awaited last, once it is sent.
+     */
+    public function release(): void
+    {
+        $dn = array_pop($this->awaited);
+
+        if ($dn !== null) {
+            unset($this->waiting[$dn]);
+        }
     }
 
     public function markSent(string $entryUuid): void
     {
+        if ($this->wasSent($entryUuid)) {
+            return;
+        }
         $this->sent[$entryUuid] = true;
+
+        if ($this->heldDnOf($entryUuid) !== null) {
+            $this->sentHolders++;
+        }
     }
 
     public function wasSent(string $entryUuid): bool
@@ -169,14 +221,36 @@ final class ChangeWindow
         return isset($this->sent[$entryUuid]);
     }
 
-    private function unsentHolderAt(string $dn): ?string
+    /**
+     * The DN the entry holds when the window added or renamed it and did not delete it.
+     */
+    private function heldDnOf(string $entryUuid): ?string
     {
-        // Siblings share a parent, so its canonical form is worked out once.
-        $uuid = $this->holders[$this->canonicalDns[$dn] ??= Dn::normalized($dn)] ?? null;
+        $dn = $this->heldDns[$entryUuid] ?? null;
 
-        return $uuid === null || $this->wasSent($uuid)
-            ? null
-            : $uuid;
+        return $dn !== null && ($this->holders[$dn] ?? null) === $entryUuid
+            ? $dn
+            : null;
+    }
+
+    /**
+     * Whether an entry waiting to be sent holds an ancestor of the canonical DN.
+     */
+    private function isHeldBack(string $name): bool
+    {
+        if ($this->waiting === []) {
+            return false;
+        }
+        $ancestor = Dn::canonicalParent($name);
+
+        while ($ancestor !== '') {
+            if (isset($this->waiting[$ancestor])) {
+                return true;
+            }
+            $ancestor = Dn::canonicalParent($ancestor);
+        }
+
+        return false;
     }
 
     private function recordAdded(PendingChange $change): void

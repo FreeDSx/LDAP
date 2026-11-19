@@ -220,6 +220,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 entries: $container->get(ReadEntryInterface::class),
                 projector: $projector,
                 stream: $stream,
+                linked: $container->get(LinkedAttributes::class),
                 sleeper: $container->get(SleeperInterface::class),
                 pollInterval: $provider->getPollInterval(),
             );

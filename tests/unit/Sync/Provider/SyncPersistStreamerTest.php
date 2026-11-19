@@ -179,6 +179,7 @@ final class SyncPersistStreamerTest extends TestCase
                 $this->journal,
                 pageSize: 1,
             ),
+            linked: $this->fromContainer(LinkedAttributes::class),
             sleeper: new CallbackSleeper(fn() => ($this->onSleep)()),
             pollInterval: 0.0,
         );
@@ -625,6 +626,302 @@ final class SyncPersistStreamerTest extends TestCase
         );
     }
 
+    public function test_a_group_is_sent_after_the_new_entry_its_member_names(): void
+    {
+        $bob = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $group = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        $this->live(
+            'cn=bob,dc=example,dc=com',
+            $bob,
+        );
+        $this->liveGroup(
+            $group,
+            'cn=bob,dc=example,dc=com',
+        );
+        $this->appendDelete('cn=bob,dc=example,dc=com');
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=bob,dc=example,dc=com',
+            $bob,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=staff,dc=example,dc=com',
+            $group,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=bob,dc=example,dc=com',
+            $bob,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_DELETE, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=staff,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_group_naming_a_new_entry_and_its_new_parent_is_sent_after_both_in_tree_order(): void
+    {
+        $parent = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $group = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        $this->live(
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->live(
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->liveGroup(
+            $group,
+            'cn=a,ou=p,dc=example,dc=com',
+            'ou=p,dc=example,dc=com',
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=staff,dc=example,dc=com',
+            $group,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->append(ChangeType::Modify);
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'ou=p,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=a,ou=p,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=staff,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_new_parent_whose_link_names_its_new_child_is_sent_before_it(): void
+    {
+        $parent = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $this->live(
+            'ou=p,dc=example,dc=com',
+            $parent,
+            'cn=a,ou=p,dc=example,dc=com',
+        );
+        $this->live(
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'ou=p,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=a,ou=p,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_link_leading_back_beneath_a_new_parent_is_sent_before_the_entry_it_names(): void
+    {
+        $parent = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $linking = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        $this->live(
+            'ou=p,dc=example,dc=com',
+            $parent,
+            'cn=q,dc=example,dc=com',
+        );
+        $this->live(
+            'cn=q,dc=example,dc=com',
+            $linking,
+            'cn=a,ou=p,dc=example,dc=com',
+        );
+        $this->live(
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=q,dc=example,dc=com',
+            $linking,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=q,dc=example,dc=com',
+            $linking,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'cn=q,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'ou=p,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=a,ou=p,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_changed_group_naming_its_own_new_child_is_sent_after_it(): void
+    {
+        $group = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $this->liveGroup(
+            $group,
+            'cn=a,cn=staff,dc=example,dc=com',
+        );
+        $this->live(
+            'cn=a,cn=staff,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,cn=staff,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=staff,dc=example,dc=com',
+            $group,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=a,cn=staff,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'cn=a,cn=staff,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=staff,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_link_naming_a_new_entry_in_another_case_still_sends_the_entry_first(): void
+    {
+        $group = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $this->live(
+            'cn=bob,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->liveGroup(
+            $group,
+            'CN=Bob,DC=Example,DC=Com',
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=bob,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=staff,dc=example,dc=com',
+            $group,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=bob,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=staff,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_new_entry_a_group_names_where_the_identity_cannot_see_it_is_never_sent(): void
+    {
+        $group = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $this->live(
+            'cn=a,' . self::HIDDEN,
+            self::ENTRY_UUID,
+        );
+        $this->liveGroup(
+            $group,
+            'cn=a,' . self::HIDDEN,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=a,' . self::HIDDEN,
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=staff,dc=example,dc=com',
+            $group,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=a,' . self::HIDDEN,
+            self::ENTRY_UUID,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'cn=staff,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
     public function test_a_journal_trimmed_mid_projection_ends_the_stream_with_refresh_required(): void
     {
         foreach (['1', '2', '3'] as $n) {
@@ -782,6 +1079,7 @@ final class SyncPersistStreamerTest extends TestCase
                 linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
             ),
             stream: new ChangeStream($journal),
+            linked: $this->fromContainer(LinkedAttributes::class),
             sleeper: new CallbackSleeper(),
             pollInterval: 0.0,
         );
@@ -981,10 +1279,34 @@ final class SyncPersistStreamerTest extends TestCase
     private function live(
         string $dn,
         string $uuid,
+        string ...$seeAlso,
     ): void {
-        $this->liveEntries[$dn] = $this->entryAt(
+        $entry = $this->entryAt(
             $dn,
             $uuid,
+        );
+
+        if ($seeAlso !== []) {
+            $entry->set(
+                'seeAlso',
+                ...$seeAlso,
+            );
+        }
+        $this->liveEntries[$dn] = $entry;
+    }
+
+    private function liveGroup(
+        string $uuid,
+        string ...$members,
+    ): void {
+        $this->liveEntries['cn=staff,dc=example,dc=com'] = Entry::create(
+            'cn=staff,dc=example,dc=com',
+            [
+                'objectClass' => 'groupOfNames',
+                'cn' => 'staff',
+                'member' => $members,
+                'entryUUID' => $uuid,
+            ],
         );
     }
 

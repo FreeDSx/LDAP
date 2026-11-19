@@ -362,6 +362,30 @@ class DnTest extends TestCase
         );
     }
 
+    public function test_the_canonical_parent_drops_the_first_rdn(): void
+    {
+        self::assertSame(
+            'ou=users,dc=example,dc=com',
+            Dn::canonicalParent(Dn::normalized('CN=Alice,OU=Users,DC=Example,DC=Com')),
+        );
+    }
+
+    public function test_the_canonical_parent_skips_an_escaped_comma(): void
+    {
+        self::assertSame(
+            'dc=example,dc=com',
+            Dn::canonicalParent(Dn::normalized('cn=Doe\,John,dc=example,dc=com')),
+        );
+    }
+
+    public function test_the_canonical_parent_of_a_single_rdn_is_the_root_dse(): void
+    {
+        self::assertSame(
+            '',
+            Dn::canonicalParent('dc=com'),
+        );
+    }
+
     /**
      * A doubled backslash escapes itself, so the comma after it separates RDNs.
      */

@@ -279,9 +279,9 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
-     * Parent of an already-canonical DN: the substring after the first unescaped RDN separator.
+     * Parent of an already-canonical DN: the substring after the first unescaped RDN separator, empty for a single RDN.
      */
-    private static function canonicalParent(string $canonical): string
+    public static function canonicalParent(string $canonical): string
     {
         $offset = 0;
         while (($pos = strpos($canonical, ',', $offset)) !== false) {

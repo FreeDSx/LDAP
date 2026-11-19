@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Sync\Provider;
 
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -30,9 +31,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Generator;
+
+use function array_pop;
+use function array_push;
+use function array_reverse;
 
 /**
  * Tails the change journal for a refreshAndPersist consumer, yielding changes until it cancels or disconnects.
@@ -50,6 +56,7 @@ final readonly class SyncPersistStreamer
         private ReadEntryInterface $entries,
         private SyncResultProjector $projector,
         private ChangeStream $stream,
+        private LinkedAttributes $linked,
         private SleeperInterface $sleeper,
         private float $pollInterval = self::DEFAULT_POLL_INTERVAL,
         private SyncResultBatcher $batcher = new SyncResultBatcher(),
@@ -241,7 +248,7 @@ final readonly class SyncPersistStreamer
     }
 
     /**
-     * @return list<SyncResult>
+     * @return iterable<SyncResult>
      */
     private function resultsFor(
         PendingChange $change,
@@ -249,7 +256,7 @@ final readonly class SyncPersistStreamer
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
-    ): array {
+    ): iterable {
         if ($change->changeType !== ChangeType::Delete) {
             return $this->afterDependencies(
                 $change->entryUuid,
@@ -275,7 +282,7 @@ final readonly class SyncPersistStreamer
     /**
      * The entry's result, preceded by those of the unsent window entries it depends on, each sent once.
      *
-     * @return list<SyncResult>
+     * @return Generator<SyncResult>
      */
     private function afterDependencies(
         string $entryUuid,
@@ -283,37 +290,74 @@ final readonly class SyncPersistStreamer
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
-    ): array {
-        $results = [];
+    ): Generator {
         $pending = [$entryUuid];
-        $window->markSent($entryUuid);
 
-        // Reversing the results sends every dependency before the entry that needed it.
-        while (($uuid = array_pop($pending)) !== null) {
-            $result = $this->fetchAndProject(
-                $uuid,
-                $window,
-                $scope,
-                $request,
-                $token,
-            );
+        // A result waits on the stack beneath the entries it depends on, which are sent first.
+        while (($next = array_pop($pending)) !== null) {
+            if ($next instanceof SyncResult) {
+                $window->release();
 
-            if ($result === null) {
+                yield $next;
+
                 continue;
             }
-            $results[] = $result;
 
-            foreach ($this->dependenciesOf($result, $window) as $dependency) {
-                $window->markSent($dependency);
-                $pending[] = $dependency;
-            }
+            array_push(
+                $pending,
+                ...$this->visit(
+                    $next,
+                    $window,
+                    $scope,
+                    $request,
+                    $token,
+                ),
+            );
         }
-
-        return array_reverse($results);
     }
 
     /**
-     * The unsent window entry now holding the parent DN an entry is sent under.
+     * The entry's result followed by the unsent window entries it depends on, or nothing when it was read already.
+     *
+     * @return list<SyncResult|string>
+     */
+    private function visit(
+        string $entryUuid,
+        ChangeWindow $window,
+        ChangeScope $scope,
+        SearchRequest $request,
+        TokenInterface $token,
+    ): array {
+        if ($window->wasSent($entryUuid)) {
+            return [];
+        }
+        $window->markSent($entryUuid);
+
+        $result = $this->fetchAndProject(
+            $entryUuid,
+            $window,
+            $scope,
+            $request,
+            $token,
+        );
+
+        if ($result === null) {
+            return [];
+        }
+        // Awaited before its own links are read, which can lead back beneath it.
+        $window->await($entryUuid);
+
+        return [
+            $result,
+            ...array_reverse($this->dependenciesOf(
+                $result,
+                $window,
+            )),
+        ];
+    }
+
+    /**
+     * The unsent window entries now holding the parent DN an entry is sent under or a DN its links name.
      *
      * @return list<string>
      */
@@ -321,15 +365,38 @@ final readonly class SyncPersistStreamer
         SyncResult $result,
         ChangeWindow $window,
     ): array {
-        if ($result->control->isDelete()) {
+        if ($result->control->isDelete() || !$window->hasUnsentHolders()) {
             return [];
         }
+        $dependencies = [];
 
-        $holder = $window->unsentHolderOfParent($result->entry->getEntry()->getDn());
+        foreach ($this->namesNeededBy($result->entry->getEntry()) as $dn) {
+            $holder = $window->unsentHolderOf($dn);
 
-        return $holder === null
-            ? []
-            : [$holder];
+            if ($holder !== null) {
+                $dependencies[] = $holder;
+            }
+        }
+
+        return $dependencies;
+    }
+
+    /**
+     * The DNs a consumer must hold before it can store the entry: its parent and those its links name.
+     *
+     * @return Generator<string>
+     */
+    private function namesNeededBy(Entry $entry): Generator
+    {
+        $parent = Dn::canonicalParent($entry->getDn()->normalizedString());
+
+        if ($parent !== '') {
+            yield $parent;
+        }
+
+        foreach ($this->linked->valuesOf($entry) as $values) {
+            yield from $values;
+        }
     }
 
     /**
