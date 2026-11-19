@@ -114,9 +114,12 @@ final class LdapReplica
 
     private function sync(): void
     {
-        $cookie = $this->reload
-            ? null
-            : $this->checkpoint->read();
+        // Cleared rather than skipped, as a restart part way through the reload must not resume from it either.
+        if ($this->reload) {
+            $this->checkpoint->clear();
+            $this->reload = false;
+        }
+        $cookie = $this->checkpoint->read();
 
         $syncRepl = $this->connectionFactory->connectSyncRepl();
         $syncRepl
@@ -194,7 +197,6 @@ final class LdapReplica
         $this->settleRefresh();
         $this->flushCookie();
         $this->refreshing = false;
-        $this->reload = false;
     }
 
     /**

@@ -29,4 +29,9 @@ interface ReplicationCheckpointInterface
      * Persist the cookie as the resume point for the next sync.
      */
     public function write(string $cookie): void;
+
+    /**
+     * Remove the persisted cookie, leaving the next sync to start with a full refresh.
+     */
+    public function clear(): void;
 }
