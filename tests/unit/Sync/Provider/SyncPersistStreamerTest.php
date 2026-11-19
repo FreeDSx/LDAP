@@ -110,6 +110,11 @@ final class SyncPersistStreamerTest extends TestCase
 
     private bool $filterMatches = true;
 
+    /**
+     * @var list<string>
+     */
+    private array $reads = [];
+
     protected function setUp(): void
     {
         $this->onSleep = static function (): void {};
@@ -140,6 +145,7 @@ final class SyncPersistStreamerTest extends TestCase
             ->method('findByUuid')
             ->willReturnCallback(function (string $uuid, EntryProjection $projection): ?Entry {
                 $this->readWith = $projection;
+                $this->reads[] = $uuid;
                 ($this->onFind)();
 
                 return $this->liveEntryHolding($uuid);
@@ -466,6 +472,159 @@ final class SyncPersistStreamerTest extends TestCase
         );
     }
 
+    public function test_each_entry_is_sent_after_the_window_entry_now_holding_its_parent_dn(): void
+    {
+        $sales = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $old1 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        $carl = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000003';
+        $newSales = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000004';
+        $this->live(
+            'ou=sales-old,dc=example,dc=com',
+            $sales,
+        );
+        $this->live(
+            'cn=old1,ou=sales-old,dc=example,dc=com',
+            $old1,
+        );
+        $this->live(
+            'ou=sales,dc=example,dc=com',
+            $newSales,
+        );
+        $this->live(
+            'cn=carl,ou=sales,dc=example,dc=com',
+            $carl,
+        );
+        $this->appendMove(
+            'ou=sales,dc=example,dc=com',
+            'ou=sales-old,dc=example,dc=com',
+            $sales,
+        );
+        $this->appendMove(
+            'cn=old1,ou=sales,dc=example,dc=com',
+            'cn=old1,ou=sales-old,dc=example,dc=com',
+            $old1,
+        );
+        $this->appendMove(
+            'cn=carl,dc=example,dc=com',
+            'cn=carl,ou=newsales,dc=example,dc=com',
+            $carl,
+        );
+        $this->appendMove(
+            'ou=newsales,dc=example,dc=com',
+            'ou=sales,dc=example,dc=com',
+            $newSales,
+        );
+        $this->appendMove(
+            'cn=carl,ou=newsales,dc=example,dc=com',
+            'cn=carl,ou=sales,dc=example,dc=com',
+            $carl,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'ou=sales-old,dc=example,dc=com',
+            $sales,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'ou=sales-old,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=old1,ou=sales-old,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'ou=sales,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=carl,ou=sales,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_new_parent_is_sent_before_the_child_moved_under_it(): void
+    {
+        $this->appendNewParentAndChild();
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'ou=p,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=a,ou=p,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_an_entry_sent_ahead_of_its_own_change_is_read_once(): void
+    {
+        $parent = $this->appendNewParentAndChild();
+
+        $this->projected();
+
+        self::assertSame(
+            [self::ENTRY_UUID, $parent],
+            $this->reads,
+        );
+    }
+
+    public function test_a_delete_a_rename_onto_its_dn_and_an_add_at_the_freed_dn_keep_their_order(): void
+    {
+        $robert = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $newRobert = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        $this->live(
+            'cn=bob,dc=example,dc=com',
+            $robert,
+        );
+        $this->live(
+            'cn=robert,dc=example,dc=com',
+            $newRobert,
+        );
+        $this->appendDelete('cn=bob,dc=example,dc=com');
+        $this->appendMove(
+            'cn=robert,dc=example,dc=com',
+            'cn=bob,dc=example,dc=com',
+            $robert,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=robert,dc=example,dc=com',
+            $newRobert,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_DELETE, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_ADD, 'cn=robert,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_entries_whose_drifted_parents_name_each_other_are_each_sent_once(): void
+    {
+        $other = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $this->live(
+            'ou=a,ou=b,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->live(
+            'ou=b,ou=a,dc=example,dc=com',
+            $other,
+        );
+        $this->appendMove(
+            'ou=a1,dc=example,dc=com',
+            'ou=a,dc=example,dc=com',
+        );
+        $this->appendMove(
+            'ou=b1,dc=example,dc=com',
+            'ou=b,dc=example,dc=com',
+            $other,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_MODIFY, 'ou=b,ou=a,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'ou=a,ou=b,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
     public function test_a_journal_trimmed_mid_projection_ends_the_stream_with_refresh_required(): void
     {
         foreach (['1', '2', '3'] as $n) {
@@ -762,11 +921,12 @@ final class SyncPersistStreamerTest extends TestCase
     private function appendMove(
         string $from,
         string $to,
+        string $uuid = self::ENTRY_UUID,
     ): void {
         $this->journal->append(new PendingChange(
             changeType: ChangeType::ModRdn,
             dn: new Dn($to),
-            entryUuid: self::ENTRY_UUID,
+            entryUuid: $uuid,
             authzId: AuthzId::anonymous(),
             previousDn: new Dn($from),
         ));
@@ -784,6 +944,48 @@ final class SyncPersistStreamerTest extends TestCase
                 self::ENTRY_UUID,
             ),
         ));
+    }
+
+    /**
+     * A parent added and changed again around a move of the entry under it, returning the parent's entryUUID.
+     */
+    private function appendNewParentAndChild(): string
+    {
+        $parent = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $this->live(
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->live(
+            'cn=a,ou=p,dc=example,dc=com',
+            self::ENTRY_UUID,
+        );
+        $this->appendFor(
+            ChangeType::Add,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+        $this->appendMove(
+            'cn=a,dc=example,dc=com',
+            'cn=a,ou=p,dc=example,dc=com',
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'ou=p,dc=example,dc=com',
+            $parent,
+        );
+
+        return $parent;
+    }
+
+    private function live(
+        string $dn,
+        string $uuid,
+    ): void {
+        $this->liveEntries[$dn] = $this->entryAt(
+            $dn,
+            $uuid,
+        );
     }
 
     /**

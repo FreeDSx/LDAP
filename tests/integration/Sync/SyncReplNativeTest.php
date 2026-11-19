@@ -555,6 +555,124 @@ final class SyncReplNativeTest extends ServerTestCase
         );
     }
 
+    public function testEachEntryIsSentAfterTheEntryNowHoldingItsParentDn(): void
+    {
+        $base = 'ou=reorg,' . self::AREA;
+        $this->createHiddenArea();
+        $this->asAdmin(static function (LdapClient $admin) use ($base): void {
+            $units = [
+                $base => 'reorg',
+                'ou=sales,' . $base => 'sales',
+                'ou=newsales,' . $base => 'newsales',
+            ];
+
+            foreach ($units as $dn => $ou) {
+                $admin->create(Entry::fromArray(
+                    $dn,
+                    [
+                        'ou' => $ou,
+                        'objectClass' => 'organizationalUnit',
+                    ],
+                ));
+            }
+
+            foreach (['cn=old1,ou=sales,' . $base => 'old1', 'cn=carl,' . $base => 'carl'] as $dn => $cn) {
+                $admin->create(Entry::fromArray(
+                    $dn,
+                    [
+                        'cn' => $cn,
+                        'sn' => 'Reorg',
+                        'objectClass' => 'inetOrgPerson',
+                    ],
+                ));
+            }
+        });
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static function (LdapClient $admin) use ($base): void {
+            $admin->rename(
+                'ou=sales,' . $base,
+                'ou=sales-old',
+                true,
+            );
+            $admin->move(
+                'cn=carl,' . $base,
+                'ou=newsales,' . $base,
+            );
+            $admin->rename(
+                'ou=newsales,' . $base,
+                'ou=sales',
+                true,
+            );
+            $admin->sendAndReceive(Operations::modify(
+                'ou=sales-old,' . $base,
+                Change::replace(
+                    'description',
+                    'archived',
+                ),
+            ));
+        });
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [
+                'ou=sales-old,' . $base,
+                'cn=old1,ou=sales-old,' . $base,
+                'ou=sales,' . $base,
+                'cn=carl,ou=sales,' . $base,
+            ],
+            $this->collectPoll($incremental),
+        );
+    }
+
+    public function testANewParentIsSentBeforeTheChildMovedUnderIt(): void
+    {
+        $parent = 'ou=new-parent,' . self::AREA;
+        $child = 'cn=adopted,' . self::AREA;
+        $this->createHiddenArea();
+        $this->asAdmin(static fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $child,
+            [
+                'cn' => 'adopted',
+                'sn' => 'Adopted',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        )));
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static function (LdapClient $admin) use ($parent, $child): void {
+            $admin->create(Entry::fromArray(
+                $parent,
+                [
+                    'ou' => 'new-parent',
+                    'objectClass' => 'organizationalUnit',
+                ],
+            ));
+            $admin->move(
+                $child,
+                $parent,
+            );
+            $admin->sendAndReceive(Operations::modify(
+                $parent,
+                Change::replace(
+                    'description',
+                    'filled',
+                ),
+            ));
+        });
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [
+                $parent,
+                'cn=adopted,' . $parent,
+            ],
+            $this->collectPoll($incremental),
+        );
+    }
+
     public function testACookieReusedForDifferentContentFallsBackToAFullRefresh(): void
     {
         $this->authenticateAdmin();
