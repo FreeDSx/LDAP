@@ -277,10 +277,7 @@ final class LdapReplicaTest extends TestCase
         $this->subject->run();
 
         self::assertNull($this->usedCookie);
-        self::assertSame(
-            'resume-me',
-            $this->checkpoint->read(),
-        );
+        self::assertNull($this->checkpoint->read());
     }
 
     public function test_moves_left_unplaced_by_a_full_refresh_are_logged_and_the_checkpoint_is_written(): void
@@ -404,10 +401,39 @@ final class LdapReplicaTest extends TestCase
         $this->subject->run();
 
         self::assertNull($this->usedCookie);
-        self::assertSame(
-            'resume-me',
-            $this->checkpoint->read(),
+        self::assertNull($this->checkpoint->read());
+    }
+
+    public function test_a_restart_part_way_through_a_reload_starts_over_with_a_full_refresh(): void
+    {
+        $this->checkpoint->write('resume-me');
+        $entry = $this->createMock(SyncEntryResult::class);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
         );
+        $syncs = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function (Closure $entryHandler) use ($entry, $session, &$syncs): void {
+                if (++$syncs === 1) {
+                    $entryHandler($entry, $session);
+
+                    return;
+                }
+                ($this->shutdown)();
+            });
+        $this->applier->method('apply')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+
+        $this->subject->run();
+        $this->replica()->run();
+
+        self::assertSame(
+            3,
+            $syncs,
+        );
+        self::assertNull($this->usedCookie);
     }
 
     public function test_a_present_phase_refresh_applies_reconciles_and_checkpoints(): void

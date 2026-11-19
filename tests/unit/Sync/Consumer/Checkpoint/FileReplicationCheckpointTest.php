@@ -88,4 +88,21 @@ final class FileReplicationCheckpointTest extends TestCase
 
         self::assertFileDoesNotExist($this->path . '.tmp');
     }
+
+    public function test_clear_removes_the_checkpoint(): void
+    {
+        $this->subject->write('cookie');
+
+        $this->subject->clear();
+
+        self::assertNull($this->subject->read());
+        self::assertFileDoesNotExist($this->path);
+    }
+
+    public function test_clear_without_a_checkpoint_leaves_none(): void
+    {
+        $this->subject->clear();
+
+        self::assertNull($this->subject->read());
+    }
 }

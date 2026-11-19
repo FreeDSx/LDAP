@@ -77,4 +77,18 @@ final readonly class FileReplicationCheckpoint implements ReplicationCheckpointI
             ));
         }
     }
+
+    public function clear(): void
+    {
+        if (!is_file($this->path)) {
+            return;
+        }
+
+        if (!@unlink($this->path)) {
+            throw new RuntimeException(sprintf(
+                'Unable to remove the replication checkpoint at "%s".',
+                $this->path,
+            ));
+        }
+    }
 }

@@ -31,4 +31,9 @@ final class InMemoryReplicationCheckpoint implements ReplicationCheckpointInterf
     {
         $this->cookie = $cookie;
     }
+
+    public function clear(): void
+    {
+        $this->cookie = null;
+    }
 }
