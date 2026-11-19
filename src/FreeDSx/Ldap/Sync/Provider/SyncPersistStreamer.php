@@ -56,7 +56,7 @@ final readonly class SyncPersistStreamer
     ) {}
 
     /**
-     * The net effect of journal changes after one sequence and through another, as sync results (adds and deletes).
+     * The net effect of journal changes after one sequence and through another, each sent after the entries it needs.
      *
      * @param int $throughSeq The seq the cookie sent after these results claims.
      * @return iterable<SyncResult>
@@ -78,19 +78,21 @@ final readonly class SyncPersistStreamer
         );
 
         foreach ($this->stream->since($sinceSeq, $scope, $throughSeq) as $record) {
-            if (!$window->isLatest($record)) {
+            $change = $record->change;
+
+            if (!$window->isLatest($record) || $window->wasSent($change->entryUuid)) {
                 continue;
             }
 
-            $result = $this->project(
-                $record->change,
+            $results = $this->resultsFor(
+                $change,
                 $window,
                 $scope,
                 $request,
                 $token,
             );
 
-            if ($result !== null) {
+            foreach ($results as $result) {
                 yield $result;
             }
         }
@@ -238,50 +240,118 @@ final readonly class SyncPersistStreamer
         return $window;
     }
 
-    private function project(
+    /**
+     * @return list<SyncResult>
+     */
+    private function resultsFor(
         PendingChange $change,
         ChangeWindow $window,
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
-    ): ?SyncResult {
-        $lastVisible = $window->lastVisible($change->entryUuid);
-
-        return $change->changeType === ChangeType::Delete
-            ? $this->projector->projectDeleted(
-                $change,
-                $lastVisible,
-                $window->hasEarlierChange($change->entryUuid),
-                $request,
-            )
-            : $this->fetchAndProject(
-                $change,
-                $lastVisible,
+    ): array {
+        if ($change->changeType !== ChangeType::Delete) {
+            return $this->afterDependencies(
+                $change->entryUuid,
+                $window,
                 $scope,
                 $request,
                 $token,
             );
+        }
+
+        $result = $this->projector->projectDeleted(
+            $change,
+            $window->lastVisible($change->entryUuid),
+            $window->hasEarlierChange($change->entryUuid),
+            $request,
+        );
+
+        return $result === null
+            ? []
+            : [$result];
+    }
+
+    /**
+     * The entry's result, preceded by those of the unsent window entries it depends on, each sent once.
+     *
+     * @return list<SyncResult>
+     */
+    private function afterDependencies(
+        string $entryUuid,
+        ChangeWindow $window,
+        ChangeScope $scope,
+        SearchRequest $request,
+        TokenInterface $token,
+    ): array {
+        $results = [];
+        $pending = [$entryUuid];
+        $window->markSent($entryUuid);
+
+        // Reversing the results sends every dependency before the entry that needed it.
+        while (($uuid = array_pop($pending)) !== null) {
+            $result = $this->fetchAndProject(
+                $uuid,
+                $window,
+                $scope,
+                $request,
+                $token,
+            );
+
+            if ($result === null) {
+                continue;
+            }
+            $results[] = $result;
+
+            foreach ($this->dependenciesOf($result, $window) as $dependency) {
+                $window->markSent($dependency);
+                $pending[] = $dependency;
+            }
+        }
+
+        return array_reverse($results);
+    }
+
+    /**
+     * The unsent window entry now holding the parent DN an entry is sent under.
+     *
+     * @return list<string>
+     */
+    private function dependenciesOf(
+        SyncResult $result,
+        ChangeWindow $window,
+    ): array {
+        if ($result->control->isDelete()) {
+            return [];
+        }
+
+        $holder = $window->unsentHolderOfParent($result->entry->getEntry()->getDn());
+
+        return $holder === null
+            ? []
+            : [$holder];
     }
 
     /**
      * Read by entryUUID, so it is the entry the change is about, judged against the content where it lives now.
      */
     private function fetchAndProject(
-        PendingChange $change,
-        ?Dn $lastVisible,
+        string $entryUuid,
+        ChangeWindow $window,
         ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
     ): ?SyncResult {
+        $lastVisible = $window->lastVisible($entryUuid);
         $entry = $this->entries->findByUuid(
-            $change->entryUuid,
+            $entryUuid,
             $this->projector->fetchProjectionFor($request),
         );
 
         // Deleted since, and announced now because a later delete judged by its pre-image alone could be withheld.
         if ($entry === null) {
             return $this->projector->projectLeft(
-                $change->entryUuid,
+                $entryUuid,
                 $lastVisible,
             );
         }
@@ -289,15 +359,15 @@ final readonly class SyncPersistStreamer
         // RFC 4533 §4.1 wants an entry that left the content deleted rather than sent from where it went.
         if (!$scope->contains($entry->getDn())) {
             return $this->projector->projectLeft(
-                $change->entryUuid,
+                $entryUuid,
                 $lastVisible,
             );
         }
 
         return $this->projector->projectFetched(
             $entry,
-            $change->entryUuid,
-            $change->changeType === ChangeType::Add,
+            $entryUuid,
+            $window->isAdded($entryUuid),
             $lastVisible,
             $request,
             $token,
