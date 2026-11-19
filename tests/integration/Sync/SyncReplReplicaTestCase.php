@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ReferralException;
@@ -621,6 +622,76 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         });
         self::assertNotNull($this->waitForReplica($renamed));
 
+        self::assertSame(
+            [$renamed],
+            array_values($this->tryReadFromReplica($group, ['member'])?->get('member')?->getValues() ?? []),
+        );
+    }
+
+    public function test_a_group_keeps_a_member_renamed_away_while_a_new_entry_takes_its_dn(): void
+    {
+        $member = 'cn=claimed,ou=people,dc=foo,dc=bar';
+        $renamed = 'cn=claimedaway,ou=people,dc=foo,dc=bar';
+        $group = 'cn=claimteam,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member, $group): void {
+            $provider->create(Entry::fromArray(
+                $member,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'claimed',
+                    'sn' => 'Original',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                $group,
+                [
+                    'objectClass' => 'groupOfNames',
+                    'cn' => 'claimteam',
+                    'member' => $member,
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($group));
+        $memberUuid = $this->providerUuidOf($member);
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member, $renamed): void {
+            $provider->rename(
+                $member,
+                'cn=claimedaway',
+            );
+            $provider->create(Entry::fromArray(
+                $member,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'claimed',
+                    'sn' => 'Newcomer',
+                ],
+            ));
+            $provider->sendAndReceive(Operations::modify(
+                $renamed,
+                Change::replace(
+                    'sn',
+                    'Moved',
+                ),
+            ));
+        });
+        $newcomerUuid = $this->providerUuidOf($member);
+
+        self::assertSame(
+            $memberUuid,
+            $this->waitForReplicaUuid(
+                $renamed,
+                $memberUuid,
+            ),
+        );
+        self::assertSame(
+            $newcomerUuid,
+            $this->waitForReplicaUuid(
+                $member,
+                $newcomerUuid,
+            ),
+        );
         self::assertSame(
             [$renamed],
             array_values($this->tryReadFromReplica($group, ['member'])?->get('member')?->getValues() ?? []),
