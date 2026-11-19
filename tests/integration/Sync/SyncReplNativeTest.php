@@ -673,6 +673,119 @@ final class SyncReplNativeTest extends ServerTestCase
         );
     }
 
+    public function testAGroupIsSentAfterTheNewEntryItsMemberNames(): void
+    {
+        $member = 'cn=provisioned,' . self::AREA;
+        $group = 'cn=provisioning,' . self::AREA;
+        $this->createHiddenArea();
+        $this->asAdmin(static function (LdapClient $admin) use ($member, $group): void {
+            $admin->create(Entry::fromArray(
+                $member,
+                [
+                    'cn' => 'provisioned',
+                    'sn' => 'Old',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                $group,
+                [
+                    'cn' => 'provisioning',
+                    'member' => $member,
+                    'objectClass' => 'groupOfNames',
+                ],
+            ));
+        });
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static function (LdapClient $admin) use ($member, $group): void {
+            $admin->delete($member);
+            $admin->create(Entry::fromArray(
+                $member,
+                [
+                    'cn' => 'provisioned',
+                    'sn' => 'New',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->sendAndReceive(Operations::modify(
+                $group,
+                Change::add(
+                    'member',
+                    $member,
+                ),
+            ));
+            $admin->sendAndReceive(Operations::modify(
+                $member,
+                Change::replace(
+                    'description',
+                    'provisioned',
+                ),
+            ));
+        });
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [
+                $member,
+                $member,
+                $group,
+            ],
+            $this->collectPoll($incremental),
+        );
+    }
+
+    public function testANewParentWhoseLinkNamesItsNewChildIsSentBeforeIt(): void
+    {
+        $parent = 'ou=linked-parent,' . self::AREA;
+        $child = 'cn=lead,' . $parent;
+        $this->createHiddenArea();
+        $cookie = $this->cookieAfterAFullPollOf(self::AREA);
+
+        $this->asAdmin(static function (LdapClient $admin) use ($parent, $child): void {
+            $admin->create(Entry::fromArray(
+                $parent,
+                [
+                    'ou' => 'linked-parent',
+                    'objectClass' => 'organizationalUnit',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                $child,
+                [
+                    'cn' => 'lead',
+                    'sn' => 'Lead',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->sendAndReceive(Operations::modify(
+                $parent,
+                Change::add(
+                    'seeAlso',
+                    $child,
+                ),
+            ));
+            $admin->sendAndReceive(Operations::modify(
+                $child,
+                Change::replace(
+                    'description',
+                    'leading',
+                ),
+            ));
+        });
+        $incremental = $this->syncRepl(baseDn: self::AREA);
+        $incremental->useCookie($cookie);
+
+        self::assertSame(
+            [
+                $parent,
+                $child,
+            ],
+            $this->collectPoll($incremental),
+        );
+    }
+
     public function testACookieReusedForDifferentContentFallsBackToAFullRefresh(): void
     {
         $this->authenticateAdmin();
