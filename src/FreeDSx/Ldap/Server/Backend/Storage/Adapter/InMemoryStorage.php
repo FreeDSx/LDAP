@@ -226,7 +226,7 @@ final class InMemoryStorage implements
     }
 
     /**
-     * @throws EntryAlreadyExistsException when the new DN is already taken
+     * @throws EntryAlreadyExistsException when the new DN, or one a descendant moves to, is already taken
      */
     public function renameSubtree(
         Dn $from,
@@ -243,7 +243,7 @@ final class InMemoryStorage implements
             $base->getDn()->toString(),
         );
 
-        if ($this->exists($to)) {
+        if ($this->exists($to) || $this->descendantLandsOnAnother($rename)) {
             throw new EntryAlreadyExistsException(sprintf(
                 'Entry already exists: %s',
                 $to->normalizedString(),
@@ -381,6 +381,23 @@ final class InMemoryStorage implements
         return $this->find($owner)
             ?->get($attribute, true)
             ?->getValues()[0] ?? null;
+    }
+
+    /**
+     * Whether an entry below the renamed base would land on one the rename does not carry, as a unique key refuses in SQL.
+     */
+    private function descendantLandsOnAnother(SubtreeRename $rename): bool
+    {
+        // Every entry the rename carries is checked, including one whose parent is not stored.
+        foreach (array_keys($this->entries) as $lcDn) {
+            $lcDn = (string) $lcDn;
+
+            if ($rename->covers(Dn::fromCanonical($lcDn)) && isset($this->entries[$rename->canonicalFor($lcDn)])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function parentOf(string $lcDn): ?string
