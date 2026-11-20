@@ -30,6 +30,10 @@ use Throwable;
  */
 abstract class SyncReplReplicaTestCase extends ServerTestCase
 {
+    private const CARRIED_ENTRY_CHANGES = __DIR__ . '/../../resources/changes/replica-carried-entry.ldif';
+
+    private const SHIFTED_UNITS_CHANGES = __DIR__ . '/../../resources/changes/replica-shifted-units.ldif';
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-replica');
@@ -695,6 +699,108 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         self::assertSame(
             [$renamed],
             array_values($this->tryReadFromReplica($group, ['member'])?->get('member')?->getValues() ?? []),
+        );
+    }
+
+    public function test_a_full_refresh_moves_back_an_entry_its_stale_parent_carried_away(): void
+    {
+        $carried = 'cn=carried,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($carried): void {
+            $provider->create(Entry::fromArray(
+                $carried,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'carried',
+                    'sn' => 'Carried',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                'ou=carrier,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => 'carrier',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica('ou=carrier,dc=foo,dc=bar'));
+        $uuid = $this->providerUuidOf($carried);
+
+        $this->restartAfterProviderChanges(self::CARRIED_ENTRY_CHANGES);
+
+        self::assertSame(
+            $uuid,
+            $this->waitForReplicaUuid(
+                'cn=carried,ou=carrier,dc=foo,dc=bar',
+                $uuid,
+            ),
+        );
+        self::assertNull($this->waitForReplicaGone('cn=carried,ou=carrier-old,dc=foo,dc=bar'));
+    }
+
+    public function test_a_full_refresh_moves_back_an_entry_that_moving_another_back_carried_away(): void
+    {
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            foreach (['shift-y', 'shift-q0', 'shift-x', 'shift-q'] as $unit) {
+                $provider->create(Entry::fromArray(
+                    'ou=' . $unit . ',dc=foo,dc=bar',
+                    [
+                        'objectClass' => 'organizationalUnit',
+                        'ou' => $unit,
+                    ],
+                ));
+            }
+            $provider->create(Entry::fromArray(
+                'cn=shift-leaf,ou=shift-x,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'shift-leaf',
+                    'sn' => 'Leaf',
+                ],
+            ));
+            $provider->move(
+                'ou=shift-x,dc=foo,dc=bar',
+                'ou=shift-q,dc=foo,dc=bar',
+            );
+        });
+        $leaf = 'cn=shift-leaf,ou=shift-x,ou=shift-q,dc=foo,dc=bar';
+        self::assertNotNull($this->waitForReplica($leaf));
+        $uuid = $this->providerUuidOf($leaf);
+
+        $this->restartAfterProviderChanges(self::SHIFTED_UNITS_CHANGES);
+
+        self::assertSame(
+            $uuid,
+            $this->waitForReplicaUuid(
+                'cn=shift-leaf,ou=shift-x,ou=shift-r,dc=foo,dc=bar',
+                $uuid,
+            ),
+        );
+    }
+
+    /**
+     * Hook for subclasses to name the runner the replica and its provider run under.
+     *
+     * @return list<string>
+     */
+    protected static function runnerArgs(): array
+    {
+        return [];
+    }
+
+    /**
+     * Restarts both servers on the databases they hold, with the provider replaying changes the replica missed.
+     */
+    private function restartAfterProviderChanges(string $changes): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::runnerArgs(),
+                '--keep-replica-db',
+                '--keep-provider-db',
+                '--provider-changes=' . $changes,
+            ],
         );
     }
 

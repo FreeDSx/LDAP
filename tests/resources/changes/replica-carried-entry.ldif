@@ -1,0 +1,18 @@
+version: 1
+
+# The unit is renamed away and a new one takes its DN, then an entry older than both moves under the new one.
+dn: ou=carrier,dc=foo,dc=bar
+changetype: modrdn
+newrdn: ou=carrier-old
+deleteoldrdn: 1
+
+dn: ou=carrier,dc=foo,dc=bar
+changetype: add
+objectClass: organizationalUnit
+ou: carrier
+
+dn: cn=carried,ou=people,dc=foo,dc=bar
+changetype: modrdn
+newrdn: cn=carried
+deleteoldrdn: 0
+newsuperior: ou=carrier,dc=foo,dc=bar

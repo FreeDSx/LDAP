@@ -1,0 +1,18 @@
+version: 1
+
+# A unit is renamed away, another takes its DN, then a third moves under that one with the first's child name.
+dn: ou=shift-q,dc=foo,dc=bar
+changetype: modrdn
+newrdn: ou=shift-r
+deleteoldrdn: 1
+
+dn: ou=shift-q0,dc=foo,dc=bar
+changetype: modrdn
+newrdn: ou=shift-q
+deleteoldrdn: 1
+
+dn: ou=shift-y,dc=foo,dc=bar
+changetype: modrdn
+newrdn: ou=shift-x
+deleteoldrdn: 1
+newsuperior: ou=shift-q,dc=foo,dc=bar

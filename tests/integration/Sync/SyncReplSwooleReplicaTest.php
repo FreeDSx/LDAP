@@ -27,7 +27,7 @@ final class SyncReplSwooleReplicaTest extends SyncReplReplicaTestCase
         static::initSharedServer(
             'ldap-replica',
             'tcp',
-            ['--runner=swoole'],
+            static::runnerArgs(),
         );
     }
 
@@ -41,5 +41,10 @@ final class SyncReplSwooleReplicaTest extends SyncReplReplicaTestCase
         $this->requireSwoole();
 
         parent::setUp();
+    }
+
+    protected static function runnerArgs(): array
+    {
+        return ['--runner=swoole'];
     }
 }

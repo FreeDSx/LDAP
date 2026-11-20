@@ -310,6 +310,12 @@ final class LdapServerCommand extends Command
                 '',
             )
             ->addOption(
+                'keep-db',
+                null,
+                InputOption::VALUE_NONE,
+                'Serve the sqlite database a previous run left behind, without seeding it',
+            )
+            ->addOption(
                 'changes',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -347,6 +353,7 @@ final class LdapServerCommand extends Command
         $allowAnonymous = $input->getOption('allow-anonymous') === true;
         $seedFile = $this->getStringOption($input, 'seed');
         $changesFile = $this->getStringOption($input, 'changes');
+        $keepDb = $input->getOption('keep-db') === true;
         $dumpFile = $this->getStringOption($input, 'dump');
         $reloadFlagFile = $this->getStringOption($input, 'reload-flag-file');
         $useSsl = false;
@@ -446,7 +453,7 @@ final class LdapServerCommand extends Command
             $network->setMaxRequestElements((int) $maxRequestElements);
         }
 
-        $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
+        $options = (new ServerOptions($this->createStorageConfig($storageType, $keepDb), $network))
             ->setRunnerConfig(new RunnerConfig(
                 $runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl,
                 (int) $this->getStringOption($input, 'workers'),
@@ -590,11 +597,13 @@ final class LdapServerCommand extends Command
             ? self::SASL_SEED_LDIF
             : self::SEED_LDIF;
 
-        $loadData = function () use ($server, $seedFile, $fixedSeed, $entries, $changesFile, $dumpFile): void {
-            $server->seed(new FileLdifLoader($seedFile !== '' ? $seedFile : $fixedSeed));
+        $loadData = function () use ($server, $seedFile, $fixedSeed, $entries, $changesFile, $dumpFile, $keepDb): void {
+            if (!$keepDb) {
+                $server->seed(new FileLdifLoader($seedFile !== '' ? $seedFile : $fixedSeed));
+            }
 
             // Validation is skipped, since these carry synthetic attributes the configured schema does not cover.
-            if ($entries !== []) {
+            if (!$keepDb && $entries !== []) {
                 $server->seedEntries(
                     $entries,
                     (new SeedOptions())->setIgnoreValidation(true),
@@ -660,18 +669,12 @@ final class LdapServerCommand extends Command
         return $instances;
     }
 
-    private function createStorageConfig(string $storageType): StorageConfigInterface
-    {
+    private function createStorageConfig(
+        string $storageType,
+        bool $keepDb,
+    ): StorageConfigInterface {
         if ($storageType === 'sqlite') {
-            $dbPath = TestWorker::path('server.sqlite');
-
-            foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
-                if (file_exists($path)) {
-                    unlink($path);
-                }
-            }
-
-            return PdoConfig::forSqlite($dbPath);
+            return $this->createSqliteConfig($keepDb);
         }
 
         if ($storageType === 'mysql') {
@@ -700,5 +703,22 @@ final class LdapServerCommand extends Command
         }
 
         return new InMemoryStorageConfig();
+    }
+
+    private function createSqliteConfig(bool $keepDb): PdoConfig
+    {
+        $dbPath = TestWorker::path('server.sqlite');
+
+        if ($keepDb) {
+            return PdoConfig::forSqlite($dbPath);
+        }
+
+        foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
+
+        return PdoConfig::forSqlite($dbPath);
     }
 }

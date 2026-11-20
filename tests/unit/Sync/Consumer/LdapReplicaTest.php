@@ -404,6 +404,70 @@ final class LdapReplicaTest extends TestCase
         self::assertNull($this->checkpoint->read());
     }
 
+    public function test_entries_a_full_refresh_cannot_move_back_are_logged_and_the_checkpoint_is_written(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $subject = $this->replica($logger);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $syncs = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session, &$syncs): void {
+                if (++$syncs > 1) {
+                    ($this->shutdown)();
+
+                    return;
+                }
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->method('reconcile')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+        $this->applier->expects(self::once())
+            ->method('settle');
+        $logger->expects(self::once())
+            ->method('error');
+
+        $subject->run();
+
+        self::assertSame(
+            'cookie-after',
+            $this->checkpoint->read(),
+        );
+    }
+
+    public function test_entries_a_refresh_after_a_cookie_cannot_move_back_reload_the_content(): void
+    {
+        $this->checkpoint->write('resume-me');
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $syncs = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session, &$syncs): void {
+                if (++$syncs > 1) {
+                    ($this->shutdown)();
+
+                    return;
+                }
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+            });
+        $this->applier->method('reconcile')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+
+        $this->subject->run();
+
+        self::assertNull($this->usedCookie);
+        self::assertNull($this->checkpoint->read());
+    }
+
     public function test_a_restart_part_way_through_a_reload_starts_over_with_a_full_refresh(): void
     {
         $this->checkpoint->write('resume-me');
