@@ -191,12 +191,27 @@ final class LdapReplica
     private function reconcileRefresh(Session $session): void
     {
         if (!$session->hasRefreshDeletes()) {
-            $this->applier->reconcile();
+            $this->reconcile();
         }
 
         $this->settleRefresh();
         $this->flushCookie();
         $this->refreshing = false;
+    }
+
+    /**
+     * @throws UnresolvedReplicaMovesException when the refresh resumed from a cookie
+     */
+    private function reconcile(): void
+    {
+        try {
+            $this->applier->reconcile();
+        } catch (UnresolvedReplicaMovesException $e) {
+            $this->logDuringFullRefresh(
+                $e,
+                'Replicated entries a full refresh carried elsewhere could not be moved back; leaving them where they are.',
+            );
+        }
     }
 
     /**

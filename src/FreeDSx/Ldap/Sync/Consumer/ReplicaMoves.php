@@ -84,6 +84,29 @@ class ReplicaMoves
     }
 
     /**
+     * Moves the entry and the subtree it heads to the DN, when something carried it elsewhere after it was placed.
+     *
+     * @throws UnresolvedReplicaMovesException when an entry in the way cannot be moved aside
+     */
+    public function relocate(
+        string $uuid,
+        Dn $target,
+    ): void {
+        $heldAt = $this->heldAt($uuid);
+
+        if ($heldAt === null || $heldAt->toString() === $target->toString()) {
+            return;
+        }
+
+        $this->move(
+            $uuid,
+            $heldAt,
+            $target,
+        );
+        $this->forget($uuid);
+    }
+
+    /**
      * Reports the entries moved aside that no change placed again by their second sync point, as a change can be read a window late.
      *
      * @throws UnresolvedReplicaMovesException naming the DNs those entries were moved aside from

@@ -58,7 +58,26 @@ final class LdapReplicaCommand extends Command
                 (string) TestWorker::port(TestWorker::OFFSET_PROVIDER),
             )
             ->addOption('runner', null, InputOption::VALUE_REQUIRED, 'The server runner (pcntl/swoole).', 'pcntl')
-            ->addOption('forward', null, InputOption::VALUE_NONE, 'Enable ppolicy-state forwarding to the provider.');
+            ->addOption('forward', null, InputOption::VALUE_NONE, 'Enable ppolicy-state forwarding to the provider.')
+            ->addOption(
+                'keep-replica-db',
+                null,
+                InputOption::VALUE_NONE,
+                'Start the replica on the database a previous run left behind.',
+            )
+            ->addOption(
+                'keep-provider-db',
+                null,
+                InputOption::VALUE_NONE,
+                'Start the provider on the database a previous run left behind, without seeding it.',
+            )
+            ->addOption(
+                'provider-changes',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'An LDIF changelog the provider replays before it starts listening.',
+                '',
+            );
     }
 
     protected function execute(
@@ -80,7 +99,7 @@ final class LdapReplicaCommand extends Command
         $provider = $this->startProvider(
             $providerPort,
             $runner,
-            $input->getOption('forward') === true,
+            $this->providerArgs($input),
         );
         register_shutdown_function(static fn() => $provider->stop());
 
@@ -111,7 +130,7 @@ final class LdapReplicaCommand extends Command
 
         $server = new LdapServer(
             (new ServerOptions(
-                storageConfig: $this->createReplicaStorageConfig(),
+                storageConfig: $this->createReplicaStorageConfig($input->getOption('keep-replica-db') === true),
                 networkConfig: $network,
                 runnerConfig: new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl),
                 replicationConfig: ReplicationConfig::forReplica($consumerConfig),
@@ -125,12 +144,40 @@ final class LdapReplicaCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * @return list<string>
+     */
+    private function providerArgs(InputInterface $input): array
+    {
+        $args = $input->getOption('keep-provider-db') === true
+            ? ['--keep-db']
+            : ['--seed=' . self::SEED];
+
+        $changes = $this->getStringOption(
+            $input,
+            'provider-changes',
+        );
+        if ($changes !== '') {
+            $args[] = '--changes=' . $changes;
+        }
+
+        if ($input->getOption('forward') === true) {
+            $args[] = '--allow-ppolicy-forward';
+            $args[] = '--manager';
+        }
+
+        return $args;
+    }
+
+    /**
+     * @param list<string> $extraArgs
+     */
     private function startProvider(
         int $providerPort,
         string $runner,
-        bool $forward,
+        array $extraArgs,
     ): Process {
-        $args = [
+        $provider = new Process([
             'php',
             '-dpcov.enabled=0',
             __DIR__ . '/../bin/ldap-server.php',
@@ -138,17 +185,10 @@ final class LdapReplicaCommand extends Command
             '--port=' . $providerPort,
             '--runner=' . $runner,
             '--storage=sqlite',
-            '--seed=' . self::SEED,
             '--allow-sync',
             '--hide-from-sync=' . self::HIDDEN_FROM_SYNC,
-        ];
-
-        if ($forward) {
-            $args[] = '--allow-ppolicy-forward';
-            $args[] = '--manager';
-        }
-
-        $provider = new Process($args);
+            ...$extraArgs,
+        ]);
         $provider->start();
 
         $deadline = microtime(true) + 10.0;
@@ -167,9 +207,13 @@ final class LdapReplicaCommand extends Command
         return $provider;
     }
 
-    private function createReplicaStorageConfig(): PdoConfig
+    private function createReplicaStorageConfig(bool $keepDb): PdoConfig
     {
         $dbPath = TestWorker::path('replica.sqlite');
+
+        if ($keepDb) {
+            return PdoConfig::forSqlite($dbPath);
+        }
 
         foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
             if (file_exists($path)) {

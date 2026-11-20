@@ -59,10 +59,12 @@ interface ChangeApplierInterface
     public function settle(): void;
 
     /**
-     * Delete local entries not seen during a present-phase refresh (reconcile by absence).
+     * Delete local entries not seen during a present-phase refresh (reconcile by absence), after moving back those found away from where they were announced.
      *
      * Only safe after a refresh where {@see Session::hasRefreshDeletes()} is false; an incremental refresh conveys its
      * deletes explicitly and must not be reconciled this way.
+     *
+     * @throws UnresolvedReplicaMovesException when an entry cannot be moved back to where it was announced
      */
     public function reconcile(): void;
 }

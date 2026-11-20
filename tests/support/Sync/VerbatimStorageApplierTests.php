@@ -505,6 +505,218 @@ trait VerbatimStorageApplierTests
         );
     }
 
+    public function test_a_full_refresh_moves_back_an_entry_its_stale_parent_carried_away(): void
+    {
+        $this->writer->store($this->entry('ou=a,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('ou=b,dc=example,dc=com', self::UUID_D));
+        $this->writer->store($this->entry('cn=kid,ou=b,dc=example,dc=com', self::UUID_C));
+
+        $this->fullRefresh([
+            self::UUID_C => 'cn=kid,ou=a,dc=example,dc=com',
+            self::UUID_A => 'ou=old,dc=example,dc=com',
+            self::UUID_B => 'ou=a,dc=example,dc=com',
+            self::UUID_D => 'ou=b,dc=example,dc=com',
+        ]);
+
+        self::assertSame(
+            self::UUID_C,
+            $this->value('cn=kid,ou=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertFalse($this->exists('cn=kid,ou=old,dc=example,dc=com'));
+    }
+
+    public function test_a_full_refresh_moves_back_an_entry_carried_aside_with_the_stale_entry_it_was_placed_under(): void
+    {
+        $this->writer->store($this->entry('ou=a,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('ou=b,dc=example,dc=com', self::UUID_D));
+        $this->writer->store($this->entry('cn=kid,ou=b,dc=example,dc=com', self::UUID_C));
+
+        $this->fullRefresh([
+            self::UUID_C => 'cn=kid,ou=a,dc=example,dc=com',
+            self::UUID_B => 'ou=a,dc=example,dc=com',
+            self::UUID_D => 'ou=b,dc=example,dc=com',
+        ]);
+        $this->subject->settle();
+        $this->subject->settle();
+
+        self::assertSame(
+            self::UUID_C,
+            $this->value('cn=kid,ou=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertFalse($this->exists($this->slot(self::UUID_A)));
+        self::assertFalse($this->exists('cn=kid,' . $this->slot(self::UUID_A)));
+    }
+
+    public function test_a_full_refresh_moves_back_a_carried_parent_with_its_children(): void
+    {
+        $member = $this->uuidFor('member');
+        $this->writer->store($this->entry('ou=a,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('ou=b,dc=example,dc=com', self::UUID_D));
+        $this->writer->store($this->entry('ou=team,ou=b,dc=example,dc=com', self::UUID_C));
+        $this->writer->store($this->entry('cn=m,ou=team,ou=b,dc=example,dc=com', $member));
+
+        $this->fullRefresh([
+            self::UUID_C => 'ou=team,ou=a,dc=example,dc=com',
+            $member => 'cn=m,ou=team,ou=a,dc=example,dc=com',
+            self::UUID_A => 'ou=old,dc=example,dc=com',
+            self::UUID_B => 'ou=a,dc=example,dc=com',
+            self::UUID_D => 'ou=b,dc=example,dc=com',
+        ]);
+
+        self::assertSame(
+            self::UUID_C,
+            $this->value('ou=team,ou=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            $member,
+            $this->value('cn=m,ou=team,ou=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertFalse($this->exists('ou=team,ou=old,dc=example,dc=com'));
+    }
+
+    public function test_a_full_refresh_leaves_a_dn_to_the_entry_announced_there_after_the_one_it_moved_aside(): void
+    {
+        $this->writer->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+
+        $this->fullRefresh([
+            self::UUID_A => 'cn=a,dc=example,dc=com',
+            self::UUID_B => 'CN=A,dc=example,dc=com',
+        ]);
+
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_A,
+            $this->value($this->slot(self::UUID_A), 'entryUUID'),
+        );
+    }
+
+    public function test_reconcile_moves_back_an_entry_onto_a_stale_entrys_dn_and_removes_the_stale_entry(): void
+    {
+        $this->writer->store($this->entry('cn=elsewhere,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('cn=t,dc=example,dc=com', self::UUID_C));
+
+        $this->subject->beginRefresh();
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_PRESENT,
+                $this->entry('cn=t,dc=example,dc=com', self::UUID_A),
+            ),
+            $this->refreshSession(),
+        );
+        $this->subject->reconcile();
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=t,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertFalse($this->exists('cn=elsewhere,dc=example,dc=com'));
+        self::assertFalse($this->exists($this->slot(self::UUID_C)));
+    }
+
+    public function test_reconcile_moves_back_an_entry_once_removing_stale_entries_frees_its_dn(): void
+    {
+        $this->writer->store($this->entry('cn=elsewhere,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('cn=t,dc=example,dc=com', self::UUID_C));
+        $this->writer->store($this->entry($this->slot(self::UUID_C), self::UUID_D));
+
+        $this->subject->beginRefresh();
+        $this->announcePresent(
+            'cn=t,dc=example,dc=com',
+            self::UUID_A,
+        );
+        $this->subject->reconcile();
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=t,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertFalse($this->exists('cn=elsewhere,dc=example,dc=com'));
+        self::assertFalse($this->exists($this->slot(self::UUID_C)));
+    }
+
+    public function test_reconcile_reports_an_entry_it_cannot_move_back(): void
+    {
+        $this->writer->store($this->entry('cn=elsewhere,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('cn=t,dc=example,dc=com', self::UUID_C));
+        $this->writer->store($this->entry($this->slot(self::UUID_C), self::UUID_D));
+        $this->writer->store($this->entry('cn=c,dc=example,dc=com', self::UUID_B));
+
+        $this->subject->beginRefresh();
+        $this->announcePresent(
+            'cn=t,dc=example,dc=com',
+            self::UUID_A,
+        );
+        $this->announcePresent(
+            'cn=c,dc=example,dc=com',
+            self::UUID_C,
+        );
+        $this->announcePresent(
+            $this->slot(self::UUID_C),
+            self::UUID_D,
+        );
+        $this->announcePresent(
+            'cn=c,dc=example,dc=com',
+            self::UUID_B,
+        );
+
+        try {
+            $this->subject->reconcile();
+            self::fail('The entry left away from where it was announced should have been reported.');
+        } catch (UnresolvedReplicaMovesException $e) {
+            self::assertSame(
+                ['cn=t,dc=example,dc=com'],
+                $e->dns,
+            );
+        }
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=elsewhere,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_C,
+            $this->value('cn=t,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_full_refresh_moves_back_an_entry_that_moving_another_back_carried_away(): void
+    {
+        $y = $this->uuidFor('y');
+        $q = $this->uuidFor('q');
+        $r = $this->uuidFor('r');
+        $x = $this->uuidFor('x');
+        $leaf = $this->uuidFor('leaf');
+        $this->writer->store($this->entry('ou=y0,dc=example,dc=com', $y));
+        $this->writer->store($this->entry('ou=q0,dc=example,dc=com', $q));
+        $this->writer->store($this->entry('ou=q,dc=example,dc=com', $r));
+        $this->writer->store($this->entry('ou=x,ou=q,dc=example,dc=com', $x));
+        $this->writer->store($this->entry('cn=leaf,ou=x,ou=q,dc=example,dc=com', $leaf));
+
+        $this->fullRefresh([
+            $y => 'ou=x,ou=q,dc=example,dc=com',
+            $q => 'ou=q,dc=example,dc=com',
+            $x => 'ou=x,ou=r,dc=example,dc=com',
+            $r => 'ou=r,dc=example,dc=com',
+            $leaf => 'cn=leaf,ou=x,ou=r,dc=example,dc=com',
+        ]);
+
+        self::assertSame(
+            $leaf,
+            $this->value('cn=leaf,ou=x,ou=r,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            $x,
+            $this->value('ou=x,ou=r,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            $y,
+            $this->value('ou=x,ou=q,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
     public function test_an_entry_named_by_its_own_uuid_takes_part_in_a_swap(): void
     {
         $selfNamed = $this->slot(self::UUID_A);
@@ -709,6 +921,46 @@ trait VerbatimStorageApplierTests
             ),
             $this->persistSession(),
         );
+    }
+
+    private function announcePresent(
+        string $dn,
+        string $uuid,
+    ): void {
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_PRESENT,
+                $this->entry(
+                    $dn,
+                    $uuid,
+                ),
+            ),
+            $this->refreshSession(),
+        );
+    }
+
+    /**
+     * @param array<string, string> $announced the DN each UUID is announced at, in the order they arrive
+     */
+    private function fullRefresh(array $announced): void
+    {
+        $session = $this->refreshSession();
+        $this->subject->beginRefresh();
+
+        foreach ($announced as $uuid => $dn) {
+            $this->subject->apply(
+                $this->syncResult(
+                    SyncStateControl::STATE_ADD,
+                    $this->entry(
+                        $dn,
+                        $uuid,
+                    ),
+                ),
+                $session,
+            );
+        }
+
+        $this->subject->reconcile();
     }
 
     /**
