@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
+use FreeDSx\Ldap\Sync\Consumer\ReplicaConsumer;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
@@ -671,8 +672,11 @@ final class LdapReplicaTest extends TestCase
     {
         return new LdapReplica(
             connectionFactory: $this->connectionFactory,
-            applier: $this->applier,
-            checkpoint: $this->checkpoint,
+            consumer: new ReplicaConsumer(
+                $this->applier,
+                $this->checkpoint,
+                $logger,
+            ),
             backoff: new BackoffSleeper(
                 new ReconnectBackoff(),
                 $this->sleeper,

@@ -163,6 +163,7 @@ use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
 use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
+use FreeDSx\Ldap\Sync\Consumer\ReplicaConsumer;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use Psr\Log\NullLogger;
@@ -964,12 +965,15 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         return new LdapReplica(
             connectionFactory: new PrimaryConnectionFactory($config),
-            // Pair reconciliation with forwarding: the store drops forwarded state once the primary's entry replicates back.
-            applier: new ReconcilingChangeApplier(
-                $applier,
-                $container->get(ReplicaPasswordStateStoreInterface::class),
+            consumer: new ReplicaConsumer(
+                // Pair reconciliation with forwarding: the store drops forwarded state once the primary's entry replicates back.
+                new ReconcilingChangeApplier(
+                    $applier,
+                    $container->get(ReplicaPasswordStateStoreInterface::class),
+                ),
+                $config->getCheckpoint(),
+                $options->getLogger(),
             ),
-            checkpoint: $config->getCheckpoint(),
             backoff: $this->makeBackoffSleeper($container, $config),
             signals: $hostManagedShutdown
                 ? null
