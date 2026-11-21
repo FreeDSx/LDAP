@@ -34,6 +34,8 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
 
     private const SHIFTED_UNITS_CHANGES = __DIR__ . '/../../resources/changes/replica-shifted-units.ldif';
 
+    private const RECREATED_MEMBER_CHANGES = __DIR__ . '/../../resources/changes/replica-recreated-member.ldif';
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-replica');
@@ -778,6 +780,58 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         );
     }
 
+    public function test_a_full_refresh_links_a_group_to_the_entry_created_again_at_its_members_dn(): void
+    {
+        $member = 'cn=recreated,ou=people,dc=foo,dc=bar';
+        $group = 'cn=reteam,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member, $group): void {
+            $provider->create(Entry::fromArray(
+                $member,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'recreated',
+                    'sn' => 'Original',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                $group,
+                [
+                    'objectClass' => 'groupOfNames',
+                    'cn' => 'reteam',
+                    'member' => $member,
+                ],
+            ));
+        });
+        self::assertSame(
+            [$member],
+            $this->waitForReplicaValues(
+                $group,
+                'member',
+                [$member],
+            ),
+        );
+
+        $this->restartAfterProviderChanges(self::RECREATED_MEMBER_CHANGES);
+        $uuid = $this->providerUuidOf($member);
+
+        self::assertSame(
+            $uuid,
+            $this->waitForReplicaUuid(
+                $member,
+                $uuid,
+            ),
+        );
+        self::assertSame(
+            [$member],
+            $this->waitForReplicaValues(
+                $group,
+                'member',
+                [$member],
+            ),
+        );
+    }
+
     /**
      * Hook for subclasses to name the runner the replica and its provider run under.
      *
@@ -886,6 +940,35 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
             )?->get('entryUUID')?->firstValue();
 
             if ($held === $uuid) {
+                return $held;
+            }
+
+            usleep(100_000);
+        } while (microtime(true) < $deadline);
+
+        return $held;
+    }
+
+    /**
+     * @param list<string> $values
+     *
+     * @return list<string>
+     */
+    private function waitForReplicaValues(
+        string $dn,
+        string $attribute,
+        array $values,
+        float $timeoutSeconds = 15.0,
+    ): array {
+        $deadline = microtime(true) + $timeoutSeconds;
+
+        do {
+            $held = array_values($this->tryReadFromReplica(
+                $dn,
+                [$attribute],
+            )?->get($attribute)?->getValues() ?? []);
+
+            if ($held === $values) {
                 return $held;
             }
 

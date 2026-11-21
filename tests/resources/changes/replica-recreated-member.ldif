@@ -1,0 +1,17 @@
+version: 1
+
+# A group's member is deleted and created again at the same DN, then added back to the group.
+dn: cn=recreated,ou=people,dc=foo,dc=bar
+changetype: delete
+
+dn: cn=recreated,ou=people,dc=foo,dc=bar
+changetype: add
+objectClass: inetOrgPerson
+cn: recreated
+sn: Newcomer
+
+dn: cn=reteam,ou=people,dc=foo,dc=bar
+changetype: modify
+add: member
+member: cn=recreated,ou=people,dc=foo,dc=bar
+-
