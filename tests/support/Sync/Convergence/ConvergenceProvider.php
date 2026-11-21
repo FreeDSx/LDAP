@@ -137,11 +137,15 @@ final class ConvergenceProvider
             $fetch,
             function () use ($request): void {
                 $moved = $request instanceof ModifyDnRequest
-                    ? $this->uuidAt($request->getDn())
-                    : null;
+                    ? $this->uuidsUnder($request->getDn())
+                    : [];
 
-                if ($this->write($request) && $moved !== null) {
-                    $this->movedMidFetch[$moved] = true;
+                if (!$this->write($request)) {
+                    return;
+                }
+
+                foreach ($moved as $uuid) {
+                    $this->movedMidFetch[$uuid] = true;
                 }
             },
         );
@@ -234,21 +238,28 @@ final class ConvergenceProvider
         return $this->movedMidFetch;
     }
 
-    private function uuidAt(Dn $dn): ?string
+    /**
+     * The lowercased entryUUIDs of the entry at the DN and everything under it, which a rename of it moves together.
+     *
+     * @return list<string>
+     */
+    private function uuidsUnder(Dn $dn): array
     {
-        $uuid = $this->reader
-            ->find(
-                $dn->normalize(),
-                new EntryProjection(
-                    [strtolower(AttributeTypeOid::NAME_ENTRY_UUID)],
-                    linkCap: 0,
-                ),
-            )
-            ?->getUuid();
+        $options = StorageListOptions::matchAll(
+            $dn->normalize(),
+            subtree: true,
+            projection: new EntryProjection(
+                [strtolower(AttributeTypeOid::NAME_ENTRY_UUID)],
+                linkCap: 0,
+            ),
+        );
+        $uuids = [];
 
-        return $uuid === null
-            ? null
-            : strtolower($uuid);
+        foreach ($this->lister->list($options)->entries() as $entry) {
+            $uuids[] = strtolower($entry->getUuidOrFail());
+        }
+
+        return $uuids;
     }
 
     private function noteHidden(): void

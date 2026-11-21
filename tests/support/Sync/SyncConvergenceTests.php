@@ -74,11 +74,6 @@ trait SyncConvergenceTests
     private bool $syncExpectsCookie = false;
 
     /**
-     * Whether a full refresh has run over entries the replica already held.
-     */
-    private bool $refreshedOverContent = false;
-
-    /**
      * @var list<string>
      */
     private array $log = [];
@@ -183,7 +178,6 @@ trait SyncConvergenceTests
         $this->writeChanges(drift: false);
         $this->replica->forgetCheckpoint();
         $this->expectCookie = false;
-        $this->refreshedOverContent = true;
         $this->restart();
         $this->maybeCrash();
         $this->settle();
@@ -328,10 +322,6 @@ trait SyncConvergenceTests
         DirectorySnapshot $provider,
         DirectorySnapshot $replica,
     ): void {
-        // A full refresh can still tie a group to an entry it then displaces, which is a known gap.
-        if ($this->refreshedOverContent) {
-            return;
-        }
         $unfollowed = $this->unfollowedMembers($this->provider);
 
         self::assertSame(
