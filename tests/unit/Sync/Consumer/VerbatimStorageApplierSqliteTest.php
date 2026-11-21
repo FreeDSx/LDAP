@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DeferredLinksInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
@@ -48,6 +49,7 @@ final class VerbatimStorageApplierSqliteTest extends TestCase
                 $lister,
                 $this->writer,
             ),
+            $this->fromContainer(DeferredLinksInterface::class),
         );
     }
 
@@ -91,6 +93,29 @@ final class VerbatimStorageApplierSqliteTest extends TestCase
         self::assertSame(
             $this->uuidFor('y500'),
             $this->value('cn=x500,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_refresh_links_the_values_held_back_for_more_groups_than_one_batch_takes(): void
+    {
+        $groups = [];
+
+        for ($group = 0; $group <= 500; $group++) {
+            $groups[] = $this->group(
+                "cn=g{$group},dc=example,dc=com",
+                $this->uuidFor("g{$group}"),
+                'cn=alice,dc=example,dc=com',
+            );
+        }
+
+        $this->refresh(
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            ...$groups,
+        );
+
+        self::assertSame(
+            ['cn=alice,dc=example,dc=com'],
+            $this->members('cn=g500,dc=example,dc=com'),
         );
     }
 

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Sync\Convergence;
 
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DeferredLinksInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
@@ -41,6 +42,7 @@ final class ConvergenceReplica
         private readonly ReadEntryInterface $reader,
         private readonly WriteEntryInterface $writer,
         private readonly TransactionalWriteInterface $transaction,
+        private readonly DeferredLinksInterface $links,
     ) {
         $this->checkpoint = new InMemoryReplicationCheckpoint();
         $this->logger = new RecordingLogger();
@@ -55,6 +57,7 @@ final class ConvergenceReplica
             $container->get(ReadEntryInterface::class),
             $container->get(WriteEntryInterface::class),
             $container->get(TransactionalWriteInterface::class),
+            $container->get(DeferredLinksInterface::class),
         );
     }
 
@@ -74,6 +77,7 @@ final class ConvergenceReplica
                     $this->lister,
                     $this->writer,
                 ),
+                $this->links,
             ),
             $this->checkpoint,
             $this->logger,

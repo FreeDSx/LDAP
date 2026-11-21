@@ -53,6 +53,16 @@ CREATE INDEX IF NOT EXISTS idx_pending_target ON entry_link_pending (target_lc_d
 
 CREATE INDEX IF NOT EXISTS idx_pending_owner ON entry_link_pending (owner_entry_id, attr_name_lower);
 
+-- Values a replica's refresh holds back from its writes: linked once the refresh has placed every entry.
+CREATE TABLE IF NOT EXISTS entry_link_deferred (
+    owner_entry_id   INTEGER NOT NULL,
+    attr_name_lower  TEXT NOT NULL,
+    target_value     TEXT NOT NULL,
+    FOREIGN KEY (owner_entry_id) REFERENCES entries(entry_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_deferred_owner ON entry_link_deferred (owner_entry_id);
+
 CREATE TABLE IF NOT EXISTS ldap_change_journal (
     seq          INTEGER NOT NULL PRIMARY KEY,
     origin       TEXT NOT NULL,

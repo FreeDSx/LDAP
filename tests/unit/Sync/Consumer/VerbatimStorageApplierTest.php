@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoDeferredLinks;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use PHPUnit\Framework\TestCase;
@@ -38,6 +39,7 @@ final class VerbatimStorageApplierTest extends TestCase
                 $storage,
                 $storage,
             ),
+            new NoDeferredLinks(),
         );
     }
 }

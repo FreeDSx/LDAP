@@ -248,6 +248,85 @@ final class LdapReplicaTest extends TestCase
         );
     }
 
+    public function test_links_held_back_by_a_refresh_are_completed_after_reconciling_and_before_the_refresh_checkpoint(): void
+    {
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $calls = [];
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->method('reconcile')
+            ->willReturnCallback(function () use (&$calls): void {
+                $calls[] = 'reconcile';
+            });
+        $this->applier->method('completeRefresh')
+            ->willReturnCallback(function () use (&$calls): void {
+                $calls[] = 'complete:' . ($this->checkpoint->read() ?? 'none');
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            ['reconcile', 'complete:none'],
+            $calls,
+        );
+    }
+
+    public function test_an_incremental_refresh_completes_the_links_it_held_back(): void
+    {
+        $session = (new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        ))->markRefreshComplete(true);
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+
+        $this->applier->expects(self::once())
+            ->method('completeRefresh');
+
+        $this->subject->run();
+    }
+
+    public function test_a_refresh_whose_held_back_links_cannot_be_completed_keeps_the_previous_checkpoint(): void
+    {
+        $this->checkpoint->write('resume-me');
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->method('completeRefresh')
+            ->willThrowException(new RuntimeException('linking failed'));
+        $this->sleeper->method('sleep')
+            ->willReturnCallback(function (): void {
+                ($this->shutdown)();
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            'resume-me',
+            $this->checkpoint->read(),
+        );
+    }
+
     public function test_moves_left_unplaced_in_a_window_reload_the_content_on_the_next_sync(): void
     {
         $this->checkpoint->write('resume-me');

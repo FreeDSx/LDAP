@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
@@ -61,6 +62,7 @@ class ReplicaMoves
     public function place(
         string $uuid,
         Entry $entry,
+        LinkDelta $links = new LinkDelta(),
     ): void {
         $heldAt = $this->heldAt($uuid);
 
@@ -79,7 +81,10 @@ class ReplicaMoves
             );
         }
 
-        $this->writer->store($entry);
+        $this->writer->store(
+            $entry,
+            links: $links,
+        );
         $this->forget($uuid);
     }
 

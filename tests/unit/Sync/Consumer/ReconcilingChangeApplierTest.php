@@ -71,6 +71,15 @@ final class ReconcilingChangeApplierTest extends TestCase
         $this->subject->reconcile();
     }
 
+    public function test_complete_refresh_delegates_to_the_base_applier(): void
+    {
+        $this->baseApplier
+            ->expects(self::once())
+            ->method('completeRefresh');
+
+        $this->subject->completeRefresh();
+    }
+
     public function test_apply_delegates_the_result_to_the_base_applier(): void
     {
         $result = $this->syncResult(

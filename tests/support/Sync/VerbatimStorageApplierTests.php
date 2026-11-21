@@ -878,6 +878,262 @@ trait VerbatimStorageApplierTests
         self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
     }
 
+    public function test_a_full_refresh_links_a_group_to_the_new_entry_holding_its_members_dn(): void
+    {
+        $this->writer->store($this->entry('cn=bob,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->group(
+            'cn=team,dc=example,dc=com',
+            self::UUID_C,
+            'cn=bob,dc=example,dc=com',
+        ));
+
+        $this->refresh(
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=bob,dc=example,dc=com',
+            ),
+            $this->entry('cn=bob,dc=example,dc=com', self::UUID_B),
+        );
+
+        self::assertSame(
+            ['cn=bob,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_full_refresh_links_a_group_to_the_new_entry_at_a_dn_a_renamed_container_carried_a_stale_one_onto(): void
+    {
+        $this->writer->store($this->entry('ou=z,dc=example,dc=com', self::UUID_D));
+        $this->writer->store($this->entry('cn=bob,ou=z,dc=example,dc=com', self::UUID_A));
+
+        $this->refresh(
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=bob,ou=a,dc=example,dc=com',
+            ),
+            $this->entry('ou=a,dc=example,dc=com', self::UUID_D),
+            $this->entry('cn=bob,ou=a,dc=example,dc=com', self::UUID_B),
+        );
+
+        self::assertSame(
+            ['cn=bob,ou=a,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_full_refresh_drops_a_member_the_group_no_longer_lists(): void
+    {
+        $this->writer->store($this->entry('cn=alice,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->entry('cn=bob,dc=example,dc=com', self::UUID_B));
+        $this->writer->store($this->group(
+            'cn=team,dc=example,dc=com',
+            self::UUID_C,
+            'cn=alice,dc=example,dc=com',
+        ));
+
+        $this->refresh(
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->entry('cn=bob,dc=example,dc=com', self::UUID_B),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=bob,dc=example,dc=com',
+            ),
+        );
+
+        self::assertSame(
+            ['cn=bob,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_full_refresh_drops_every_member_of_a_group_sent_without_any(): void
+    {
+        $this->writer->store($this->entry('cn=alice,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->group(
+            'cn=team,dc=example,dc=com',
+            self::UUID_C,
+            'cn=alice,dc=example,dc=com',
+        ));
+
+        $this->refresh(
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->entry('cn=team,dc=example,dc=com', self::UUID_C),
+        );
+
+        self::assertSame(
+            [],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_full_refresh_drops_every_member_of_a_group_sent_with_an_empty_member_attribute(): void
+    {
+        $this->writer->store($this->entry('cn=alice,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->group(
+            'cn=team,dc=example,dc=com',
+            self::UUID_C,
+            'cn=alice,dc=example,dc=com',
+        ));
+
+        $this->refresh(
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+            ),
+        );
+
+        self::assertSame(
+            [],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_group_sent_with_members_and_then_without_any_in_one_refresh_ends_with_none(): void
+    {
+        $this->refresh(
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=alice,dc=example,dc=com',
+            ),
+            $this->entry('cn=team,dc=example,dc=com', self::UUID_C),
+        );
+
+        self::assertSame(
+            [],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_group_keeps_its_members_until_the_refresh_links_the_values_it_held_back(): void
+    {
+        $this->writer->store($this->entry('cn=alice,dc=example,dc=com', self::UUID_A));
+        $this->writer->store($this->group(
+            'cn=team,dc=example,dc=com',
+            self::UUID_C,
+            'cn=alice,dc=example,dc=com',
+        ));
+
+        $this->subject->beginRefresh();
+        $this->applyAll(
+            $this->refreshSession(),
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=alice,dc=example,dc=com',
+            ),
+        );
+
+        self::assertSame(
+            ['cn=alice,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_refresh_links_the_values_a_group_was_last_sent_with(): void
+    {
+        $this->refresh(
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->entry('cn=bob,dc=example,dc=com', self::UUID_B),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=alice,dc=example,dc=com',
+            ),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=bob,dc=example,dc=com',
+            ),
+        );
+
+        self::assertSame(
+            ['cn=bob,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_refresh_cut_short_has_its_values_linked_at_the_end_of_the_next_one(): void
+    {
+        $this->subject->beginRefresh();
+        $this->applyAll(
+            $this->refreshSession(),
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=alice,dc=example,dc=com',
+            ),
+        );
+
+        $this->subject->beginRefresh();
+        $this->subject->completeRefresh();
+
+        self::assertSame(
+            ['cn=alice,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_an_entry_deleted_during_a_refresh_takes_the_values_held_back_for_it(): void
+    {
+        $session = $this->refreshSession();
+
+        $this->subject->beginRefresh();
+        $this->applyAll(
+            $session,
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=alice,dc=example,dc=com',
+            ),
+        );
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_DELETE,
+                $this->entry('cn=team,dc=example,dc=com', self::UUID_C),
+            ),
+            $session,
+        );
+        $this->subject->completeRefresh();
+        $this->applyAll(
+            $this->persistSession(),
+            $this->entry('cn=carol,dc=example,dc=com', self::UUID_B),
+        );
+        $this->subject->beginRefresh();
+        $this->subject->completeRefresh();
+
+        self::assertSame(
+            [],
+            $this->members('cn=carol,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_change_after_the_refresh_links_its_values_at_once(): void
+    {
+        $this->applyAll(
+            $this->persistSession(),
+            $this->entry('cn=alice,dc=example,dc=com', self::UUID_A),
+            $this->group(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                'cn=alice,dc=example,dc=com',
+            ),
+        );
+
+        self::assertSame(
+            ['cn=alice,dc=example,dc=com'],
+            $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
     /**
      * A stable UUID per name, so a test can refer to the same entry before and after it moves.
      */
@@ -961,6 +1217,60 @@ trait VerbatimStorageApplierTests
         }
 
         $this->subject->reconcile();
+        $this->subject->completeRefresh();
+    }
+
+    /**
+     * A full refresh sending the entries in the order given, reconciled and completed as the consumer does.
+     */
+    private function refresh(Entry ...$entries): void
+    {
+        $this->subject->beginRefresh();
+        $this->applyAll(
+            $this->refreshSession(),
+            ...$entries,
+        );
+        $this->subject->reconcile();
+        $this->subject->completeRefresh();
+    }
+
+    private function applyAll(
+        Session $session,
+        Entry ...$entries,
+    ): void {
+        foreach ($entries as $entry) {
+            $this->subject->apply(
+                $this->syncResult(
+                    SyncStateControl::STATE_ADD,
+                    $entry,
+                ),
+                $session,
+            );
+        }
+    }
+
+    private function group(
+        string $dn,
+        string $uuid,
+        string ...$members,
+    ): Entry {
+        return new Entry(
+            $dn,
+            new Attribute('cn', 'x'),
+            new Attribute('member', ...$members),
+            new Attribute('entryUUID', $uuid),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function members(string $dn): array
+    {
+        $entry = $this->reader->find((new Dn($dn))->normalize());
+        self::assertNotNull($entry);
+
+        return array_values($entry->get('member')?->getValues() ?? []);
     }
 
     /**

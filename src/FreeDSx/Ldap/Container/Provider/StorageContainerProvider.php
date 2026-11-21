@@ -23,12 +23,15 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\DeferredLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\DnKeyRebuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DeferredLinksInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\DnKeyRebuilderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoDeferredLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoDnKeyRebuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ResolvedReferences;
@@ -77,6 +80,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             RowLockableInterface::class => $this->makeRowLocks(...),
             ReferenceIntegrityInterface::class => $this->makeReferenceIntegrity(...),
             LinkedValueLookupInterface::class => $this->makeLinkedValueLookup(...),
+            DeferredLinksInterface::class => $this->makeDeferredLinks(...),
             LinkedLeafWitness::class => $this->makeLinkedLeafWitness(...),
             LinkedChanges::class => $this->makeLinkedChanges(...),
             LinkedChangeReplay::class => $this->makeLinkedChangeReplay(...),
@@ -152,6 +156,16 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return $this->isPdo($container)
             ? $container->get(EntryLinks::class)
             : $container->get(InMemoryStorage::class);
+    }
+
+    /**
+     * In memory storage keeps values as written and ties none to an entry that may still move.
+     */
+    private function makeDeferredLinks(Container $container): DeferredLinksInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(DeferredLinkWriter::class)
+            : new NoDeferredLinks();
     }
 
     private function makeLinkedChanges(Container $container): LinkedChanges

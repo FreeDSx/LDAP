@@ -113,7 +113,7 @@ class ReplicaConsumer
     }
 
     /**
-     * Entries moved aside are checked after reconciling, which may have removed them.
+     * Held back links are tied to entries once reconciling has placed them, then entries moved aside are checked.
      *
      * @throws UnresolvedReplicaMovesException when the refresh resumed from a cookie
      */
@@ -123,6 +123,7 @@ class ReplicaConsumer
             $this->reconcile();
         }
 
+        $this->applier->completeRefresh();
         $this->settleRefresh();
         $this->flushCookie();
         $this->refreshing = false;
