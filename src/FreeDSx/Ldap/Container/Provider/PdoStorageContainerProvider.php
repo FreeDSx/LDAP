@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnector;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\RoutingPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\DeferredLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\DnKeyRebuilder;
@@ -98,6 +99,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             EntryLinks::class => $this->makeEntryLinks(...),
             EntryLinkWriter::class => $this->makeEntryLinkWriter(...),
             PendingLinkWriter::class => $this->makePendingLinkWriter(...),
+            DeferredLinkWriter::class => $this->makeDeferredLinkWriter(...),
             DnKeyRebuilder::class => $this->makeDnKeyRebuilder(...),
             EntryRowCodec::class => $this->makeEntryRowCodec(...),
             EntryReader::class => $this->makeReader(...),
@@ -289,6 +291,16 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
         return new PendingLinkWriter(
             $container->get(PdoDialectInterface::class),
             $container->get(PdoConnection::class),
+        );
+    }
+
+    private function makeDeferredLinkWriter(Container $container): DeferredLinkWriter
+    {
+        return new DeferredLinkWriter(
+            $container->get(PdoDialectInterface::class),
+            $container->get(PdoConnection::class),
+            $container->get(LinkedAttributes::class),
+            $container->get(EntryLinkWriter::class),
         );
     }
 

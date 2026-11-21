@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS entry_link_pending (
         REFERENCES entries(entry_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+-- Values a replica's refresh holds back from its writes: linked once the refresh has placed every entry.
+CREATE TABLE IF NOT EXISTS entry_link_deferred (
+    owner_entry_id   BIGINT NOT NULL,
+    attr_name_lower  VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    target_value     TEXT COLLATE utf8mb4_bin NOT NULL,
+    INDEX idx_deferred_owner (owner_entry_id),
+    CONSTRAINT fk_deferred_owner FOREIGN KEY (owner_entry_id)
+        REFERENCES entries(entry_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS ldap_change_journal (
     seq          BIGINT NOT NULL,
     origin       VARCHAR(255) NOT NULL,

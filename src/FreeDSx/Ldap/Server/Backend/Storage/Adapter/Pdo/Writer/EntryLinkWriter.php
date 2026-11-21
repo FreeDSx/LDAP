@@ -68,7 +68,22 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         if ($this->linked->isEmpty()) {
             return;
         }
-        $values = $this->linked->valuesOf($entry);
+
+        $this->restate(
+            $ownerId,
+            $this->linked->valuesOf($entry),
+        );
+    }
+
+    /**
+     * Brings the owner's links to exactly the values given, touching only the rows that differ.
+     *
+     * @param array<string, list<string>> $values Values keyed by lowercased attribute name.
+     */
+    public function restate(
+        int $ownerId,
+        array $values,
+    ): void {
         $resolved = $this->resolve($values);
         $wanted = $this->wantedLinks($values, $resolved);
         $held = $this->heldLinks($ownerId);

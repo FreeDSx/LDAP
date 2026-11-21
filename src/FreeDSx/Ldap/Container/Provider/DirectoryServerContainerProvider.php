@@ -53,6 +53,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DeferredLinksInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -961,6 +962,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $container->get(ListEntryInterface::class),
                 $container->get(WriteEntryInterface::class),
             ),
+            $container->get(DeferredLinksInterface::class),
         );
 
         return new LdapReplica(

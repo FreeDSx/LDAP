@@ -67,4 +67,9 @@ interface ChangeApplierInterface
      * @throws UnresolvedReplicaMovesException when an entry cannot be moved back to where it was announced
      */
     public function reconcile(): void;
+
+    /**
+     * Link the values held back during the refresh, once its entries are placed and reconciled.
+     */
+    public function completeRefresh(): void;
 }

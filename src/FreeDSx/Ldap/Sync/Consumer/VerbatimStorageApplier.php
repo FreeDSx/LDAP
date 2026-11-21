@@ -17,10 +17,12 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\DeferredLinksInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
@@ -58,6 +60,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         private readonly ReadEntryInterface $reader,
         private readonly TransactionalWriteInterface $transaction,
         private readonly ReplicaMoves $moves,
+        private readonly DeferredLinksInterface $links,
     ) {}
 
     public function beginRefresh(): void
@@ -92,10 +95,11 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         );
 
         // RFC 4533 §3.6 keys entries by UUID, which makes the same one arriving elsewhere a move rather than a new entry.
-        $this->transaction->atomic(function () use ($entry, $uuid): void {
-            $this->moves->place(
+        $this->transaction->atomic(function () use ($entry, $uuid, $session): void {
+            $this->place(
                 $uuid,
                 $entry,
+                $session,
             );
         });
     }
@@ -144,6 +148,48 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     public function settle(): void
     {
         $this->moves->settle();
+    }
+
+    public function completeRefresh(): void
+    {
+        // Each batch commits on its own, and one cut short is linked at the end of the next refresh.
+        do {
+            $more = $this->transaction->atomic(fn(): bool => $this->links->linkDeferred());
+        } while ($more);
+    }
+
+    /**
+     * A refresh holds linked values back, as the entry at a DN they name may be one it has yet to move aside.
+     *
+     * @throws UnresolvedReplicaMovesException
+     */
+    private function place(
+        string $uuid,
+        Entry $entry,
+        Session $session,
+    ): void {
+        $place = function (Entry $entry, LinkDelta $links) use ($uuid): void {
+            $this->moves->place(
+                $uuid,
+                $entry,
+                $links,
+            );
+        };
+
+        if ($session->isRefreshComplete()) {
+            $place(
+                $entry,
+                new LinkDelta(),
+            );
+
+            return;
+        }
+
+        $this->links->deferLinks(
+            $uuid,
+            $entry,
+            $place,
+        );
     }
 
     /**

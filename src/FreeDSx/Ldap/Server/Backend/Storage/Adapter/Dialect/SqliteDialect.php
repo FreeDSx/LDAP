@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoDeferredLinkDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryListDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryReadDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryWriteDialectTrait;
@@ -35,6 +36,7 @@ use PDO;
 final class SqliteDialect implements PdoDialectInterface
 {
     use PdoBacklinkReadDialectTrait;
+    use PdoDeferredLinkDialectTrait;
     use PdoEntryListDialectTrait;
     use PdoEntryReadDialectTrait;
     use PdoEntryWriteDialectTrait;
