@@ -578,14 +578,6 @@ final class ServerSyncHandlerTest extends TestCase
         self::assertTrue($this->doneControl()->getRefreshDeletes());
     }
 
-    public function test_refresh_and_persist_is_declined_when_persist_is_unsupported(): void
-    {
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
-
-        $this->handle(null, mode: SyncRequestControl::MODE_REFRESH_AND_PERSIST);
-    }
-
     public function test_refresh_and_persist_full_refresh_ends_the_refresh_phase_with_a_present_boundary(): void
     {
         $this->searchEntries = [$this->entry('cn=a,dc=example,dc=com', self::UUID_A)];
@@ -593,7 +585,7 @@ final class ServerSyncHandlerTest extends TestCase
         $this->cancelSignals = [new LdapMessageRequest(9, new CancelRequest(1))];
 
         $this->drive(
-            $this->persistHandler(),
+            $this->subject,
             $this->syncMessage(null, SyncRequestControl::MODE_REFRESH_AND_PERSIST),
         );
 
@@ -615,7 +607,7 @@ final class ServerSyncHandlerTest extends TestCase
 
     public function test_refresh_and_persist_is_written_as_a_persistent_stream(): void
     {
-        $stream = $this->persistHandler()->handleRequest(
+        $stream = $this->subject->handleRequest(
             $this->syncMessage(
                 null,
                 SyncRequestControl::MODE_REFRESH_AND_PERSIST,
@@ -628,7 +620,7 @@ final class ServerSyncHandlerTest extends TestCase
 
     public function test_refresh_only_is_not_written_as_a_persistent_stream(): void
     {
-        $stream = $this->persistHandler()->handleRequest(
+        $stream = $this->subject->handleRequest(
             $this->syncMessage(null),
             $this->token,
         );
@@ -661,7 +653,7 @@ final class ServerSyncHandlerTest extends TestCase
         $this->onFind = fn() => $this->journal->prune(new RetentionPolicy(maxRecords: 1));
 
         $this->drive(
-            $this->persistHandler(),
+            $this->subject,
             $this->syncMessage(
                 $this->cookieAt(0),
                 SyncRequestControl::MODE_REFRESH_AND_PERSIST,
@@ -716,17 +708,6 @@ final class ServerSyncHandlerTest extends TestCase
         }
 
         return null;
-    }
-
-    private function persistHandler(): ServerSyncHandler
-    {
-        return new ServerSyncHandler(
-            backend: $this->backend,
-            projector: $this->syncProjector,
-            changeStream: $this->changeStream,
-            persistStreamer: $this->persistStreamer,
-            persistSupported: true,
-        );
     }
 
     private function handle(

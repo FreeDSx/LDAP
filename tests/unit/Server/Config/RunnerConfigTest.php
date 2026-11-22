@@ -92,37 +92,6 @@ final class RunnerConfigTest extends TestCase
             RunnerMode::Pcntl,
             $subject->getMode(),
         );
-        self::assertFalse($subject->isSingleProcess());
-    }
-
-    public function test_the_forking_runner_is_never_a_single_process(): void
-    {
-        self::assertFalse($this->subject->isSingleProcess());
-    }
-
-    public function test_one_coroutine_worker_is_a_single_process(): void
-    {
-        self::assertTrue((new RunnerConfig(RunnerMode::Swoole))->isSingleProcess());
-    }
-
-    public function test_several_coroutine_workers_are_not_a_single_process(): void
-    {
-        self::assertFalse(
-            (new RunnerConfig(
-                RunnerMode::Swoole,
-                2,
-            ))->isSingleProcess(),
-        );
-    }
-
-    public function test_auto_detected_workers_are_not_assumed_to_be_a_single_process(): void
-    {
-        self::assertFalse(
-            (new RunnerConfig(
-                RunnerMode::Swoole,
-                0,
-            ))->isSingleProcess(),
-        );
     }
 
     public function test_it_rejects_a_negative_worker_count_from_the_constructor(): void

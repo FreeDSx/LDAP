@@ -100,7 +100,7 @@ connections, which means the recorded changes must be visible to whichever proce
 | Swoole | One process, one coroutine per connection | Any storage, including in-memory, since everything shares one process. |
 
 In short, the persistent listen mode is available when either the Swoole runner is in use or the storage is shared
-across processes. Otherwise the server still answers a one-time poll but declines the persistent listen.
+across processes.
 
 ## Access Control
 

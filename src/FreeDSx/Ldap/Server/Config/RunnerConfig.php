@@ -107,15 +107,4 @@ final class RunnerConfig
             ? $this->workers
             : (new SystemResources())->cpuCount();
     }
-
-    /**
-     * Whether connections are all served by one process, so they can observe each other through memory alone.
-     *
-     * A worker count left to auto-detect counts as multiple, since the resolved count depends on the backend.
-     */
-    public function isSingleProcess(): bool
-    {
-        return $this->mode === RunnerMode::Swoole
-            && $this->workers === 1;
-    }
 }

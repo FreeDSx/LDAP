@@ -480,6 +480,19 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         ];
     }
 
+    protected function boundSync(?FilterInterface $filter = null): SyncRepl
+    {
+        $client = $this->listenClient();
+        $client->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $syncRepl = $client->syncRepl($filter);
+        $syncRepl->request()
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        return $syncRepl;
+    }
+
     private function currentCookie(): string
     {
         $cookie = null;
@@ -536,19 +549,6 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         } finally {
             $writer->unbind();
         }
-    }
-
-    private function boundSync(?FilterInterface $filter = null): SyncRepl
-    {
-        $client = $this->listenClient();
-        $client->bind('cn=user,dc=foo,dc=bar', '12345');
-
-        $syncRepl = $client->syncRepl($filter);
-        $syncRepl->request()
-            ->base('dc=foo,dc=bar')
-            ->useSubtreeScope();
-
-        return $syncRepl;
     }
 
     private function listenClient(): LdapClient

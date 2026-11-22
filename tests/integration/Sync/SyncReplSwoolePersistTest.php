@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
+use FreeDSx\Ldap\Exception\CancelRequestException;
+
 /**
  * refreshAndPersist under the Swoole runner.
  */
@@ -44,5 +46,30 @@ final class SyncReplSwoolePersistTest extends SyncReplPersistTestCase
         $this->requireSwoole();
 
         parent::setUp();
+    }
+
+    public function testAnInMemoryServerSetToSeveralWorkersServesAPersist(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--storage=memory',
+                '--seed=' . self::SEED_LDIF,
+                '--allow-sync',
+                '--runner=swoole',
+                '--workers=2',
+            ],
+        );
+        $refreshed = false;
+
+        $this->boundSync()
+            ->useRefreshDoneHandler(static function () use (&$refreshed): void {
+                $refreshed = true;
+
+                throw new CancelRequestException();
+            })
+            ->listen();
+
+        self::assertTrue($refreshed);
     }
 }
