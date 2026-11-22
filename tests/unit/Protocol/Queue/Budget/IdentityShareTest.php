@@ -77,6 +77,16 @@ final class IdentityShareTest extends TestCase
         );
     }
 
+    public function test_a_username_identity_is_keyed_by_its_username(): void
+    {
+        $this->authorization->setToken(BindToken::fromUsername('FOO\user'));
+
+        self::assertSame(
+            'u:FOO\user',
+            $this->subject->current()->key,
+        );
+    }
+
     public function test_the_share_follows_a_rebind(): void
     {
         $this->authorization->setToken(BindToken::fromDn('cn=user,dc=foo,dc=bar'));

@@ -456,6 +456,8 @@ class LdapClient
     /**
      * Perform a whoami request and get the returned value.
      *
+     * @throws Exception\ConnectionException
+     * @throws Exception\ReferralException
      * @throws OperationException
      */
     public function whoami(): ?string

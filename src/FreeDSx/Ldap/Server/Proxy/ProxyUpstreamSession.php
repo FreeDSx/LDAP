@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Proxy;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use SensitiveParameter;
@@ -84,6 +85,24 @@ final class ProxyUpstreamSession implements SessionTeardownInterface
         }
 
         $this->isBound = true;
+    }
+
+    /**
+     * The authorization identity the upstream reports for this session, or null when it will not say.
+     *
+     * @throws ConnectionException
+     */
+    public function whoAmI(): ?string
+    {
+        try {
+            return $this->client->whoami();
+        } catch (OperationException|ReferralException) {
+            return null;
+        } catch (ConnectionException $e) {
+            $this->dropConnection();
+
+            throw $e;
+        }
     }
 
     /**

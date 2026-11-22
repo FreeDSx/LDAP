@@ -136,6 +136,64 @@ trait SharedRequestBudgetTestsTrait
         }
     }
 
+    public function testAnIdentityHoldingItsWholeShareIsAnsweredBusyHoweverItsDnIsSpelled(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--max-held-request-size=1000000',
+                '--max-request-size=60000',
+                '--max-request-elements=1000',
+            ],
+        );
+        $stalled = array_map(
+            fn(int $ignored) => $this->boundStalledClient(
+                45_000,
+                'cn=user,dc=foo,dc=bar',
+            ),
+            range(
+                1,
+                3,
+            ),
+        );
+        $respelled = $this->boundRawQueue('commonName=user,domainComponent=foo,dc=bar');
+        $bystander = $this->boundRawQueue('cn=admin,dc=foo,dc=bar');
+
+        try {
+            $respelled->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchHoldingManyElements(),
+            ));
+            $bystander->sendMessage(new LdapMessageRequest(
+                2,
+                self::searchHoldingManyElements(),
+            ));
+
+            self::assertSame(
+                [
+                    [2 => ResultCode::BUSY],
+                    [2 => ResultCode::SUCCESS],
+                ],
+                [
+                    $this->resultCodesFor(
+                        $respelled,
+                        2,
+                    ),
+                    $this->resultCodesFor(
+                        $bystander,
+                        2,
+                    ),
+                ],
+            );
+        } finally {
+            $respelled->close();
+            $bystander->close();
+            foreach ($stalled as $client) {
+                fclose($client);
+            }
+        }
+    }
+
     /**
      * @return iterable<string, array{RequestInterface}>
      */

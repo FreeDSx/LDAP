@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -58,8 +59,59 @@ trait RequestBudgetClientTrait
     private function stalledClient(int $bytes)
     {
         $client = $this->openClient();
-        $request = self::encodedRequest(new LdapMessageRequest(
+        $this->stall(
+            $client,
             1,
+            $bytes,
+        );
+
+        return $client;
+    }
+
+    /**
+     * Binds as the name given before stalling a request, leaving the bytes held against that identity.
+     *
+     * @return resource
+     */
+    private function boundStalledClient(
+        int $bytes,
+        string $name,
+    ) {
+        $client = $this->openClient();
+        fwrite(
+            $client,
+            self::encodedRequest(new LdapMessageRequest(
+                1,
+                Operations::bind(
+                    $name,
+                    '12345',
+                ),
+            )),
+        );
+        if ($this->resultCodeFor($client, 1) !== ResultCode::SUCCESS) {
+            throw new RuntimeException('The client to stall could not bind.');
+        }
+        $this->stall(
+            $client,
+            2,
+            $bytes,
+        );
+
+        return $client;
+    }
+
+    /**
+     * Writes the first bytes of a request and never the rest.
+     *
+     * @param resource $client
+     */
+    private function stall(
+        $client,
+        int $messageId,
+        int $bytes,
+    ): void {
+        $request = self::encodedRequest(new LdapMessageRequest(
+            $messageId,
             Operations::modify(
                 'cn=user,dc=foo,dc=bar',
                 Change::replace(
@@ -81,8 +133,6 @@ trait RequestBudgetClientTrait
         );
         // Gives the server time to buffer the bytes before anything else arrives.
         usleep(1_000_000);
-
-        return $client;
     }
 
     /**

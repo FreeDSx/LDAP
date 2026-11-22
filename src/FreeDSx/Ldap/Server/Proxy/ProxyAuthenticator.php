@@ -13,10 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Proxy;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
+use FreeDSx\Ldap\Protocol\Authorization\AuthzIdType;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -31,8 +35,12 @@ use SensitiveParameter;
  */
 final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterface
 {
+    /**
+     * @param bool $asksUpstreamIdentity whether a bind asks the upstream which identity it bound as
+     */
     public function __construct(
         private ProxyUpstreamSession $session,
+        private bool $asksUpstreamIdentity = false,
     ) {}
 
     public function authenticate(
@@ -45,6 +53,9 @@ final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterf
                 $name,
                 $password,
             );
+            $identity = $this->asksUpstreamIdentity
+                ? $this->session->whoAmI()
+                : null;
         } catch (BindException $e) {
             throw new OperationException(
                 $e->getMessage(),
@@ -57,7 +68,10 @@ final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterf
             );
         }
 
-        return BindToken::fromDn($name);
+        return $this->tokenFor(
+            $name,
+            $identity,
+        );
     }
 
     /**
@@ -68,5 +82,49 @@ final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterf
         MechanismName $mechanism,
     ): ?SaslIdentity {
         return null;
+    }
+
+    /**
+     * The identity the upstream reports when it names one, otherwise the name as it was bound.
+     */
+    private function tokenFor(
+        string $name,
+        ?string $identity,
+    ): BindToken {
+        $authzId = $this->namedIdentity($identity);
+
+        if ($authzId === null) {
+            return BindToken::fromDn($name);
+        }
+
+        return new BindToken(
+            $authzId,
+            $name,
+        );
+    }
+
+    /**
+     * The reported identity, or null when it is empty or malformed.
+     */
+    private function namedIdentity(?string $identity): ?AuthzId
+    {
+        if ($identity === null) {
+            return null;
+        }
+
+        try {
+            $authzId = AuthzId::fromString($identity);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        if ($authzId->getValue() === '') {
+            return null;
+        }
+        if ($authzId->isType(AuthzIdType::Dn) && !Dn::isValid($authzId->getValue())) {
+            return null;
+        }
+
+        return $authzId;
     }
 }
