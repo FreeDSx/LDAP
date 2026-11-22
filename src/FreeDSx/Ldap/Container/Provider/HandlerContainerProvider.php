@@ -210,10 +210,10 @@ final class HandlerContainerProvider implements ContainerProviderInterface
 
         $stream = null;
         $streamer = null;
-        $persistSupported = false;
 
         $provider = $options->getReplicationConfig()->getProvider();
 
+        // A persist sees every write, since a journal that is not shared belongs to a storage held to one process.
         if ($journal !== null && $provider !== null) {
             $stream = new ChangeStream($journal);
             $streamer = new SyncPersistStreamer(
@@ -224,10 +224,6 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 sleeper: $container->get(SleeperInterface::class),
                 pollInterval: $provider->getPollInterval(),
             );
-            // Persist can only deliver writes made on other connections: one process shares them in memory,
-            // otherwise the journal itself must be cross-process.
-            $persistSupported = $journal->sharesAcrossProcesses()
-                || $options->getRunnerConfig()->isSingleProcess();
         }
 
         return new ServerSyncHandler(
@@ -236,7 +232,6 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             limits: $searchLimits ?? $options->makeSearchLimits(),
             changeStream: $stream,
             persistStreamer: $streamer,
-            persistSupported: $persistSupported,
         );
     }
 

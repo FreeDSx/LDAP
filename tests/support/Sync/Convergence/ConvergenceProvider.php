@@ -306,7 +306,6 @@ final class ConvergenceProvider
                 linked: $container->get(LinkedAttributes::class),
                 sleeper: new CallbackSleeper(maxTicks: PHP_INT_MAX),
             ),
-            persistSupported: true,
         );
     }
 

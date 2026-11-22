@@ -68,7 +68,6 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         private readonly SearchLimits $limits = new SearchLimits(),
         private readonly ?ChangeStream $changeStream = null,
         private readonly ?SyncPersistStreamer $persistStreamer = null,
-        private readonly bool $persistSupported = false,
         private readonly SyncResultBatcher $batcher = new SyncResultBatcher(),
     ) {}
 
@@ -194,13 +193,6 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         if ($mode !== SyncRequestControl::MODE_REFRESH_ONLY && $mode !== SyncRequestControl::MODE_REFRESH_AND_PERSIST) {
             throw new OperationException(
                 'The requested content synchronization mode is not supported.',
-                ResultCode::UNWILLING_TO_PERFORM,
-            );
-        }
-
-        if ($mode === SyncRequestControl::MODE_REFRESH_AND_PERSIST && !$this->persistSupported) {
-            throw new OperationException(
-                'The refreshAndPersist synchronization mode is not supported by this server.',
                 ResultCode::UNWILLING_TO_PERFORM,
             );
         }
