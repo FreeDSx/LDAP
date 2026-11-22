@@ -86,11 +86,15 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
             && $controls->has(Control::OID_PAGING);
     }
 
+    /**
+     * Only a provider serves content synchronization, leaving a sync control elsewhere to the critical-control check.
+     */
     private function isSyncSearch(
         RequestInterface $request,
         ControlBag $controls,
     ): bool {
         return $request instanceof SearchRequest
-            && $controls->has(Control::OID_SYNC_REQUEST);
+            && $controls->has(Control::OID_SYNC_REQUEST)
+            && $this->options->getReplicationConfig()->isProvider();
     }
 }

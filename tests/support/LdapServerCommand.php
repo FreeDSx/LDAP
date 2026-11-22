@@ -285,6 +285,12 @@ final class LdapServerCommand extends Command
                 'Grant cn=user the (privileged) content-sync control over dc=foo,dc=bar and dc=other,dc=test',
             )
             ->addOption(
+                'no-provider',
+                null,
+                InputOption::VALUE_NONE,
+                'Serve without acting as a content synchronization provider',
+            )
+            ->addOption(
                 'hide-from-sync',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -466,10 +472,13 @@ final class LdapServerCommand extends Command
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
             ->setMaxPagingSessions((int) $this->getStringOption($input, 'max-paging-sessions'))
-            ->setReplicationConfig(ReplicationConfig::forProvider(
-                (new ProviderConfig())->setPollInterval(self::SYNC_POLL_INTERVAL),
-            ))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
+
+        if ($input->getOption('no-provider') !== true) {
+            $options->setReplicationConfig(ReplicationConfig::forProvider(
+                (new ProviderConfig())->setPollInterval(self::SYNC_POLL_INTERVAL),
+            ));
+        }
 
         $authenticatedLookthrough = (int) $this->getStringOption($input, 'authenticated-lookthrough');
         if ($authenticatedLookthrough > 0) {

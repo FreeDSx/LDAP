@@ -37,10 +37,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Middleware\RecordingMiddlewareHandler;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class AssertionMiddlewareTest extends TestCase
@@ -190,6 +192,14 @@ final class AssertionMiddlewareTest extends TestCase
         );
 
         self::assertNotNull($this->next->received);
+    }
+
+    /**
+     * A provider routes a sync search to where its assertion is checked.
+     */
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::provider();
     }
 
     private function search(): SearchRequest
