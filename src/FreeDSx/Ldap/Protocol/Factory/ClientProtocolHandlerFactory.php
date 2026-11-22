@@ -70,7 +70,7 @@ readonly class ClientProtocolHandlerFactory
         Request\RequestInterface $request,
         Response\ResponseInterface $response,
     ): ResponseHandlerInterface {
-        if ($response instanceof Response\SearchResultDone || $response instanceof Response\SearchResultEntry || $response instanceof Response\SearchResultReference) {
+        if ($this->isSearchMessage($request, $response)) {
             return $request instanceof Request\SyncRequest
                 ? new ClientProtocolHandler\ClientSyncHandler(
                     queue: $this->queue(),
@@ -80,11 +80,6 @@ readonly class ClientProtocolHandlerFactory
                     queue: $this->queue(),
                     options: $this->clientOptions,
                 );
-        } elseif ($response instanceof  Response\SyncInfoMessage) {
-            return new ClientProtocolHandler\ClientSyncHandler(
-                queue: $this->queue(),
-                options: $this->clientOptions,
-            );
         } elseif ($response instanceof Operation\LdapResult && $response->getResultCode() === ResultCode::REFERRAL) {
             return new ClientProtocolHandler\ClientReferralHandler($this->clientOptions);
         } elseif ($request instanceof Request\ExtendedRequest && $request->getName() === Request\ExtendedRequest::OID_START_TLS) {
@@ -97,6 +92,22 @@ readonly class ClientProtocolHandlerFactory
         } else {
             return new ClientProtocolHandler\ClientBasicHandler($this->queue());
         }
+    }
+
+    /**
+     * Whether the response is one a search streams, intermediates included, which only a search request solicits.
+     */
+    private function isSearchMessage(
+        Request\RequestInterface $request,
+        Response\ResponseInterface $response,
+    ): bool {
+        if ($response instanceof Response\IntermediateResponse) {
+            return $request instanceof Request\SearchRequest;
+        }
+
+        return $response instanceof Response\SearchResultDone
+            || $response instanceof Response\SearchResultEntry
+            || $response instanceof Response\SearchResultReference;
     }
 
     private function queue(): ClientQueue

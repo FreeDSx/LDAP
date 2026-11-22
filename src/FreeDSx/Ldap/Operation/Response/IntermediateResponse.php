@@ -79,10 +79,13 @@ class IntermediateResponse implements ResponseInterface
             $value = $encoder->encode($this->responseValueToEncode);
         }
 
-        $response->addChild(Asn1::context(
-            tagNumber: 1,
-            type: Asn1::octetString((string) $value),
-        ));
+        // RFC 4511 section 4.13 makes the value optional.
+        if ($value !== null) {
+            $response->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($value),
+            ));
+        }
 
         return Asn1::application(
             tagNumber: self::TAG_NUMBER,

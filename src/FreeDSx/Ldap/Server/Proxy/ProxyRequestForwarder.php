@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
@@ -43,6 +44,14 @@ use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
  */
 final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
 {
+    /**
+     * Controls besides a refreshAndPersist sync that keep a search open until it is abandoned.
+     */
+    private const PERSISTENT_SEARCH_CONTROLS = [
+        Control::OID_PERSISTENT_SEARCH,
+        Control::OID_CHANGE_NOTIFICATION,
+    ];
+
     public function __construct(
         private LdapClient $client,
         private ServerQueue $queue,
@@ -80,7 +89,7 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
         try {
             $response = $this->sendUpstream(
                 $request,
-                array_values($message->controls()->toArray()),
+                $this->forwardedControls($message),
             );
         } catch (OperationException $e) {
             $this->queue->sendMessage($this->responseFactory->getStandardResponse(
@@ -116,9 +125,48 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
     }
 
     /**
+     * @return list<Control>
+     * @throws OperationException when a critical control would keep the search open for changes
+     */
+    private function forwardedControls(LdapMessageRequest $message): array
+    {
+        $forwarded = [];
+
+        foreach ($message->controls() as $control) {
+            if (!$this->keepsTheSearchOpen($control)) {
+                $forwarded[] = $control;
+
+                continue;
+            }
+            if ($control->getCriticality()) {
+                throw new OperationException(
+                    'A search that stays open for changes cannot be proxied.',
+                    ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                );
+            }
+        }
+
+        return $forwarded;
+    }
+
+    private function keepsTheSearchOpen(Control $control): bool
+    {
+        if ($control instanceof SyncRequestControl) {
+            return $control->getMode() === SyncRequestControl::MODE_REFRESH_AND_PERSIST;
+        }
+
+        return in_array(
+            $control->getTypeOid(),
+            self::PERSISTENT_SEARCH_CONTROLS,
+            true,
+        );
+    }
+
+    /**
      * @param array<int, Control> $controls
      * @throws ConnectionException When a bound session loses the upstream identity it was answering for.
      * @throws OperationException
+     * @throws ReferralException when the upstream answers an operation other than a search with a referral
      */
     private function sendUpstream(
         RequestInterface $request,
@@ -193,6 +241,13 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
             $this->queue->sendMessage($this->relayed(
                 $messageId,
                 $result->getMessage(),
+            ));
+        });
+
+        $request->useIntermediateResponseHandler(function (LdapMessageResponse $upstream) use ($messageId): void {
+            $this->queue->sendMessage($this->relayed(
+                $messageId,
+                $upstream,
             ));
         });
     }

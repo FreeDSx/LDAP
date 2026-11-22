@@ -47,4 +47,21 @@ final class IntermediateResponseTest extends TestCase
             $this->subject->toAsn1(),
         );
     }
+
+    public function test_it_leaves_out_a_value_it_does_not_have(): void
+    {
+        self::assertEquals(
+            Asn1::application(
+                25,
+                Asn1::sequence(Asn1::context(
+                    0,
+                    Asn1::octetString('foo'),
+                )),
+            ),
+            (new IntermediateResponse(
+                'foo',
+                null,
+            ))->toAsn1(),
+        );
+    }
 }

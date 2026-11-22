@@ -309,8 +309,11 @@ otherwise carry a password to the proxy in the clear.
 `ProxyOptions` accepts `setRequireUpstreamConfidentiality`, which refuses to start the proxy unless the upstream hop
 uses LDAPS or StartTLS.
 
-**Note**: only simple and anonymous binds are proxied (SASL is not), and every request is forwarded to the
-single configured upstream.
+**Limitations:**
+- Only simple and anonymous binds are proxied; SASL is not.
+- Every request is forwarded to the single configured upstream.
+- A search that stays open for changes is not proxied: a persistent (refreshAndPersist) content synchronization, a
+  persistent search or a change notification. refreshOnly polls are proxied.
 
 ## Providing a Backend
 
