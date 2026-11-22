@@ -54,6 +54,7 @@ use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerLimit;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
@@ -74,6 +75,10 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             RequestBudget::class => static fn(Container $c): RequestBudget => new RequestBudget(
                 $c->get(SleeperInterface::class),
                 $c->get(SystemResources::class),
+            ),
+            WorkerLimit::class => static fn(Container $c): WorkerLimit => new WorkerLimit(
+                $c->get(ServerListenerOptionsInterface::class),
+                $c->get(ListenerContributorInterface::class)->supportsMultipleWorkers(),
             ),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             ServerInitialization::class => $this->makeServerInitialization(...),
@@ -96,7 +101,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             $options->getNetworkConfig(),
             $options->getRunnerConfig()->getMode(),
             $this->makeEventLogger($options),
-            $this->resolveWorkerCount($container) > 1,
+            $container->get(WorkerLimit::class)->workers() > 1,
         );
     }
 
@@ -116,7 +121,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
-            $workers = $this->resolveWorkerCount($container);
+            $workers = $container->get(WorkerLimit::class)->workers();
             $workerFactory = new WorkerFactory(
                 configuration: $this->makeRunnerConfiguration($container),
                 socketServerFactory: $container->get(SocketServerFactory::class),
@@ -204,10 +209,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $network,
                 $heldRequestSize,
             ),
-            new WorkerClampAdvisory(
-                $options,
-                $contributor->supportsMultipleWorkers(),
-            ),
+            new WorkerClampAdvisory($container->get(WorkerLimit::class)),
             new OpenFileLimitAdvisory(
                 $options,
                 $resources->openFileLimit(),
@@ -219,25 +221,6 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 $heldRequestSize,
             ),
         ];
-    }
-
-    /**
-     * The workers to actually accept on: the configured count, auto-detected from the CPUs when zero.
-     *
-     * This is clamped back to one when the server keeps state that cannot be shared between processes.
-     */
-    private function resolveWorkerCount(Container $container): int
-    {
-        $options = $container->get(ServerListenerOptionsInterface::class);
-        if (!$options->isRunnerMode(RunnerMode::Swoole)) {
-            return 1;
-        }
-        $workers = $options->getRunnerConfig()->resolvedWorkers();
-        if ($workers === 1 || $container->get(ListenerContributorInterface::class)->supportsMultipleWorkers()) {
-            return $workers;
-        }
-
-        return 1;
     }
 
     private function makeEventLogger(ServerListenerOptionsInterface $options): EventLogger

@@ -32,7 +32,7 @@ interface ListenerContributorInterface
     public function forkResettable(): ResettableInterface;
 
     /**
-     * Whether this server keeps no state in the process, so several workers can serve it at once.
+     * Whether this server keeps no state in the process that several workers would need to share.
      */
     public function supportsMultipleWorkers(): bool;
 

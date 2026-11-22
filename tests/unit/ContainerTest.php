@@ -1138,6 +1138,52 @@ class ContainerTest extends TestCase
         );
     }
 
+    public function test_several_workers_are_clamped_to_one_process_on_a_unix_socket(): void
+    {
+        $this->requireSwoole();
+
+        $container = $this->containerFor(
+            new ServerOptions(
+                $this->sharedStorage(),
+                (new NetworkConfig())->setTransport('unix'),
+                runnerConfig: RunnerConfig::forSwoole(4),
+            ),
+        );
+
+        self::assertInstanceOf(
+            SwooleServerRunner::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_a_proxy_on_a_unix_socket_is_clamped_to_one_process_and_says_why(): void
+    {
+        $this->requireSwoole();
+        $logger = new RecordingLogger();
+
+        $container = $this->proxyContainerFor(
+            (new ProxyServerOptions(
+                (new NetworkConfig())->setTransport('unix'),
+                RunnerConfig::forSwoole(4),
+            ))->setLogger($logger),
+        );
+        $container->get(ServerInitialization::class)->start();
+
+        self::assertSame(
+            [
+                [
+                    LogLevel::WARNING,
+                    ConcurrencyLimitReason::UnixSocket->value,
+                ],
+            ],
+            $this->concurrencyLimitsRecorded($logger),
+        );
+        self::assertInstanceOf(
+            SwooleServerRunner::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
     public function test_swoole_on_sqlite_warns_when_swoole_was_built_without_the_sqlite_hook(): void
     {
         $this->requireSwoole();
@@ -1410,6 +1456,22 @@ class ContainerTest extends TestCase
     private function proxyContainer(): Container
     {
         return Container::forProxy(new ProxyOptions(new ProxyServerOptions()));
+    }
+
+    /**
+     * Fixed limits stand in for this machine's, as they do for a directory server.
+     */
+    private function proxyContainerFor(ProxyServerOptions $options): Container
+    {
+        return Container::forProxy(
+            new ProxyOptions($options),
+            [
+                SystemResources::class => new SystemResources(
+                    openFileLimit: new OpenFileLimit(null),
+                    memoryLimit: new MemoryLimit(1_073_741_824),
+                ),
+            ],
+        );
     }
 
     private function startOnSqlite(

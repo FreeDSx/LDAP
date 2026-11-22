@@ -26,6 +26,11 @@ enum ConcurrencyLimitReason: string
     case StorageNotShareable = 'storage_not_shareable';
 
     /**
+     * Several workers were configured for a unix socket that only one worker can bind.
+     */
+    case UnixSocket = 'unix_socket';
+
+    /**
      * SQLite runs on a Swoole built without its SQLite hook, where a lock wait blocks the whole worker.
      */
     case StorageBlocksWorker = 'storage_blocks_worker';

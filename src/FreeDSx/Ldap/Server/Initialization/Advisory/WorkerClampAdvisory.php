@@ -15,12 +15,10 @@ namespace FreeDSx\Ldap\Server\Initialization\Advisory;
 
 use FreeDSx\Ldap\Server\Initialization\AdvisoryInterface;
 use FreeDSx\Ldap\Server\Initialization\InitializationWarning;
-use FreeDSx\Ldap\Server\Logging\ConcurrencyLimitReason;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
-use FreeDSx\Ldap\ServerListenerOptionsInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerLimit;
 
 /**
- * Several Swoole workers are clamped to one when the server keeps state that cannot be shared between processes.
+ * Several Swoole workers are clamped to one when the storage or the listener cannot be shared between processes.
  *
  * @internal
  *
@@ -28,26 +26,19 @@ use FreeDSx\Ldap\ServerListenerOptionsInterface;
  */
 readonly class WorkerClampAdvisory implements AdvisoryInterface
 {
-    public function __construct(
-        private ServerListenerOptionsInterface $options,
-        private bool $supportsMultipleWorkers,
-    ) {}
+    public function __construct(private WorkerLimit $limit) {}
 
     public function warnings(): array
     {
-        if (!$this->options->isRunnerMode(RunnerMode::Swoole) || $this->supportsMultipleWorkers) {
-            return [];
-        }
-
-        $requestedWorkers = $this->options->getRunnerConfig()->resolvedWorkers();
-        if ($requestedWorkers === 1) {
+        $reason = $this->limit->reason();
+        if ($reason === null) {
             return [];
         }
 
         return [
             InitializationWarning::concurrencyLimited(
-                ConcurrencyLimitReason::StorageNotShareable,
-                ['requested_workers' => $requestedWorkers],
+                $reason,
+                ['requested_workers' => $this->limit->requested()],
             ),
         ];
     }
