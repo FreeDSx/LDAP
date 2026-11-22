@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Proxy\ProxyBindResetMiddleware;
 use FreeDSx\Ldap\Server\Proxy\ProxyRequestForwarder;
 use FreeDSx\Ldap\Server\Proxy\ProxyRequestPipeline;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Socket\Socket;
 
@@ -97,7 +98,12 @@ class ProxyConnectionContainerProvider implements ContainerProviderInterface
     {
         return new SimpleBind(
             queue: $container->get(ServerQueue::class),
-            authenticator: new ProxyAuthenticator($container->get(ProxyUpstreamSession::class)),
+            // Only connections sharing a process share an identity's request budget.
+            authenticator: new ProxyAuthenticator(
+                session: $container->get(ProxyUpstreamSession::class),
+                asksUpstreamIdentity: $container->get(ServerListenerOptionsInterface::class)
+                    ->isRunnerMode(RunnerMode::Swoole),
+            ),
             eventLogger: $container->get(EventLogger::class),
         );
     }

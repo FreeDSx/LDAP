@@ -314,6 +314,8 @@ uses LDAPS or StartTLS.
 - Every request is forwarded to the single configured upstream.
 - A search that stays open for changes is not proxied: a persistent (refreshAndPersist) content synchronization, a
   persistent search or a change notification. refreshOnly polls are proxied.
+- On the Swoole runner, an identity's request budget share follows the identity the upstream reports through WhoAmI.
+  An upstream that reports none keys the share by the DN as bound.
 
 ## Providing a Backend
 

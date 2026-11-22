@@ -55,13 +55,13 @@ trait RawClientQueueTrait
         );
     }
 
-    private function boundRawQueue(): ClientQueue
+    private function boundRawQueue(string $name = 'cn=user,dc=foo,dc=bar'): ClientQueue
     {
         $queue = $this->rawQueue();
         $queue->sendMessage(new LdapMessageRequest(
             1,
             Operations::bind(
-                'cn=user,dc=foo,dc=bar',
+                $name,
                 '12345',
             ),
         ));

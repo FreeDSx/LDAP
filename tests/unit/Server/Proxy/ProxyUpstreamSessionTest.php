@@ -7,6 +7,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
@@ -211,6 +212,53 @@ final class ProxyUpstreamSessionTest extends TestCase
             'cn=user,dc=foo,dc=bar',
             'wrong',
         );
+    }
+
+    public function test_it_reports_the_identity_the_upstream_answers_with(): void
+    {
+        $this->client
+            ->method('whoami')
+            ->willReturn('dn:cn=user,dc=foo,dc=bar');
+
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->subject->whoAmI(),
+        );
+    }
+
+    public function test_it_reports_no_identity_when_the_upstream_refuses_to_say(): void
+    {
+        $this->client
+            ->method('whoami')
+            ->willThrowException(new OperationException(
+                'Unsupported extended operation.',
+                ResultCode::PROTOCOL_ERROR,
+            ));
+
+        self::assertNull($this->subject->whoAmI());
+    }
+
+    public function test_it_reports_no_identity_when_the_upstream_refers_the_question_elsewhere(): void
+    {
+        $this->client
+            ->method('whoami')
+            ->willThrowException(new ReferralException('Referral.'));
+
+        self::assertNull($this->subject->whoAmI());
+    }
+
+    public function test_it_drops_the_connection_when_asking_for_the_identity_fails_on_the_transport(): void
+    {
+        $this->client
+            ->method('whoami')
+            ->willThrowException(new ConnectionException('gone'));
+        $this->client
+            ->expects(self::once())
+            ->method('disconnect');
+
+        $this->expectException(ConnectionException::class);
+
+        $this->subject->whoAmI();
     }
 
     public function test_it_unbinds_upstream_when_reset_while_bound(): void
