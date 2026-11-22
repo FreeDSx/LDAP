@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Container\Provider\ProxyServerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\ServerListenerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\StorageContainerProvider;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Socket\Socket;
 
@@ -56,8 +57,9 @@ class Container
     ): self {
         $instances = [ClientOptions::class => $options] + $sharedInstances;
 
+        // Only the loader can hold the client weakly.
         if ($client !== null) {
-            $instances[LdapClient::class] = $client;
+            $instances[RootDseLoader::class] ??= new RootDseLoader($client);
         }
 
         return self::root($instances);

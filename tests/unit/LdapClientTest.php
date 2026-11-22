@@ -17,10 +17,12 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\AddResponse;
@@ -39,6 +41,10 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use WeakReference;
+
+use function gc_disable;
+use function gc_enable;
 
 class LdapClientTest extends TestCase
 {
@@ -520,6 +526,57 @@ class LdapClientTest extends TestCase
         );
     }
 
+    public function test_a_client_is_freed_as_soon_as_nothing_uses_it(): void
+    {
+        $client = new LdapClient((new ClientOptions())
+            ->setServers(['127.0.0.1'])
+            ->setPort(1)
+            ->setTimeoutConnect(1));
+        $this->sendWithoutAServer($client);
+        $released = WeakReference::create($client);
+
+        gc_disable();
+        try {
+            unset($client);
+
+            self::assertNull($released->get());
+        } finally {
+            gc_enable();
+        }
+    }
+
+    public function test_a_client_whose_unbind_fails_is_destroyed_without_throwing(): void
+    {
+        $queueInstantiator = $this->createMock(ClientQueueInstantiator::class);
+        $queueInstantiator
+            ->method('isInstantiatedAndConnected')
+            ->willReturn(true);
+        $handler = $this->createMock(ClientProtocolHandler::class);
+        $handler
+            ->expects(self::exactly(2))
+            ->method('send')
+            ->willReturnCallback(static function (RequestInterface $request): ?LdapMessageResponse {
+                if ($request instanceof UnbindRequest) {
+                    throw new ConnectionException('The connection is gone.');
+                }
+
+                return null;
+            });
+        $client = new LdapClient(
+            new ClientOptions(),
+            Container::forClient(
+                new ClientOptions(),
+                sharedInstances: [
+                    ClientProtocolHandler::class => $handler,
+                    ClientQueueInstantiator::class => $queueInstantiator,
+                ],
+            ),
+        );
+        $client->startTls();
+
+        unset($client);
+    }
+
     public function test_it_should_construct_a_syncrepl_helper(): void
     {
         $syncRequest = Filters::present('foo');
@@ -535,5 +592,19 @@ class LdapClientTest extends TestCase
             new SyncRepl($this->subject),
             $this->subject->syncRepl(),
         );
+    }
+
+    /**
+     * Fails a request on connect, which still builds the client's whole protocol handler graph.
+     */
+    private function sendWithoutAServer(LdapClient $client): void
+    {
+        try {
+            $client->send(Operations::whoami());
+        } catch (ConnectionException) {
+            return;
+        }
+
+        self::fail('The request was expected to fail without a server to connect to.');
     }
 }

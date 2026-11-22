@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
-use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Decoder\Response\TypedExtendedResponseDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
@@ -41,7 +40,6 @@ final class ClientContainerProvider implements ContainerProviderInterface
             SocketPool::class => $this->makeSocketPool(...),
             ClientProtocolHandlerFactory::class => $this->makeClientProtocolHandlerFactory(...),
             ClientQueueInstantiator::class => $this->makeClientQueueInstantiator(...),
-            RootDseLoader::class => $this->makeRootDseLoader(...),
         ];
     }
 
@@ -92,10 +90,5 @@ final class ClientContainerProvider implements ContainerProviderInterface
             rootDseLoader: $container->get(RootDseLoader::class),
             extendedResponses: $container->get(TypedExtendedResponseDecoder::class),
         );
-    }
-
-    private function makeRootDseLoader(Container $container): RootDseLoader
-    {
-        return new RootDseLoader($container->get(LdapClient::class));
     }
 }

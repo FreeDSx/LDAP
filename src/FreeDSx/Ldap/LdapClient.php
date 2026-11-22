@@ -75,14 +75,15 @@ class LdapClient
     }
 
     /**
-     * Try to clean-up if needed.
-     *
-     * @throws Exception\ConnectionException
-     * @throws OperationException
+     * Unbinds a connection still open, ignoring any failure.
      */
     public function __destruct()
     {
-        $this->unbindIfConnected();
+        try {
+            $this->unbindIfConnected();
+        } catch (Exception\ConnectionException|OperationException) {
+            // The connection is gone either way once the client is.
+        }
     }
 
     /**
