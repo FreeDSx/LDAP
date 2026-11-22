@@ -13,19 +13,32 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
+use FreeDSx\Ldap\Sync\SyncRepl;
+use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\RequestBudgetTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\DripsRequestsTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
+use function array_map;
 use function extension_loaded;
 use function microtime;
 use function range;
+use function sort;
+use function strtolower;
 use function usleep;
 
 /**
@@ -47,7 +60,10 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
         static::initSharedServer(
             'ldap-proxy',
             'tcp',
-            static::runnerArgs(),
+            [
+                ...static::runnerArgs(),
+                '--upstream-allow-sync',
+            ],
         );
     }
 
@@ -150,6 +166,148 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
         );
     }
 
+    public function testAnIncrementalSyncPollThroughTheProxyReportsDeletedEntries(): void
+    {
+        $this->authenticateUser();
+        $dns = [
+            'cn=proxy-sync-a,dc=foo,dc=bar',
+            'cn=proxy-sync-b,dc=foo,dc=bar',
+        ];
+        $uuids = $this->asAdmin(fn(LdapClient $admin): array => array_map(
+            fn(string $dn): string => $this->createPerson(
+                $admin,
+                $dn,
+            ),
+            $dns,
+        ));
+        $cookie = null;
+        $this->syncRepl()
+            ->useCookieHandler(static function (string $value) use (&$cookie): void {
+                $cookie = $value;
+            })
+            ->poll();
+        $this->asAdmin(static function (LdapClient $admin) use ($dns): void {
+            foreach ($dns as $dn) {
+                $admin->delete($dn);
+            }
+        });
+
+        $deleted = [];
+        $this->syncRepl()
+            ->useCookie($cookie)
+            ->useIdSetHandler(static function (SyncIdSetResult $result) use (&$deleted): void {
+                foreach ($result->getDecodedEntryUuids() as $uuid) {
+                    $deleted[] = strtolower($uuid);
+                }
+            })
+            ->poll();
+
+        sort($uuids);
+        sort($deleted);
+        self::assertSame(
+            $uuids,
+            $deleted,
+        );
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testACriticalPersistentSyncThroughTheProxyIsRefusedAndTheSessionStaysUsable(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->syncRepl()
+                ->useRefreshDoneHandler(static function (): void {
+                    throw new RuntimeException('The persistent sync reached its persist stage through the proxy.');
+                })
+                ->listen();
+            self::fail('A persistent sync through the proxy was expected to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    #[DataProvider('searchOpenForChangesProvider')]
+    public function testASearchKeptOpenForChangesThroughTheProxyIsRefusedByTheProxy(string $oid): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->sendAndReceive(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useBaseScope(),
+                new Control(
+                    $oid,
+                    true,
+                ),
+            );
+            self::fail('A search kept open for changes through the proxy was expected to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                [
+                    ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                    'A search that stays open for changes cannot be proxied.',
+                ],
+                [
+                    $e->getCode(),
+                    $e->getMessage(),
+                ],
+            );
+        }
+
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function searchOpenForChangesProvider(): iterable
+    {
+        yield 'a persistent search' => [Control::OID_PERSISTENT_SEARCH];
+        yield 'a change notification' => [Control::OID_CHANGE_NOTIFICATION];
+    }
+
+    public function testANonCriticalPersistentSyncThroughTheProxyRunsAsAPlainSearch(): void
+    {
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useBaseScope()
+                ->useIntermediateResponseHandler(static function (): void {
+                    throw new RuntimeException('The search reached the upstream as a persistent sync.');
+                }),
+            (new SyncRequestControl(SyncRequestControl::MODE_REFRESH_AND_PERSIST))->setCriticality(false),
+        );
+
+        $search = $response->getResponse();
+        self::assertInstanceOf(
+            SearchResponse::class,
+            $search,
+        );
+        self::assertCount(
+            1,
+            $search->getEntries(),
+        );
+        self::assertFalse($response->controls()->has(Control::OID_SYNC_DONE));
+    }
+
     /**
      * Appends the runner selection to every proxy this suite starts, including the per-test ones.
      *
@@ -184,6 +342,47 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
     {
         return extension_loaded('pcntl')
             && extension_loaded('posix');
+    }
+
+    /**
+     * A sync over the whole test directory.
+     */
+    private function syncRepl(): SyncRepl
+    {
+        $syncRepl = $this->ldapClient()->syncRepl();
+        $syncRepl->request()
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        return $syncRepl;
+    }
+
+    /**
+     * Creates a person and returns the entryUUID the upstream gave it.
+     */
+    private function createPerson(
+        LdapClient $admin,
+        string $dn,
+    ): string {
+        $entry = Entry::fromArray(
+            $dn,
+            [
+                'sn' => 'Sync',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        );
+        $entry->add(
+            'cn',
+            $entry->getDn()->getRdn()->getValue(),
+        );
+        $admin->create($entry);
+        $uuid = $admin->read(
+            $dn,
+            ['entryUUID'],
+        )?->get('entryUUID')?->firstValue();
+        self::assertIsString($uuid);
+
+        return strtolower($uuid);
     }
 
     /**

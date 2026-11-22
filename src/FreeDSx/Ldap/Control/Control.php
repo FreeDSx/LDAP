@@ -36,6 +36,8 @@ class Control implements ProtocolElementInterface, Stringable
 {
     public const OID_ASSERTION = '1.3.6.1.1.12';
 
+    public const OID_CHANGE_NOTIFICATION = '1.2.840.113556.1.4.528';
+
     public const OID_DIR_SYNC = '1.2.840.113556.1.4.841';
 
     public const OID_EXPECTED_ENTRY_COUNT = '1.2.840.113556.1.4.2211';
@@ -45,6 +47,8 @@ class Control implements ProtocolElementInterface, Stringable
     public const OID_MANAGE_DSA_IT = '2.16.840.1.113730.3.4.2';
 
     public const OID_PAGING = '1.2.840.113556.1.4.319';
+
+    public const OID_PERSISTENT_SEARCH = '2.16.840.1.113730.3.4.3';
 
     public const OID_POLICY_HINTS = '1.2.840.113556.1.4.2239';
 

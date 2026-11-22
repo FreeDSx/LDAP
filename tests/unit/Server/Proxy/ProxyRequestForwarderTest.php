@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 
+use ArrayObject;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -18,10 +20,12 @@ use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
+use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncNewCookie;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Search\Result\ReferralResult;
@@ -36,6 +40,7 @@ use FreeDSx\Ldap\Server\Proxy\ProxyRequestForwarder;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\WriteTimeoutException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -412,6 +417,140 @@ final class ProxyRequestForwarderTest extends TestCase
         );
     }
 
+    public function test_it_relays_an_intermediate_message_with_its_controls_under_the_client_message_id(): void
+    {
+        $control = new Control('1.3.6.1.4.1.42.2.27.8.5.1');
+        $cookie = new SyncNewCookie('next-cookie');
+        $this->upstreamStreams(
+            [new LdapMessageResponse(
+                3,
+                $cookie,
+                $control,
+            )],
+            ResultCode::SUCCESS,
+        );
+
+        $this->subject->handle($this->contextFor(
+            7,
+            $this->searchRequest(),
+        ));
+
+        self::assertSame(
+            7,
+            $this->relayed[0]->getMessageId(),
+        );
+        self::assertSame(
+            $cookie,
+            $this->relayed[0]->getResponse(),
+        );
+        self::assertEquals(
+            [$control],
+            $this->relayed[0]->controls()->toArray(),
+        );
+    }
+
+    #[DataProvider('searchOpenForChangesProvider')]
+    public function test_a_critical_control_that_keeps_the_search_open_is_refused_without_contacting_the_upstream(
+        Control $control,
+    ): void {
+        $this->client
+            ->expects(self::never())
+            ->method('sendAndReceive');
+
+        $this->subject->handle($this->searchContextWith(
+            7,
+            $control->setCriticality(true),
+        ));
+
+        $response = $this->relayed[0]->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            $response->getResultCode(),
+        );
+    }
+
+    #[DataProvider('searchOpenForChangesProvider')]
+    public function test_a_non_critical_control_that_keeps_the_search_open_is_left_out_of_the_forwarded_search(
+        Control $control,
+    ): void {
+        $other = new Control('1.3.6.1.4.1.42.2.27.8.5.1');
+        $forwarded = $this->captureForwardedControls();
+
+        $this->subject->handle($this->searchContextWith(
+            7,
+            $other,
+            $control->setCriticality(false),
+        ));
+
+        self::assertSame(
+            [$other],
+            $forwarded->getArrayCopy(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Control}>
+     */
+    public static function searchOpenForChangesProvider(): iterable
+    {
+        yield 'a persistent content synchronization' => [
+            new SyncRequestControl(SyncRequestControl::MODE_REFRESH_AND_PERSIST),
+        ];
+        yield 'a persistent search' => [
+            new Control(Control::OID_PERSISTENT_SEARCH),
+        ];
+        yield 'a change notification' => [
+            new Control(Control::OID_CHANGE_NOTIFICATION),
+        ];
+    }
+
+    public function test_a_persistent_sync_behind_a_sync_poll_is_still_refused(): void
+    {
+        $this->client
+            ->expects(self::never())
+            ->method('sendAndReceive');
+
+        $this->subject->handle($this->searchContextWith(
+            7,
+            new SyncRequestControl(SyncRequestControl::MODE_REFRESH_ONLY),
+            new SyncRequestControl(SyncRequestControl::MODE_REFRESH_AND_PERSIST),
+        ));
+
+        $response = $this->relayed[0]->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            $response->getResultCode(),
+        );
+    }
+
+    public function test_a_sync_poll_is_forwarded_with_its_sync_control(): void
+    {
+        $sync = new SyncRequestControl(SyncRequestControl::MODE_REFRESH_ONLY);
+        $forwarded = $this->captureForwardedControls();
+
+        $this->subject->handle(new ServerRequestContext(
+            new LdapMessageRequest(
+                7,
+                $this->searchRequest(),
+                $sync,
+            ),
+            $this->token,
+        ));
+
+        self::assertSame(
+            [$sync],
+            $forwarded->getArrayCopy(),
+        );
+    }
+
     public function test_it_relays_the_controls_a_failed_operation_answered_with(): void
     {
         $control = new Control('1.3.6.1.4.1.42.2.27.8.5.1');
@@ -450,6 +589,14 @@ final class ProxyRequestForwarderTest extends TestCase
                 static function (SearchRequest $request) use ($results, $resultCode, $doneControls): LdapMessageResponse {
                     foreach ($results as $result) {
                         $response = $result->getResponse();
+
+                        if ($response instanceof IntermediateResponse) {
+                            $intermediateHandler = $request->getIntermediateResponseHandler()
+                                ?? throw new RuntimeException('The forwarder installed no intermediate handler.');
+                            $intermediateHandler($result);
+
+                            continue;
+                        }
 
                         if ($response instanceof SearchResultReference) {
                             $referralHandler = $request->getReferralHandler()
@@ -493,6 +640,49 @@ final class ProxyRequestForwarderTest extends TestCase
     ): ServerRequestContext {
         return new ServerRequestContext(
             new LdapMessageRequest($messageId, $request),
+            $this->token,
+        );
+    }
+
+    /**
+     * Answers the forwarded search with success, collecting the controls it was sent upstream with.
+     *
+     * @return ArrayObject<int, Control>
+     */
+    private function captureForwardedControls(): ArrayObject
+    {
+        /** @var ArrayObject<int, Control> $forwarded */
+        $forwarded = new ArrayObject();
+        $this->client
+            ->expects(self::once())
+            ->method('sendAndReceive')
+            ->willReturnCallback(static function (
+                RequestInterface $request,
+                Control ...$controls,
+            ) use ($forwarded): LdapMessageResponse {
+                foreach ($controls as $control) {
+                    $forwarded->append($control);
+                }
+
+                return new LdapMessageResponse(
+                    99,
+                    new SearchResponse(new LdapResult(ResultCode::SUCCESS)),
+                );
+            });
+
+        return $forwarded;
+    }
+
+    private function searchContextWith(
+        int $messageId,
+        Control ...$controls,
+    ): ServerRequestContext {
+        return new ServerRequestContext(
+            new LdapMessageRequest(
+                $messageId,
+                $this->searchRequest(),
+                ...$controls,
+            ),
             $this->token,
         );
     }

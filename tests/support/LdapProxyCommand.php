@@ -136,6 +136,12 @@ final class LdapProxyCommand extends Command
                 '',
             )
             ->addOption(
+                'upstream-allow-sync',
+                null,
+                InputOption::VALUE_NONE,
+                'Let the standard user run content synchronization searches against the upstream',
+            )
+            ->addOption(
                 'log',
                 null,
                 InputOption::VALUE_NONE,
@@ -255,6 +261,9 @@ final class LdapProxyCommand extends Command
 
         if ($maxConnections !== '') {
             $args[] = '--max-connections=' . $maxConnections;
+        }
+        if ($input->getOption('upstream-allow-sync') === true) {
+            $args[] = '--allow-sync';
         }
 
         return $args;

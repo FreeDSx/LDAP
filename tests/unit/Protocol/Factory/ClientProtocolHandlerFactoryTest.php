@@ -24,9 +24,11 @@ use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientBasicHandler;
@@ -42,6 +44,7 @@ use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
+use FreeDSx\Ldap\Search\Filters;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -212,6 +215,45 @@ final class ClientProtocolHandlerFactoryTest extends TestCase
                 new SyncRequest(),
                 new SyncRefreshDelete(),
             ),
+        );
+    }
+
+    public function test_a_plain_search_answered_first_with_a_sync_info_message_gets_a_search_handler(): void
+    {
+        self::assertInstanceOf(
+            ClientSearchHandler::class,
+            $this->subject->forResponse(
+                Operations::search(Filters::present('objectClass')),
+                new SyncRefreshPresent(),
+            ),
+        );
+    }
+
+    public function test_a_plain_search_answered_first_with_an_intermediate_response_gets_a_search_handler(): void
+    {
+        self::assertInstanceOf(
+            ClientSearchHandler::class,
+            $this->subject->forResponse(
+                Operations::search(Filters::present('objectClass')),
+                new IntermediateResponse(
+                    '1.2.3.4',
+                    null,
+                ),
+            ),
+        );
+    }
+
+    public function test_an_extended_request_answered_with_an_intermediate_response_gets_no_search_handler(): void
+    {
+        self::assertSame(
+            ClientBasicHandler::class,
+            $this->subject->forResponse(
+                new ExtendedRequest('1.2.3.4'),
+                new IntermediateResponse(
+                    '1.2.3.4',
+                    null,
+                ),
+            )::class,
         );
     }
 }
