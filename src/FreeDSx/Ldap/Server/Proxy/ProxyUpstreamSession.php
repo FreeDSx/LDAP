@@ -15,7 +15,9 @@ namespace FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use SensitiveParameter;
 
 /**
@@ -23,7 +25,7 @@ use SensitiveParameter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class ProxyUpstreamSession
+final class ProxyUpstreamSession implements SessionTeardownInterface
 {
     private bool $isBound = false;
 
@@ -31,6 +33,24 @@ final class ProxyUpstreamSession
         private readonly LdapClient $client,
         private readonly bool $useStartTls = false,
     ) {}
+
+    /**
+     * Unbinds and closes the upstream connection when one is open, without ever opening one.
+     */
+    public function tearDown(): void
+    {
+        $this->isBound = false;
+
+        if (!$this->client->isConnected()) {
+            return;
+        }
+
+        try {
+            $this->client->unbind();
+        } catch (ConnectionException|OperationException) {
+            $this->client->disconnect();
+        }
+    }
 
     /**
      * Whether an identity is currently established upstream.
@@ -107,16 +127,6 @@ final class ProxyUpstreamSession
             return;
         }
 
-        $this->isBound = false;
-
-        if (!$this->client->isConnected()) {
-            return;
-        }
-
-        try {
-            $this->client->unbind();
-        } catch (ConnectionException) {
-            $this->client->disconnect();
-        }
+        $this->tearDown();
     }
 }

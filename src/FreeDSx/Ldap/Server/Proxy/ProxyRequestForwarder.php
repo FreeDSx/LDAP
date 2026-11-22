@@ -59,7 +59,7 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
         $request = $message->getRequest();
 
         if ($request instanceof UnbindRequest) {
-            $this->client->unbind();
+            $this->session->tearDown();
             $this->queue->close();
 
             return ResponseStream::resolved(OperationOutcomeResult::succeeded());

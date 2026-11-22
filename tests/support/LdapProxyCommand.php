@@ -129,6 +129,13 @@ final class LdapProxyCommand extends Command
                 '0',
             )
             ->addOption(
+                'upstream-max-connections',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Connections the upstream serves at once; the library default when omitted',
+                '',
+            )
+            ->addOption(
                 'log',
                 null,
                 InputOption::VALUE_NONE,
@@ -167,6 +174,7 @@ final class LdapProxyCommand extends Command
             $upstreamConfidentiality,
             $this->getStringOption($input, 'entries'),
             $this->getStringOption($input, 'entry-padding'),
+            $this->upstreamArgs($input),
         );
 
         register_shutdown_function(static fn() => $upstream->stop());
@@ -233,7 +241,29 @@ final class LdapProxyCommand extends Command
     }
 
     /**
+     * The upstream settings a test passes through the proxy, beyond the ones every upstream gets.
+     *
+     * @return list<string>
+     */
+    private function upstreamArgs(InputInterface $input): array
+    {
+        $args = [];
+        $maxConnections = $this->getStringOption(
+            $input,
+            'upstream-max-connections',
+        );
+
+        if ($maxConnections !== '') {
+            $args[] = '--max-connections=' . $maxConnections;
+        }
+
+        return $args;
+    }
+
+    /**
      * The proxy owns its upstream, so tests get both from one process tree.
+     *
+     * @param list<string> $extraArgs
      */
     private function startUpstream(
         int $port,
@@ -241,6 +271,7 @@ final class LdapProxyCommand extends Command
         string $confidentiality,
         string $entries,
         string $entryPadding,
+        array $extraArgs,
     ): Process {
         $upstream = new Process([
             'php',
@@ -252,6 +283,7 @@ final class LdapProxyCommand extends Command
             '--entries=' . $entries,
             '--entry-padding=' . $entryPadding,
             '--require-confidentiality=' . $confidentiality,
+            ...$extraArgs,
         ]);
         $upstream->start();
 

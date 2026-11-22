@@ -54,6 +54,8 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Protocol\Session\NoSessionTeardown;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
@@ -565,6 +567,24 @@ class ContainerTest extends TestCase
         );
     }
 
+    public function test_a_directory_session_holds_nothing_to_tear_down(): void
+    {
+        self::assertInstanceOf(
+            NoSessionTeardown::class,
+            $this->openConnectionScope($this->saslAndManagerContainer())->get(SessionTeardownInterface::class),
+        );
+    }
+
+    public function test_a_proxied_session_tears_down_its_own_upstream_session(): void
+    {
+        $scope = $this->openConnectionScope($this->proxyContainer());
+
+        self::assertSame(
+            $scope->get(ProxyUpstreamSession::class),
+            $scope->get(SessionTeardownInterface::class),
+        );
+    }
+
     public function test_a_proxy_container_uses_the_server_protocol_factory(): void
     {
         $container = Container::forProxy(new ProxyOptions(new ProxyServerOptions()));
@@ -722,6 +742,7 @@ class ContainerTest extends TestCase
             [RequestValidationMiddleware::class],
             [ConfidentialityMiddleware::class],
             [ServerProtocolHandler::class],
+            [SessionTeardownInterface::class],
             [PasswordPolicyContext::class],
             [PasswordPolicyBindGuard::class],
             [PasswordPolicyAwareAuthenticator::class],
@@ -771,6 +792,7 @@ class ContainerTest extends TestCase
             [ServerProtocolHandler::class],
             [LdapClient::class],
             [ProxyUpstreamSession::class],
+            [SessionTeardownInterface::class],
             [SimpleBind::class],
             [Authenticator::class],
             [DispatchAuthorizer::class],

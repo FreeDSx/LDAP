@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\Session\NoSessionTeardown;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -46,6 +48,7 @@ readonly class ServerProtocolHandler
         private EventLogger $eventLogger = new EventLogger(null),
         private ResponseFactory $responseFactory = new ResponseFactory(),
         private ConnectionContext $connectionContext = new ConnectionContext(),
+        private SessionTeardownInterface $teardown = new NoSessionTeardown(),
     ) {}
 
     /**
@@ -67,6 +70,7 @@ readonly class ServerProtocolHandler
             if ($this->queue->isConnected()) {
                 $this->queue->close();
             }
+            $this->teardown->tearDown();
         }
     }
 

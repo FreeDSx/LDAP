@@ -6,6 +6,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
@@ -260,6 +261,79 @@ final class ProxyUpstreamSessionTest extends TestCase
         $this->subject->reset();
 
         self::assertFalse($this->subject->isBound());
+    }
+
+    public function test_tearing_down_unbinds_a_bound_upstream(): void
+    {
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->expects(self::once())
+            ->method('unbind');
+
+        $this->subject->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $this->subject->tearDown();
+
+        self::assertFalse($this->subject->isBound());
+    }
+
+    public function test_tearing_down_closes_an_upstream_connection_that_never_bound(): void
+    {
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->expects(self::once())
+            ->method('unbind');
+
+        $this->subject->tearDown();
+    }
+
+    public function test_tearing_down_never_opens_an_upstream_connection(): void
+    {
+        $this->client
+            ->expects(self::never())
+            ->method('unbind');
+        $this->client
+            ->expects(self::never())
+            ->method('disconnect');
+
+        $this->subject->tearDown();
+    }
+
+    public function test_tearing_down_closes_the_connection_when_the_upstream_refuses_the_unbind(): void
+    {
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->method('unbind')
+            ->willThrowException(new OperationException('refused'));
+        $this->client
+            ->expects(self::once())
+            ->method('disconnect');
+
+        $this->subject->tearDown();
+    }
+
+    public function test_tearing_down_twice_unbinds_once(): void
+    {
+        $this->client
+            ->method('isConnected')
+            ->willReturnOnConsecutiveCalls(
+                true,
+                false,
+            );
+        $this->client
+            ->expects(self::once())
+            ->method('unbind');
+
+        $this->subject->tearDown();
+        $this->subject->tearDown();
     }
 
     private function makeStartTlsSession(): ProxyUpstreamSession

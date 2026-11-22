@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -41,7 +42,7 @@ use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
- * Registers the connection services shared by both servers, except each one's queue, authenticator and pipeline.
+ * Registers the connection services both servers share, except each one's queue, authenticator, pipeline and teardown.
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
@@ -217,6 +218,7 @@ class ConnectionScaffoldingContainerProvider implements ContainerProviderInterfa
             decodeFailures: $container->get(DecodeFailureResponder::class),
             eventLogger: $container->get(EventLogger::class),
             connectionContext: $container->get(ConnectionContext::class),
+            teardown: $container->get(SessionTeardownInterface::class),
         );
     }
 }

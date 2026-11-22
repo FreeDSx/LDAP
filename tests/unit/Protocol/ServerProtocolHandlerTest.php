@@ -36,6 +36,8 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Protocol\Session\NoSessionTeardown;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Logging\EventContext;
@@ -400,6 +402,88 @@ final class ServerProtocolHandlerTest extends TestCase
             ->handle();
     }
 
+    public function test_the_session_is_torn_down_after_a_request_closes_the_connection(): void
+    {
+        $this->mockQueue = $this->createMock(ServerQueue::class);
+        $this->mockQueue
+            ->method('isConnected')
+            ->willReturn(false);
+        $this->queueReturns([
+            new LdapMessageRequest(
+                1,
+                new ModifyDnRequest(
+                    'cn=foo,dc=bar',
+                    'cn=bar',
+                    true,
+                ),
+            ),
+        ]);
+
+        $this->handlerWith(
+            new StubMiddlewareHandler(OperationOutcomeResult::succeeded()),
+            teardown: $this->expectTeardown(),
+        )->handle();
+    }
+
+    public function test_the_session_is_torn_down_when_the_client_closes_the_connection(): void
+    {
+        $this->queueReturns([]);
+
+        $this->handlerWith(
+            new StubMiddlewareHandler(OperationOutcomeResult::succeeded()),
+            teardown: $this->expectTeardown(),
+        )->handle();
+    }
+
+    public function test_the_session_is_torn_down_when_a_failure_ends_it(): void
+    {
+        $this->queueReturns([
+            new LdapMessageRequest(
+                1,
+                new ModifyDnRequest(
+                    'cn=foo,dc=bar',
+                    'cn=bar',
+                    true,
+                ),
+            ),
+        ]);
+
+        $this->handlerWith(
+            new ThrowingMiddlewareHandler(new ProtocolException('The PDU is malformed.')),
+            teardown: $this->expectTeardown(),
+        )->handle();
+    }
+
+    public function test_the_session_is_torn_down_after_the_client_connection_is_closed(): void
+    {
+        $calls = [];
+        $this->mockQueue
+            ->method('close')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'close';
+            });
+        $teardown = $this->createMock(SessionTeardownInterface::class);
+        $teardown
+            ->method('tearDown')
+            ->willReturnCallback(static function () use (&$calls): void {
+                $calls[] = 'tearDown';
+            });
+        $this->queueReturns([]);
+
+        $this->handlerWith(
+            new StubMiddlewareHandler(OperationOutcomeResult::succeeded()),
+            teardown: $teardown,
+        )->handle();
+
+        self::assertSame(
+            [
+                'close',
+                'tearDown',
+            ],
+            $calls,
+        );
+    }
+
     public function test_a_write_timeout_is_recorded_and_closes_without_a_notice_of_disconnect(): void
     {
         $recordingLogger = new RecordingLogger();
@@ -680,9 +764,20 @@ final class ServerProtocolHandlerTest extends TestCase
             });
     }
 
+    private function expectTeardown(): SessionTeardownInterface
+    {
+        $teardown = $this->createMock(SessionTeardownInterface::class);
+        $teardown
+            ->expects(self::once())
+            ->method('tearDown');
+
+        return $teardown;
+    }
+
     private function handlerWith(
         MiddlewareHandlerInterface $pipeline,
         ?EventLogger $eventLogger = null,
+        SessionTeardownInterface $teardown = new NoSessionTeardown(),
     ): ServerProtocolHandler {
         $eventLogger ??= new EventLogger(null);
 
@@ -702,6 +797,7 @@ final class ServerProtocolHandlerTest extends TestCase
                 $eventLogger,
             ),
             $eventLogger,
+            teardown: $teardown,
         );
     }
 
