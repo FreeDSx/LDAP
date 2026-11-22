@@ -593,6 +593,28 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
+    public function test_a_sync_control_a_search_route_ignores_needs_no_grant(): void
+    {
+        $this->routeResolvesTo(HandlerId::Search);
+        $this->accessControl
+            ->expects(self::never())
+            ->method('authorizeControl');
+
+        $this->subject->process(
+            new ServerRequestContext(
+                new LdapMessageRequest(
+                    1,
+                    (new SearchRequest(Filters::present('objectClass')))->base('dc=foo,dc=bar'),
+                    new Control(Control::OID_SYNC_REQUEST),
+                ),
+                $this->token,
+            ),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
+    }
+
     public function test_sync_route_control_denial_blocks_dispatch(): void
     {
         $subject = new OperationAuthorizationMiddleware(

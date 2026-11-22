@@ -87,7 +87,7 @@ final class LdapAuditJournalTest extends ServerTestCase
             ->useSubtreeScope();
 
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+        $this->expectExceptionCode(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION);
 
         $syncRepl->poll(static fn() => null);
     }

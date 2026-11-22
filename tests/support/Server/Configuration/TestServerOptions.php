@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\PasswordHashing;
+use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
@@ -102,6 +104,14 @@ final class TestServerOptions
     public static function defaults(): ServerOptions
     {
         return new ServerOptions(self::transientStorage());
+    }
+
+    /**
+     * Stock options on a content synchronization provider.
+     */
+    public static function provider(): ServerOptions
+    {
+        return self::defaults()->setReplicationConfig(ReplicationConfig::forProvider(new ProviderConfig()));
     }
 
     /**

@@ -78,14 +78,17 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         ServerRequestContext $context,
         MiddlewareHandlerInterface $next,
     ): ResponseStream {
-        $this->authorizePrivilegedExtendedOperation($context);
-        $this->authorizePrivilegedControls($context);
-        $this->authorizeControlledReads($context);
-
         $routeId = $this->routeResolver->routeIdFor(
             $context->message->getRequest(),
             $context->message->controls(),
         );
+
+        $this->authorizePrivilegedExtendedOperation($context);
+        $this->authorizePrivilegedControls(
+            $context,
+            $routeId,
+        );
+        $this->authorizeControlledReads($context);
 
         if ($routeId === HandlerId::Search || $routeId === HandlerId::Paging) {
             $this->authorizeSearch(
@@ -148,12 +151,14 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     }
 
     /**
-     * Authorize every privileged control on the request ahead of routing so that no route can omit the gate.
+     * Authorize every privileged control on the request before any handler runs so that no route can omit the gate.
      *
      * @throws OperationException
      */
-    private function authorizePrivilegedControls(ServerRequestContext $context): void
-    {
+    private function authorizePrivilegedControls(
+        ServerRequestContext $context,
+        HandlerId $routeId,
+    ): void {
         $request = $context->message->getRequest();
 
         // Neither carries a response, so a denial here could only be delivered as an unsolicited notification.
@@ -166,6 +171,10 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
 
         foreach (self::PRIVILEGED_CONTROLS as $oid) {
             if (!$controls->has($oid)) {
+                continue;
+            }
+            // RFC 4511 section 4.1.11 has a server ignore a non-critical control it does not serve.
+            if ($oid === Control::OID_SYNC_REQUEST && $routeId !== HandlerId::Sync) {
                 continue;
             }
 

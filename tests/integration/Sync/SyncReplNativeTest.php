@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -31,6 +33,7 @@ use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
@@ -911,6 +914,82 @@ final class SyncReplNativeTest extends ServerTestCase
                 $e->getCode(),
             );
         }
+    }
+
+    #[DataProvider('syncModeProvider')]
+    public function testACriticalSyncToAServerThatIsNotAProviderIsAnUnavailableCriticalExtension(int $mode): void
+    {
+        $this->startAServerThatIsNotAProvider();
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->sendAndReceive(
+                $this->searchThatFailsOnASyncMessage(),
+                new SyncRequestControl($mode),
+            );
+            self::fail('A critical sync to a server that is not a provider was expected to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    #[DataProvider('syncModeProvider')]
+    public function testANonCriticalSyncToAServerThatIsNotAProviderRunsAsAPlainSearch(int $mode): void
+    {
+        $this->startAServerThatIsNotAProvider();
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->sendAndReceive(
+            $this->searchThatFailsOnASyncMessage(),
+            (new SyncRequestControl($mode))->setCriticality(false),
+        );
+
+        $search = $response->getResponse();
+        self::assertInstanceOf(
+            SearchResponse::class,
+            $search,
+        );
+        self::assertCount(
+            1,
+            $search->getEntries(),
+        );
+        self::assertFalse($response->controls()->has(Control::OID_SYNC_DONE));
+    }
+
+    /**
+     * @return iterable<string, array{int}>
+     */
+    public static function syncModeProvider(): iterable
+    {
+        yield 'a poll' => [SyncRequestControl::MODE_REFRESH_ONLY];
+        yield 'a persistent sync' => [SyncRequestControl::MODE_REFRESH_AND_PERSIST];
+    }
+
+    private function startAServerThatIsNotAProvider(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--seed=' . self::SEED_LDIF,
+                '--no-provider',
+            ],
+        );
+    }
+
+    /**
+     * A base search of the suffix that fails as soon as the server answers it with a sync message.
+     */
+    private function searchThatFailsOnASyncMessage(): SearchRequest
+    {
+        return Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useBaseScope()
+            ->useIntermediateResponseHandler(static function (): void {
+                throw new RuntimeException('The server answered with a sync message.');
+            });
     }
 
     private function syncRepl(

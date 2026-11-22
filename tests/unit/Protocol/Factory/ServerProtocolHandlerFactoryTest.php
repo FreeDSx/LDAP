@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -66,24 +67,157 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
         );
     }
 
+    #[DataProvider('syncControlsProvider')]
+    public function test_a_sync_search_routes_to_sync_on_a_provider(ControlBag $controls): void
+    {
+        $factory = new ServerProtocolHandlerFactory(TestServerOptions::provider());
+
+        self::assertSame(
+            HandlerId::Sync,
+            $factory->routeIdFor(
+                Operations::list(
+                    new EqualityFilter(
+                        'foo',
+                        'bar',
+                    ),
+                    'cn=foo',
+                ),
+                $controls,
+            ),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{ControlBag}>
+     */
+    public static function syncControlsProvider(): iterable
+    {
+        yield 'the sync control alone' => [
+            new ControlBag(new SyncRequestControl()),
+        ];
+        yield 'the sync control alongside paging' => [
+            new ControlBag(
+                new SyncRequestControl(),
+                new PagingControl(10),
+            ),
+        ];
+    }
+
     /**
      * @return iterable<string, array{RequestInterface, ControlBag, HandlerId}>
      */
     public static function routes(): iterable
     {
-        yield 'abandon' => [new AbandonRequest(1), new ControlBag(), HandlerId::Abandon];
-        yield 'cancel' => [new CancelRequest(1), new ControlBag(), HandlerId::Cancel];
-        yield 'whoami' => [Operations::whoami(), new ControlBag(), HandlerId::WhoAmI];
-        yield 'password modify' => [Operations::extended(ExtendedRequest::OID_PWD_MODIFY), new ControlBag(), HandlerId::PasswordModify];
-        yield 'start tls' => [Operations::extended(ExtendedRequest::OID_START_TLS), new ControlBag(), HandlerId::StartTls];
-        yield 'unsupported extended' => [Operations::extended('1.2.3.4.5.6.7.8.9'), new ControlBag(), HandlerId::UnsupportedExtended];
-        yield 'root dse' => [Operations::read(''), new ControlBag(), HandlerId::RootDse];
-        yield 'subschema' => [Operations::read('cn=Subschema'), new ControlBag(), HandlerId::Subschema];
-        yield 'monitor disabled routes to search' => [Operations::read('cn=monitor'), new ControlBag(), HandlerId::Search];
-        yield 'paging' => [Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag(new PagingControl(10)), HandlerId::Paging];
-        yield 'search' => [Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag(), HandlerId::Search];
-        yield 'unbind' => [Operations::unbind(), new ControlBag(), HandlerId::Unbind];
-        yield 'compare' => [Operations::compare('cn=foo', 'cn', 'foo'), new ControlBag(), HandlerId::Compare];
-        yield 'delete dispatch' => [Operations::delete('cn=foo'), new ControlBag(), HandlerId::Dispatch];
+        yield 'abandon' => [
+            new AbandonRequest(1),
+            new ControlBag(),
+            HandlerId::Abandon,
+        ];
+        yield 'cancel' => [
+            new CancelRequest(1),
+            new ControlBag(),
+            HandlerId::Cancel,
+        ];
+        yield 'whoami' => [
+            Operations::whoami(),
+            new ControlBag(),
+            HandlerId::WhoAmI,
+        ];
+        yield 'password modify' => [
+            Operations::extended(ExtendedRequest::OID_PWD_MODIFY),
+            new ControlBag(),
+            HandlerId::PasswordModify,
+        ];
+        yield 'start tls' => [
+            Operations::extended(ExtendedRequest::OID_START_TLS),
+            new ControlBag(),
+            HandlerId::StartTls,
+        ];
+        yield 'unsupported extended' => [
+            Operations::extended('1.2.3.4.5.6.7.8.9'),
+            new ControlBag(),
+            HandlerId::UnsupportedExtended,
+        ];
+        yield 'root dse' => [
+            Operations::read(''),
+            new ControlBag(),
+            HandlerId::RootDse,
+        ];
+        yield 'subschema' => [
+            Operations::read('cn=Subschema'),
+            new ControlBag(),
+            HandlerId::Subschema,
+        ];
+        yield 'monitor disabled routes to search' => [
+            Operations::read('cn=monitor'),
+            new ControlBag(),
+            HandlerId::Search,
+        ];
+        yield 'paging' => [
+            Operations::list(
+                new EqualityFilter(
+                    'foo',
+                    'bar',
+                ),
+                'cn=foo',
+            ),
+            new ControlBag(new PagingControl(10)),
+            HandlerId::Paging,
+        ];
+        yield 'search' => [
+            Operations::list(
+                new EqualityFilter(
+                    'foo',
+                    'bar',
+                ),
+                'cn=foo',
+            ),
+            new ControlBag(),
+            HandlerId::Search,
+        ];
+        yield 'sync on a server that is not a provider' => [
+            Operations::list(
+                new EqualityFilter(
+                    'foo',
+                    'bar',
+                ),
+                'cn=foo',
+            ),
+            new ControlBag(new SyncRequestControl()),
+            HandlerId::Search,
+        ];
+        yield 'sync with paging on a server that is not a provider' => [
+            Operations::list(
+                new EqualityFilter(
+                    'foo',
+                    'bar',
+                ),
+                'cn=foo',
+            ),
+            new ControlBag(
+                new SyncRequestControl(),
+                new PagingControl(10),
+            ),
+            HandlerId::Paging,
+        ];
+        yield 'unbind' => [
+            Operations::unbind(),
+            new ControlBag(),
+            HandlerId::Unbind,
+        ];
+        yield 'compare' => [
+            Operations::compare(
+                'cn=foo',
+                'cn',
+                'foo',
+            ),
+            new ControlBag(),
+            HandlerId::Compare,
+        ];
+        yield 'delete dispatch' => [
+            Operations::delete('cn=foo'),
+            new ControlBag(),
+            HandlerId::Dispatch,
+        ];
     }
 }
