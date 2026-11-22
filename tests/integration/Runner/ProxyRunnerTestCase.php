@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
@@ -22,6 +24,9 @@ use Tests\Support\FreeDSx\Ldap\DripsRequestsTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 use function extension_loaded;
+use function microtime;
+use function range;
+use function usleep;
 
 /**
  * Proxy behavior that runs against every server runner.
@@ -124,6 +129,27 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
         self::assertNotNull($this->ldapClient()->read('dc=foo,dc=bar'));
     }
 
+    public function testASessionClosedWithoutAnUnbindReleasesItsUpstreamConnection(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--upstream-max-connections=2'],
+        );
+
+        foreach (range(
+            1,
+            3,
+        ) as $ignored) {
+            $this->boundRawQueue()->close();
+        }
+        $this->bindOnceTheUpstreamHasRoom();
+
+        self::assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
     /**
      * Appends the runner selection to every proxy this suite starts, including the per-test ones.
      *
@@ -158,5 +184,26 @@ abstract class ProxyRunnerTestCase extends ServerTestCase
     {
         return extension_loaded('pcntl')
             && extension_loaded('posix');
+    }
+
+    /**
+     * Binds as the standard user, retrying while the upstream refuses the connection for want of room.
+     */
+    private function bindOnceTheUpstreamHasRoom(): void
+    {
+        $deadline = microtime(true) + 5.0;
+
+        while (true) {
+            try {
+                $this->authenticateUser();
+
+                return;
+            } catch (BindException $e) {
+                if ($e->getCode() !== ResultCode::UNAVAILABLE || microtime(true) >= $deadline) {
+                    throw $e;
+                }
+                usleep(100_000);
+            }
+        }
     }
 }

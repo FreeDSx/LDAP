@@ -243,8 +243,44 @@ final class ProxyRequestForwarderTest extends TestCase
     public function test_it_closes_both_connections_on_unbind(): void
     {
         $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
             ->expects(self::once())
             ->method('unbind');
+        $this->queue
+            ->expects(self::once())
+            ->method('close');
+
+        $this->subject->handle($this->contextFor(
+            1,
+            new UnbindRequest(),
+        ));
+    }
+
+    public function test_an_unbind_sends_nothing_upstream_when_the_upstream_was_never_used(): void
+    {
+        $this->client
+            ->expects(self::never())
+            ->method('unbind');
+        $this->queue
+            ->expects(self::once())
+            ->method('close');
+
+        $this->subject->handle($this->contextFor(
+            1,
+            new UnbindRequest(),
+        ));
+    }
+
+    public function test_an_unbind_closes_the_client_connection_when_the_upstream_is_gone(): void
+    {
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->method('unbind')
+            ->willThrowException(new ConnectionException('gone'));
         $this->queue
             ->expects(self::once())
             ->method('close');

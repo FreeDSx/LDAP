@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
@@ -58,6 +59,8 @@ class ProxyConnectionContainerProvider implements ContainerProviderInterface
                 $container->get(ProxyOptions::class)->getClientOptions(),
             ),
             ProxyUpstreamSession::class => $this->makeUpstreamSession(...),
+            SessionTeardownInterface::class => static fn(Container $container): ProxyUpstreamSession
+                => $container->get(ProxyUpstreamSession::class),
             SimpleBind::class => $this->makeSimpleBind(...),
             Authenticator::class => $this->makeAuthenticator(...),
             DispatchAuthorizer::class => static fn(Container $container): DispatchAuthorizer => new DispatchAuthorizer(

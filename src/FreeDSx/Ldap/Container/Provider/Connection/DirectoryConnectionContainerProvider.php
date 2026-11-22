@@ -45,6 +45,8 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
+use FreeDSx\Ldap\Protocol\Session\NoSessionTeardown;
+use FreeDSx\Ldap\Protocol\Session\SessionTeardownInterface;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
@@ -108,6 +110,7 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
     {
         return [
             ServerQueue::class => $this->makeServerQueue(...),
+            SessionTeardownInterface::class => static fn(): NoSessionTeardown => new NoSessionTeardown(),
             PasswordPolicyContext::class => static fn(): PasswordPolicyContext => new PasswordPolicyContext(),
             PasswordPolicyBindGuard::class => $this->makePasswordPolicyBindGuard(...),
             PasswordPolicyAwareAuthenticator::class => $this->makePasswordPolicyAwareAuthenticator(...),
