@@ -219,13 +219,17 @@ process. Anything else is clamped back to a single worker with a logged warning.
 | PDO (`PdoConfig`) | Yes | The database is the shared state |
 | In-memory (`InMemoryStorageConfig`) | No | Entries never leave the process that holds them |
 
-A proxy has no local directory, so it can always use multiple workers.
+A proxy has no local directory. Only a unix socket limits its workers.
+
+A server or proxy listening on a unix socket is also clamped to a single worker, whatever its storage. Each worker binds
+its own listener, and only one can bind the socket's path.
 
 ### Concurrency Limits
 
 The server logs `server.concurrency_limited` at startup when one of these limits how many clients it serves at once:
 
 * `storage_not_shareable`: the storage cannot be shared between processes.
+* `unix_socket`: only one worker can bind the unix socket the server listens on.
 * `storage_blocks_worker`: a SQLite lock wait blocks a worker that serves many clients in one process.
 * `open_file_limit`: `ulimit -n` is below the open files a worker that serves many clients in one process needs at the
   connection limit.

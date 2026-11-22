@@ -82,10 +82,7 @@ final class RunnerConfig
     }
 
     /**
-     * Only the Swoole runner uses this.
-     *
-     * More than one worker requires a backend that keeps no state in the process, so in-memory storage is clamped
-     * back to a single worker.
+     * Worker processes for the Swoole runner, clamped to one for in-memory storage or a unix socket.
      */
     public function setWorkers(int $workers): self
     {
