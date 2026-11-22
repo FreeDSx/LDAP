@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -88,5 +89,14 @@ final class RootDseLoaderTest extends TestCase
         self::expectException(OperationException::class);
 
         $this->subject->load();
+    }
+
+    public function test_it_refuses_to_load_once_its_client_is_gone(): void
+    {
+        $subject = new RootDseLoader(new LdapClient());
+
+        self::expectException(RuntimeException::class);
+
+        $subject->load();
     }
 }

@@ -15,7 +15,9 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapClient;
+use WeakReference;
 
 class RootDseLoader
 {
@@ -27,19 +29,33 @@ class RootDseLoader
 
     private ?Entry $rootDse = null;
 
-    public function __construct(private readonly LdapClient $client) {}
+    /**
+     * @var WeakReference<LdapClient>
+     */
+    private readonly WeakReference $client;
+
+    /**
+     * The client is held weakly to break the cycle through the client that holds this loader.
+     */
+    public function __construct(LdapClient $client)
+    {
+        $this->client = WeakReference::create($client);
+    }
 
     /**
      * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
      *
      * @throws OperationException
+     * @throws RuntimeException when the client that loads it is gone
      */
     public function load(bool $reload = false): Entry
     {
         if ($reload === false && $this->rootDse !== null) {
             return $this->rootDse;
         }
-        $this->rootDse = $this->client->read(
+        $client = $this->client->get() ?? throw new RuntimeException('The client that loads the RootDSE is gone.');
+
+        $this->rootDse = $client->read(
             entry: '',
             attributes: self::ROOTDSE_ATTRIBUTES,
         );

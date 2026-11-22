@@ -694,7 +694,6 @@ class ContainerTest extends TestCase
     public static function clientDependenciesDataProvider(): array
     {
         return [
-            [LdapClient::class],
             [ClientProtocolHandler::class],
             [ClientQueueInstantiator::class],
             [ClientProtocolHandlerFactory::class],
