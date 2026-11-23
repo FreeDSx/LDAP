@@ -42,6 +42,8 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
 
     private const PWD_FAILURE_TIME = 'pwdFailureTime';
 
+    private const PWD_CHANGED_TIME = 'pwdChangedTime';
+
     /**
      * What the engine keeps when the policy names no maximum of its own.
      */
@@ -84,6 +86,7 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
             $this->pollUntil(fn(): bool => $this->providerHasLock($dn)),
             'The account should first lock on the provider via forward.',
         );
+        $forwardedFailures = $this->failureTimesOnProvider($dn);
 
         // An admin reset on the provider advances pwdChangedTime and clears the lockout.
         $this->resetPasswordOnProvider($dn, 'newpass');
@@ -93,9 +96,23 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         );
 
         // The reset replicates back; the replica supersedes its local lock and accepts the new password.
+        $lastBindFailure = null;
+        $retired = $this->pollUntil(function () use ($dn, &$lastBindFailure): bool {
+            $lastBindFailure = $this->replicaBindFailure(
+                $dn,
+                'newpass',
+            );
+
+            return $lastBindFailure === null;
+        });
         self::assertTrue(
-            $this->pollUntil(fn(): bool => $this->replicaBindSucceeds($dn, 'newpass')),
-            'The replica should retire its local lock once the reset replicates.',
+            $retired,
+            'The replica should retire its local lock once the reset replicates. '
+                . $this->describeLockState(
+                    $dn,
+                    $lastBindFailure,
+                    $forwardedFailures,
+                ),
         );
     }
 
@@ -351,10 +368,10 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         }
     }
 
-    private function replicaBindSucceeds(
+    private function replicaBindFailure(
         string $dn,
         string $password,
-    ): bool {
+    ): ?string {
         $client = $this->buildClient('tcp');
 
         try {
@@ -363,9 +380,9 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
                 $password,
             );
 
-            return true;
-        } catch (BindException) {
-            return false;
+            return null;
+        } catch (BindException $e) {
+            return $e->getCode() . ' (' . $e->getMessage() . ')';
         } finally {
             $this->quietUnbind($client);
         }
@@ -375,7 +392,65 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         string $dn,
         string $password,
     ): void {
-        $this->replicaBindSucceeds($dn, $password);
+        $this->replicaBindFailure(
+            $dn,
+            $password,
+        );
+    }
+
+    /**
+     * @param list<string> $forwardedFailures
+     */
+    private function describeLockState(
+        string $dn,
+        ?string $lastBindFailure,
+        array $forwardedFailures,
+    ): string {
+        return sprintf(
+            'Last replica bind: %s. Forwarded failures before the reset: %s. Provider now: %s.',
+            $lastBindFailure ?? 'none',
+            implode(
+                '|',
+                $forwardedFailures,
+            ),
+            $this->policyStateOnProvider($dn),
+        );
+    }
+
+    private function policyStateOnProvider(string $dn): string
+    {
+        $attributes = [
+            self::PWD_CHANGED_TIME,
+            self::PWD_LOCKED_TIME,
+            self::PWD_FAILURE_TIME,
+        ];
+        $manager = $this->providerClient();
+
+        try {
+            $manager->bind(
+                LdapServerCommand::MANAGER_DN,
+                LdapServerCommand::MANAGER_PASSWORD,
+            );
+            $entry = $manager->read(
+                $dn,
+                $attributes,
+            );
+        } catch (Throwable $e) {
+            return 'unreadable (' . $e->getMessage() . ')';
+        } finally {
+            $this->quietUnbind($manager);
+        }
+
+        return implode(
+            ', ',
+            array_map(
+                static fn(string $name): string => $name . '=' . implode(
+                    '|',
+                    $entry?->get($name)?->getValues() ?? [],
+                ),
+                $attributes,
+            ),
+        );
     }
 
     private function waitForReplica(
