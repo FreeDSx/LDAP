@@ -13,11 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner\Concern;
 
+use function posix_kill;
 use function usleep;
 
 trait StraySignalTestsTrait
 {
-    public function testAServerSentSigusr1KeepsServingItsSessionsAndNewClients(): void
+    public function testASigusr1SentToEveryServerProcessKeepsServingItsSessionsAndNewClients(): void
     {
         $this->requirePosix();
         $this->createServerProcess('tcp');
@@ -27,7 +28,12 @@ trait StraySignalTestsTrait
             '12345',
         );
 
-        $this->sendServerSignal(SIGUSR1);
+        foreach ([$this->serverPid(), ...$this->serverChildPids()] as $pid) {
+            posix_kill(
+                $pid,
+                SIGUSR1,
+            );
+        }
         usleep(250_000);
 
         self::assertTrue(

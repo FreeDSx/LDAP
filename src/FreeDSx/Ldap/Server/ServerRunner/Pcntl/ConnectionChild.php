@@ -212,11 +212,6 @@ class ConnectionChild
         }
 
         if ($this->configuration->follow($context)) {
-            $this->configuration->events()->record(
-                ServerEvent::ClientReloadFollowed,
-                $context,
-            );
-
             return;
         }
 

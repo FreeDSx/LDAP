@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 use Closure;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
@@ -90,19 +91,25 @@ class RunnerConfiguration
      * For a process that serves only the connections it already has: runs the reloader and applies what they must follow.
      *
      * @param array<string, mixed> $context
-     * @return bool whether the reload was applied
+     * @return bool whether its connections can stay open, which only a failed reload prevents
      */
     public function follow(array $context): bool
     {
-        $reloaded = (new ReloadCoordinator())->reloadOptions(
+        $coordinator = new ReloadCoordinator();
+        $reloaded = $coordinator->reloadOptions(
             $this->options,
             $context,
         );
         if ($reloaded === null) {
-            return false;
+            // With nothing to reload, the connections are already on the current configuration.
+            return !$coordinator->canReload($this->options);
         }
 
         ($this->applyReload)($reloaded);
+        $this->events->record(
+            ServerEvent::ClientReloadFollowed,
+            $context,
+        );
 
         return true;
     }

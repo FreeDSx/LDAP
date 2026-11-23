@@ -26,6 +26,8 @@ use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 
+use function array_map;
+use function exec;
 use function extension_loaded;
 
 /**
@@ -121,6 +123,23 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         foreach ($clients as $client) {
             fclose($client);
         }
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function serverChildPids(): array
+    {
+        $pids = [];
+        exec(
+            'pgrep -P ' . $this->serverPid(),
+            $pids,
+        );
+
+        return array_map(
+            intval(...),
+            $pids,
+        );
     }
 
     protected function reloadServer(): void

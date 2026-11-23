@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Configuration;
 
+use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
@@ -123,5 +124,22 @@ final class ReloadCoordinatorTest extends TestCase
         );
 
         self::assertNull($result);
+    }
+
+    public function test_options_with_a_config_reloader_can_reload(): void
+    {
+        self::assertTrue($this->subject->canReload(
+            (TestServerOptions::defaults())->setConfigReloader($this->createMock(ConfigReloaderInterface::class)),
+        ));
+    }
+
+    public function test_options_without_a_config_reloader_cannot_reload(): void
+    {
+        self::assertFalse($this->subject->canReload(TestServerOptions::defaults()));
+    }
+
+    public function test_proxy_options_cannot_reload(): void
+    {
+        self::assertFalse($this->subject->canReload(new ProxyServerOptions()));
     }
 }

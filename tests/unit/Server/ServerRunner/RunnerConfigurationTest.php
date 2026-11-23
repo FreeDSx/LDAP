@@ -50,14 +50,7 @@ final class RunnerConfigurationTest extends TestCase
         $this->startupFactory = $this->createMock(ServerProtocolFactoryInterface::class);
         $this->reloadedFactory = $this->createMock(ServerProtocolFactoryInterface::class);
 
-        $this->subject = new RunnerConfiguration(
-            $this->startupOptions,
-            $this->startupFactory,
-            fn(): ServerProtocolFactoryInterface => $this->reloadedFactory,
-            function (ServerListenerOptionsInterface $options): void {
-                $this->applied[] = $options;
-            },
-        );
+        $this->subject = $this->makeSubject($this->startupOptions);
     }
 
     public function test_a_reload_replaces_what_new_connections_are_served_under_and_applies_it_to_open_ones(): void
@@ -121,6 +114,29 @@ final class RunnerConfigurationTest extends TestCase
         self::assertSame(
             [],
             $this->applied,
+        );
+    }
+
+    public function test_following_with_nothing_to_reload_keeps_the_connections_and_applies_nothing(): void
+    {
+        $subject = $this->makeSubject(TestServerOptions::defaults());
+
+        self::assertTrue($subject->follow([]));
+        self::assertSame(
+            [],
+            $this->applied,
+        );
+    }
+
+    private function makeSubject(ServerOptions $options): RunnerConfiguration
+    {
+        return new RunnerConfiguration(
+            $options,
+            $this->startupFactory,
+            fn(): ServerProtocolFactoryInterface => $this->reloadedFactory,
+            function (ServerListenerOptionsInterface $options): void {
+                $this->applied[] = $options;
+            },
         );
     }
 }
