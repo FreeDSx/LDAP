@@ -325,6 +325,11 @@ class PcntlServerRunner implements ServerRunnerInterface
                 $this->metrics->serverReloaded();
             },
         );
+        // A handler rather than ignoring it keeps a reload sent to a child forked before it installs its own pending.
+        pcntl_signal(
+            SIGUSR1,
+            static fn(): null => null,
+        );
     }
 
     /**

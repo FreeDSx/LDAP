@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Runner;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\SharedRequestBudgetTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Runner\Concern\StraySignalTestsTrait;
 use Tests\Support\FreeDSx\Ldap\RequiresOperatingSystemTrait;
 
 use function extension_loaded;
@@ -29,6 +30,7 @@ final class ServerRunnerSwooleTest extends ServerRunnerTestCase
 {
     use RequiresOperatingSystemTrait;
     use SharedRequestBudgetTestsTrait;
+    use StraySignalTestsTrait;
 
     public function setUp(): void
     {
