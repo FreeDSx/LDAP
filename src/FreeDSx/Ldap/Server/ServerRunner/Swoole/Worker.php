@@ -180,6 +180,11 @@ class Worker
             SIGHUP,
             fn(int $signal): null => $this->handleReloadSignal($signal, $context),
         );
+        // Unused here, and its default action would end the process.
+        Process::signal(
+            SIGUSR1,
+            static fn(): null => null,
+        );
     }
 
     /**

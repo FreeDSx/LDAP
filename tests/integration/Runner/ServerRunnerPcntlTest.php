@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use Tests\Integration\FreeDSx\Ldap\Runner\Concern\StraySignalTestsTrait;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 use function file_put_contents;
@@ -28,6 +29,7 @@ use function unlink;
 final class ServerRunnerPcntlTest extends ServerRunnerTestCase
 {
     use RawClientQueueTrait;
+    use StraySignalTestsTrait;
 
     public function testASessionThatCannotFollowAReloadIsEndedAsUnavailable(): void
     {
