@@ -114,6 +114,15 @@ final class ReloadCoordinator
         }
     }
 
+    /**
+     * Whether the options carry a reloader to run.
+     */
+    public function canReload(ServerListenerOptionsInterface $current): bool
+    {
+        return $current instanceof ServerOptions
+            && $current->getConfigReloader() !== null;
+    }
+
     private static function events(ServerListenerOptionsInterface $current): EventLogger
     {
         return new EventLogger(

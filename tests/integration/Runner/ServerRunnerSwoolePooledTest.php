@@ -18,8 +18,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
-use function array_map;
-use function exec;
 use function extension_loaded;
 use function file_put_contents;
 use function posix_kill;
@@ -119,29 +117,12 @@ final class ServerRunnerSwoolePooledTest extends ServerRunnerTestCase
         int $signal,
         string $marker,
     ): void {
-        foreach ($this->workerPids() as $pid) {
+        foreach ($this->serverChildPids() as $pid) {
             posix_kill(
                 $pid,
                 $signal,
             );
             $this->waitForServerOutput($marker);
         }
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function workerPids(): array
-    {
-        $pids = [];
-        exec(
-            'pgrep -P ' . $this->serverPid(),
-            $pids,
-        );
-
-        return array_map(
-            intval(...),
-            $pids,
-        );
     }
 }
