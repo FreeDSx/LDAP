@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
+use Tests\Support\FreeDSx\Ldap\Sync\PersistDeletionLog;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 /**
@@ -50,6 +51,18 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
      * The provider keepalives every poll, so a read never idles out; this bounds the wait for an expected result.
      */
     private const MAX_PERSIST_RESULTS = 5;
+
+    private const IDSET_CONTAINER = 'ou=idset,dc=foo,dc=bar';
+
+    /**
+     * The first cookie change after this entry's add means every deletion journaled before it was sent.
+     */
+    private const IDSET_MARKER = 'cn=idset-marker,dc=foo,dc=bar';
+
+    /**
+     * The marker and a deletion for each entry, with room to spare before giving up.
+     */
+    private const MAX_IDSET_PERSIST_RESULTS = 20;
 
     public function setUp(): void
     {
@@ -381,55 +394,51 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
      */
     public function testPersistCoalescesMultipleDeletionsIntoAnIdSet(): void
     {
-        $container = 'ou=idset,dc=foo,dc=bar';
-        $idSet = null;
+        $log = new PersistDeletionLog(self::IDSET_MARKER);
+        $wrote = false;
+        $seen = 0;
+        $this->onAnotherConnection(fn(LdapClient $writer) => $log->useNames($this->createASubtree($writer)));
 
         $syncRepl = $this->boundSync();
-        $syncRepl->useIdSetHandler(function (SyncIdSetResult $result) use (&$idSet): void {
-            $idSet = $result;
-
-            throw new CancelRequestException();
+        $syncRepl->useIdSetHandler($log->recordSet(...));
+        $syncRepl->useCookieHandler(static function () use ($log): void {
+            if ($log->isMarked()) {
+                throw new CancelRequestException();
+            }
         });
 
-        $this->listenAfterWriting(
-            $syncRepl,
-            static function (LdapClient $w) use ($container): void {
-                $w->create(Entry::fromArray(
-                    $container,
-                    [
-                        'ou' => 'idset',
-                        'objectClass' => 'organizationalUnit',
-                    ],
-                ));
-
-                foreach (['idset-one', 'idset-two', 'idset-three'] as $cn) {
-                    $w->create(Entry::fromArray(
-                        "cn={$cn},{$container}",
-                        [
-                            'cn' => $cn,
-                            'sn' => 'Doomed',
-                            'objectClass' => 'inetOrgPerson',
-                        ],
-                    ));
+        $syncRepl->listen(function (SyncEntryResult $entry, Session $session) use ($log, &$wrote, &$seen): void {
+            if (!$session->isRefreshComplete()) {
+                if (!$wrote) {
+                    $wrote = true;
+                    $this->onAnotherConnection($this->subtreeDeleteThenMarkIt(...));
                 }
 
-                // Separate deletes can straddle a journal poll, while a subtree delete commits them all together.
-                $w->sendAndReceive(
-                    Operations::delete($container),
-                    Controls::subtreeDelete(),
-                );
-            },
-        );
+                return;
+            }
 
+            $log->recordEntry($entry);
+            if (++$seen >= self::MAX_IDSET_PERSIST_RESULTS) {
+                throw new CancelRequestException();
+            }
+        });
+        $this->onAnotherConnection(static fn(LdapClient $w) => $w->delete(self::IDSET_MARKER));
+
+        self::assertEqualsCanonicalizing(
+            $log->expectedNames(),
+            $log->deletedNames(),
+            'Every removed entry is reported deleted. ' . $log->summary(),
+        );
         self::assertInstanceOf(
             SyncIdSetResult::class,
-            $idSet,
-            'Several deletions in one journal window are delivered as a single syncIdSet.',
+            $log->firstSet(),
+            'Several deletions in one journal window are delivered as a single syncIdSet. ' . $log->summary(),
         );
-        self::assertTrue($idSet->isDeleted());
+        self::assertTrue($log->firstSet()->isDeleted());
         self::assertCount(
             4,
-            $idSet,
+            $log->firstSet(),
+            $log->summary(),
         );
     }
 
@@ -510,35 +519,6 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         return $cookie;
     }
 
-    /**
-     * Applies $write on another connection once the refresh phase begins, then persists until the result cap.
-     */
-    private function listenAfterWriting(
-        SyncRepl $syncRepl,
-        Closure $write,
-    ): void {
-        $wrote = false;
-        $seen = 0;
-
-        $syncRepl->listen(function (SyncEntryResult $entry, Session $session) use (&$wrote, &$seen, $write): void {
-            $refreshing = !$session->isRefreshComplete();
-            if ($refreshing && !$wrote) {
-                $wrote = true;
-                $this->onAnotherConnection($write);
-
-                return;
-            }
-            if ($refreshing) {
-                return;
-            }
-            $seen++;
-
-            if ($seen >= self::MAX_PERSIST_RESULTS) {
-                throw new CancelRequestException();
-            }
-        });
-    }
-
     private function onAnotherConnection(Closure $do): void
     {
         $writer = $this->buildClient('tcp');
@@ -549,6 +529,76 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         } finally {
             $writer->unbind();
         }
+    }
+
+    /**
+     * Written before the listen, keeping the adds whose fetch could race the delete out of the persist window.
+     *
+     * @return array<string, string> each entry's name, by its entryUUID
+     */
+    private function createASubtree(LdapClient $writer): array
+    {
+        $writer->create(Entry::fromArray(
+            self::IDSET_CONTAINER,
+            [
+                'ou' => 'idset',
+                'objectClass' => 'organizationalUnit',
+            ],
+        ));
+        $names = [
+            $this->uuidOf(
+                $writer,
+                self::IDSET_CONTAINER,
+            ) => 'ou=idset',
+        ];
+
+        foreach (['idset-one', 'idset-two', 'idset-three'] as $cn) {
+            $dn = 'cn=' . $cn . ',' . self::IDSET_CONTAINER;
+            $writer->create(Entry::fromArray(
+                $dn,
+                [
+                    'cn' => $cn,
+                    'sn' => 'Doomed',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $names[$this->uuidOf(
+                $writer,
+                $dn,
+            )] = 'cn=' . $cn;
+        }
+
+        return $names;
+    }
+
+    /**
+     * Removes the container and its three children with one subtree delete, then writes the marker.
+     */
+    private function subtreeDeleteThenMarkIt(LdapClient $writer): void
+    {
+        // Separate deletes can straddle a journal poll, while a subtree delete commits them all together.
+        $writer->sendAndReceive(
+            Operations::delete(self::IDSET_CONTAINER),
+            Controls::subtreeDelete(),
+        );
+        $writer->create(Entry::fromArray(
+            self::IDSET_MARKER,
+            [
+                'cn' => 'idset-marker',
+                'sn' => 'Marker',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+    }
+
+    private function uuidOf(
+        LdapClient $client,
+        string $dn,
+    ): string {
+        return (string) $client->read(
+            $dn,
+            ['entryUUID'],
+        )?->get('entryUUID')?->firstValue();
     }
 
     private function listenClient(): LdapClient
