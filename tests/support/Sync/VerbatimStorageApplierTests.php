@@ -260,6 +260,66 @@ trait VerbatimStorageApplierTests
         );
     }
 
+    public function test_a_moved_entry_takes_an_entry_whose_parent_is_not_stored(): void
+    {
+        $this->writer->store($this->entry(
+            'ou=staff,dc=example,dc=com',
+            self::UUID_A,
+        ));
+        $this->writer->store($this->entry(
+            'cn=g,ou=gone,ou=staff,dc=example,dc=com',
+            self::UUID_C,
+        ));
+
+        $this->applyMove(
+            'ou=crew,dc=example,dc=com',
+            self::UUID_A,
+        );
+
+        self::assertFalse($this->exists('cn=g,ou=gone,ou=staff,dc=example,dc=com'));
+        self::assertSame(
+            self::UUID_C,
+            $this->value(
+                'cn=g,ou=gone,ou=crew,dc=example,dc=com',
+                'entryUUID',
+            ),
+        );
+    }
+
+    public function test_an_entry_moved_aside_takes_an_entry_whose_parent_is_not_stored(): void
+    {
+        $this->writer->store($this->entry(
+            'cn=a,dc=example,dc=com',
+            self::UUID_A,
+        ));
+        $this->writer->store($this->entry(
+            'cn=b,dc=example,dc=com',
+            self::UUID_B,
+        ));
+        $this->writer->store($this->entry(
+            'cn=o,ou=gone,cn=b,dc=example,dc=com',
+            self::UUID_C,
+        ));
+
+        $this->applyMove(
+            'cn=b,dc=example,dc=com',
+            self::UUID_A,
+        );
+        $this->applyMove(
+            'cn=c,dc=example,dc=com',
+            self::UUID_B,
+        );
+
+        self::assertFalse($this->exists('cn=o,ou=gone,cn=b,dc=example,dc=com'));
+        self::assertSame(
+            self::UUID_C,
+            $this->value(
+                'cn=o,ou=gone,cn=c,dc=example,dc=com',
+                'entryUUID',
+            ),
+        );
+    }
+
     public function test_a_move_onto_a_dn_held_by_an_entry_moving_away_is_placed_at_once(): void
     {
         $this->writer->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
@@ -377,7 +437,7 @@ trait VerbatimStorageApplierTests
         );
     }
 
-    public function test_a_move_carrying_an_entry_without_a_parent_onto_a_taken_dn_loses_no_entry(): void
+    public function test_a_move_carrying_an_entry_whose_parent_is_not_stored_onto_a_taken_dn_moves_that_entry_aside(): void
     {
         $this->writer->store($this->entry('ou=a,dc=example,dc=com', self::UUID_A));
         $this->writer->store($this->entry('cn=o,ou=gone,ou=a,dc=example,dc=com', self::UUID_C));
@@ -389,8 +449,20 @@ trait VerbatimStorageApplierTests
             self::UUID_A,
             $this->value('ou=b,dc=example,dc=com', 'entryUUID'),
         );
-        self::assertNotNull($this->reader->findByUuid(self::UUID_C));
-        self::assertNotNull($this->reader->findByUuid(self::UUID_D));
+        self::assertSame(
+            self::UUID_C,
+            $this->value(
+                'cn=o,ou=gone,ou=b,dc=example,dc=com',
+                'entryUUID',
+            ),
+        );
+        self::assertSame(
+            self::UUID_D,
+            $this->value(
+                'entryUUID=' . self::UUID_D . ',ou=gone,ou=b,dc=example,dc=com',
+                'entryUUID',
+            ),
+        );
     }
 
     public function test_an_entry_moved_aside_and_placed_by_its_change_in_the_next_window_is_not_reported(): void

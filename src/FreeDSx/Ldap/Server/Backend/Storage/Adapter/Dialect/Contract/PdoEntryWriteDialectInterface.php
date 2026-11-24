@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
+
 /**
  * Database-specific SQL for writing the entry table.
  *
@@ -51,9 +53,9 @@ interface PdoEntryWriteDialectInterface
     public function queryRenameEntry(): string;
 
     /**
-     * Re-key every entry beneath a DN, keeping each stored DN's own spelling of its leading RDNs.
+     * Re-key every entry the scope finds beneath a DN, keeping each stored DN's own spelling of its leading RDNs.
      */
-    public function queryRenameDescendants(): string;
+    public function queryRenameDescendants(DescendantScope $scope): string;
 
     /**
      * Delete the entry at the DN. Parameters: [lc_dn]

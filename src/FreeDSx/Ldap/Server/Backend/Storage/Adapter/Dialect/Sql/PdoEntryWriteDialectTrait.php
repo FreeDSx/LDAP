@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
 /**
@@ -75,7 +76,7 @@ trait PdoEntryWriteDialectTrait
      *
      * The stored DN is assigned first, because MySQL evaluates each assignment against the preceding ones.
      */
-    public function queryRenameDescendants(): string
+    public function queryRenameDescendants(DescendantScope $scope): string
     {
         $storedDn = $this->textOf('dn');
         $carriesSuffix = $this->binaryCompare(
@@ -85,7 +86,7 @@ trait PdoEntryWriteDialectTrait
         $stored = $this->replaceDnSuffix('dn');
         $canonical = $this->replaceDnSuffix('lc_dn');
         $parent = $this->replaceDnSuffix('lc_parent_dn');
-        $scope = $this->scopedSubtreeIds();
+        $descendants = $this->descendantCondition($scope);
 
         return <<<SQL
             UPDATE entries
@@ -96,7 +97,7 @@ trait PdoEntryWriteDialectTrait
                 END,
                 lc_dn = $canonical,
                 lc_parent_dn = $parent
-            WHERE entry_id IN ($scope)
+            WHERE $descendants
         SQL;
     }
 
@@ -163,6 +164,17 @@ trait PdoEntryWriteDialectTrait
         string $right,
     ): string {
         return "$left = $right";
+    }
+
+    /**
+     * The rename's condition on the entries beneath its base, binding the scope's value for that base.
+     */
+    protected function descendantCondition(DescendantScope $scope): string
+    {
+        return match ($scope) {
+            DescendantScope::ParentLinks => 'entry_id IN (' . $this->scopedSubtreeIds() . ')',
+            DescendantScope::DnSuffix => "lc_dn LIKE ? ESCAPE '!'",
+        };
     }
 
     /**

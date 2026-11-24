@@ -276,6 +276,65 @@ final class EntryWriterTest extends TestCase
         );
     }
 
+    public function test_a_rename_leaves_an_entry_whose_parent_is_not_stored_where_it_was(): void
+    {
+        $this->storeAll(
+            $this->subject,
+            'ou=Staff,dc=example,dc=com',
+            'cn=Orphan,ou=Missing,ou=Staff,dc=example,dc=com',
+        );
+
+        $this->subject->renameSubtree(
+            new Dn('ou=Staff,dc=example,dc=com'),
+            new Dn('ou=Crew,dc=example,dc=com'),
+        );
+
+        self::assertNotNull($this->reader->find(new Dn('cn=orphan,ou=missing,ou=staff,dc=example,dc=com')));
+        self::assertNull($this->reader->find(new Dn('cn=orphan,ou=missing,ou=crew,dc=example,dc=com')));
+    }
+
+    public function test_a_replica_rename_carries_an_entry_whose_parent_is_not_stored(): void
+    {
+        $writer = $this->replicaWriter();
+        $this->storeAll(
+            $writer,
+            'ou=Staff,dc=example,dc=com',
+            'cn=Orphan,ou=Missing,ou=Staff,dc=example,dc=com',
+        );
+
+        $writer->renameSubtree(
+            new Dn('ou=Staff,dc=example,dc=com'),
+            new Dn('ou=Crew,dc=example,dc=com'),
+        );
+
+        self::assertNull($this->reader->find(new Dn('cn=orphan,ou=missing,ou=staff,dc=example,dc=com')));
+        self::assertSame(
+            'cn=Orphan,ou=Missing,ou=Crew,dc=example,dc=com',
+            $this->reader->find(new Dn('cn=orphan,ou=missing,ou=crew,dc=example,dc=com'))?->getDn()->toString(),
+        );
+        self::assertSame(
+            ['cn=orphan,ou=missing,ou=crew,dc=example,dc=com'],
+            $this->lister->childDns(['ou=missing,ou=crew,dc=example,dc=com']),
+        );
+    }
+
+    public function test_a_replica_rename_reads_a_like_wildcard_in_the_base_literally(): void
+    {
+        $writer = $this->replicaWriter();
+        $this->storeAll(
+            $writer,
+            'ou=Sta_ff,dc=example,dc=com',
+            'cn=Outsider,ou=Missing,ou=StaXff,dc=example,dc=com',
+        );
+
+        $writer->renameSubtree(
+            new Dn('ou=Sta_ff,dc=example,dc=com'),
+            new Dn('ou=Crew,dc=example,dc=com'),
+        );
+
+        self::assertNotNull($this->reader->find(new Dn('cn=outsider,ou=missing,ou=staxff,dc=example,dc=com')));
+    }
+
     public function test_remove_deletes_the_entry(): void
     {
         $this->storeNamed('Alice');
@@ -915,6 +974,23 @@ final class EntryWriterTest extends TestCase
             'cn=admins,dc=example,dc=com',
             'cn=bob,dc=example,dc=com',
         );
+    }
+
+    private function replicaWriter(): EntryWriter
+    {
+        return Container::forServer(
+            TestServerOptions::replicaOn(PdoConfig::forSqlite(':memory:')),
+            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider($this->pdo)],
+        )->get(EntryWriter::class);
+    }
+
+    private function storeAll(
+        EntryWriter $writer,
+        string ...$dns,
+    ): void {
+        foreach ($dns as $dn) {
+            $writer->store(EntryFixture::withUuid(new Entry(new Dn($dn))));
+        }
     }
 
     private function storeNamed(string $cn): Dn

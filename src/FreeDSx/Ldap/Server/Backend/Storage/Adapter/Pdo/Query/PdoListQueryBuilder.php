@@ -15,9 +15,9 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryListDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 use function array_merge;
@@ -33,6 +33,7 @@ final readonly class PdoListQueryBuilder
 {
     public function __construct(
         private PdoEntryListDialectInterface $dialect,
+        private DescendantScope $subtreeScope = DescendantScope::ParentLinks,
     ) {}
 
     /**
@@ -184,7 +185,7 @@ final readonly class PdoListQueryBuilder
                     LIMIT ?
                 SQL;
             $params[] = $base;
-            $params[] = '%,' . SqlFilterUtility::escape($base);
+            $params[] = DescendantScope::DnSuffix->bindingFor($base);
         }
 
         if ($after !== null) {
@@ -295,9 +296,9 @@ final readonly class PdoListQueryBuilder
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
         ?SqlQuery $seek,
-        bool $withChildFlag = false,
+        bool $withChildFlag,
     ): SqlQuery {
-        if ($filterResult === null) {
+        if ($filterResult === null && $this->subtreeScope === DescendantScope::ParentLinks) {
             $query = new SqlQuery(
                 $this->dialect->querySubtree($withChildFlag),
                 [$base],
@@ -315,7 +316,7 @@ final readonly class PdoListQueryBuilder
             );
         }
 
-        return $this->buildFilteredSubtreeQuery(
+        return $this->buildSuffixScopedQuery(
             $base,
             $filterResult,
             $subentryCondition,
@@ -325,29 +326,31 @@ final readonly class PdoListQueryBuilder
     }
 
     /**
-     * Filter drives via the sidecar index; scope suffix is LIKE-checked per candidate.
+     * Scope is a DN suffix match, LIKE-checked per candidate when a filter drives via the sidecar index.
      */
-    private function buildFilteredSubtreeQuery(
+    private function buildSuffixScopedQuery(
         string $base,
-        SqlFilterResult $filterResult,
+        ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
         ?SqlQuery $seek,
-        bool $withChildFlag = false,
+        bool $withChildFlag,
     ): SqlQuery {
         $fetchAll = $this->dialect->queryFetchAll($withChildFlag);
-        $filterSql = $filterResult->sql;
+        $filterClause = $filterResult !== null
+            ? "($filterResult->sql) AND"
+            : '';
         $subentryClause = $subentryCondition !== null
             ? "AND $subentryCondition"
             : '';
         $sql = <<<SQL
-            $fetchAll WHERE ($filterSql)
-            AND (lc_dn = ? OR lc_dn LIKE ? ESCAPE '!')
+            $fetchAll WHERE $filterClause
+            (lc_dn = ? OR lc_dn LIKE ? ESCAPE '!')
             $subentryClause
             SQL;
 
-        $params = $filterResult->params;
+        $params = $filterResult->params ?? [];
         $params[] = $base;
-        $params[] = '%,' . SqlFilterUtility::escape($base);
+        $params[] = DescendantScope::DnSuffix->bindingFor($base);
 
         return $this->appendSeek(
             new SqlQuery(
