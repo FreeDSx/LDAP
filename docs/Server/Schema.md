@@ -53,6 +53,7 @@ Every `add`, `modify` and `modify DN` is checked before reaching storage:
 - No attribute is given twice, and no value is repeated under an equivalent spelling.
 - The structural object class of an existing entry does not change.
 - Naming attributes have an equality matching rule, and none of them is operational or linked.
+- An RDN names each attribute type once.
 
 Failures return one of these codes, with a diagnostic naming the attribute or class:
 
@@ -61,7 +62,7 @@ Failures return one of these codes, with a diagnostic naming the attribute or cl
 | `objectClassViolation` (65)      | The structural class, `MUST` and `MAY` attributes, an undefined object class    |
 | `undefinedAttributeType` (17)    | An attribute type the schema does not define                                    |
 | `invalidAttributeSyntax` (21)    | A value that does not conform to its syntax                                     |
-| `invalidDNSyntax` (34)           | An RDN value that does not conform to its syntax                                |
+| `invalidDNSyntax` (34)           | An RDN value that does not conform to its syntax, an RDN naming a type twice    |
 | `constraintViolation` (19)       | Several values on a single-valued attribute, a `NO-USER-MODIFICATION` attribute |
 | `attributeOrValueExists` (20)    | An attribute given twice, a value repeated under an equivalent spelling         |
 | `objectClassModsProhibited` (69) | Changing the structural object class                                            |

@@ -154,6 +154,46 @@ final class MoveEntryHandlerTest extends TestCase
         );
     }
 
+    #[DataProvider('repeatedRdnTypeProvider')]
+    public function test_a_new_rdn_repeating_a_type_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+        string $newRdn,
+    ): void {
+        $this->writeGraph(
+            EntryFixture::inMemoryStorage(...$this->fixture()),
+            TestServerOptions::validatedCore($mode),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->rename(
+            self::ALICE,
+            $newRdn,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode, string}>
+     */
+    public static function repeatedRdnTypeProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield $mode->name . ' same value' => [
+                $mode,
+                'cn=m+cn=m',
+            ];
+            yield $mode->name . ' by name and OID' => [
+                $mode,
+                'cn=m+2.5.4.3=m',
+            ];
+            yield $mode->name . ' two values' => [
+                $mode,
+                'cn=m+cn=n',
+            ];
+        }
+    }
+
     public function test_a_rename_adding_a_second_password_through_its_rdn_is_refused(): void
     {
         self::expectException(OperationException::class);

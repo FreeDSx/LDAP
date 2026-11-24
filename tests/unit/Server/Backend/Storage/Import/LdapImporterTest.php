@@ -390,6 +390,33 @@ final class LdapImporterTest extends TestCase
         );
     }
 
+    public function test_importEntries_ignoreValidation_still_refuses_an_rdn_repeating_a_type(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->importerFor(
+            $this->storage,
+            TestServerOptions::validatedCore(SchemaValidationMode::Strict),
+        )->importEntries(
+            entries: [
+                $this->domain(),
+                new Entry(
+                    new Dn('cn=a+cn=a,dc=example,dc=com'),
+                    new Attribute(
+                        'objectClass',
+                        'device',
+                    ),
+                    new Attribute(
+                        'cn',
+                        'a',
+                    ),
+                ),
+            ],
+            ignoreValidation: true,
+        );
+    }
+
     public function test_importEntries_ignoreValidation_still_refuses_an_entry_named_by_a_linked_attribute(): void
     {
         self::expectException(OperationException::class);
