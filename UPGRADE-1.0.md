@@ -3,6 +3,7 @@ Upgrading from 0.x to 1.0
 
 * [Client Changes](#client-changes)
     * [Client Options](#client-options)
+    * [Escaping Values](#escaping-values)
 * [Decoding Protocol Elements](#decoding-protocol-elements)
 * [Server Changes](#server-changes)
     * [Server Options](#server-options)
@@ -66,6 +67,16 @@ $ldap = new LdapClient(
         # The base_dn is used as the default for searches
         ->setBaseDn('dc=example,dc=local')
 );
+```
+
+### Escaping Values
+
+`Rdn::escape()`, `Attribute::escape()` and `escapeAll()` now escape every value. In 0.x, a value made only of `\XX`
+sequences was returned unchanged. Pass each a raw value once, and do not escape their output again.
+
+```php
+# 0.x returned '\61\64'
+Attribute::escape('\61\64'); // '\5c61\5c64'
 ```
 
 ## Decoding Protocol Elements

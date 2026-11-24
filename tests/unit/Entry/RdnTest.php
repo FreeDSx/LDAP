@@ -103,6 +103,22 @@ class RdnTest extends TestCase
         );
     }
 
+    public function test_it_should_escape_a_value_that_looks_hex_encoded(): void
+    {
+        self::assertSame(
+            '\5c2c',
+            Rdn::escape('\2c'),
+        );
+    }
+
+    public function test_it_should_leave_an_empty_value_empty(): void
+    {
+        self::assertSame(
+            '',
+            Rdn::escape(''),
+        );
+    }
+
     public function test_it_should_escape_all_characters(): void
     {
         self::assertSame(

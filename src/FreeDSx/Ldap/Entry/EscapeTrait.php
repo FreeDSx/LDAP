@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Entry;
 
 use function bin2hex;
 use function implode;
-use function preg_match;
 use function preg_replace_callback;
 use function str_split;
 
@@ -29,13 +28,15 @@ use function str_split;
 trait EscapeTrait
 {
     /**
-     * Escape all characters in a value.
+     * Escape every character of a raw value.
+     *
+     * Note: This includes text that already looks escaped.
      *
      * @api
      */
     public static function escapeAll(string $value): string
     {
-        if (self::shouldNotEscape($value)) {
+        if ($value === '') {
             return $value;
         }
 
@@ -50,10 +51,5 @@ trait EscapeTrait
         return (string) preg_replace_callback('/([\x00-\x1F\x7F])/', function ($matches) {
             return '\\' . bin2hex($matches[1]);
         }, $value);
-    }
-
-    private static function shouldNotEscape(string $value): bool
-    {
-        return (preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value) === 1 || $value === '');
     }
 }

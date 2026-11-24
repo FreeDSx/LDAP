@@ -402,9 +402,11 @@ final class InMemoryStorage implements
 
     private static function parentOf(string $lcDn): ?string
     {
-        return Dn::fromCanonical($lcDn)
-            ->getParent()
-            ?->normalizedString();
+        $parent = Dn::canonicalParent($lcDn);
+
+        return $parent === ''
+            ? null
+            : $parent;
     }
 
     private function forgetChild(string $lcDn): void

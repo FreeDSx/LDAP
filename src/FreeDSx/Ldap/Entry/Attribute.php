@@ -337,13 +337,12 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     }
 
     /**
-     * Escape an attribute value for a filter.
+     * Escape a raw attribute value for a filter.
+     *
+     * Note: This includes text that already looks escaped.
      */
     public static function escape(string $value): string
     {
-        if (self::shouldNotEscape($value)) {
-            return $value;
-        }
         $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
 
         return self::escapeNonPrintable($value);

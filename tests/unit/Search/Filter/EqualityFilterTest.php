@@ -91,6 +91,24 @@ final class EqualityFilterTest extends TestCase
         );
     }
 
+    public function test_a_value_that_reads_as_an_escape_renders_apart_from_the_character_it_names(): void
+    {
+        self::assertSame(
+            '(foo=\5c2a)',
+            (new EqualityFilter(
+                'foo',
+                '\2a',
+            ))->toString(),
+        );
+        self::assertSame(
+            '(foo=\2a)',
+            (new EqualityFilter(
+                'foo',
+                '*',
+            ))->toString(),
+        );
+    }
+
     /**
      * @param non-empty-string $attribute
      */

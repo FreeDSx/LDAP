@@ -99,6 +99,40 @@ final class DnNormalizerTest extends TestCase
         );
     }
 
+    public function test_a_value_that_reads_as_an_escape_stays_distinct_from_the_character_it_names(): void
+    {
+        self::assertNotSame(
+            DnNormalizer::canonicalize('cn=\2c,dc=x'),
+            DnNormalizer::canonicalize('cn=\5c2c,dc=x'),
+        );
+    }
+
+    #[DataProvider('canonicalIdempotenceProvider')]
+    public function test_a_canonical_dn_canonicalizes_to_itself(string $dn): void
+    {
+        $canonical = DnNormalizer::canonicalize($dn);
+
+        self::assertSame(
+            $canonical,
+            DnNormalizer::canonicalize($canonical),
+        );
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function canonicalIdempotenceProvider(): array
+    {
+        return [
+            'a value that reads as an escape' => ['cn=\5c41,dc=x'],
+            'an escaped comma' => ['cn=\2c,dc=x'],
+            'a leading number sign' => ['cn=\23a,dc=x'],
+            'a trailing space' => ['cn=a\20,dc=x'],
+            'a NUL' => ['cn=\00b,dc=x'],
+            'a multivalued rdn' => ['cn=\5c2b+sn=\2b,dc=x'],
+        ];
+    }
+
     /**
      * @param non-empty-string $dn
      */

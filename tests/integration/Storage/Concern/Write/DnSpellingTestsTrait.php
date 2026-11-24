@@ -500,6 +500,103 @@ trait DnSpellingTestsTrait
         );
     }
 
+    public function testAValueThatReadsAsAnEscapeNamesAnotherEntryThanTheCharacterItNames(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=\2c,dc=foo,dc=bar',
+                ['cn' => ',', 'sn' => 'Comma', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=\5c2c,dc=foo,dc=bar',
+                ['cn' => '\2c', 'sn' => 'Literal', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
+
+        try {
+            $this->asAdmin(fn(LdapClient $admin) => $admin->send(Operations::modify(
+                'cn=\5c2c,dc=foo,dc=bar',
+                Change::replace(
+                    'description',
+                    'changed',
+                ),
+            )));
+
+            self::assertSame(
+                ['Comma', null],
+                [
+                    $this->ldapClient()->read('cn=\2c,dc=foo,dc=bar')?->get('sn')?->firstValue(),
+                    $this->ldapClient()->read('cn=\2c,dc=foo,dc=bar')?->get('description')?->firstValue(),
+                ],
+            );
+
+            $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=\5c2c,dc=foo,dc=bar'));
+
+            self::assertSame(
+                'Comma',
+                $this->ldapClient()->read('cn=\2c,dc=foo,dc=bar')?->get('sn')?->firstValue(),
+            );
+        } finally {
+            $this->asAdmin(function (LdapClient $admin): void {
+                foreach (['cn=\5c2c,dc=foo,dc=bar', 'cn=\2c,dc=foo,dc=bar'] as $dn) {
+                    if ($admin->read($dn) !== null) {
+                        $admin->delete($dn);
+                    }
+                }
+            });
+        }
+    }
+
+    public function testAChildStaysUnderAParentWhoseValueReadsAsAnEscape(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'cn=\5c41,dc=foo,dc=bar',
+                ['cn' => '\41', 'sn' => 'Literal', 'objectClass' => 'inetOrgPerson'],
+            ));
+            $admin->create(Entry::fromArray(
+                'cn=kid,cn=\5c41,dc=foo,dc=bar',
+                ['cn' => 'kid', 'sn' => 'Kid', 'objectClass' => 'inetOrgPerson'],
+            ));
+        });
+
+        try {
+            $children = $this->ldapClient()->search(
+                Operations::search(
+                    Filters::present('objectClass'),
+                    'cn',
+                )
+                    ->base('cn=\5c41,dc=foo,dc=bar')
+                    ->useSingleLevelScope(),
+            );
+
+            self::assertSame(
+                ['kid'],
+                $children->first()?->get('cn')?->getValues(),
+            );
+            self::assertSame(
+                ResultCode::NOT_ALLOWED_ON_NON_LEAF,
+                $this->asAdmin(function (LdapClient $admin): int {
+                    try {
+                        $admin->delete('cn=\5c41,dc=foo,dc=bar');
+                    } catch (OperationException $e) {
+                        return $e->getCode();
+                    }
+
+                    return ResultCode::SUCCESS;
+                }),
+            );
+        } finally {
+            $this->asAdmin(function (LdapClient $admin): void {
+                foreach (['cn=kid,cn=\5c41,dc=foo,dc=bar', 'cn=\5c41,dc=foo,dc=bar'] as $dn) {
+                    if ($admin->read($dn) !== null) {
+                        $admin->delete($dn);
+                    }
+                }
+            });
+        }
+    }
+
     public function testAnAddUnderAMissingParentMatchesTheAncestorAsTheRequestSpelledIt(): void
     {
         self::assertSame(
