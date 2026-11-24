@@ -907,6 +907,28 @@ final class RuleBasedAccessControlTest extends TestCase
         $subject->setBackend($mockBackend);
     }
 
+    public function test_set_backend_propagates_to_relocation_rule_subjects(): void
+    {
+        $mockBackend = $this->createMock(ReadBackendInterface::class);
+
+        /** @var SubjectMatcherInterface&BackendAwareInterface&MockObject $mockBackendAwareSubject */
+        $mockBackendAwareSubject = $this->createMockForIntersectionOfInterfaces([
+            SubjectMatcherInterface::class,
+            BackendAwareInterface::class,
+        ]);
+
+        $mockBackendAwareSubject
+            ->expects(self::once())
+            ->method('setBackend')
+            ->with($mockBackend);
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            relocations: [RelocationRule::allow($mockBackendAwareSubject)],
+        ));
+
+        $subject->setBackend($mockBackend);
+    }
+
     public function test_confidential_access_is_denied_when_no_rule_grants_it(): void
     {
         $subject = new RuleBasedAccessControl(AclRules::fromEmpty());

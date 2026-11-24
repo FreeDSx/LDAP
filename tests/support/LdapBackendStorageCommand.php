@@ -68,6 +68,11 @@ final class LdapBackendStorageCommand extends Command
     public const MOVER_PASSWORD = '12345';
 
     /**
+     * Holds cn=mover and is named only by the relocation grant.
+     */
+    public const MOVERS_GROUP_DN = 'cn=movers,dc=foo,dc=bar';
+
+    /**
      * Entries may be renamed inside this container but never moved out of it.
      */
     public const PINNED_CONTAINER_DN = 'ou=pinned,dc=foo,dc=bar';
@@ -759,7 +764,7 @@ final class LdapBackendStorageCommand extends Command
                         RelocationAccess::In,
                     ),
                     RelocationRule::allow(
-                        $mover,
+                        Subject::group(self::MOVERS_GROUP_DN),
                         Target::subtree(self::ROOT_DN),
                     ),
                 ),

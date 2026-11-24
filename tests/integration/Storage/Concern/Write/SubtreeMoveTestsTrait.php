@@ -188,7 +188,7 @@ trait SubtreeMoveTestsTrait
         );
 
         $this->deleteSubtree('ou=division,dc=foo,dc=bar');
-        $this->asAdmin(fn(LdapClient $admin) => $admin->delete(LdapBackendStorageCommand::MOVER_DN));
+        $this->removeMover();
     }
 
     public function testRenamingInPlaceIsAllowedInsideAPinnedContainer(): void
@@ -287,8 +287,8 @@ trait SubtreeMoveTestsTrait
         $this->asAdmin(function (LdapClient $admin): void {
             $admin->delete('ou=loosecontainer,ou=elsewhere,dc=foo,dc=bar');
             $admin->delete('ou=elsewhere,dc=foo,dc=bar');
-            $admin->delete(LdapBackendStorageCommand::MOVER_DN);
         });
+        $this->removeMover();
     }
 
     public function testMovingIntoASealedContainerIsRefused(): void
@@ -333,15 +333,33 @@ trait SubtreeMoveTestsTrait
      */
     private function seedMover(): void
     {
-        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
-            LdapBackendStorageCommand::MOVER_DN,
-            [
-                'cn' => 'mover',
-                'sn' => 'Mover',
-                'userPassword' => LdapBackendStorageCommand::MOVER_PASSWORD,
-                'objectClass' => 'inetOrgPerson',
-            ],
-        )));
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                LdapBackendStorageCommand::MOVER_DN,
+                [
+                    'cn' => 'mover',
+                    'sn' => 'Mover',
+                    'userPassword' => LdapBackendStorageCommand::MOVER_PASSWORD,
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            $admin->create(Entry::fromArray(
+                LdapBackendStorageCommand::MOVERS_GROUP_DN,
+                [
+                    'cn' => 'movers',
+                    'member' => LdapBackendStorageCommand::MOVER_DN,
+                    'objectClass' => 'groupOfNames',
+                ],
+            ));
+        });
+    }
+
+    private function removeMover(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->delete(LdapBackendStorageCommand::MOVERS_GROUP_DN);
+            $admin->delete(LdapBackendStorageCommand::MOVER_DN);
+        });
     }
 
     private function authenticateMover(): void
@@ -372,7 +390,7 @@ trait SubtreeMoveTestsTrait
     private function cleanUpRelocationFixtures(): void
     {
         $this->deleteSubtree(LdapBackendStorageCommand::PINNED_CONTAINER_DN);
-        $this->asAdmin(fn(LdapClient $admin) => $admin->delete(LdapBackendStorageCommand::MOVER_DN));
+        $this->removeMover();
     }
 
     /**
