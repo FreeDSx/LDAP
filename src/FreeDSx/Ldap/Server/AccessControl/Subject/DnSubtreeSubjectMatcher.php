@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableInterface;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableTrait;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Throwable;
@@ -23,8 +25,10 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class DnSubtreeSubjectMatcher implements TokenDecidedSubjectInterface
+final readonly class DnSubtreeSubjectMatcher implements TokenDecidedSubjectInterface, DnSpellableInterface
 {
+    use DnSpellableTrait;
+
     private Dn $subtreeDn;
 
     public function __construct(string $dn)
@@ -45,5 +49,15 @@ final readonly class DnSubtreeSubjectMatcher implements TokenDecidedSubjectInter
         } catch (Throwable) {
             return false;
         }
+    }
+
+    private function spellableDn(): Dn
+    {
+        return $this->subtreeDn;
+    }
+
+    private function withSpellableDn(Dn $dn): static
+    {
+        return new self($dn->toString());
     }
 }

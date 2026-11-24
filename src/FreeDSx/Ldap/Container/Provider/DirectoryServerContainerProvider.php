@@ -184,6 +184,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             ),
             AclRuleNames::class => static fn(Container $c): AclRuleNames => new AclRuleNames(
                 $c->get(ServerOptions::class)->getSchema(),
+                $c->get(AttributeTypeSpelling::class),
             ),
             ReloadableAccessControl::class => static fn(Container $c): ReloadableAccessControl => new ReloadableAccessControl(
                 new RuleBasedAccessControl($c->get(AclRuleNames::class)->canonicalize(
@@ -393,6 +394,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(ReadEntryInterface::class)->namingContexts(),
             $container->get(FilterEvaluatorInterface::class),
             $container->get(LinkedLeafWitness::class),
+            $container->get(AttributeTypeSpelling::class),
         );
     }
 
@@ -436,6 +438,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $options = $container->get(ServerOptions::class);
         $config = $options->getPasswordConfig();
         $administrators = $options->getAdministrators();
+
+        if ($administrators !== null) {
+            $administrators = $container->get(AclRuleNames::class)->subject($administrators);
+        }
 
         // A group of administrators reads its members through the same backend access control does.
         if ($administrators instanceof BackendAwareInterface) {

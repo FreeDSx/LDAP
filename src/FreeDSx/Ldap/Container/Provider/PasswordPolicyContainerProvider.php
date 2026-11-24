@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\Auth\HashCostCeiling;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
@@ -134,10 +135,13 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     {
         $options = $container->get(ServerOptions::class);
         $backend = $container->get(ReadBackendInterface::class);
+        $defaultPolicyDn = $options->getPasswordConfig()->getDefaultPolicyDn();
 
         return new PasswordPolicyResolver(
             $backend,
-            $options->getPasswordConfig()->getDefaultPolicyDn(),
+            $defaultPolicyDn === null
+                ? null
+                : $container->get(AttributeTypeSpelling::class)->dn($defaultPolicyDn),
             $options->getPasswordConfig()->getPolicy(),
             new GoverningSubentryResolver(
                 $backend,

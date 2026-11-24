@@ -51,6 +51,7 @@ use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\MatchedDnFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
@@ -199,10 +200,16 @@ class DirectoryConnectionContainerProvider implements ContainerProviderInterface
 
     private function makeManagerAwareAuthenticator(Container $container): ManagerAwareAuthenticator
     {
+        $manager = $container->get(ServerOptions::class)->getManager()
+            ?? throw new RuntimeException('A manager-aware authenticator requires a configured manager.');
+
         return new ManagerAwareAuthenticator(
             $container->get(PasswordPolicyAwareAuthenticator::class),
-            $container->get(ServerOptions::class)->getManager()
-                ?? throw new RuntimeException('A manager-aware authenticator requires a configured manager.'),
+            // Compared spelled by primary names, the way a bind name arrives.
+            new ManagerIdentity(
+                $container->get(AttributeTypeSpelling::class)->dn($manager->dn()),
+                $manager->hashedPassword(),
+            ),
             $container->get(PasswordHashService::class),
         );
     }

@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableInterface;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableTrait;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -37,8 +39,10 @@ use LogicException;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAwareInterface
+final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAwareInterface, DnSpellableInterface
 {
+    use DnSpellableTrait;
+
     private readonly Dn $groupDn;
 
     private ?ReadBackendInterface $backend = null;
@@ -172,5 +176,23 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         }
 
         return $this->backend;
+    }
+
+    private function spellableDn(): Dn
+    {
+        return $this->groupDn;
+    }
+
+    /**
+     * A copy starts without a backend.
+     */
+    private function withSpellableDn(Dn $dn): static
+    {
+        return new self(
+            $dn->toString(),
+            $this->memberAttribute,
+            $this->cacheTtl,
+            $this->clock,
+        );
     }
 }

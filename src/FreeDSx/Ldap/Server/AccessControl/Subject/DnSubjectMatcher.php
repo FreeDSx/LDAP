@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableInterface;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableTrait;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -22,8 +24,10 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class DnSubjectMatcher implements TokenDecidedSubjectInterface
+final readonly class DnSubjectMatcher implements TokenDecidedSubjectInterface, DnSpellableInterface
 {
+    use DnSpellableTrait;
+
     private string $normalizedDn;
 
     public function __construct(string $dn)
@@ -40,5 +44,15 @@ final readonly class DnSubjectMatcher implements TokenDecidedSubjectInterface
         }
 
         return $token->getResolvedDn()->normalizedString() === $this->normalizedDn;
+    }
+
+    private function spellableDn(): Dn
+    {
+        return Dn::fromCanonical($this->normalizedDn);
+    }
+
+    private function withSpellableDn(Dn $dn): static
+    {
+        return new self($dn->toString());
     }
 }

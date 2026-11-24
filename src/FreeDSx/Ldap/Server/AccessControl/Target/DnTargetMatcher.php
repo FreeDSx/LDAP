@@ -14,14 +14,18 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl\Target;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableInterface;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableTrait;
 
 /**
  * Matches a specific target DN (case-insensitive).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class DnTargetMatcher implements TargetMatcherInterface
+final class DnTargetMatcher implements TargetMatcherInterface, DnSpellableInterface
 {
+    use DnSpellableTrait;
+
     private readonly string $normalizedDn;
 
     public function __construct(string $dn)
@@ -40,5 +44,15 @@ final class DnTargetMatcher implements TargetMatcherInterface
     public function normalizedDn(): string
     {
         return $this->normalizedDn;
+    }
+
+    private function spellableDn(): Dn
+    {
+        return Dn::fromCanonical($this->normalizedDn);
+    }
+
+    private function withSpellableDn(Dn $dn): static
+    {
+        return new self($dn->toString());
     }
 }
