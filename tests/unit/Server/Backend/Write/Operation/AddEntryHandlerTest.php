@@ -583,6 +583,70 @@ final class AddEntryHandlerTest extends TestCase
         }
     }
 
+    #[DataProvider('repeatedRdnTypeProvider')]
+    public function test_an_add_whose_rdn_repeats_a_type_is_refused_in_every_validation_mode(
+        SchemaValidationMode $mode,
+        string $rdn,
+    ): void {
+        $this->validatedGraph($mode);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                $rdn . ',dc=example,dc=com',
+                [
+                    'objectClass' => ['device'],
+                    'cn' => ['a', 'b'],
+                ],
+            )),
+            $this->context(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{SchemaValidationMode, string}>
+     */
+    public static function repeatedRdnTypeProvider(): iterable
+    {
+        foreach (SchemaValidationMode::cases() as $mode) {
+            yield $mode->name . ' same value' => [
+                $mode,
+                'cn=a+cn=a',
+            ];
+            yield $mode->name . ' differing only by case' => [
+                $mode,
+                'cn=a+CN=A',
+            ];
+            yield $mode->name . ' by name and OID' => [
+                $mode,
+                'cn=a+2.5.4.3=a',
+            ];
+            yield $mode->name . ' two values' => [
+                $mode,
+                'cn=a+cn=b',
+            ];
+        }
+    }
+
+    public function test_an_add_whose_rdn_names_distinct_types_is_stored(): void
+    {
+        $this->adds()->handle(
+            new AddCommand(Entry::fromArray(
+                'cn=a+sn=b,dc=example,dc=com',
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['a'],
+                    'sn' => ['b'],
+                ],
+            )),
+            $this->context(),
+        );
+
+        self::assertNotNull($this->find('cn=a+sn=b,dc=example,dc=com'));
+    }
+
     #[DataProvider('validationModeProvider')]
     public function test_an_add_holding_two_entry_uuids_is_refused_in_every_validation_mode(
         SchemaValidationMode $mode,

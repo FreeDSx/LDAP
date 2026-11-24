@@ -125,6 +125,74 @@ trait WriteSchemaTestsTrait
         ];
     }
 
+    #[DataProvider('rdnRepeatingATypeProvider')]
+    public function testAddIsRefusedWhenItsRdnRepeatsAType(string $dn): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->create(new Entry(
+                $dn,
+                new Attribute(
+                    'objectClass',
+                    'top',
+                    'person',
+                ),
+                new Attribute(
+                    'cn',
+                    'dup',
+                    'dup2',
+                ),
+                new Attribute(
+                    'sn',
+                    'Repeated',
+                ),
+            ));
+            self::fail('An add whose RDN repeats a type should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+        $this->authenticateUser();
+
+        self::assertNull($this->ldapClient()->read($dn));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function rdnRepeatingATypeProvider(): iterable
+    {
+        yield 'the same value' => ['cn=dup+cn=dup,dc=foo,dc=bar'];
+        yield 'a value differing only by case' => ['cn=dup+CN=DUP,dc=foo,dc=bar'];
+        yield 'the type by name and by OID' => ['cn=dup+2.5.4.3=dup,dc=foo,dc=bar'];
+        yield 'two values' => ['cn=dup+cn=dup2,dc=foo,dc=bar'];
+    }
+
+    public function testRenameIsRefusedWhenTheNewRdnRepeatsAType(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->rename(
+                'cn=user,dc=foo,dc=bar',
+                'cn=user+cn=user2',
+                true,
+            );
+            self::fail('A rename onto an RDN repeating a type should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+        $this->authenticateUser();
+
+        self::assertNotNull($this->ldapClient()->read('cn=user,dc=foo,dc=bar'));
+    }
+
     public function testRenameIsRefusedWhenTheNewRdnValueFailsItsSyntax(): void
     {
         $this->authenticateAdmin();

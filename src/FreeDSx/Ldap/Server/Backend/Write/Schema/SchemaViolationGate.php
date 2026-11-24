@@ -106,6 +106,7 @@ final readonly class SchemaViolationGate
         WriteContext $context,
     ): void {
         $this->assertTypesStorable($write->entry);
+        $this->assertRdnTypesDistinct($write);
         $this->assertNamedByUserAttributes($write);
         $this->assertServerOwnedUntouched($write);
         $this->assertOneEntryUuid($write);
@@ -155,6 +156,43 @@ final readonly class SchemaViolationGate
             ),
             ResultCode::ADMIN_LIMIT_EXCEEDED,
         );
+    }
+
+    /**
+     * An RDN may name each attribute type once, whatever the mode allows.
+     *
+     * @throws OperationException
+     */
+    private function assertRdnTypesDistinct(SchemaWrite $write): void
+    {
+        $dn = $write->entry->getDn();
+
+        if (!$write->namesEntry() || $dn->isRootDse()) {
+            return;
+        }
+        $seen = [];
+
+        foreach ($dn->getRdn()->getAll() as $component) {
+            $type = $this->typeIdentity($component->getName());
+
+            if (isset($seen[$type])) {
+                throw new OperationException(
+                    'An RDN names the same attribute type more than once.',
+                    ResultCode::INVALID_DN_SYNTAX,
+                );
+            }
+            $seen[$type] = true;
+        }
+    }
+
+    /**
+     * The schema's OID for a type, or its folded name when the schema does not define it.
+     */
+    private function typeIdentity(string $name): string
+    {
+        $folded = Attribute::normalizeName(trim($name));
+
+        return $this->schema->getAttributeType($folded)->oid ?? $folded;
     }
 
     /**
