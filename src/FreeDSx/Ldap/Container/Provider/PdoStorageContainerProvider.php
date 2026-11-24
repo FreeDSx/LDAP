@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 use Closure;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
@@ -103,8 +104,9 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             DnKeyRebuilder::class => $this->makeDnKeyRebuilder(...),
             EntryRowCodec::class => $this->makeEntryRowCodec(...),
             EntryReader::class => $this->makeReader(...),
-            PdoListQueryBuilder::class => static fn(Container $container): PdoListQueryBuilder => new PdoListQueryBuilder(
+            PdoListQueryBuilder::class => fn(Container $container): PdoListQueryBuilder => new PdoListQueryBuilder(
                 $container->get(PdoDialectInterface::class),
+                $this->subtreeScope($container),
             ),
             EntryLister::class => $this->makeLister(...),
             EntryWriter::class => $this->makeWriter(...),
@@ -395,7 +397,18 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(PendingLinkWriter::class),
             $container->get(EntryRowCodec::class),
             $container->get(PdoErrorFactory::class),
+            $this->subtreeScope($container),
         );
+    }
+
+    /**
+     * A replica can hold an entry whose parent is not stored, which its ancestor's subtree must still take.
+     */
+    private function subtreeScope(Container $container): DescendantScope
+    {
+        return $container->get(ServerOptions::class)->getReplicationConfig()->isConsumer()
+            ? DescendantScope::DnSuffix
+            : DescendantScope::ParentLinks;
     }
 
     private function makeSerializedEntryWriter(Container $container): SerializedEntryWriter

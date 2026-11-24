@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Server\Configuration;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\PasswordHashing;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
@@ -112,6 +114,16 @@ final class TestServerOptions
     public static function provider(): ServerOptions
     {
         return self::defaults()->setReplicationConfig(ReplicationConfig::forProvider(new ProviderConfig()));
+    }
+
+    /**
+     * The given storage on a replica, for a test of how a replica stores what it is sent.
+     */
+    public static function replicaOn(StorageConfigInterface $storageConfig): ServerOptions
+    {
+        return self::forStorage($storageConfig)->setReplicationConfig(ReplicationConfig::forReplica(
+            new ConsumerConfig(new ClientOptions()),
+        ));
     }
 
     /**

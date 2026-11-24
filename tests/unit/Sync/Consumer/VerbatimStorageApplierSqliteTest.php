@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
@@ -121,6 +122,6 @@ final class VerbatimStorageApplierSqliteTest extends TestCase
 
     protected function makeServerOptions(): ServerOptions
     {
-        return TestServerOptions::sqlite();
+        return TestServerOptions::replicaOn(PdoConfig::forSqlite(':memory:'));
     }
 }

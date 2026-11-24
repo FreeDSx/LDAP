@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
@@ -351,6 +352,44 @@ final class PdoListQueryBuilderTest extends TestCase
         self::assertStringNotContainsString(
             'EXISTS (',
             $query->sql,
+        );
+    }
+
+    public function test_an_unfiltered_subtree_walks_the_stored_parent_links(): void
+    {
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(base: 'ou=people,dc=foo,dc=bar'));
+
+        self::assertStringContainsString(
+            'WITH RECURSIVE subtree',
+            $query->sql,
+        );
+        self::assertSame(
+            ['ou=people,dc=foo,dc=bar'],
+            $query->params,
+        );
+    }
+
+    public function test_an_unfiltered_subtree_scoped_by_dn_suffix_matches_every_dn_ending_in_the_base(): void
+    {
+        $query = (new PdoListQueryBuilder(
+            new SqliteDialect(),
+            DescendantScope::DnSuffix,
+        ))->build(self::querySpec(base: 'ou=people_a,dc=foo,dc=bar'));
+
+        self::assertStringContainsString(
+            "(lc_dn = ? OR lc_dn LIKE ? ESCAPE '!')",
+            $query->sql,
+        );
+        self::assertStringNotContainsString(
+            'WITH RECURSIVE',
+            $query->sql,
+        );
+        self::assertSame(
+            [
+                'ou=people_a,dc=foo,dc=bar',
+                '%,ou=people!_a,dc=foo,dc=bar',
+            ],
+            $query->params,
         );
     }
 

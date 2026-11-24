@@ -73,6 +73,6 @@ final class VerbatimStorageApplierMysqlTest extends TestCase
 
     protected function makeServerOptions(): ServerOptions
     {
-        return TestServerOptions::forStorage($this->storage);
+        return TestServerOptions::replicaOn($this->storage);
     }
 }

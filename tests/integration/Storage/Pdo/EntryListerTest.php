@@ -517,6 +517,63 @@ final class EntryListerTest extends TestCase
         );
     }
 
+    public function test_a_filter_without_an_sql_form_skips_an_entry_whose_parent_is_not_stored(): void
+    {
+        $this->store(
+            'cn=Orphan,ou=Missing,dc=example,dc=com',
+            new Attribute(
+                'cn',
+                'Orphan',
+            ),
+        );
+
+        self::assertSame(
+            [self::BASE],
+            $this->dnsFrom(
+                $this->subject,
+                Filters::extensible(
+                    'cn',
+                    'Orphan',
+                    'caseExactMatch',
+                ),
+            ),
+        );
+    }
+
+    public function test_a_replica_lists_an_entry_whose_parent_is_not_stored_for_a_filter_without_an_sql_form(): void
+    {
+        $this->store(
+            'cn=Orphan,ou=Missing,dc=example,dc=com',
+            new Attribute(
+                'cn',
+                'Orphan',
+            ),
+        );
+
+        self::assertSame(
+            [
+                self::BASE,
+                'cn=Orphan,ou=Missing,dc=example,dc=com',
+            ],
+            $this->dnsFrom(
+                $this->replicaLister(),
+                Filters::extensible(
+                    'cn',
+                    'Orphan',
+                    'caseExactMatch',
+                ),
+            ),
+        );
+    }
+
+    private function replicaLister(): EntryLister
+    {
+        return Container::forServer(
+            TestServerOptions::replicaOn(PdoConfig::forSqlite(':memory:')),
+            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider($this->pdo)],
+        )->get(EntryLister::class);
+    }
+
     private function store(
         string $dn,
         Attribute ...$attributes,

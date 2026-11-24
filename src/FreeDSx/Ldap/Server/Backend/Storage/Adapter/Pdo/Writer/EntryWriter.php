@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
@@ -59,6 +60,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         private PendingLinkWriter $pending,
         private EntryRowCodec $codec,
         private PdoErrorFactory $errors,
+        private DescendantScope $renameScope,
     ) {}
 
     /**
@@ -186,7 +188,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
             $this->translatingRefusal(
                 function () use ($rename): void {
                     $this->connection->execute(
-                        $this->dialect->queryRenameDescendants(),
+                        $this->dialect->queryRenameDescendants($this->renameScope),
                         $this->renameDescendantParams($rename),
                     );
                 },
@@ -434,7 +436,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
             $rename->lcTo,
             $canonicalLength,
             $rename->lcTo,
-            $rename->lcFrom,
+            $this->renameScope->bindingFor($rename->lcFrom),
         ];
     }
 
