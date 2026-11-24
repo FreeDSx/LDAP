@@ -94,7 +94,7 @@ final readonly class WriteCommandFactory
      */
     private function addCommand(AddRequest $request): AddCommand
     {
-        $this->assertCanonicalFormIsUtf8($request->getEntry()->getDn());
+        $this->assertUtf8($request->getEntry()->getDn());
 
         return new AddCommand($request->getEntry());
     }
@@ -102,9 +102,9 @@ final readonly class WriteCommandFactory
     /**
      * @throws OperationException
      */
-    private function assertCanonicalFormIsUtf8(Dn $dn): void
+    private function assertUtf8(Dn $dn): void
     {
-        if ($dn->hasUtf8CanonicalForm()) {
+        if ($dn->isUtf8()) {
             return;
         }
 
@@ -147,7 +147,7 @@ final readonly class WriteCommandFactory
                 ResultCode::INVALID_DN_SYNTAX,
             );
         }
-        $this->assertCanonicalFormIsUtf8(OperationTargetDn::resultOf($request));
+        $this->assertUtf8(OperationTargetDn::resultOf($request));
 
         return new MoveCommand(
             $request->getDn(),

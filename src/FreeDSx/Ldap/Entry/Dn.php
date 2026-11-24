@@ -18,6 +18,7 @@ use Countable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
+use FreeDSx\Ldap\Schema\Text;
 use IteratorAggregate;
 use Stringable;
 use Traversable;
@@ -223,11 +224,12 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
-     * Whether the canonical form is UTF-8. Parsing does not settle this since a hexpair un-escapes to any octet.
+     * Whether the DN is UTF-8 both as given and once its hexpairs are unescaped.
      */
-    public function hasUtf8CanonicalForm(): bool
+    public function isUtf8(): bool
     {
-        return preg_match('//u', $this->normalizedString()) === 1;
+        return Text::isUtf8($this->dn)
+            && Text::isUtf8($this->normalizedString());
     }
 
     /**
