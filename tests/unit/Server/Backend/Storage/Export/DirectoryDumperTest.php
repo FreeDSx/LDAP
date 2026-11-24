@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Ldif\LdifOutputOptions;
 use FreeDSx\Ldap\Ldif\LdifWriter;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
@@ -27,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
@@ -116,6 +118,40 @@ final class DirectoryDumperTest extends TestCase
                 $record,
             );
         }
+    }
+
+    #[DataProvider('otherSpellingProvider')]
+    public function test_a_base_dn_naming_a_type_another_way_restricts_to_that_entry(string $base): void
+    {
+        $dumper = $this->makeDumper(
+            writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
+        );
+
+        $ldif = implode(
+            '',
+            iterator_to_array(
+                $dumper->dump((new DumpOptions())->setBaseDn(new Dn($base))),
+                false,
+            ),
+        );
+
+        self::assertStringContainsString(
+            'dn: cn=alice,dc=foo,dc=bar',
+            $ldif,
+        );
+        self::assertStringNotContainsString(
+            'dn: cn=bob,dc=foo,dc=bar',
+            $ldif,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function otherSpellingProvider(): iterable
+    {
+        yield 'an alias' => ['commonName=alice,dc=foo,dc=bar'];
+        yield 'an OID' => ['2.5.4.3=alice,dc=foo,dc=bar'];
     }
 
     public function test_it_restricts_to_the_options_base_dn_when_set(): void
@@ -224,6 +260,7 @@ final class DirectoryDumperTest extends TestCase
                 LinkedLeafWitness::class,
                 [LinkedValueLookupInterface::class => $storage],
             ),
+            $this->fromContainer(AttributeTypeSpelling::class),
             $writer ?? new LdifWriter(),
         );
     }

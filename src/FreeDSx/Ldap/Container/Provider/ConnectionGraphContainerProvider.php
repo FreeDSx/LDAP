@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
@@ -51,7 +52,11 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\ReplicaBindStrategy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
+use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
+use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\ServerOptions;
+
+use function array_map;
 
 /**
  * Registers the connection-independent collaborators the per-connection graph composes: stateless middleware,
@@ -116,8 +121,15 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
     private function makeSearchLimitResolver(Container $container): SearchLimitResolver
     {
         $options = $container->get(ServerOptions::class);
+        $names = $container->get(AclRuleNames::class);
         $resolver = new SearchLimitResolver(
-            $options->getSearchLimitRules(),
+            new SearchLimitRules(array_map(
+                static fn(SearchLimitRule $rule): SearchLimitRule => SearchLimitRule::for(
+                    $names->subject($rule->subject),
+                    $rule->limits,
+                ),
+                $options->getSearchLimitRules()->rules,
+            )),
             $options->makeSearchLimits(),
         );
         $resolver->setBackend($container->get(ReadBackendInterface::class));

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Ldif\LdifWriter;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -38,6 +39,7 @@ final readonly class DirectoryDumper
         private array $namingContexts,
         private FilterEvaluatorInterface $filterEvaluator,
         private LinkedLeafWitness $linkedLeaves,
+        private AttributeTypeSpelling $spelling,
         private LdifWriter $writer = new LdifWriter(),
     ) {}
 
@@ -74,7 +76,7 @@ final readonly class DirectoryDumper
     private function resolveBases(DumpOptions $options): array
     {
         if ($options->getBaseDn() !== null) {
-            return [$options->getBaseDn()];
+            return [$this->spelling->dn($options->getBaseDn())];
         }
 
         return $this->namingContexts;

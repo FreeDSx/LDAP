@@ -733,6 +733,120 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    #[DataProvider('configuredSpellingProvider')]
+    public function testAReadDenyAppliesWhenAConfiguredDnNamesATypeByAnAliasOrOid(string $attribute): void
+    {
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        self::assertNull($this->readSpelledTarget(
+            $attribute,
+            LdapAclCommand::CONFIGURED_SPELLING_DN,
+        ));
+    }
+
+    /**
+     * @return Generator<string, array{string}>
+     */
+    public static function configuredSpellingProvider(): Generator
+    {
+        yield 'the subject DN by an alias' => ['description'];
+        yield 'the target DN by an OID' => ['title'];
+        yield 'the target subtree by an alias' => ['street'];
+        yield 'the subject subtree by an OID' => ['l'];
+    }
+
+    public function testTheConfiguredSpellingDeniesDoNotReachAnotherIdentity(): void
+    {
+        $this->bindDelegate();
+
+        self::assertSame(
+            ['subject-dn-secret', 'target-dn-secret', 'target-subtree-secret', 'subject-subtree-secret'],
+            array_map(
+                fn(string $attribute): ?string => $this->readSpelledTarget(
+                    $attribute,
+                    LdapAclCommand::CONFIGURED_SPELLING_DN,
+                ),
+                ['description', 'title', 'street', 'l'],
+            ),
+        );
+    }
+
+    public function testAReadAllowAppliesWhenItsGroupDnNamesATypeByAnAlias(): void
+    {
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        self::assertSame(
+            'group-dn-secret',
+            $this->readSpelledTarget(
+                'postalCode',
+                LdapAclCommand::CONFIGURED_SPELLING_DN,
+            ),
+        );
+    }
+
+    public function testTheConfiguredSpellingGroupAllowDoesNotReachANonMember(): void
+    {
+        $this->bindDelegate();
+
+        self::assertNull($this->readSpelledTarget(
+            'postalCode',
+            LdapAclCommand::CONFIGURED_SPELLING_DN,
+        ));
+    }
+
+    public function testAnOperationDenyAppliesWhenItsConfiguredDnsNameTypesByAnAliasAndOid(): void
+    {
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->compare(
+            LdapAclCommand::CONFIGURED_SPELLING_DN,
+            'sn',
+            'Configured',
+        );
+    }
+
+    public function testAManagerConfiguredWithAnAliasBindsAsTheManager(): void
+    {
+        $this->ldapClient()->bind(
+            LdapAclCommand::MANAGER_DN,
+            LdapAclCommand::MANAGER_PASSWORD,
+        );
+
+        self::assertSame(
+            'dn:' . LdapAclCommand::MANAGER_DN,
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testASearchLimitAppliesWhenItsConfiguredSubjectNamesATypeByAnAlias(): void
+    {
+        $this->ldapClient()->bind(
+            LdapAclCommand::LIMITED_DN,
+            LdapAclCommand::LIMITED_PASSWORD,
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::SIZE_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+    }
+
     public function testAnOperationDenyAppliesToAGroupMemberSpelledByNumericOid(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
@@ -1461,14 +1575,16 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
-    private function readSpelledTarget(string $attribute): ?string
-    {
+    private function readSpelledTarget(
+        string $attribute,
+        string $dn = LdapAclCommand::SPELLED_TARGET_DN,
+    ): ?string {
         $entry = $this->ldapClient()->search(
             Operations::search(
                 Filters::present('objectClass'),
                 $attribute,
             )
-                ->base(LdapAclCommand::SPELLED_TARGET_DN)
+                ->base($dn)
                 ->useBaseScope(),
         )->first();
 

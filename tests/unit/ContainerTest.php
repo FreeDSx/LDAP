@@ -13,7 +13,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\StoredPasswordGuard;
+use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -24,6 +31,7 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Decoder\RequestMessageDecoder;
 use FreeDSx\Ldap\Protocol\Decoder\ResponseMessageDecoder;
@@ -125,6 +133,9 @@ use FreeDSx\Ldap\Server\Resources\MemoryLimit;
 use FreeDSx\Ldap\Server\Resources\OpenFileLimit;
 use FreeDSx\Ldap\Server\Resources\SystemResources;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
+use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
+use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
+use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Proxy\ProxyBindResetMiddleware;
@@ -191,6 +202,102 @@ class ContainerTest extends TestCase
             $storage,
             $container->get(TransactionalWriteInterface::class),
         );
+    }
+
+    #[DataProvider('otherPolicySpellingProvider')]
+    public function test_a_default_policy_dn_naming_a_type_another_way_resolves_the_policy(string $dn): void
+    {
+        $options = (new ServerOptions(new InMemoryStorageConfig()))
+            ->setPasswordConfig((new PasswordConfig())->setDefaultPolicyDn(new Dn($dn)));
+        $container = Container::forServer($options);
+        (new LdapServer(
+            $options,
+            $container,
+        ))->seedEntries([
+            Entry::fromArray(
+                'dc=foo,dc=bar',
+                [
+                    'objectClass' => 'domain',
+                    'dc' => 'foo',
+                ],
+            ),
+            Entry::fromArray(
+                'cn=default,dc=foo,dc=bar',
+                [
+                    'objectClass' => ['organizationalRole', 'pwdPolicy'],
+                    'cn' => 'default',
+                    'pwdAttribute' => 'userPassword',
+                    'pwdMinLength' => '10',
+                ],
+            ),
+        ]);
+
+        self::assertSame(
+            10,
+            $container->get(PasswordPolicyResolver::class)->resolveDefault()?->quality->minLength,
+        );
+    }
+
+    public function test_an_administrator_named_by_an_alias_may_store_a_pre_hashed_password(): void
+    {
+        $container = Container::forServer(
+            TestServerOptions::defaults()->setAdministrators(Subject::dn('commonName=admin,dc=foo,dc=bar')),
+        );
+
+        $this->expectNotToPerformAssertions();
+
+        $container->get(StoredPasswordGuard::class)->assertStorable(
+            new Entry(
+                new Dn('cn=user,dc=foo,dc=bar'),
+                new Attribute(
+                    'userPassword',
+                    '{SSHA}c2FsdGVkaGFzaA==',
+                ),
+            ),
+            [],
+            new WriteContext(
+                BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
+                new ControlBag(),
+            ),
+        );
+    }
+
+    #[DataProvider('otherUserSpellingProvider')]
+    public function test_a_search_limit_rule_naming_its_subject_a_type_another_way_applies(string $dn): void
+    {
+        $container = Container::forServer(
+            TestServerOptions::defaults()->setSearchLimitRules((new SearchLimitRules())->withRules(
+                SearchLimitRule::for(
+                    Subject::dn($dn),
+                    new SearchLimits(maxSearchSize: 3),
+                ),
+            )),
+        );
+
+        self::assertSame(
+            3,
+            $container->get(SearchLimitResolver::class)
+                ->resolve(BindToken::fromDn('cn=user,dc=foo,dc=bar'))
+                ->maxSearchSize(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function otherPolicySpellingProvider(): iterable
+    {
+        yield 'an alias' => ['commonName=default,dc=foo,dc=bar'];
+        yield 'an OID' => ['2.5.4.3=default,dc=foo,dc=bar'];
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function otherUserSpellingProvider(): iterable
+    {
+        yield 'an alias' => ['commonName=user,dc=foo,dc=bar'];
+        yield 'an OID' => ['2.5.4.3=user,dc=foo,dc=bar'];
     }
 
     public function test_a_pdo_config_reads_and_lists_in_place_but_writes_through_the_serializing_writer(): void

@@ -14,14 +14,18 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl\Target;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableInterface;
+use FreeDSx\Ldap\Server\AccessControl\DnSpellableTrait;
 
 /**
  * Matches any target DN within a given subtree (case-insensitive).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class SubtreeTargetMatcher implements TargetMatcherInterface
+final class SubtreeTargetMatcher implements TargetMatcherInterface, DnSpellableInterface
 {
+    use DnSpellableTrait;
+
     private readonly Dn $subtreeDn;
 
     public function __construct(string $dn)
@@ -32,5 +36,15 @@ final class SubtreeTargetMatcher implements TargetMatcherInterface
     public function matches(Dn $dn): bool
     {
         return $dn->isDescendantOf($this->subtreeDn);
+    }
+
+    private function spellableDn(): Dn
+    {
+        return $this->subtreeDn;
+    }
+
+    private function withSpellableDn(Dn $dn): static
+    {
+        return new self($dn->toString());
     }
 }

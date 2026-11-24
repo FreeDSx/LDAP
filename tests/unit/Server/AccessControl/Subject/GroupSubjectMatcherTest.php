@@ -17,11 +17,14 @@ use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\AccessControl\Subject\GroupSubjectMatcher;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
@@ -35,10 +38,13 @@ final class GroupSubjectMatcherTest extends TestCase
 
     private Dn $targetDn;
 
+    private AttributeTypeSpelling $spelling;
+
     protected function setUp(): void
     {
         $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->targetDn = new Dn('dc=foo,dc=bar');
+        $this->spelling = new AttributeTypeSpelling(SchemaResource::Core->load());
 
         // Only the group read is stood in for; membership is decided by the real comparison.
         $comparing = $this->backendFor(new InMemoryStorage());
@@ -46,6 +52,53 @@ final class GroupSubjectMatcherTest extends TestCase
         $this->mockBackend
             ->method('compare')
             ->willReturnCallback($comparing->compare(...));
+    }
+
+    #[DataProvider('otherSpellingProvider')]
+    public function test_a_group_naming_a_type_another_way_is_read_once_spelled_by_primary_names(
+        string $groupDn,
+        string $memberAttribute,
+    ): void {
+        $group = Entry::create(
+            'cn=admins,dc=foo,dc=bar',
+            [$memberAttribute => ['cn=admin,dc=foo,dc=bar']],
+        );
+        $this->mockBackend
+            ->method('get')
+            ->willReturnCallback(static fn(Dn $dn): ?Entry => $dn->normalizedString() === 'cn=admins,dc=foo,dc=bar'
+                ? $group
+                : null);
+
+        $subject = (new GroupSubjectMatcher(
+            $groupDn,
+            $memberAttribute,
+        ))->spelledBy($this->spelling);
+        $subject->setBackend($this->mockBackend);
+
+        self::assertTrue($subject->matches(
+            BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
+            $this->targetDn,
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function otherSpellingProvider(): iterable
+    {
+        yield 'an alias' => ['commonName=admins,dc=foo,dc=bar', 'member'];
+        yield 'an OID' => ['2.5.4.3=admins,dc=foo,dc=bar', 'member'];
+        yield 'an alias, with another member attribute' => ['commonName=admins,dc=foo,dc=bar', 'uniqueMember'];
+    }
+
+    public function test_a_group_spelled_by_primary_names_keeps_the_same_matcher(): void
+    {
+        $subject = new GroupSubjectMatcher('cn=admins,dc=foo,dc=bar');
+
+        self::assertSame(
+            $subject,
+            $subject->spelledBy($this->spelling),
+        );
     }
 
     public function test_it_should_match_when_bound_dn_is_a_group_member(): void

@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Container\Contributor\DirectoryListenerContributor;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\ReloadableAccessControl;
@@ -56,7 +57,10 @@ final class DirectoryListenerContributorTest extends TestCase
             [],
             $this->options->getStorageConfig(),
             $this->accessControl,
-            new AclRuleNames($this->options->getSchema()),
+            new AclRuleNames(
+                $this->options->getSchema(),
+                new AttributeTypeSpelling($this->options->getSchema()),
+            ),
             [$this->requirement],
             [$this->advisory],
         );
@@ -76,6 +80,23 @@ final class DirectoryListenerContributorTest extends TestCase
 
         $this->subject->applyReload((clone $this->options)->setAclRules(AclRules::fromEmpty(
             extendedOps: [ExtendedOperationRule::allow(Subject::anyone(), self::OID)],
+        )));
+
+        $this->accessControl->authorizeExtendedOperation(
+            BindToken::fromDn('cn=user,dc=foo,dc=bar'),
+            self::OID,
+        );
+    }
+
+    public function test_a_reloaded_rule_naming_its_subject_by_an_alias_applies(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->applyReload((clone $this->options)->setAclRules(AclRules::fromEmpty(
+            extendedOps: [ExtendedOperationRule::allow(
+                Subject::dn('commonName=user,dc=foo,dc=bar'),
+                self::OID,
+            )],
         )));
 
         $this->accessControl->authorizeExtendedOperation(

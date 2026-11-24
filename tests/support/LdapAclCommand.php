@@ -18,9 +18,14 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
+use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
+use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
+use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -56,6 +61,25 @@ class LdapAclCommand extends Command
      * Carries one attribute per spelled-member group, each denied to that group's members.
      */
     public const SPELLED_TARGET_DN = 'cn=spelled-target,dc=foo,dc=bar';
+
+    /**
+     * Carries one attribute per rule whose configured DNs name a type by an alias or OID, each decided for cn=user.
+     */
+    public const CONFIGURED_SPELLING_DN = 'cn=configured-spelling,dc=foo,dc=bar';
+
+    /**
+     * Configured as commonName=manager, and binds only once a configured DN is spelled by primary names.
+     */
+    public const MANAGER_DN = 'cn=manager,dc=foo,dc=bar';
+
+    public const MANAGER_PASSWORD = 'managerpass';
+
+    /**
+     * Held to one entry per search by a limit rule naming it commonName=limited.
+     */
+    public const LIMITED_DN = 'cn=limited,dc=foo,dc=bar';
+
+    public const LIMITED_PASSWORD = 'limitedpass';
 
     /**
      * Names cn=user by the numeric OID of cn.
@@ -130,6 +154,19 @@ class LdapAclCommand extends Command
             ),
         ))
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
+                ->setManager(new ManagerIdentity(
+                    new Dn('commonName=manager,dc=foo,dc=bar'),
+                    '{SHA}' . base64_encode(sha1(
+                        self::MANAGER_PASSWORD,
+                        true,
+                    )),
+                ))
+                ->setSearchLimitRules((new SearchLimitRules())->withRules(
+                    SearchLimitRule::for(
+                        Subject::dn('commonName=limited,dc=foo,dc=bar'),
+                        new SearchLimits(maxSearchSize: 1),
+                    ),
+                ))
                 ->setAclRules(
                     (AclRules::fromEmpty())
                         ->replaceOperationRules(
@@ -147,6 +184,12 @@ class LdapAclCommand extends Command
                             OperationRule::deny(
                                 Subject::group(self::OID_MEMBER_GROUP_DN),
                                 Target::dn(self::SPELLED_TARGET_DN),
+                                OperationType::Compare,
+                            ),
+                            // Only bites if both configured DNs, spelled by an alias and an OID, are respelled.
+                            OperationRule::deny(
+                                Subject::dn('commonName=user,dc=foo,dc=bar'),
+                                Target::dn('2.5.4.3=configured-spelling,dc=foo,dc=bar'),
                                 OperationType::Compare,
                             ),
                             OperationRule::allow(
@@ -198,6 +241,38 @@ class LdapAclCommand extends Command
                                 ),
                                 Target::dn(self::SPELLED_TARGET_DN),
                                 'postalCode',
+                            )->forRead(),
+                            // Each only bites if the one configured DN it spells another way is respelled.
+                            AttributeRule::deny(
+                                Subject::dn('commonName=user,dc=foo,dc=bar'),
+                                Target::dn(self::CONFIGURED_SPELLING_DN),
+                                'description',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::dn('cn=user,dc=foo,dc=bar'),
+                                Target::dn('2.5.4.3=configured-spelling,dc=foo,dc=bar'),
+                                'title',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::dn('cn=user,dc=foo,dc=bar'),
+                                Target::subtree('commonName=configured-spelling,dc=foo,dc=bar'),
+                                'street',
+                            )->forRead(),
+                            // An allow: a group that cannot be read makes a deny apply all the same.
+                            AttributeRule::allow(
+                                Subject::group('commonName=blocked-oid,dc=foo,dc=bar'),
+                                Target::dn(self::CONFIGURED_SPELLING_DN),
+                                'postalCode',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::anyone(),
+                                Target::dn(self::CONFIGURED_SPELLING_DN),
+                                'postalCode',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::dnSubtree('2.5.4.3=user,dc=foo,dc=bar'),
+                                Target::dn(self::CONFIGURED_SPELLING_DN),
+                                'l',
                             )->forRead(),
                             // Spelled with an alias, so the rule only bites if rule names are canonicalized.
                             AttributeRule::deny(
