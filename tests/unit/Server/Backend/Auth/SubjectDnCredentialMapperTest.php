@@ -74,6 +74,30 @@ final class SubjectDnCredentialMapperTest extends TestCase
         -----END CERTIFICATE-----
         PEM;
 
+    /**
+     * Throwaway self-signed cert whose CN is text that reads as escapes.
+     */
+    private const ESCAPE_LOOKALIKE_PEM = <<<'PEM'
+        -----BEGIN CERTIFICATE-----
+        MIIC9DCCAdygAwIBAgIUCdwUFTlrBgH/sokRt5uxpKI7DP0wDQYJKoZIhvcNAQEL
+        BQAwGjEYMBYGA1UEAwwPXDYxXDY0XDZkXDY5XDZlMB4XDTI2MTEyNDAxMjMxOVoX
+        DTI2MTEyNTAxMjMxOVowGjEYMBYGA1UEAwwPXDYxXDY0XDZkXDY5XDZlMIIBIjAN
+        BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwwj4EevTSbhaAlWMvohrCXA0Ch99
+        e9xtg2/rOeWRiTYqtstVIsLKTg3xDw9vG4WlSATcPN43eahwSfpY7rQV4dJ5kGvZ
+        ejL7bXi1jEbro6W+TomP5iTqQiJoTky4Ce0WMCG2+5j9l7RBwXfksKYmpyrSEo1q
+        uGlM+rkAQ17O2QbZL3faL+WwQQQAA5E1WkMenqX4vUy+Xnc2wufedKWoXkkYtPTZ
+        hFmTrd92LUxjn4OpQ2KLmMEiksxf9DFOyDWxdG7f9tSdp81t0m/8rMnbPDc56jK9
+        D8Cfkn0J87IZmB2G7MkZCO2A86OHPamovqOEkFK+DM0ToXNgJymy0Yq6kQIDAQAB
+        ozIwMDAdBgNVHQ4EFgQUKfm0VYxlPSOiWkHe3RKHpnV+YoswDwYDVR0TAQH/BAUw
+        AwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAR5tJNVO7In5bLAzHmMJL1fD3qBdTWunr
+        ARBakfUZv+wszwTnP5xchh8zK0+G5uLejQGIaPBbVRYaCpLBLGT/yBBZD6oLetDD
+        csbOGUlUMA3VgJVfa1W58Htw2jml5V0zVSPrBVOa59Be7zsZUQVYAtr02feyhFOm
+        gsKVef0R2/qrOj8IMRKyX1E3x/eOyxu+8pFrJdnvSmbYYdrKXzAlborZRZ444pQv
+        2e0dv8x/ljC7sxT6plsFtrX72fUVeNLvs/tmlo311wrTnYl9jyrvIkHgLPktH/0c
+        Kc6pXWX5L+cYSveR9Wx5xt1JguPyxOTyhpMSs084RGRLuZCWl8Xpew==
+        -----END CERTIFICATE-----
+        PEM;
+
     public function test_it_reverses_the_subject_into_an_ldap_dn(): void
     {
         $authzId = (new SubjectDnCredentialMapper())->map($this->certificate(self::COCN_PEM));
@@ -93,6 +117,21 @@ final class SubjectDnCredentialMapperTest extends TestCase
         self::assertNotNull($authzId);
         self::assertSame(
             (new Dn('cn=bar,dc=example,dc=com'))->normalizedString(),
+            (new Dn($authzId->getValue()))->normalizedString(),
+        );
+    }
+
+    public function test_a_subject_value_that_reads_as_an_escape_keeps_its_literal_text(): void
+    {
+        $authzId = (new SubjectDnCredentialMapper())->map($this->certificate(self::ESCAPE_LOOKALIKE_PEM));
+
+        self::assertNotNull($authzId);
+        self::assertSame(
+            'CN=\5c61\5c64\5c6d\5c69\5c6e',
+            $authzId->getValue(),
+        );
+        self::assertNotSame(
+            (new Dn('cn=admin'))->normalizedString(),
             (new Dn($authzId->getValue()))->normalizedString(),
         );
     }

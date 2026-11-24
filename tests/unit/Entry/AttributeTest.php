@@ -338,11 +338,27 @@ class AttributeTest extends TestCase
         );
     }
 
-    public function test_it_should_not_escape_a_string_that_is_already_hex_encoded(): void
+    public function test_it_should_escape_a_value_that_looks_hex_encoded(): void
     {
         self::assertSame(
-            '\66\6f\6f\62\61\72',
-            Attribute::escape('\66\6f\6f\62\61\72'),
+            '\5c66\5c6f\5c6f',
+            Attribute::escape('\66\6f\6f'),
+        );
+    }
+
+    public function test_it_should_escape_all_characters_of_a_value_that_looks_hex_encoded(): void
+    {
+        self::assertSame(
+            '\5c\36\36',
+            Attribute::escapeAll('\66'),
+        );
+    }
+
+    public function test_it_should_ignore_an_empty_value_when_escaping_all_characters(): void
+    {
+        self::assertSame(
+            '',
+            Attribute::escapeAll(''),
         );
     }
 

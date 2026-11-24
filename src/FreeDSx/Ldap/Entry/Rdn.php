@@ -203,11 +203,13 @@ class Rdn implements Stringable
     }
 
     /**
-     * Escape an RDN value.
+     * Escape a raw RDN value.
+     *
+     * Note: This includes text that already looks escaped.
      */
     public static function escape(string $value): string
     {
-        if (self::shouldNotEscape($value)) {
+        if ($value === '') {
             return $value;
         }
         $value = str_replace(

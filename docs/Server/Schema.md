@@ -518,5 +518,6 @@ composer require symfony/polyfill-intl-normalizer symfony/polyfill-mbstring
 
 - `caseExactMatch` preserves case but still ignores insignificant whitespace and applies NFKC — it is no longer a raw
   byte comparison. `octetStringMatch` (used by binary attributes such as `userPassword`) remains byte-exact.
-- Distinguished name matching is not affected by this profile.
+- Distinguished names are compared with this profile too, case-folded for every RDN value whatever its attribute's
+  equality rule. See [DN Values Are Always Case-Folded](Conformance.md#dn-values-are-always-case-folded).
 - The Prohibit and Bidirectional steps of RFC 4518 are not implemented.

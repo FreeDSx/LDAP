@@ -356,6 +356,62 @@ final class InMemoryStorageTest extends TestCase
         );
     }
 
+    public function test_list_single_level_finds_the_child_of_a_parent_whose_value_reads_as_an_escape(): void
+    {
+        $storage = EntryFixture::inMemoryStorage(
+            Entry::fromArray(
+                'dc=example,dc=com',
+                ['dc' => 'example'],
+            ),
+            Entry::fromArray(
+                'cn=A,dc=example,dc=com',
+                ['cn' => 'A'],
+            ),
+            Entry::fromArray(
+                'cn=\5c41,dc=example,dc=com',
+                ['cn' => '\41'],
+            ),
+            Entry::fromArray(
+                'cn=Kid,cn=\5c41,dc=example,dc=com',
+                ['cn' => 'Kid'],
+            ),
+        );
+
+        $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(
+            new Dn('cn=\5c41,dc=example,dc=com'),
+            false,
+        ))->entries());
+
+        self::assertSame(
+            ['cn=Kid,cn=\5c41,dc=example,dc=com'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries,
+            ),
+        );
+    }
+
+    public function test_a_parent_whose_value_reads_as_an_escape_has_children(): void
+    {
+        $storage = EntryFixture::inMemoryStorage(
+            Entry::fromArray(
+                'cn=A,dc=example,dc=com',
+                ['cn' => 'A'],
+            ),
+            Entry::fromArray(
+                'cn=\5c41,dc=example,dc=com',
+                ['cn' => '\41'],
+            ),
+            Entry::fromArray(
+                'cn=Kid,cn=\5c41,dc=example,dc=com',
+                ['cn' => 'Kid'],
+            ),
+        );
+
+        self::assertTrue($storage->hasChildren(new Dn('cn=\5c41,dc=example,dc=com')));
+        self::assertFalse($storage->hasChildren(new Dn('cn=A,dc=example,dc=com')));
+    }
+
     public function test_list_recursive_includes_base_and_descendants(): void
     {
         $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));

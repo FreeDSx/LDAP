@@ -127,6 +127,20 @@ final class SyncCookieTest extends TestCase
         );
     }
 
+    public function test_the_content_key_tells_a_filter_value_that_reads_as_an_escape_from_the_character_it_names(): void
+    {
+        self::assertNotSame(
+            SyncCookie::contentKey($this->request()->setFilter(Filters::equal(
+                'cn',
+                '*',
+            ))),
+            SyncCookie::contentKey($this->request()->setFilter(Filters::equal(
+                'cn',
+                '\2a',
+            ))),
+        );
+    }
+
     public function test_the_content_key_ignores_the_limits(): void
     {
         self::assertSame(
