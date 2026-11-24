@@ -59,6 +59,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             ...$this->rules->controls,
             ...$this->rules->extendedOps,
             ...$this->rules->confidential,
+            ...$this->rules->relocations,
             ...$this->rules->filters,
         ];
 
