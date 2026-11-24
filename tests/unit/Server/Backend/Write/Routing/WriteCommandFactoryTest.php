@@ -146,6 +146,30 @@ final class WriteCommandFactoryTest extends TestCase
         );
     }
 
+    #[DataProvider('hexpairBesideRawOctetProvider')]
+    public function test_it_rejects_an_added_dn_mixing_a_hexpair_with_a_raw_octet(string $dn): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->subject->fromRequest(
+            new AddRequest(Entry::fromArray(
+                $dn,
+                ['objectClass' => 'top'],
+            )),
+            $this->context(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function hexpairBesideRawOctetProvider(): iterable
+    {
+        yield 'a hexpair before a raw octet' => ['cn=\C3' . "\xA9" . ',dc=bar'];
+        yield 'a raw octet before a hexpair' => ["cn=\xC3" . '\A9,dc=bar'];
+    }
+
     public function test_it_rejects_a_new_rdn_whose_canonical_form_is_not_utf8(): void
     {
         self::expectException(OperationException::class);

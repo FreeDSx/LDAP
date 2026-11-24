@@ -166,17 +166,42 @@ class DnTest extends TestCase
         self::assertTrue(Dn::isValid('cn=a\00b,dc=x'));
     }
 
-    public function test_a_hexpair_escaping_a_non_utf8_octet_parses_but_has_no_utf8_canonical_form(): void
+    public function test_a_hexpair_escaping_a_non_utf8_octet_parses_but_is_not_utf8(): void
     {
         $dn = new Dn('userPassword=\FF,dc=x');
 
         self::assertTrue(Dn::isValid('userPassword=\FF,dc=x'));
-        self::assertFalse($dn->hasUtf8CanonicalForm());
+        self::assertFalse($dn->isUtf8());
     }
 
-    public function test_an_ordinary_dn_has_a_utf8_canonical_form(): void
+    #[DataProvider('hexpairBesideRawOctetProvider')]
+    public function test_a_hexpair_beside_a_raw_octet_is_not_utf8_though_it_unescapes_to_utf8(string $dn): void
     {
-        self::assertTrue((new Dn('cn=José,dc=x'))->hasUtf8CanonicalForm());
+        self::assertFalse((new Dn($dn))->isUtf8());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function hexpairBesideRawOctetProvider(): iterable
+    {
+        yield 'a hexpair before a raw octet' => ['cn=\C3' . "\xA9" . ',dc=x'];
+        yield 'a raw octet before a hexpair' => ["cn=\xC3" . '\A9,dc=x'];
+    }
+
+    #[DataProvider('utf8DnProvider')]
+    public function test_a_dn_naming_utf8_raw_or_by_hexpairs_is_utf8(string $dn): void
+    {
+        self::assertTrue((new Dn($dn))->isUtf8());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function utf8DnProvider(): iterable
+    {
+        yield 'raw' => ['cn=José,dc=x'];
+        yield 'by hexpairs' => ['cn=Jos\C3\A9,dc=x'];
     }
 
     public function test_the_hexstring_value_form_is_refused(): void

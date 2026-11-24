@@ -783,6 +783,88 @@ final class LdapServerTest extends ServerTestCase
         ];
     }
 
+    #[DataProvider('nonUtf8DnProvider')]
+    public function testARequestNamingADnThatIsNotUtf8IsAnsweredWithInvalidDnSyntaxForAnyIdentity(
+        RequestInterface $request,
+    ): void {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->send($request);
+            $this->fail('A request naming a DN that is not UTF-8 should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function nonUtf8DnProvider(): iterable
+    {
+        $values = [
+            'raw octets' => "\xFF\xFE",
+            'a hexpair' => '\FF',
+            'a hexpair before a raw octet' => '\C3' . "\xA9",
+            'a raw octet before a hexpair' => "\xC3" . '\A9',
+        ];
+
+        foreach ($values as $kind => $value) {
+            yield "a search base, $kind" => [
+                Operations::search(Filters::present('objectClass'))->base("cn=$value,dc=foo,dc=bar"),
+            ];
+            yield "a compare target, $kind" => [
+                Operations::compare(
+                    "cn=$value,dc=foo,dc=bar",
+                    'cn',
+                    'x',
+                ),
+            ];
+            yield "a delete target, $kind" => [Operations::delete("cn=$value,dc=foo,dc=bar")];
+            yield "a modify target, $kind" => [
+                Operations::modify(
+                    "cn=$value,dc=foo,dc=bar",
+                    Change::replace(
+                        'description',
+                        'x',
+                    ),
+                ),
+            ];
+            yield "an add target, $kind" => [
+                Operations::add(Entry::fromArray(
+                    "cn=$value,dc=foo,dc=bar",
+                    ['objectClass' => 'person', 'cn' => 'x', 'sn' => 'x'],
+                )),
+            ];
+            yield "a rename target, $kind" => [
+                Operations::rename(
+                    "cn=$value,dc=foo,dc=bar",
+                    'cn=b',
+                ),
+            ];
+            yield "a new superior, $kind" => [
+                Operations::move(
+                    'cn=user,dc=foo,dc=bar',
+                    "ou=$value,dc=foo,dc=bar",
+                ),
+            ];
+            yield "a new rdn, $kind" => [
+                Operations::rename(
+                    'cn=user,dc=foo,dc=bar',
+                    "cn=$value",
+                ),
+            ];
+        }
+    }
+
     public function testASearchCarryingATrailingComponentItDoesNotRecognizeIsAnswered(): void
     {
         $queue = $this->rawQueue();
