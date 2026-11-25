@@ -74,6 +74,13 @@ interface PdoLinkReadDialectInterface
     public function queryHeldLinkValues(int $count): string;
 
     /**
+     * Every DN an owner links under an attribute.
+     *
+     * Parameters: [owner lc_dn, attr_name_lower]
+     */
+    public function queryLinkValues(): string;
+
+    /**
      * Any one DN an owner links under an attribute, for answering whether it holds the attribute at all.
      *
      * Parameters: [owner lc_dn, attr_name_lower]

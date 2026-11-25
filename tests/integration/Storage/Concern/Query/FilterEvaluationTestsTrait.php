@@ -1206,6 +1206,30 @@ trait FilterEvaluationTestsTrait
             ),
             1,
         ];
+        // cn=user is named by two groups, and only one of them answers these.
+        yield 'an extensible match on a back-link by another rule' => [
+            Filters::extensible(
+                'memberOf',
+                'cn=Smith\, John,dc=foo,dc=bar',
+                'caseIgnoreMatch',
+            ),
+            1,
+        ];
+        yield 'a negated extensible match on a back-link by another rule' => [
+            Filters::not(Filters::extensible(
+                'memberOf',
+                'cn=Smith\, John,dc=foo,dc=bar',
+                'caseIgnoreMatch',
+            )),
+            7,
+        ];
+        yield 'an ordering match on a back-link' => [
+            Filters::greaterThanOrEqual(
+                'memberOf',
+                'cn=Smith',
+            ),
+            1,
+        ];
     }
 
     /**

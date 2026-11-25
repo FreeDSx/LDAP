@@ -30,6 +30,8 @@ final class EntryLinkWriterTest extends TestCase
 
     private const BOB = 'cn=Bob,dc=example,dc=com';
 
+    private const ALICE = 'cn=Alice,dc=example,dc=com';
+
     private EntryLinkWriter $subject;
 
     private WriteEntryInterface $storage;
@@ -54,11 +56,19 @@ final class EntryLinkWriterTest extends TestCase
                 ],
             ),
             Entry::fromArray(
+                self::ALICE,
+                [
+                    'objectClass' => ['person'],
+                    'cn' => ['Alice'],
+                    'sn' => ['Alice'],
+                ],
+            ),
+            Entry::fromArray(
                 self::ADMINS,
                 [
                     'objectClass' => ['groupOfNames'],
                     'cn' => ['Admins'],
-                    'member' => [self::BOB],
+                    'member' => [self::BOB, self::ALICE],
                 ],
             ),
         ]);
@@ -105,6 +115,17 @@ final class EntryLinkWriterTest extends TestCase
                     [self::BOB],
                 ),
             ],
+        );
+    }
+
+    public function test_every_value_the_owner_links_is_read(): void
+    {
+        self::assertEqualsCanonicalizing(
+            [self::BOB, self::ALICE],
+            $this->subject->linkValues(
+                new Dn(self::ADMINS),
+                'member',
+            ),
         );
     }
 

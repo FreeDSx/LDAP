@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Capability;
 use FreeDSx\Ldap\Entry\Dn;
 
 /**
- * Answers what an entry links without reading the values it links.
+ * Answers what an entry links, reading only as many of its values as the question needs.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -42,4 +42,14 @@ interface LinkedValueLookupInterface
         Dn $owner,
         string $attribute,
     ): ?string;
+
+    /**
+     * Every value the entry holds.
+     *
+     * @return list<string>
+     */
+    public function linkValues(
+        Dn $owner,
+        string $attribute,
+    ): array;
 }

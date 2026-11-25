@@ -96,22 +96,38 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         Dn $owner,
         string $attribute,
     ): ?string {
-        $reversed = $this->declared->linkedBy($attribute);
-        $row = $this->connection
-            ->execute(
-                $reversed === null
-                    ? $this->dialect->queryAnyLinkValue()
-                    : $this->dialect->queryAnyBacklinkValue(),
-                [
-                    $owner->normalizedString(),
-                    $reversed ?? Attribute::normalizeName($attribute),
-                ],
-            )
-            ->fetch();
+        $row = $this->valueRows(
+            $owner,
+            $attribute,
+            $this->dialect->queryAnyLinkValue(),
+            $this->dialect->queryAnyBacklinkValue(),
+        )->fetch();
 
         return is_array($row)
             ? $this->stringColumn($row['dn'] ?? null)
             : null;
+    }
+
+    /**
+     * Every value the entry links, for a rule that any one of them may answer.
+     */
+    public function linkValues(
+        Dn $owner,
+        string $attribute,
+    ): array {
+        $values = [];
+
+        $rows = $this->valueRows(
+            $owner,
+            $attribute,
+            $this->dialect->queryLinkValues(),
+            $this->dialect->queryBacklinkValues(),
+        );
+        foreach ($this->rowsOf($rows) as $row) {
+            $values[] = $this->stringColumn($row['dn'] ?? null);
+        }
+
+        return $values;
     }
 
     /**
@@ -365,6 +381,28 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
                 $params,
             ));
         }
+    }
+
+    /**
+     * The values of one attribute, read from the entry holding them or, for a back-link, from the entries naming it.
+     */
+    private function valueRows(
+        Dn $owner,
+        string $attribute,
+        string $forward,
+        string $backward,
+    ): PooledStatement {
+        $reversed = $this->declared->linkedBy($attribute);
+
+        return $this->connection->execute(
+            $reversed === null
+                ? $forward
+                : $backward,
+            [
+                $owner->normalizedString(),
+                $reversed ?? Attribute::normalizeName($attribute),
+            ],
+        );
     }
 
     /**

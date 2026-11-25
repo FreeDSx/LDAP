@@ -42,4 +42,14 @@ final readonly class NoLinkedValues implements LinkedValueLookupInterface
     ): ?string {
         return null;
     }
+
+    /**
+     * The entry carries every value it holds, leaving nothing to add.
+     */
+    public function linkValues(
+        Dn $owner,
+        string $attribute,
+    ): array {
+        return [];
+    }
 }

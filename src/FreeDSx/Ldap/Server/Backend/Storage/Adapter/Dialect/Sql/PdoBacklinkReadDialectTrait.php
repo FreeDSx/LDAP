@@ -125,7 +125,7 @@ trait PdoBacklinkReadDialectTrait
         SQL;
     }
 
-    public function queryAnyBacklinkValue(): string
+    public function queryBacklinkValues(): string
     {
         return <<<SQL
             SELECT o.dn
@@ -133,8 +133,12 @@ trait PdoBacklinkReadDialectTrait
             JOIN entries t ON t.entry_id = l.target_entry_id
             JOIN entries o ON o.entry_id = l.owner_entry_id
             WHERE t.lc_dn = ? AND l.attr_name_lower = ?
-            LIMIT 1
         SQL;
+    }
+
+    public function queryAnyBacklinkValue(): string
+    {
+        return $this->queryBacklinkValues() . ' LIMIT 1';
     }
 
     /**

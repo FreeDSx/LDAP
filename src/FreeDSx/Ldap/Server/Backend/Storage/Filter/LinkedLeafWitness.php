@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Search\Filter\AttributeValueAssertionInterface;
 use FreeDSx\Ldap\Search\Filter\FilterAttributeInterface;
 use FreeDSx\Ldap\Search\Filter\FilterContainerInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
+use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
@@ -36,7 +38,7 @@ use function array_diff_key;
 final readonly class LinkedLeafWitness
 {
     /**
-     * @var WeakMap<FilterInterface, array<string, list<string>>>
+     * @var WeakMap<FilterInterface, array{array<string, list<string>>, array<string, true>}>
      */
     private WeakMap $assertedCache;
 
@@ -62,7 +64,7 @@ final readonly class LinkedLeafWitness
             return $entry;
         }
         // The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
-        $asserted = $this->assertedCache[$filter] ??= $this->assertedBy($filter);
+        [$asserted, $everyValue] = $this->assertedCache[$filter] ??= $this->assertedBy($filter);
 
         if ($withheld !== []) {
             $asserted = array_diff_key(
@@ -75,36 +77,57 @@ final readonly class LinkedLeafWitness
             return $entry;
         }
 
-        return $this->answering($entry, $asserted);
+        return $this->answering(
+            $entry,
+            $asserted,
+            $everyValue,
+        );
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array{array<string, list<string>>, array<string, true>}
      */
     private function assertedBy(FilterInterface $filter): array
     {
         $asserted = [];
+        $everyValue = [];
+
         $this->collect(
             $filter,
             $asserted,
+            $everyValue,
         );
 
-        return $asserted;
+        return [
+            $asserted,
+            $everyValue,
+        ];
     }
 
     /**
      * A copy carrying the asserted linked values as well, since a bounded read may have stopped short of them.
      *
      * @param array<string, list<string>> $asserted
+     * @param array<string, true> $everyValue The names a leaf tests every value of.
      */
     private function answering(
         Entry $entry,
         array $asserted,
+        array $everyValue,
     ): Entry {
         $copy = $entry->makeCopy();
 
         foreach ($asserted as $name => $values) {
-            $held = $this->heldOf($entry, $name, $values);
+            $held = isset($everyValue[$name])
+                ? $this->everyValueOf(
+                    $entry,
+                    $name,
+                )
+                : $this->heldOf(
+                    $entry,
+                    $name,
+                    $values,
+                );
 
             if ($held !== []) {
                 $copy->add($name, ...$held);
@@ -112,6 +135,26 @@ final readonly class LinkedLeafWitness
         }
 
         return $copy;
+    }
+
+    /**
+     * Every value the entry holds, unless it already shows all of them.
+     *
+     * @return list<string>
+     */
+    private function everyValueOf(
+        Entry $entry,
+        string $name,
+    ): array {
+        // A read capped short of every value shows the attribute only under a range option.
+        if ($entry->has($name, true)) {
+            return [];
+        }
+
+        return $this->links->linkValues(
+            $entry->getDn(),
+            $name,
+        );
     }
 
     /**
@@ -143,20 +186,30 @@ final readonly class LinkedLeafWitness
      * Every linked attribute the filter names, against the values it asserts of each.
      *
      * @param array<string, list<string>> $asserted
+     * @param array<string, true> $everyValue
      */
     private function collect(
         FilterInterface $filter,
         array &$asserted,
+        array &$everyValue,
     ): void {
         if ($filter instanceof NotFilter) {
-            $this->collect($filter->get(), $asserted);
+            $this->collect(
+                $filter->get(),
+                $asserted,
+                $everyValue,
+            );
 
             return;
         }
 
         if ($filter instanceof FilterContainerInterface) {
             foreach ($filter->get() as $child) {
-                $this->collect($child, $asserted);
+                $this->collect(
+                    $child,
+                    $asserted,
+                    $everyValue,
+                );
             }
 
             return;
@@ -177,6 +230,12 @@ final readonly class LinkedLeafWitness
         }
         $normalized = Attribute::normalizeName($name);
         $asserted[$normalized] ??= [];
+
+        if ($this->testsEveryValue($filter, $normalized)) {
+            $everyValue[$normalized] = true;
+
+            return;
+        }
         $value = $this->assertedValueOf(
             $filter,
             $normalized,
@@ -185,6 +244,26 @@ final readonly class LinkedLeafWitness
         if ($value !== null) {
             $asserted[$normalized][] = $value;
         }
+    }
+
+    /**
+     * Whether the leaf orders the values or matches them by a rule other than equality.
+     */
+    private function testsEveryValue(
+        FilterAttributeInterface $filter,
+        string $name,
+    ): bool {
+        if ($filter instanceof GreaterThanOrEqualFilter || $filter instanceof LessThanOrEqualFilter) {
+            return true;
+        }
+        if (!$filter instanceof MatchingRuleFilter || $filter->getMatchingRule() === null) {
+            return false;
+        }
+        // No value the entry holds changes the Undefined answer an unrecognized rule gives.
+        $rule = $this->schema->getMatchingRule($filter->getMatchingRule())?->oid;
+
+        return $rule !== null
+            && $rule !== $this->schema->getEqualityRuleOid($name);
     }
 
     /**
