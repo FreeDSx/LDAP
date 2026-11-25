@@ -130,6 +130,42 @@ final class PdoListQueryBuilderTest extends TestCase
         );
     }
 
+    #[DataProvider('uidKeyProvider')]
+    public function test_a_linked_key_whose_values_carry_a_uid_orders_by_the_dn_then_the_uid(
+        PdoEntryListDialectInterface $dialect,
+        string $key,
+    ): void {
+        $query = (new PdoListQueryBuilder($dialect))->build(self::querySpec(
+            sortKeys: [new SortKeySpec(
+                'uidlink',
+                'ASC',
+                source: SortKeySource::LinksWithUid,
+            )],
+        ));
+
+        self::assertStringContainsString(
+            "MIN($key)",
+            $query->sql,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{PdoEntryListDialectInterface, string}>
+     */
+    public static function uidKeyProvider(): iterable
+    {
+        $dn = '(SELECT t.lc_dn FROM entries t WHERE t.entry_id = l.target_entry_id)';
+
+        yield 'sqlite' => [
+            new SqliteDialect(),
+            "$dn || l.target_uid",
+        ];
+        yield 'mysql' => [
+            new MysqlDialect(),
+            "CONCAT($dn, l.target_uid)",
+        ];
+    }
+
     #[DataProvider('dialectProvider')]
     public function test_a_sort_breaks_ties_by_the_entry_key(PdoEntryListDialectInterface $dialect): void
     {

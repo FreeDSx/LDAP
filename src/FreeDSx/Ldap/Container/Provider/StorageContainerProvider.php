@@ -182,6 +182,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $this->isPdo($container)
                 ? $container->get(EntryLinkWriter::class)
                 : $container->get(InMemoryStorage::class),
+            $container->get(LinkedAttributes::class),
         );
     }
 

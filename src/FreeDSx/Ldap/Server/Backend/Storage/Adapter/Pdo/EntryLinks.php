@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use Generator;
@@ -68,9 +69,15 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         array $values,
     ): array {
         $asked = [];
+        $names = [];
 
         foreach ($values as $value) {
-            $asked[Dn::normalized($value)] = $value;
+            $target = $this->declared->targetOf(
+                $attribute,
+                $value,
+            );
+            $asked[$target->identity()] = $value;
+            $names[$target->lcDn] = true;
         }
 
         if ($asked === []) {
@@ -78,11 +85,20 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         }
         $held = [];
 
-        foreach ($this->heldRows($owner, $attribute, array_keys($asked)) as $row) {
-            $normalized = $this->stringColumn($row['lc_dn'] ?? null);
+        $rows = $this->heldRows(
+            $owner,
+            $attribute,
+            array_keys($names),
+        );
 
-            if (isset($asked[$normalized])) {
-                $held[] = $asked[$normalized];
+        foreach ($rows as $row) {
+            $identity = LinkTarget::identityOf(
+                $this->stringColumn($row['lc_dn'] ?? null),
+                $this->stringColumn($row['target_uid'] ?? null),
+            );
+
+            if (isset($asked[$identity])) {
+                $held[] = $asked[$identity];
             }
         }
 
@@ -104,7 +120,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         )->fetch();
 
         return is_array($row)
-            ? $this->stringColumn($row['dn'] ?? null)
+            ? $this->valueOf($row)
             : null;
     }
 
@@ -124,7 +140,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
             $this->dialect->queryBacklinkValues(),
         );
         foreach ($this->rowsOf($rows) as $row) {
-            $values[] = $this->stringColumn($row['dn'] ?? null);
+            $values[] = $this->valueOf($row);
         }
 
         return $values;
@@ -417,6 +433,19 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
                 yield $row;
             }
         }
+    }
+
+    /**
+     * The value a row gives back: the DN it names, then any uid a forward link was written with.
+     *
+     * @param array<array-key, mixed> $row
+     */
+    private function valueOf(array $row): string
+    {
+        return LinkTarget::valueOf(
+            $this->stringColumn($row['dn'] ?? null),
+            $this->stringColumn($row['target_uid'] ?? null),
+        );
     }
 
     private function entryIdOf(mixed $row): int

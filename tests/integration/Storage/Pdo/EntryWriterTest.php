@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use PDO;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -51,6 +52,7 @@ use Tests\Support\FreeDSx\Ldap\Storage\ChildDnsStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntriesAtStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\LinkedUidStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeWalkStorageContractTests;
 
@@ -60,6 +62,7 @@ final class EntryWriterTest extends TestCase
     use EntriesAtStorageContractTests;
     use EntryIdentityStorageContractTests;
     use EntryLinkFixtureTrait;
+    use LinkedUidStorageContractTests;
     use SubtreeRenameStorageContractTests;
     use SubtreeWalkStorageContractTests;
 
@@ -923,6 +926,11 @@ final class EntryWriterTest extends TestCase
         self::assertNull(
             $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))?->get('member'),
         );
+    }
+
+    protected function uidLinkStorage(): StorageConfigInterface
+    {
+        return PdoConfig::forSqlite(':memory:');
     }
 
     protected function makeStorageContainer(Entry ...$entries): Container

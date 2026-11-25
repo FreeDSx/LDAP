@@ -18,11 +18,14 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\Linked\LinkedChangeReplay;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
+use Tests\Support\FreeDSx\Ldap\Storage\UidLinkSchema;
 
 final class LinkedChangeReplayTest extends TestCase
 {
@@ -36,6 +39,8 @@ final class LinkedChangeReplayTest extends TestCase
 
     private LinkedChangeReplay $subject;
 
+    private LinkedChangeReplay $uidSubject;
+
     protected function setUp(): void
     {
         $storage = EntryFixture::inMemoryStorage(Entry::fromArray(
@@ -47,6 +52,21 @@ final class LinkedChangeReplayTest extends TestCase
             ],
         ));
         $this->subject = $this->containerFor($storage)->get(LinkedChangeReplay::class);
+
+        $linked = new LinkedAttributes(UidLinkSchema::load());
+        $this->uidSubject = new LinkedChangeReplay(
+            new InMemoryStorage(
+                EntryFixture::allWithUuid(Entry::fromArray(
+                    self::ADMINS,
+                    [
+                        'cn' => ['Admins'],
+                        UidLinkSchema::ATTRIBUTE => [self::BOB . "#'01'B", self::BOB . "#'10'B"],
+                    ],
+                )),
+                linkedAttributes: $linked,
+            ),
+            $linked,
+        );
     }
 
     public function test_changes_applied_apart_load_none_of_the_links(): void
@@ -175,6 +195,55 @@ final class LinkedChangeReplayTest extends TestCase
         $this->settle(self::deleting('not a dn'));
     }
 
+    public function test_another_uid_on_a_held_target_is_a_value_of_its_own(): void
+    {
+        $delta = $this->settleUids(Change::add(
+            UidLinkSchema::ATTRIBUTE,
+            self::BOB . "#'11'B",
+        ));
+
+        self::assertSame(
+            [self::BOB . "#'11'B"],
+            $delta->added(UidLinkSchema::ATTRIBUTE),
+        );
+    }
+
+    public function test_a_held_uid_spelled_another_way_is_refused_as_already_held(): void
+    {
+        $this->expectOperationCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->settleUids(Change::add(
+            UidLinkSchema::ATTRIBUTE,
+            "CN=Bob, DC=example, DC=com#'01'b",
+        ));
+    }
+
+    public function test_deleting_one_uid_of_a_target_keeps_the_other_held(): void
+    {
+        $this->expectOperationCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->settleUids(
+            Change::delete(
+                UidLinkSchema::ATTRIBUTE,
+                self::BOB . "#'01'B",
+            ),
+            Change::add(
+                UidLinkSchema::ATTRIBUTE,
+                self::BOB . "#'10'B",
+            ),
+        );
+    }
+
+    public function test_deleting_a_target_without_the_uid_it_is_held_with_is_answered_as_not_held(): void
+    {
+        $this->expectOperationCode(ResultCode::NO_SUCH_ATTRIBUTE);
+
+        $this->settleUids(Change::delete(
+            UidLinkSchema::ATTRIBUTE,
+            self::BOB,
+        ));
+    }
+
     private static function adding(string ...$members): Change
     {
         return Change::add(
@@ -194,6 +263,14 @@ final class LinkedChangeReplayTest extends TestCase
     private function settle(Change ...$changes): LinkDelta
     {
         return $this->subject->settle(
+            array_values($changes),
+            new Dn(self::ADMINS),
+        );
+    }
+
+    private function settleUids(Change ...$changes): LinkDelta
+    {
+        return $this->uidSubject->settle(
             array_values($changes),
             new Dn(self::ADMINS),
         );

@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -30,6 +32,7 @@ use Tests\Support\FreeDSx\Ldap\Storage\ChildDnsStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntriesAtStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\LinkedUidStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeWalkStorageContractTests;
 
@@ -38,6 +41,7 @@ final class InMemoryStorageTest extends TestCase
     use ChildDnsStorageContractTests;
     use EntriesAtStorageContractTests;
     use EntryIdentityStorageContractTests;
+    use LinkedUidStorageContractTests;
     use ServerContainerTrait;
     use SubtreeRenameStorageContractTests;
     use SubtreeWalkStorageContractTests;
@@ -718,5 +722,10 @@ final class InMemoryStorageTest extends TestCase
     protected function makeStorageContainer(Entry ...$entries): Container
     {
         return $this->containerFor(EntryFixture::inMemoryStorage(...$entries));
+    }
+
+    protected function uidLinkStorage(): StorageConfigInterface
+    {
+        return new InMemoryStorageConfig();
     }
 }

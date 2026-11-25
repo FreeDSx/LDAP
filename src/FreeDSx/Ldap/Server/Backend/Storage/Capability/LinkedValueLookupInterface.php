@@ -20,21 +20,8 @@ use FreeDSx\Ldap\Entry\Dn;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface LinkedValueLookupInterface
+interface LinkedValueLookupInterface extends HeldLinkLookupInterface
 {
-    /**
-     * Which of the named values the entry holds, given back as they were asked for.
-     *
-     * @param list<string> $values
-     *
-     * @return list<string>
-     */
-    public function heldLinkValues(
-        Dn $owner,
-        string $attribute,
-        array $values,
-    ): array;
-
     /**
      * Any one value the entry holds, or null when it holds none.
      */

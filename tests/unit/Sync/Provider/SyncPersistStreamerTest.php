@@ -62,6 +62,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\CallbackSleeper;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\UidLinkSchema;
 
 final class SyncPersistStreamerTest extends TestCase
 {
@@ -166,6 +167,7 @@ final class SyncPersistStreamerTest extends TestCase
             ->method('evaluate')
             ->willReturnCallback(fn(): bool => $this->filterMatches);
 
+        $linked = new LinkedAttributes(UidLinkSchema::load());
         $this->subject = new SyncPersistStreamer(
             entries: $this->entries,
             projector: new SyncResultProjector(
@@ -173,13 +175,13 @@ final class SyncPersistStreamerTest extends TestCase
                 filterEvaluator: $filterEvaluator,
                 schema: SchemaResource::Core->load(),
                 linkedLeaves: $this->fromContainer(LinkedLeafWitness::class),
-                linked: $this->fromContainer(LinkedAttributes::class),
+                linked: $linked,
             ),
             stream: new ChangeStream(
                 $this->journal,
                 pageSize: 1,
             ),
-            linked: $this->fromContainer(LinkedAttributes::class),
+            linked: $linked,
             sleeper: new CallbackSleeper(fn() => ($this->onSleep)()),
             pollInterval: 0.0,
         );
@@ -637,6 +639,49 @@ final class SyncPersistStreamerTest extends TestCase
         $this->liveGroup(
             $group,
             'cn=bob,dc=example,dc=com',
+        );
+        $this->appendDelete('cn=bob,dc=example,dc=com');
+        $this->appendFor(
+            ChangeType::Add,
+            'cn=bob,dc=example,dc=com',
+            $bob,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=staff,dc=example,dc=com',
+            $group,
+        );
+        $this->appendFor(
+            ChangeType::Modify,
+            'cn=bob,dc=example,dc=com',
+            $bob,
+        );
+
+        self::assertSame(
+            [
+                [SyncStateControl::STATE_DELETE, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=bob,dc=example,dc=com'],
+                [SyncStateControl::STATE_MODIFY, 'cn=staff,dc=example,dc=com'],
+            ],
+            $this->projected(),
+        );
+    }
+
+    public function test_a_group_is_sent_after_the_new_entry_its_member_names_with_a_uid(): void
+    {
+        $bob = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001';
+        $group = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000002';
+        $this->live(
+            'cn=bob,dc=example,dc=com',
+            $bob,
+        );
+        $this->liveEntries['cn=staff,dc=example,dc=com'] = Entry::create(
+            'cn=staff,dc=example,dc=com',
+            [
+                'cn' => 'staff',
+                UidLinkSchema::ATTRIBUTE => "cn=bob,dc=example,dc=com#'01'B",
+                'entryUUID' => $group,
+            ],
         );
         $this->appendDelete('cn=bob,dc=example,dc=com');
         $this->appendFor(

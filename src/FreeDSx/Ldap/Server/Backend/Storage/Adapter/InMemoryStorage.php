@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\MissingEntryUuidException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
@@ -193,6 +194,7 @@ final class InMemoryStorage implements
      *
      * @throws MissingEntryUuidException when the entry carries no entryUUID, as the database adapters' column requires
      * @throws EntryUuidTakenException when an entry at another DN holds the entryUUID
+     * @throws OperationException when a linked value carries a uid longer than a store keeps
      */
     public function store(
         Entry $entry,
@@ -208,6 +210,11 @@ final class InMemoryStorage implements
                 sprintf('Another entry already holds the entryUUID of: %s', $lcDn),
             );
         }
+        $this->assertLinksStorable(
+            $entry,
+            $links,
+        );
+
         if (($this->entries[$lcDn] ?? null)?->getUuid() !== $uuid) {
             $this->remove($entry->getDn());
         }
@@ -346,27 +353,35 @@ final class InMemoryStorage implements
     }
 
     /**
-     * Which of the named values the entry holds, matched as DNs since that is what a linked value is.
+     * Which of the named values the entry holds, matched by the entry each names and the uid it carries.
      */
     public function heldLinkValues(
         Dn $owner,
         string $attribute,
         array $values,
     ): array {
-        $held = $this->linkedValuesOf($owner, $attribute);
+        $held = $this->linkedValuesOf(
+            $owner,
+            $attribute,
+        );
 
         if ($held === []) {
             return [];
         }
+        $found = [];
 
-        return array_values(array_filter(
-            $values,
-            static fn(string $value): bool => in_array(
-                Dn::normalized($value),
-                $held,
-                true,
-            ),
-        ));
+        foreach ($values as $value) {
+            $identity = $this->linkIdentity(
+                $attribute,
+                $value,
+            );
+
+            if (isset($held[$identity])) {
+                $found[] = $value;
+            }
+        }
+
+        return $found;
     }
 
     public function anyLinkValue(
@@ -452,19 +467,26 @@ final class InMemoryStorage implements
     }
 
     /**
-     * @return list<string> the normalised form of every value the entry holds for the attribute
+     * @return array<string, true> the link identity of every value the entry holds for the attribute
      */
     private function linkedValuesOf(
         Dn $owner,
         string $attribute,
     ): array {
-        return array_map(
-            Dn::normalized(...),
-            $this->linkValues(
-                $owner,
-                $attribute,
-            ),
+        $held = [];
+        $values = $this->linkValues(
+            $owner,
+            $attribute,
         );
+
+        foreach ($values as $value) {
+            $held[$this->linkIdentity(
+                $attribute,
+                $value,
+            )] = true;
+        }
+
+        return $held;
     }
 
     /**
@@ -473,20 +495,89 @@ final class InMemoryStorage implements
      *
      * @return list<string>
      */
-    private static function withoutLinkValues(
+    private function withoutLinkValues(
+        string $name,
         array $held,
         array $removed,
     ): array {
         $gone = [];
 
         foreach ($removed as $value) {
-            $gone[Dn::normalized($value)] = true;
+            $gone[$this->linkIdentity(
+                $name,
+                $value,
+            )] = true;
+        }
+        $kept = [];
+
+        foreach ($held as $value) {
+            if (!isset($gone[$this->linkIdentity($name, $value)])) {
+                $kept[] = $value;
+            }
         }
 
-        return array_values(array_filter(
-            $held,
-            static fn(string $value): bool => !isset($gone[Dn::normalized($value)]),
-        ));
+        return $kept;
+    }
+
+    /**
+     * Two values share an identity when they name the same entry with the same uid, however either is spelled.
+     */
+    private function linkIdentity(
+        string $name,
+        string $value,
+    ): string {
+        return $this->linkedAttributes->targetOf(
+            $name,
+            $value,
+        )->identity();
+    }
+
+    /**
+     * Refuses a write before it changes anything when a linked value it adds carries a uid no store keeps.
+     *
+     * @throws OperationException when a value carries a uid longer than a store keeps
+     */
+    private function assertLinksStorable(
+        Entry $entry,
+        LinkDelta $links,
+    ): void {
+        $added = $this->linksAdded(
+            $entry,
+            $links,
+        );
+
+        foreach ($added as $name => $values) {
+            foreach ($values as $value) {
+                $this->linkedAttributes->targetOf(
+                    $name,
+                    $value,
+                )->assertStorable();
+            }
+        }
+    }
+
+    /**
+     * The linked values a write adds: every one the entry carries when written whole, or those a delta names.
+     *
+     * @return array<string, list<string>>
+     */
+    private function linksAdded(
+        Entry $entry,
+        LinkDelta $links,
+    ): array {
+        if ($links->isUntouched()) {
+            return [];
+        }
+        if ($links->isEmpty()) {
+            return $this->linkedAttributes->valuesOf($entry);
+        }
+        $added = [];
+
+        foreach ($links->names() as $name) {
+            $added[$name] = $links->added($name);
+        }
+
+        return $added;
     }
 
     /**
@@ -538,7 +629,8 @@ final class InMemoryStorage implements
 
         foreach ($links->names() as $name) {
             $values = array_merge(
-                self::withoutLinkValues(
+                $this->withoutLinkValues(
+                    $name,
                     $previous?->get($name, true)?->getValues() ?? [],
                     $links->removed($name),
                 ),

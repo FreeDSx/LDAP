@@ -213,11 +213,27 @@ trait SqlFilterTranslatorTrait
             ? 't'
             : 'o';
 
+        if ($direction === LinkDirection::Backward || !$this->linked->carriesUid($attribute)) {
+            return $this->linkedResult(
+                $attribute,
+                "$alias.lc_dn = ?",
+                [Dn::normalized($value)],
+                $direction,
+            );
+        }
+        // RFC 4517 4.2.34: the uid must be absent from both sides or equal in both.
+        $target = $this->linked->targetOf(
+            $attribute,
+            $value,
+        );
+
         return $this->linkedResult(
             $attribute,
-            "$alias.lc_dn = ?",
-            [Dn::normalized($value)],
-            $direction,
+            't.lc_dn = ? AND l.target_uid = ?',
+            [
+                $target->lcDn,
+                $target->uid,
+            ],
         );
     }
 

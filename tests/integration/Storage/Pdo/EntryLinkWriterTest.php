@@ -118,17 +118,6 @@ final class EntryLinkWriterTest extends TestCase
         );
     }
 
-    public function test_every_value_the_owner_links_is_read(): void
-    {
-        self::assertEqualsCanonicalizing(
-            [self::BOB, self::ALICE],
-            $this->subject->linkValues(
-                new Dn(self::ADMINS),
-                'member',
-            ),
-        );
-    }
-
     public function test_a_value_the_owner_does_not_link_is_not_held(): void
     {
         self::assertSame(

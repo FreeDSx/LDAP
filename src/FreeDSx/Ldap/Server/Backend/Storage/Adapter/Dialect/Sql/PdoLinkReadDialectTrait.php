@@ -28,11 +28,11 @@ trait PdoLinkReadDialectTrait
         $covered = $owners->condition('l.owner_entry_id');
 
         return <<<SQL
-            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
+            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn, l.target_uid
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
             WHERE $covered
-            ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id
+            ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id, l.target_uid
         SQL;
     }
 
@@ -65,12 +65,12 @@ trait PdoLinkReadDialectTrait
         );
 
         return <<<SQL
-            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
+            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn, l.target_uid
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
             WHERE $covered
               AND (l.owner_entry_id, l.attr_name_lower) NOT IN ($markers)
-            ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id
+            ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id, l.target_uid
         SQL;
     }
 
@@ -79,7 +79,7 @@ trait PdoLinkReadDialectTrait
         $markers = SqlFilterUtility::markers($count);
 
         return <<<SQL
-            SELECT t.lc_dn
+            SELECT t.lc_dn, l.target_uid
             FROM entry_attribute_links l
             JOIN entries o ON o.entry_id = l.owner_entry_id
             JOIN entries t ON t.entry_id = l.target_entry_id
@@ -90,7 +90,7 @@ trait PdoLinkReadDialectTrait
     public function queryLinkValues(): string
     {
         return <<<SQL
-            SELECT t.dn
+            SELECT t.dn, l.target_uid
             FROM entry_attribute_links l
             JOIN entries o ON o.entry_id = l.owner_entry_id
             JOIN entries t ON t.entry_id = l.target_entry_id
@@ -106,11 +106,11 @@ trait PdoLinkReadDialectTrait
     public function queryLinksForAttribute(): string
     {
         return <<<SQL
-            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
+            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn, l.target_uid
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
             WHERE l.owner_entry_id = ? AND l.attr_name_lower = ?
-            ORDER BY l.target_entry_id
+            ORDER BY l.target_entry_id, l.target_uid
             LIMIT ?
         SQL;
     }

@@ -1,0 +1,5 @@
+dn: cn=Subschema
+objectClass: top
+objectClass: subschema
+cn: Subschema
+attributeTypes: ( 1.3.6.1.4.1.99999.2.1 NAME 'uidLink' DESC 'A linked name and optional UID, for storage tests' SUP 2.5.4.50 X-LINKED 'TRUE' )

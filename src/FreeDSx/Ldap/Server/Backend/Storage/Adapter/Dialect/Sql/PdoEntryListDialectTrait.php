@@ -185,6 +185,14 @@ trait PdoEntryListDialectTrait
     }
 
     /**
+     * Two string expressions joined in the dialect's own spelling.
+     */
+    abstract protected function concat(
+        string $left,
+        string $right,
+    ): string;
+
+    /**
      * The least of the values a sort key orders an entry by (RFC 2891 §2), correlated on the entry's key.
      */
     private function leastSortValue(
@@ -197,6 +205,16 @@ trait PdoEntryListDialectTrait
             : 'eav.value_lower';
 
         // Each linked DN is read in a nested select to keep a joined entries table from hiding the correlated entry_id.
+        $linkedDn = '(SELECT t.lc_dn FROM entries t WHERE t.entry_id = l.target_entry_id)';
+
+        // Followed by the uid, the DN gives the same key the value index holds for the value.
+        $linkedKey = $sortKey->source === SortKeySource::LinksWithUid
+            ? $this->concat(
+                $linkedDn,
+                'l.target_uid',
+            )
+            : $linkedDn;
+
         return match ($sortKey->source) {
             SortKeySource::Values => <<<SQL
                 (SELECT MIN({$value})
@@ -204,8 +222,9 @@ trait PdoEntryListDialectTrait
                  WHERE eav.owner_entry_id = {$entryId}
                    AND eav.attr_name_lower = ?)
                 SQL,
-            SortKeySource::Links => <<<SQL
-                (SELECT MIN((SELECT t.lc_dn FROM entries t WHERE t.entry_id = l.target_entry_id))
+            SortKeySource::Links,
+            SortKeySource::LinksWithUid => <<<SQL
+                (SELECT MIN({$linkedKey})
                  FROM entry_attribute_links l
                  WHERE l.owner_entry_id = {$entryId}
                    AND l.attr_name_lower = ?)

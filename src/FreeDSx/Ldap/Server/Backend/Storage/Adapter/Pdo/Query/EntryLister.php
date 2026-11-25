@@ -311,7 +311,9 @@ readonly class EntryLister implements ListEntryInterface
             return new SortKeySpec(
                 strtolower($this->linked->primaryName($name)),
                 $direction,
-                source: SortKeySource::Links,
+                source: $this->linked->carriesUid($name)
+                    ? SortKeySource::LinksWithUid
+                    : SortKeySource::Links,
             );
         }
         if ($reversed !== null && $this->linked->isBacklink($attribute)) {

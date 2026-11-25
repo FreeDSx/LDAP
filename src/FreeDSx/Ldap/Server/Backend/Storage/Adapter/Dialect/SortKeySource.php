@@ -33,6 +33,11 @@ enum SortKeySource
     case Links;
 
     /**
+     * The links the entry holds for a type whose values carry a uid, ordered by the DN then the uid as the value's key.
+     */
+    case LinksWithUid;
+
+    /**
      * The links naming the entry, ordered by the DN of each entry holding one.
      */
     case Backlinks;

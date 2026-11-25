@@ -394,8 +394,13 @@ final readonly class SyncPersistStreamer
             yield $parent;
         }
 
-        foreach ($this->linked->valuesOf($entry) as $values) {
-            yield from $values;
+        foreach ($this->linked->valuesOf($entry) as $name => $values) {
+            foreach ($values as $value) {
+                yield $this->linked->targetOf(
+                    $name,
+                    $value,
+                )->name;
+            }
         }
     }
 
