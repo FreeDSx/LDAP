@@ -16,6 +16,8 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortedQuery;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySource;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
 use function strtolower;
@@ -121,15 +123,12 @@ trait PdoEntryListDialectTrait
         // key once into a derived table, then order by the materialised column (single evaluation per candidate).
         foreach ($sortKeys as $index => $sortKey) {
             $alias = '__sk' . $index;
-            $value = $sortKey->numeric
-                ? 'CAST(eav.value_lower AS DECIMAL(65,0))'
-                : 'eav.value_lower';
-            $projections[] = <<<SQL
-                (SELECT MIN({$value})
-                 FROM entry_attribute_values eav
-                 WHERE eav.owner_entry_id = __base.entry_id
-                   AND eav.attr_name_lower = ?) AS {$alias}
-                SQL;
+            $least = $this->leastSortValue(
+                $sortKey,
+                '__base.entry_id',
+                'CAST(eav.value_lower AS DECIMAL(65,0))',
+            );
+            $projections[] = "{$least} AS {$alias}";
             $orderTerms[] = "{$alias} IS NULL {$sortKey->direction}, {$alias} {$sortKey->direction}";
             $sortParams[] = $sortKey->attributeLower;
         }
@@ -181,5 +180,40 @@ trait PdoEntryListDialectTrait
     protected function listColumns(): string
     {
         return 'entry_id, lc_dn, dn, attributes';
+    }
+
+    /**
+     * The least of the values a sort key orders an entry by (RFC 2891 §2), correlated on the entry's key.
+     */
+    private function leastSortValue(
+        SortKeySpec $sortKey,
+        string $entryId,
+        string $numericValue,
+    ): string {
+        $value = $sortKey->numeric
+            ? $numericValue
+            : 'eav.value_lower';
+
+        // Each linked DN is read in a nested select to keep a joined entries table from hiding the correlated entry_id.
+        return match ($sortKey->source) {
+            SortKeySource::Values => <<<SQL
+                (SELECT MIN({$value})
+                 FROM entry_attribute_values eav
+                 WHERE eav.owner_entry_id = {$entryId}
+                   AND eav.attr_name_lower = ?)
+                SQL,
+            SortKeySource::Links => <<<SQL
+                (SELECT MIN((SELECT t.lc_dn FROM entries t WHERE t.entry_id = l.target_entry_id))
+                 FROM entry_attribute_links l
+                 WHERE l.owner_entry_id = {$entryId}
+                   AND l.attr_name_lower = ?)
+                SQL,
+            SortKeySource::Backlinks => <<<SQL
+                (SELECT MIN((SELECT o.lc_dn FROM entries o WHERE o.entry_id = l.owner_entry_id))
+                 FROM entry_attribute_links l
+                 WHERE l.target_entry_id = {$entryId}
+                   AND l.attr_name_lower = ?)
+                SQL,
+        };
     }
 }

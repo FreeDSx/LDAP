@@ -20,9 +20,14 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
  */
 final readonly class SortKeySpec
 {
+    /**
+     * @param string $attributeLower The attribute the values are stored under, which for a back-link is the one it
+     *     reverses.
+     */
     public function __construct(
         public string $attributeLower,
         public string $direction,
         public bool $numeric = false,
+        public SortKeySource $source = SortKeySource::Values,
     ) {}
 }

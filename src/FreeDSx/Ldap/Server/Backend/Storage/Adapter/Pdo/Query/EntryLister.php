@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
@@ -29,6 +31,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -65,6 +68,7 @@ readonly class EntryLister implements ListEntryInterface
         private AttributeContextInterface $attributeContext,
         private EntryRowCodec $codec,
         private EntryLinks $links,
+        private LinkedAttributes $linked,
     ) {}
 
     public function list(StorageListOptions $options): EntryStream
@@ -286,16 +290,46 @@ readonly class EntryLister implements ListEntryInterface
     private function sortSpecs(StorageListOptions $options): array
     {
         return array_values(array_map(
-            fn(SortKey $sortKey): SortKeySpec => new SortKeySpec(
-                strtolower($sortKey->getAttribute()),
-                $sortKey->getUseReverseOrder() ? 'DESC' : 'ASC',
-                $this->attributeContext->sortsNumerically(
-                    $sortKey->getAttribute(),
-                    $sortKey->getOrderingRule(),
-                ),
-            ),
+            $this->sortSpecOf(...),
             $options->sortKeys,
         ));
+    }
+
+    /**
+     * A linked attribute or a back-link orders by the DNs its links name, kept apart from the value index.
+     */
+    private function sortSpecOf(SortKey $sortKey): SortKeySpec
+    {
+        $name = $sortKey->getAttribute();
+        $direction = $sortKey->getUseReverseOrder()
+            ? 'DESC'
+            : 'ASC';
+        $attribute = new Attribute($name);
+        $reversed = $this->linked->linkedBy($name);
+
+        if ($this->linked->links($attribute)) {
+            return new SortKeySpec(
+                strtolower($this->linked->primaryName($name)),
+                $direction,
+                source: SortKeySource::Links,
+            );
+        }
+        if ($reversed !== null && $this->linked->isBacklink($attribute)) {
+            return new SortKeySpec(
+                strtolower($reversed),
+                $direction,
+                source: SortKeySource::Backlinks,
+            );
+        }
+
+        return new SortKeySpec(
+            strtolower($name),
+            $direction,
+            $this->attributeContext->sortsNumerically(
+                $name,
+                $sortKey->getOrderingRule(),
+            ),
+        );
     }
 
     /**
