@@ -130,6 +130,21 @@ final class PdoListQueryBuilderTest extends TestCase
         );
     }
 
+    #[DataProvider('dialectProvider')]
+    public function test_a_sort_breaks_ties_by_the_entry_key(PdoEntryListDialectInterface $dialect): void
+    {
+        [$sql] = $this->rootQuery(
+            new PdoListQueryBuilder($dialect),
+            null,
+            SortKey::descending('cn'),
+        );
+
+        self::assertStringEndsWith(
+            ', entry_id',
+            $sql,
+        );
+    }
+
     /**
      * @return iterable<string, array{PdoEntryListDialectInterface}>
      */

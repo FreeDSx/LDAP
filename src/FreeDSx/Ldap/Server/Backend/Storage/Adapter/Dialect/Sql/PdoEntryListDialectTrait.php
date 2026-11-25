@@ -132,6 +132,8 @@ trait PdoEntryListDialectTrait
             $orderTerms[] = "{$alias} IS NULL {$sortKey->direction}, {$alias} {$sortKey->direction}";
             $sortParams[] = $sortKey->attributeLower;
         }
+        // A unique last term keeps tied rows in one order across the batches and pages that resume the sort.
+        $orderTerms[] = 'entry_id';
 
         $projection = implode(",\n", $projections);
         $order = implode(', ', $orderTerms);

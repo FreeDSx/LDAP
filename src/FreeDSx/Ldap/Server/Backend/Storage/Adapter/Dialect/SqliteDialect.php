@@ -95,6 +95,8 @@ final class SqliteDialect implements PdoDialectInterface
             $terms[] = "$least $sortKey->direction $nulls";
             $sortParams[] = $sortKey->attributeLower;
         }
+        // A unique last term keeps tied rows in one order across the batches and pages that resume the sort.
+        $terms[] = 'entry_id';
 
         return new SortedQuery(
             $baseSql . ' ORDER BY ' . implode(', ', $terms),
