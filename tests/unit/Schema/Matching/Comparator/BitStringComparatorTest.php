@@ -76,6 +76,29 @@ final class BitStringComparatorTest extends TestCase
         self::assertTrue($result);
     }
 
+    public function test_equals_matches_a_closing_b_written_lowercase(): void
+    {
+        $result = $this->subject->equals(
+            "'0101'b",
+            "'0101'B",
+        );
+
+        self::assertTrue($result);
+    }
+
+    public function test_compare_ignores_the_case_of_the_closing_b(): void
+    {
+        $result = $this->subject->compare(
+            "'0101'b",
+            "'0101'B",
+        );
+
+        self::assertSame(
+            0,
+            $result,
+        );
+    }
+
     public function test_compare_orders_by_bits(): void
     {
         $result = $this->subject->compare(
@@ -100,6 +123,14 @@ final class BitStringComparatorTest extends TestCase
     {
         self::assertSame(
             $this->subject->indexKey(" '0101'B "),
+            $this->subject->indexKey("'0101'B"),
+        );
+    }
+
+    public function test_index_key_is_shared_by_either_case_of_the_closing_b(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey("'0101'b"),
             $this->subject->indexKey("'0101'B"),
         );
     }
