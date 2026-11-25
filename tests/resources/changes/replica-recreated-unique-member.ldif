@@ -1,0 +1,17 @@
+version: 1
+
+# A group's uniqueMember is deleted and created again at the same DN, then added back to the group with its uid.
+dn: cn=recreatedunique,ou=people,dc=foo,dc=bar
+changetype: delete
+
+dn: cn=recreatedunique,ou=people,dc=foo,dc=bar
+changetype: add
+objectClass: inetOrgPerson
+cn: recreatedunique
+sn: Newcomer
+
+dn: cn=reuniqueteam,ou=people,dc=foo,dc=bar
+changetype: modify
+add: uniqueMember
+uniqueMember: cn=recreatedunique,ou=people,dc=foo,dc=bar#'0101'B
+-

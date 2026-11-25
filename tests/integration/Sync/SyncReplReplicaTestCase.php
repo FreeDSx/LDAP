@@ -36,6 +36,8 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
 
     private const RECREATED_MEMBER_CHANGES = __DIR__ . '/../../resources/changes/replica-recreated-member.ldif';
 
+    private const RECREATED_UNIQUE_MEMBER_CHANGES = __DIR__ . '/../../resources/changes/replica-recreated-unique-member.ldif';
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-replica');
@@ -828,6 +830,101 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
                 $group,
                 'member',
                 [$member],
+            ),
+        );
+    }
+
+    public function test_a_group_keeps_a_unique_member_and_its_uid_the_provider_renames(): void
+    {
+        $member = 'cn=uniquemate,ou=people,dc=foo,dc=bar';
+        $renamed = 'cn=renameduniquemate,ou=people,dc=foo,dc=bar';
+        $group = 'cn=uniqueteam,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member, $group): void {
+            $provider->create(Entry::fromArray(
+                $member,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'uniquemate',
+                    'sn' => 'Mate',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                $group,
+                [
+                    'objectClass' => 'groupOfUniqueNames',
+                    'cn' => 'uniqueteam',
+                    'uniqueMember' => $member . "#'0101'B",
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($group));
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member): void {
+            $provider->rename(
+                $member,
+                'cn=renameduniquemate',
+            );
+        });
+        self::assertNotNull($this->waitForReplica($renamed));
+
+        self::assertSame(
+            [$renamed . "#'0101'B"],
+            array_values($this->tryReadFromReplica(
+                $group,
+                ['uniqueMember'],
+            )?->get('uniqueMember')?->getValues() ?? []),
+        );
+    }
+
+    public function test_a_full_refresh_links_a_unique_member_and_its_uid_to_the_entry_created_again_at_its_dn(): void
+    {
+        $member = 'cn=recreatedunique,ou=people,dc=foo,dc=bar';
+        $group = 'cn=reuniqueteam,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member, $group): void {
+            $provider->create(Entry::fromArray(
+                $member,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'recreatedunique',
+                    'sn' => 'Original',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                $group,
+                [
+                    'objectClass' => 'groupOfUniqueNames',
+                    'cn' => 'reuniqueteam',
+                    'uniqueMember' => $member . "#'0101'B",
+                ],
+            ));
+        });
+        self::assertSame(
+            [$member . "#'0101'B"],
+            $this->waitForReplicaValues(
+                $group,
+                'uniqueMember',
+                [$member . "#'0101'B"],
+            ),
+        );
+
+        $this->restartAfterProviderChanges(self::RECREATED_UNIQUE_MEMBER_CHANGES);
+        $uuid = $this->providerUuidOf($member);
+
+        self::assertSame(
+            $uuid,
+            $this->waitForReplicaUuid(
+                $member,
+                $uuid,
+            ),
+        );
+        self::assertSame(
+            [$member . "#'0101'B"],
+            $this->waitForReplicaValues(
+                $group,
+                'uniqueMember',
+                [$member . "#'0101'B"],
             ),
         );
     }

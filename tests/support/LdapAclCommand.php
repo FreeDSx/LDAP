@@ -92,9 +92,18 @@ class LdapAclCommand extends Command
     public const ALIAS_MEMBER_GROUP_DN = 'cn=blocked-alias,dc=foo,dc=bar';
 
     /**
-     * Names cn=user by the numeric OID of cn through uniqueMember, which is not held as a link.
+     * Names cn=user by the numeric OID of cn through uniqueMember.
      */
     public const UNIQUE_MEMBER_GROUP_DN = 'cn=blocked-unique,dc=foo,dc=bar';
+
+    /**
+     * Names the renamee through uniqueMember to show the group still names it after a rename.
+     */
+    public const RENAMED_UNIQUE_MEMBER_GROUP_DN = 'cn=blocked-unique-renamed,dc=foo,dc=bar';
+
+    public const UNIQUE_RENAMEE_DN = 'cn=unique-renamee,ou=people,dc=foo,dc=bar';
+
+    public const UNIQUE_RENAMEE_PASSWORD = 'delegatepass';
 
     /**
      * Seeded without cn=user, so a test can add it over the wire.
@@ -241,6 +250,14 @@ class LdapAclCommand extends Command
                                 ),
                                 Target::dn(self::SPELLED_TARGET_DN),
                                 'postalCode',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::group(
+                                    self::RENAMED_UNIQUE_MEMBER_GROUP_DN,
+                                    'uniqueMember',
+                                ),
+                                Target::dn(self::SPELLED_TARGET_DN),
+                                'l',
                             )->forRead(),
                             // Each only bites if the one configured DN it spells another way is respelled.
                             AttributeRule::deny(

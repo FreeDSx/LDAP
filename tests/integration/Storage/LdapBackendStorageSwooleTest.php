@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedValueAsWrittenTestsTrait;
+
 /**
  * Runs the full LdapBackendStorageTestCase suite against the SwooleServerRunner.
  *
@@ -22,6 +24,8 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage;
  */
 final class LdapBackendStorageSwooleTest extends LdapBackendStorageTestCase
 {
+    use LinkedValueAsWrittenTestsTrait;
+
     /**
      * Start a single shared Swoole server instead of the PCNTL server that
      * LdapBackendStorageTestCase::setUpBeforeClass() would launch.

@@ -99,15 +99,22 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_equality_on_a_name_and_optional_uid_attribute_is_inexact(): void
+    public function test_equality_on_unique_member_matches_the_linked_name_and_its_uid(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'uniqueMember',
-            'cn=Alice,dc=example,dc=com',
+            "CN=Alice,DC=example,DC=com#'0101'B",
         ));
 
         self::assertNotNull($result);
-        self::assertFalse($result->isExact);
+        self::assertStringContainsString(
+            't.lc_dn = ? AND l.target_uid = ?',
+            $result->sql,
+        );
+        self::assertSame(
+            ['cn=alice,dc=example,dc=com', '#0101'],
+            $result->params,
+        );
     }
 
     public function test_present_filter_returns_sidecar_presence_exists(): void

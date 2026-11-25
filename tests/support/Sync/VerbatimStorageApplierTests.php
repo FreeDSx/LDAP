@@ -17,13 +17,16 @@ use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 use FreeDSx\Ldap\Server\Utility\Uuid;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
@@ -1203,6 +1206,37 @@ trait VerbatimStorageApplierTests
         self::assertSame(
             ['cn=alice,dc=example,dc=com'],
             $this->members('cn=team,dc=example,dc=com'),
+        );
+    }
+
+    public function test_a_refresh_carrying_a_uid_longer_than_the_replica_keeps_is_refused(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->refresh(
+            $this->entry(
+                'cn=alice,dc=example,dc=com',
+                self::UUID_A,
+            ),
+            new Entry(
+                'cn=team,dc=example,dc=com',
+                new Attribute(
+                    'cn',
+                    'x',
+                ),
+                new Attribute(
+                    'uniqueMember',
+                    "cn=alice,dc=example,dc=com#'" . str_repeat(
+                        '1',
+                        LinkTarget::MAX_UID_BITS + 1,
+                    ) . "'B",
+                ),
+                new Attribute(
+                    'entryUUID',
+                    self::UUID_C,
+                ),
+            ),
         );
     }
 

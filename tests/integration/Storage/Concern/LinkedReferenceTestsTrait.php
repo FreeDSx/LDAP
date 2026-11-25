@@ -158,6 +158,62 @@ trait LinkedReferenceTestsTrait
         );
     }
 
+    public function testAUniqueMemberFollowsItsTargetsRenameAndKeepsItsUid(): void
+    {
+        $member = $this->seedReferencedMember('unique-renamed-member');
+        $group = $this->seedUniqueGroup(
+            'unique-member-renamed',
+            $member . "#'0101'B",
+        );
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->rename(
+            $member,
+            'cn=unique-renamed-after',
+        ));
+
+        self::assertSame(
+            ["cn=unique-renamed-after,dc=foo,dc=bar#'0101'B"],
+            $this->uniqueMembersOf($group),
+        );
+    }
+
+    public function testAnEntryAddedAtADeletedUniqueMembersDnIsNotNamedByTheGroup(): void
+    {
+        $member = $this->seedReferencedMember('unique-deleted-member');
+        $group = $this->seedUniqueGroup(
+            'unique-member-deleted',
+            self::LINKED_USER,
+            $member . "#'0101'B",
+        );
+        $held = [];
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete($member));
+        $held[] = $this->uniqueMembersOf($group);
+        $this->seedReferencedMember('unique-deleted-member');
+        $held[] = $this->uniqueMembersOf($group);
+
+        self::assertSame(
+            [[self::LINKED_USER], [self::LINKED_USER]],
+            $held,
+        );
+    }
+
+    public function testAUniqueMemberWhoseTailIsNotABitStringNamesAnEntryThatIsNotStored(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectOperationCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=unique-not-a-bit-string,dc=foo,dc=bar',
+            [
+                'cn' => 'unique-not-a-bit-string',
+                'uniqueMember' => self::LINKED_USER . "#'0102'B",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        ));
+    }
+
     public function testARenamesPostReadShowsItsLinksIntoItsOwnSubtreeAtTheirNewDns(): void
     {
         $team = 'ou=link-post-team,dc=foo,dc=bar';
