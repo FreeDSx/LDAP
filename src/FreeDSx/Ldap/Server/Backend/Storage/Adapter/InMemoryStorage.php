@@ -373,14 +373,28 @@ final class InMemoryStorage implements
         Dn $owner,
         string $attribute,
     ): ?string {
+        return $this->linkValues(
+            $owner,
+            $attribute,
+        )[0] ?? null;
+    }
+
+    public function linkValues(
+        Dn $owner,
+        string $attribute,
+    ): array {
         $reversed = $this->linkedAttributes->linkedBy($attribute);
+
         if ($reversed !== null) {
-            return $this->namingEntries($owner, $reversed)[0] ?? null;
+            return $this->namingEntries(
+                $owner,
+                $reversed,
+            );
         }
 
-        return $this->find($owner)
+        return array_values($this->find($owner)
             ?->get($attribute, true)
-            ?->getValues()[0] ?? null;
+            ?->getValues() ?? []);
     }
 
     /**
@@ -444,17 +458,13 @@ final class InMemoryStorage implements
         Dn $owner,
         string $attribute,
     ): array {
-        $reversed = $this->linkedAttributes->linkedBy($attribute);
-        $values = $reversed !== null
-            ? $this->namingEntries($owner, $reversed)
-            : $this->find($owner)
-                ?->get($attribute, true)
-                ?->getValues() ?? [];
-
-        return array_values(array_map(
+        return array_map(
             Dn::normalized(...),
-            $values,
-        ));
+            $this->linkValues(
+                $owner,
+                $attribute,
+            ),
+        );
     }
 
     /**

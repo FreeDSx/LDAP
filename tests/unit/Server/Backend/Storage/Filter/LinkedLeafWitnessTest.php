@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Filter;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
@@ -34,6 +35,8 @@ final class LinkedLeafWitnessTest extends TestCase
     private const ALICE = 'cn=alice,dc=example,dc=com';
 
     private const BOB = 'cn=bob,dc=example,dc=com';
+
+    private const GROUP_A = 'cn=group-a,dc=example,dc=com';
 
     private const GROUP_C = 'cn=group-c,dc=example,dc=com';
 
@@ -129,18 +132,67 @@ final class LinkedLeafWitnessTest extends TestCase
         );
     }
 
-    public function test_an_extensible_match_by_another_rule_is_not_handed_the_value_it_asserts(): void
+    #[DataProvider('everyValueFilterProvider')]
+    public function test_a_leaf_any_value_may_answer_is_handed_every_value_the_entry_holds(FilterInterface $filter): void
     {
-        self::assertNotContains(
-            self::GROUP_C,
+        self::assertSame(
+            [self::GROUP_A, self::GROUP_C],
+            $this->subject->witness(
+                $this->person(),
+                $filter,
+            )->get('memberOf')?->getValues(),
+        );
+    }
+
+    public function test_an_extensible_match_by_an_unrecognized_rule_is_not_handed_every_value(): void
+    {
+        self::assertSame(
+            [self::GROUP_A],
             $this->subject->witness(
                 $this->person(),
                 Filters::extensible(
                     'memberOf',
                     self::GROUP_C,
-                    'caseIgnoreMatch',
+                    '1.2.3.4.5',
                 ),
-            )->get('memberOf')?->getValues() ?? [],
+            )->get('memberOf')?->getValues(),
+        );
+    }
+
+    public function test_an_entry_showing_the_attribute_whole_is_not_handed_more_values(): void
+    {
+        self::assertSame(
+            [self::GROUP_C],
+            $this->subject->witness(
+                $this->person(new Attribute(
+                    'memberOf',
+                    self::GROUP_C,
+                )),
+                Filters::greaterThanOrEqual(
+                    'memberOf',
+                    self::GROUP_C,
+                ),
+            )->get('memberOf')?->getValues(),
+        );
+    }
+
+    public function test_an_entry_showing_a_range_of_the_attribute_is_handed_every_value(): void
+    {
+        self::assertSame(
+            [self::GROUP_A, self::GROUP_C],
+            $this->subject->witness(
+                $this->person(new Attribute(
+                    'memberOf;range=0-0',
+                    self::GROUP_A,
+                )),
+                Filters::greaterThanOrEqual(
+                    'memberOf',
+                    self::GROUP_C,
+                ),
+            )->get(
+                'memberOf',
+                true,
+            )?->getValues(),
         );
     }
 
@@ -154,7 +206,48 @@ final class LinkedLeafWitnessTest extends TestCase
         yield 'the equality rule by OID' => ['2.5.13.1'];
     }
 
-    private function person(): Entry
+    /**
+     * @return Generator<string, array{FilterInterface}>
+     */
+    public static function everyValueFilterProvider(): Generator
+    {
+        yield 'an extensible match by another rule' => [Filters::extensible(
+            'memberOf',
+            self::GROUP_C,
+            'caseIgnoreMatch',
+        )];
+        yield 'an extensible match by another rule by OID' => [Filters::extensible(
+            'memberOf',
+            self::GROUP_C,
+            '2.5.13.2',
+        )];
+        yield 'a greater-or-equal' => [Filters::greaterThanOrEqual(
+            'memberOf',
+            self::GROUP_C,
+        )];
+        yield 'a less-or-equal' => [Filters::lessThanOrEqual(
+            'memberOf',
+            self::GROUP_A,
+        )];
+        yield 'a negated extensible match by another rule' => [Filters::not(Filters::extensible(
+            'memberOf',
+            self::GROUP_C,
+            'caseIgnoreMatch',
+        ))];
+        yield 'one beside an equality on the same attribute' => [Filters::and(
+            Filters::equal(
+                'memberOf',
+                self::GROUP_C,
+            ),
+            Filters::extensible(
+                'memberOf',
+                self::GROUP_C,
+                'caseIgnoreMatch',
+            ),
+        )];
+    }
+
+    private function person(Attribute ...$attributes): Entry
     {
         return new Entry(
             new Dn(self::ALICE),
@@ -162,6 +255,7 @@ final class LinkedLeafWitnessTest extends TestCase
                 'cn',
                 'alice',
             ),
+            ...$attributes,
         );
     }
 

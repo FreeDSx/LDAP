@@ -87,7 +87,7 @@ trait PdoLinkReadDialectTrait
         SQL;
     }
 
-    public function queryAnyLinkValue(): string
+    public function queryLinkValues(): string
     {
         return <<<SQL
             SELECT t.dn
@@ -95,8 +95,12 @@ trait PdoLinkReadDialectTrait
             JOIN entries o ON o.entry_id = l.owner_entry_id
             JOIN entries t ON t.entry_id = l.target_entry_id
             WHERE o.lc_dn = ? AND l.attr_name_lower = ?
-            LIMIT 1
         SQL;
+    }
+
+    public function queryAnyLinkValue(): string
+    {
+        return $this->queryLinkValues() . ' LIMIT 1';
     }
 
     public function queryLinksForAttribute(): string

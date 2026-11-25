@@ -93,6 +93,13 @@ interface PdoBacklinkReadDialectInterface
     public function queryHeldBacklinkValues(int $count): string;
 
     /**
+     * Every DN linking to a target under an attribute.
+     *
+     * Parameters: [target lc_dn, attr_name_lower]
+     */
+    public function queryBacklinkValues(): string;
+
+    /**
      * Any one DN linking to a target under an attribute, for answering whether it is named at all.
      *
      * Parameters: [target lc_dn, attr_name_lower]

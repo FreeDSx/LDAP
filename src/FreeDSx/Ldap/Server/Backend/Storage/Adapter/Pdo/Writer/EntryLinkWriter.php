@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDia
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -204,19 +205,52 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         Dn $owner,
         string $attribute,
     ): ?string {
-        $row = $this->connection
-            ->execute(
-                $this->dialect->queryAnyLinkValue(),
-                [
-                    $owner->normalizedString(),
-                    Attribute::normalizeName($attribute),
-                ],
-            )
-            ->fetch();
+        $row = $this->valueRows(
+            $owner,
+            $attribute,
+            $this->dialect->queryAnyLinkValue(),
+        )->fetch();
 
         return is_array($row)
             ? $this->stringColumn($row['dn'] ?? null)
             : null;
+    }
+
+    /**
+     * Every value the owner links.
+     */
+    public function linkValues(
+        Dn $owner,
+        string $attribute,
+    ): array {
+        $values = [];
+
+        $rows = $this->valueRows(
+            $owner,
+            $attribute,
+            $this->dialect->queryLinkValues(),
+        );
+        while (($row = $rows->fetch()) !== false) {
+            if (is_array($row)) {
+                $values[] = $this->stringColumn($row['dn'] ?? null);
+            }
+        }
+
+        return $values;
+    }
+
+    private function valueRows(
+        Dn $owner,
+        string $attribute,
+        string $query,
+    ): PooledStatement {
+        return $this->connection->execute(
+            $query,
+            [
+                $owner->normalizedString(),
+                Attribute::normalizeName($attribute),
+            ],
+        );
     }
 
     /**

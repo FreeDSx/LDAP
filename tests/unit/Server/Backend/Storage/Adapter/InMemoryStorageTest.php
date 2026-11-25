@@ -279,6 +279,53 @@ final class InMemoryStorageTest extends TestCase
         );
     }
 
+    public function test_every_value_a_linked_attribute_holds_is_read(): void
+    {
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()),
+        );
+        $subject->store(EntryFixture::withUuid(Entry::fromArray(
+            'cn=admins,dc=ex,dc=com',
+            ['cn' => ['admins'], 'member' => ['cn=alice,dc=ex,dc=com', 'cn=bob,dc=ex,dc=com']],
+        )));
+
+        self::assertSame(
+            ['cn=alice,dc=ex,dc=com', 'cn=bob,dc=ex,dc=com'],
+            $subject->linkValues(
+                new Dn('cn=admins,dc=ex,dc=com'),
+                'member',
+            ),
+        );
+    }
+
+    public function test_every_entry_naming_a_backlink_is_read(): void
+    {
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()),
+        );
+
+        $groups = [
+            'admins' => 'cn=bob,dc=ex,dc=com',
+            'staff' => 'cn=bob,dc=ex,dc=com',
+            'guests' => 'cn=carol,dc=ex,dc=com',
+        ];
+
+        foreach ($groups as $group => $member) {
+            $subject->store(EntryFixture::withUuid(Entry::fromArray(
+                "cn={$group},dc=ex,dc=com",
+                ['cn' => [$group], 'member' => [$member]],
+            )));
+        }
+
+        self::assertSame(
+            ['cn=admins,dc=ex,dc=com', 'cn=staff,dc=ex,dc=com'],
+            $subject->linkValues(
+                new Dn('CN=Bob,DC=ex,DC=com'),
+                'memberOf',
+            ),
+        );
+    }
+
     public function test_an_untouched_write_holds_the_kept_values_under_their_schema_name(): void
     {
         $subject = new InMemoryStorage(
