@@ -129,6 +129,37 @@ trait ValueMatchingWriteTestsTrait
         $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=uidmatch,dc=foo,dc=bar'));
     }
 
+    public function testUniqueMemberMatchesAnIdentifierWhoseClosingBIsLowercase(): void
+    {
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            'cn=uidcase,dc=foo,dc=bar',
+            [
+                'cn' => 'uidcase',
+                'uniqueMember' => "cn=user,dc=foo,dc=bar#'0101'b",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        )));
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::equal(
+                'uniqueMember',
+                "cn=user,dc=foo,dc=bar#'0101'B",
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=uidcase,dc=foo,dc=bar'));
+
+        self::assertSame(
+            ['cn=uidcase,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $found->toArray(),
+            ),
+        );
+    }
+
     public function testModifyAddOfACaseVariantOnACaseExactAttributeIsANewValue(): void
     {
         $this->asAdmin(function (LdapClient $admin): void {

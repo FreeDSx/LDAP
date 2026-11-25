@@ -69,7 +69,8 @@ final class BitStringComparator implements MatchingRuleComparatorInterface, Cano
     {
         $trimmed = trim($value);
 
-        if (preg_match("/^'([01]*)'B$/", $trimmed, $matches) !== 1) {
+        // A closing lowercase b is accepted because RFC 4512's ABNF reads quoted literals without regard to case.
+        if (preg_match("/^'([01]*)'[Bb]$/", $trimmed, $matches) !== 1) {
             return $trimmed;
         }
 

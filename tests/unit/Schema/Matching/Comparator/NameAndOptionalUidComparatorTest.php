@@ -49,6 +49,24 @@ final class NameAndOptionalUidComparatorTest extends TestCase
         self::assertTrue($result);
     }
 
+    public function test_equals_matches_an_identifier_whose_closing_b_is_lowercase(): void
+    {
+        $result = $this->subject->equals(
+            "cn=admin,dc=foo#'0101'b",
+            "cn=admin,dc=foo#'0101'B",
+        );
+
+        self::assertTrue($result);
+    }
+
+    public function test_index_key_is_shared_by_either_case_of_the_closing_b(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey("cn=admin,dc=foo#'0101'b"),
+            $this->subject->indexKey("cn=admin,dc=foo#'0101'B"),
+        );
+    }
+
     public function test_equals_is_false_when_only_one_side_carries_an_identifier(): void
     {
         $result = $this->subject->equals(
