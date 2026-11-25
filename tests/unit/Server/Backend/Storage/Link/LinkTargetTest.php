@@ -142,6 +142,16 @@ final class LinkTargetTest extends TestCase
             'cn=a#b,dc=x',
             '',
         ];
+        yield 'an escaped # before a bit string' => [
+            "cn=a,dc=x\\#'01'B",
+            "cn=a,dc=x\\#'01'B",
+            '',
+        ];
+        yield 'an escaped backslash before the #' => [
+            "cn=a,dc=x\\\\#'01'B",
+            'cn=a,dc=x\\\\',
+            '#01',
+        ];
     }
 
     /**

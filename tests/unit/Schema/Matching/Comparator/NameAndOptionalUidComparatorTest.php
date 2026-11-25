@@ -77,6 +77,16 @@ final class NameAndOptionalUidComparatorTest extends TestCase
         self::assertFalse($result);
     }
 
+    public function test_equals_keeps_an_escaped_hash_in_the_name(): void
+    {
+        $result = $this->subject->equals(
+            "cn=admin,dc=foo\\#'0101'B",
+            "cn=admin,dc=foo\\\\#'0101'B",
+        );
+
+        self::assertFalse($result);
+    }
+
     public function test_equals_is_false_when_the_identifiers_differ(): void
     {
         $result = $this->subject->equals(
