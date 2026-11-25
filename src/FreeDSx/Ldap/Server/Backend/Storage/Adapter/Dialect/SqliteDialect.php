@@ -87,15 +87,12 @@ final class SqliteDialect implements PdoDialectInterface
             $nulls = $sortKey->direction === 'ASC'
                 ? 'NULLS LAST'
                 : 'NULLS FIRST';
-            $value = $sortKey->numeric
-                ? 'CAST(eav.value_lower AS INTEGER)'
-                : 'eav.value_lower';
-            $terms[] = <<<SQL
-                (SELECT MIN({$value})
-                 FROM entry_attribute_values eav
-                 WHERE eav.owner_entry_id = entry_id
-                   AND eav.attr_name_lower = ?) {$sortKey->direction} {$nulls}
-                SQL;
+            $least = $this->leastSortValue(
+                $sortKey,
+                'entry_id',
+                'CAST(eav.value_lower AS INTEGER)',
+            );
+            $terms[] = "$least $sortKey->direction $nulls";
             $sortParams[] = $sortKey->attributeLower;
         }
 

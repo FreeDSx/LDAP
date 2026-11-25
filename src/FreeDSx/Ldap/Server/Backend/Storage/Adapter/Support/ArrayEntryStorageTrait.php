@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
@@ -150,7 +151,7 @@ trait ArrayEntryStorageTrait
     }
 
     /**
-     * The back-links to derive.
+     * The back-links to derive: those the read returns, its filter names or its sort keys order by.
      */
     private function backlinksWanted(StorageListOptions $options): Backlinks
     {
@@ -158,6 +159,9 @@ trait ArrayEntryStorageTrait
 
         foreach (FilterAttributes::referenced($options->filter) ?? [] as $attribute) {
             $wanted[] = $attribute;
+        }
+        foreach ($options->sortKeys as $sortKey) {
+            $wanted[] = Attribute::normalizeName($sortKey->getAttribute());
         }
 
         return $this->linkedAttributes

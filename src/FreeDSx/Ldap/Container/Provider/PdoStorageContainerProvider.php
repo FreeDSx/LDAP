@@ -376,6 +376,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(AttributeContextInterface::class),
             $container->get(EntryRowCodec::class),
             $container->get(EntryLinks::class),
+            $container->get(LinkedAttributes::class),
         );
     }
 

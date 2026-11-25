@@ -15,14 +15,17 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryListDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\DescendantScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PdoListQueryBuilderTest extends TestCase
@@ -74,6 +77,66 @@ final class PdoListQueryBuilderTest extends TestCase
             'MIN(CAST(eav.value_lower AS DECIMAL(65,0)))',
             $query->sql,
         );
+    }
+
+    #[DataProvider('dialectProvider')]
+    public function test_a_linked_key_orders_by_the_least_dn_its_links_name(PdoEntryListDialectInterface $dialect): void
+    {
+        $query = (new PdoListQueryBuilder($dialect))->build(self::querySpec(
+            sortKeys: [new SortKeySpec(
+                'member',
+                'ASC',
+                source: SortKeySource::Links,
+            )],
+        ));
+
+        self::assertStringContainsString(
+            'MIN((SELECT t.lc_dn FROM entries t WHERE t.entry_id = l.target_entry_id))',
+            $query->sql,
+        );
+        self::assertStringContainsString(
+            'l.owner_entry_id =',
+            $query->sql,
+        );
+        self::assertSame(
+            ['member'],
+            $query->params,
+        );
+    }
+
+    #[DataProvider('dialectProvider')]
+    public function test_a_backlink_key_orders_by_the_least_dn_of_the_entries_naming_it(
+        PdoEntryListDialectInterface $dialect,
+    ): void {
+        $query = (new PdoListQueryBuilder($dialect))->build(self::querySpec(
+            sortKeys: [new SortKeySpec(
+                'member',
+                'DESC',
+                source: SortKeySource::Backlinks,
+            )],
+        ));
+
+        self::assertStringContainsString(
+            'MIN((SELECT o.lc_dn FROM entries o WHERE o.entry_id = l.owner_entry_id))',
+            $query->sql,
+        );
+        self::assertStringContainsString(
+            'l.target_entry_id =',
+            $query->sql,
+        );
+        self::assertSame(
+            ['member'],
+            $query->params,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{PdoEntryListDialectInterface}>
+     */
+    public static function dialectProvider(): iterable
+    {
+        yield 'sqlite' => [new SqliteDialect()];
+        yield 'mysql' => [new MysqlDialect()];
     }
 
     public function test_sqlite_descending_orders_nulls_first_with_one_param(): void

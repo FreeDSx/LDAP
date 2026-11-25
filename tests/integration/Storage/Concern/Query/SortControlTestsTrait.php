@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -481,6 +482,70 @@ trait SortControlTestsTrait
         );
     }
 
+    public function testSortControlOrdersByTheDnsALinkedAttributeNames(): void
+    {
+        $this->seedLinkedSortEntries();
+
+        try {
+            self::assertSame(
+                [
+                    ['g2', 'g3', 'g1'],
+                    ['g1', 'g3', 'g2'],
+                ],
+                [
+                    $this->linkedSortOrder(
+                        'groupOfNames',
+                        SortKey::ascending(
+                            'member',
+                            'distinguishedNameMatch',
+                        ),
+                    ),
+                    $this->linkedSortOrder(
+                        'groupOfNames',
+                        SortKey::descending(
+                            'member',
+                            'distinguishedNameMatch',
+                        ),
+                    ),
+                ],
+            );
+        } finally {
+            $this->removeLinkedSortEntries();
+        }
+    }
+
+    public function testSortControlOrdersByTheDnsOfTheEntriesNamingABacklink(): void
+    {
+        $this->seedLinkedSortEntries();
+
+        try {
+            self::assertSame(
+                [
+                    ['m3', 'm1', 'm2', 'm4'],
+                    ['m4', 'm2', 'm1', 'm3'],
+                ],
+                [
+                    $this->linkedSortOrder(
+                        'person',
+                        SortKey::ascending(
+                            'memberOf',
+                            'distinguishedNameMatch',
+                        ),
+                    ),
+                    $this->linkedSortOrder(
+                        'person',
+                        SortKey::descending(
+                            'memberOf',
+                            'distinguishedNameMatch',
+                        ),
+                    ),
+                ],
+            );
+        } finally {
+            $this->removeLinkedSortEntries();
+        }
+    }
+
     public function testSortControlPlacesMissingAttributeLastWhenAscending(): void
     {
         $this->authenticateUser();
@@ -554,6 +619,85 @@ trait SortControlTestsTrait
         )
             ->base('dc=foo,dc=bar')
             ->useSubtreeScope();
+    }
+
+    /**
+     * People and groups created in an order that differs from the one their linked DNs sort in; cn=m4 is in no group.
+     */
+    private function seedLinkedSortEntries(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            $admin->create(Entry::fromArray(
+                'ou=linkedsort,dc=foo,dc=bar',
+                ['objectClass' => 'organizationalUnit', 'ou' => 'linkedsort'],
+            ));
+
+            foreach (['m3', 'm2', 'm1', 'm4'] as $person) {
+                $admin->create(Entry::fromArray(
+                    "cn=$person,ou=linkedsort,dc=foo,dc=bar",
+                    ['objectClass' => 'person', 'cn' => $person, 'sn' => $person],
+                ));
+            }
+            foreach (['g1' => 'm3', 'g2' => 'm1', 'g3' => 'm2'] as $group => $member) {
+                $admin->create(Entry::fromArray(
+                    "cn=$group,ou=linkedsort,dc=foo,dc=bar",
+                    ['objectClass' => 'groupOfNames', 'cn' => $group, 'member' => "cn=$member,ou=linkedsort,dc=foo,dc=bar"],
+                ));
+            }
+        });
+    }
+
+    private function removeLinkedSortEntries(): void
+    {
+        $this->asAdmin(function (LdapClient $admin): void {
+            foreach (['g1', 'g2', 'g3', 'm1', 'm2', 'm3', 'm4'] as $cn) {
+                $admin->delete("cn=$cn,ou=linkedsort,dc=foo,dc=bar");
+            }
+            $admin->delete('ou=linkedsort,dc=foo,dc=bar');
+        });
+    }
+
+    /**
+     * The cn of each entry of the class under the fixture, in the order a successful sort put them.
+     *
+     * @return list<string>
+     */
+    private function linkedSortOrder(
+        string $objectClass,
+        SortKey $sortKey,
+    ): array {
+        $response = $this->ldapClient()->send(
+            Operations::search(
+                Filters::equal(
+                    'objectClass',
+                    $objectClass,
+                ),
+                'cn',
+            )
+                ->base('ou=linkedsort,dc=foo,dc=bar')
+                ->useSingleLevelScope(),
+            new SortingControl($sortKey),
+        );
+        $sortResponse = $response?->controls()->get(Control::OID_SORTING_RESPONSE);
+        $search = $response?->getResponse();
+
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortResponse,
+        );
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $sortResponse->getResult(),
+        );
+        self::assertInstanceOf(
+            SearchResponse::class,
+            $search,
+        );
+
+        return array_values(array_map(
+            static fn(Entry $entry): string => $entry->get('cn')?->firstValue() ?? '',
+            $search->getEntries()->toArray(),
+        ));
     }
 
     private function sortThatCannotBePerformed(): SortingControl
