@@ -32,7 +32,7 @@ final readonly class NameAndOptionalUid
 
     public static function parse(string $value): self
     {
-        if (preg_match(self::PATTERN, $value, $matches) !== 1) {
+        if (preg_match(self::PATTERN, $value, $matches) !== 1 || self::endsInAnEscape($matches['name'])) {
             return new self($value, null);
         }
 
@@ -40,5 +40,18 @@ final readonly class NameAndOptionalUid
             $matches['name'],
             $matches['uid'],
         );
+    }
+
+    /**
+     * An odd run of backslashes before the '#' escapes it, leaving it part of the DN.
+     */
+    private static function endsInAnEscape(string $name): bool
+    {
+        $unescaped = rtrim(
+            $name,
+            '\\',
+        );
+
+        return (strlen($name) - strlen($unescaped)) % 2 === 1;
     }
 }

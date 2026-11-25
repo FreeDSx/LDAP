@@ -160,6 +160,36 @@ trait ValueMatchingWriteTestsTrait
         );
     }
 
+    public function testUniqueMemberKeepsAnEscapedHashInTheName(): void
+    {
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            'cn=uidescape,dc=foo,dc=bar',
+            [
+                'cn' => 'uidescape',
+                'uniqueMember' => "cn=user,dc=foo,dc=bar\\\\#'0101'B",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        )));
+
+        $matches = fn(string $assertion): int => count($this->ldapClient()->search(
+            Operations::search(Filters::equal(
+                'uniqueMember',
+                $assertion,
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        ));
+        $withUid = $matches("cn=user,dc=foo,dc=bar\\\\#'0101'B");
+        $escaped = $matches("cn=user,dc=foo,dc=bar\\#'0101'B");
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=uidescape,dc=foo,dc=bar'));
+
+        self::assertSame(
+            [1, 0],
+            [$withUid, $escaped],
+        );
+    }
+
     public function testModifyAddOfACaseVariantOnACaseExactAttributeIsANewValue(): void
     {
         $this->asAdmin(function (LdapClient $admin): void {
