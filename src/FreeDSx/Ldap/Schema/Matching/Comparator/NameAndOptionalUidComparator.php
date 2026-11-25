@@ -49,21 +49,26 @@ final readonly class NameAndOptionalUidComparator implements MatchingRuleCompara
         return $this->uid->equals($left->uid, $right->uid);
     }
 
+    /**
+     * Orders by the stored keys, so every storage sorts the values alike.
+     */
     public function compare(
         string $a,
         string $b,
     ): int {
-        $left = NameAndOptionalUid::parse($a);
-        $right = NameAndOptionalUid::parse($b);
-        $byName = $this->name->compare($left->name, $right->name);
+        $left = $this->indexKey($a);
+        $right = $this->indexKey($b);
 
-        if ($byName !== 0) {
-            return $byName;
+        if ($left === null || $right === null) {
+            return $this->compareParts(
+                $a,
+                $b,
+            );
         }
 
-        return $this->uid->compare(
-            $left->uid ?? '',
-            $right->uid ?? '',
+        return strcmp(
+            $left,
+            $right,
         );
     }
 
@@ -104,5 +109,34 @@ final readonly class NameAndOptionalUidComparator implements MatchingRuleCompara
     public function indexFragment(string $fragment): ?string
     {
         return null;
+    }
+
+    /**
+     * Orders by the name and then the identifier, for a part comparator that gives no key.
+     */
+    private function compareParts(
+        string $a,
+        string $b,
+    ): int {
+        $left = NameAndOptionalUid::parse($a);
+        $right = NameAndOptionalUid::parse($b);
+        $byName = $this->name->compare(
+            $left->name,
+            $right->name,
+        );
+
+        if ($byName !== 0) {
+            return $byName;
+        }
+
+        // An absent identifier sorts before any present one.
+        if ($left->uid === null || $right->uid === null) {
+            return ($left->uid !== null) <=> ($right->uid !== null);
+        }
+
+        return $this->uid->compare(
+            $left->uid,
+            $right->uid,
+        );
     }
 }
