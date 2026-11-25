@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
+use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -39,6 +40,7 @@ final class LinkedAttributesTest extends TestCase
     public function test_the_core_schema_declares_the_dn_valued_group_attributes(): void
     {
         self::assertTrue($this->links('member'));
+        self::assertTrue($this->links('uniqueMember'));
         self::assertTrue($this->links('owner'));
         self::assertTrue($this->links('seeAlso'));
     }
@@ -380,9 +382,21 @@ final class LinkedAttributesTest extends TestCase
         );
     }
 
+    public function test_the_core_unique_member_carries_a_uid(): void
+    {
+        self::assertTrue($this->subject->carriesUid('uniqueMember'));
+    }
+
     public function test_a_type_that_is_not_linked_carries_no_uid(): void
     {
-        self::assertFalse($this->subject->carriesUid('uniqueMember'));
+        $subject = new LinkedAttributes(SchemaResource::Core->load()->addAttributeType(new AttributeType(
+            '1.601',
+            ['uidUnlinked'],
+            equalityOid: '2.5.13.23',
+            syntaxOid: SyntaxOid::OID_NAME_AND_OPTIONAL_UID,
+        )));
+
+        self::assertFalse($subject->carriesUid('uidUnlinked'));
     }
 
     public function test_a_schema_declaring_none_is_empty(): void

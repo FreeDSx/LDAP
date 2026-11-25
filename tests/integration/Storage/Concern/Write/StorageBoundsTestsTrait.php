@@ -22,6 +22,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 
 /**
  * What the storage holds at its edges: values that are binary or large, wide attributes, and long attribute types.
@@ -242,6 +243,49 @@ trait StorageBoundsTestsTrait
 
         // The refusal answers the operation rather than dropping the connection, so the session still serves.
         self::assertNotNull($this->ldapClient()->read('cn=admin,dc=foo,dc=bar'));
+    }
+
+    public function testAUniqueMemberUidAtTheLengthKeptIsStoredAndALongerOneIsRefused(): void
+    {
+        $kept = "cn=user,dc=foo,dc=bar#'" . str_repeat(
+            '1',
+            LinkTarget::MAX_UID_BITS,
+        ) . "'B";
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=uidlength,dc=foo,dc=bar',
+            [
+                'cn' => 'uidlength',
+                'objectClass' => 'groupOfUniqueNames',
+                'uniqueMember' => $kept,
+            ],
+        ));
+        $refused = null;
+
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=uidlength,dc=foo,dc=bar',
+                Change::add(
+                    'uniqueMember',
+                    "cn=user,dc=foo,dc=bar#'" . str_repeat(
+                        '1',
+                        LinkTarget::MAX_UID_BITS + 1,
+                    ) . "'B",
+                ),
+            ));
+        } catch (OperationException $e) {
+            $refused = $e->getCode();
+        }
+        $held = $this->ldapClient()->read(
+            'cn=uidlength,dc=foo,dc=bar',
+            ['uniqueMember'],
+        )?->get('uniqueMember')?->getValues();
+        $this->ldapClient()->delete('cn=uidlength,dc=foo,dc=bar');
+
+        self::assertSame(
+            [ResultCode::ADMIN_LIMIT_EXCEEDED, [$kept]],
+            [$refused, $held],
+        );
     }
 
     public function testAnAttributeDescriptionNamingNoTypeIsRefusedWithValidationOff(): void

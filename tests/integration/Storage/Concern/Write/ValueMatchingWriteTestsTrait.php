@@ -68,33 +68,6 @@ trait ValueMatchingWriteTestsTrait
         ));
     }
 
-    /**
-     * RFC 4517 3.3.21 leaves '#' unescaped inside the name, so a tail that is not a bit string belongs to the DN.
-     */
-    public function testAddAcceptsAUniqueMemberWhoseTailIsNotABitString(): void
-    {
-        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
-            'cn=notabitstring,dc=foo,dc=bar',
-            [
-                'cn' => 'notabitstring',
-                'uniqueMember' => "cn=user,dc=foo,dc=bar#'0102'B",
-                'objectClass' => 'groupOfUniqueNames',
-            ],
-        )));
-
-        $found = $this->ldapClient()->search(
-            Operations::search(Filters::present('objectClass'), 'uniqueMember')
-                ->base('cn=notabitstring,dc=foo,dc=bar')
-                ->useBaseScope(),
-        );
-        self::assertSame(
-            ["cn=user,dc=foo,dc=bar#'0102'B"],
-            $found->first()?->get('uniqueMember')?->getValues(),
-        );
-
-        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=notabitstring,dc=foo,dc=bar'));
-    }
-
     public function testUniqueMemberMatchesOnTheNameAndTheIdentifierTogether(): void
     {
         $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
@@ -157,36 +130,6 @@ trait ValueMatchingWriteTestsTrait
                 static fn(Entry $entry): string => $entry->getDn()->toString(),
                 $found->toArray(),
             ),
-        );
-    }
-
-    public function testUniqueMemberKeepsAnEscapedHashInTheName(): void
-    {
-        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
-            'cn=uidescape,dc=foo,dc=bar',
-            [
-                'cn' => 'uidescape',
-                'uniqueMember' => "cn=user,dc=foo,dc=bar\\\\#'0101'B",
-                'objectClass' => 'groupOfUniqueNames',
-            ],
-        )));
-
-        $matches = fn(string $assertion): int => count($this->ldapClient()->search(
-            Operations::search(Filters::equal(
-                'uniqueMember',
-                $assertion,
-            ))
-                ->base('dc=foo,dc=bar')
-                ->useSubtreeScope(),
-        ));
-        $withUid = $matches("cn=user,dc=foo,dc=bar\\\\#'0101'B");
-        $escaped = $matches("cn=user,dc=foo,dc=bar\\#'0101'B");
-
-        $this->asAdmin(fn(LdapClient $admin) => $admin->delete('cn=uidescape,dc=foo,dc=bar'));
-
-        self::assertSame(
-            [1, 0],
-            [$withUid, $escaped],
         );
     }
 

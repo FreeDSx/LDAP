@@ -294,11 +294,50 @@ final class StorageReadBackendTest extends TestCase
         ));
     }
 
+    public function test_a_compare_past_the_bound_matches_a_unique_member_by_its_name_and_uid(): void
+    {
+        $group = $this->boundedGroup(
+            'uniqueMember',
+            'groupOfUniqueNames',
+            "#'0101'B",
+        );
+
+        self::assertSame(
+            [true, false, false],
+            [
+                $this->subject->compare(
+                    $group,
+                    Filters::equal(
+                        'uniqueMember',
+                        "cn=Third,dc=example,dc=com#'0101'B",
+                    ),
+                ),
+                $this->subject->compare(
+                    $group,
+                    Filters::equal(
+                        'uniqueMember',
+                        'cn=Third,dc=example,dc=com',
+                    ),
+                ),
+                $this->subject->compare(
+                    $group,
+                    Filters::equal(
+                        'uniqueMember',
+                        "cn=Third,dc=example,dc=com#'1111'B",
+                    ),
+                ),
+            ],
+        );
+    }
+
     /**
      * A group read under a bound that leaves all but one of its members unread.
      */
-    private function boundedGroup(): Entry
-    {
+    private function boundedGroup(
+        string $attribute = 'member',
+        string $objectClass = 'groupOfNames',
+        string $uid = '',
+    ): Entry {
         $members = [];
         foreach (['First', 'Second', 'Third'] as $name) {
             $members[] = new Entry(
@@ -312,11 +351,14 @@ final class StorageReadBackendTest extends TestCase
             ...[new Entry(
                 new Dn('cn=Admins,dc=example,dc=com'),
                 new Attribute('cn', 'Admins'),
-                new Attribute('objectClass', 'groupOfNames'),
                 new Attribute(
-                    'member',
+                    'objectClass',
+                    $objectClass,
+                ),
+                new Attribute(
+                    $attribute,
                     ...array_map(
-                        static fn(Entry $entry): string => $entry->getDn()->toString(),
+                        static fn(Entry $entry): string => $entry->getDn()->toString() . $uid,
                         $members,
                     ),
                 ),
@@ -330,7 +372,7 @@ final class StorageReadBackendTest extends TestCase
 
         self::assertCount(
             1,
-            $group->get('member')?->getValues() ?? [],
+            $group->get($attribute)?->getValues() ?? [],
         );
 
         return $group;

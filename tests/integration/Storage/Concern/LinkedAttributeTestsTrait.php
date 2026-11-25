@@ -608,6 +608,69 @@ trait LinkedAttributeTestsTrait
         );
     }
 
+    public function testOneEntryHeldUnderTwoUidsIsTwoUniqueMembers(): void
+    {
+        $group = $this->seedUniqueGroup(
+            'unique-two-uids',
+            self::LINKED_USER . "#'01'B",
+        );
+        $held = [];
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->send(Operations::modify(
+            $group,
+            Change::add(
+                'uniqueMember',
+                self::LINKED_USER . "#'10'B",
+            ),
+        )));
+        $held[] = $this->uniqueMembersOf($group);
+        $this->asAdmin(fn(LdapClient $admin) => $admin->send(Operations::modify(
+            $group,
+            Change::delete(
+                'uniqueMember',
+                self::LINKED_USER . "#'01'B",
+            ),
+        )));
+        $held[] = $this->uniqueMembersOf($group);
+
+        self::assertSame(
+            [
+                [self::LINKED_USER . "#'01'B", self::LINKED_USER . "#'10'B"],
+                [self::LINKED_USER . "#'10'B"],
+            ],
+            $held,
+        );
+    }
+
+    public function testACompareOfAUniqueMemberMatchesItsUidAsWellAsItsName(): void
+    {
+        $group = $this->seedUniqueGroup(
+            'unique-compare',
+            self::LINKED_USER . "#'0101'B",
+        );
+
+        self::assertSame(
+            [true, false, false],
+            [
+                $this->ldapClient()->compare(
+                    $group,
+                    'uniqueMember',
+                    self::LINKED_USER . "#'0101'B",
+                ),
+                $this->ldapClient()->compare(
+                    $group,
+                    'uniqueMember',
+                    self::LINKED_USER,
+                ),
+                $this->ldapClient()->compare(
+                    $group,
+                    'uniqueMember',
+                    self::LINKED_USER . "#'1111'B",
+                ),
+            ],
+        );
+    }
+
     /**
      * @return list<string>
      */
@@ -641,6 +704,43 @@ trait LinkedAttributeTestsTrait
         )));
 
         return $dn;
+    }
+
+    /**
+     * A group of unique names of its own per test, holding the values given.
+     */
+    private function seedUniqueGroup(
+        string $cn,
+        string ...$uniqueMembers,
+    ): string {
+        $dn = "cn={$cn},dc=foo,dc=bar";
+
+        $this->asAdmin(fn(LdapClient $admin) => $admin->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => $cn,
+                'objectClass' => 'groupOfUniqueNames',
+                'uniqueMember' => $uniqueMembers,
+            ],
+        )));
+
+        return $dn;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function uniqueMembersOf(string $dn): array
+    {
+        return array_values(
+            $this->ldapClient()
+                ->read(
+                    $dn,
+                    ['uniqueMember'],
+                )
+                ?->get('uniqueMember')
+                ?->getValues() ?? [],
+        );
     }
 
     /**

@@ -719,6 +719,40 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($this->readSpelledTarget('postalCode'));
     }
 
+    public function testAUniqueMemberReadDenyStillAppliesAfterTheMemberIsRenamed(): void
+    {
+        $this->bindDelegate();
+        $outside = $this->readSpelledTarget('l');
+
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $this->ldapClient()->rename(
+            LdapAclCommand::UNIQUE_RENAMEE_DN,
+            'cn=unique-renamed',
+        );
+        $this->ldapClient()->bind(
+            'cn=unique-renamed,ou=people,dc=foo,dc=bar',
+            LdapAclCommand::UNIQUE_RENAMEE_PASSWORD,
+        );
+        $renamed = $this->readSpelledTarget('l');
+
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $this->ldapClient()->rename(
+            'cn=unique-renamed,ou=people,dc=foo,dc=bar',
+            'cn=unique-renamee',
+        );
+
+        self::assertSame(
+            ['locality-secret', null],
+            [$outside, $renamed],
+        );
+    }
+
     public function testTheSpelledMemberDeniesDoNotReachAnIdentityOutsideThoseGroups(): void
     {
         $this->bindDelegate();

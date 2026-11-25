@@ -345,9 +345,9 @@ attributeTypes: ( 2.5.4.31 NAME 'member' SUP 2.5.4.49 EQUALITY 2.5.13.1
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 X-LINKED 'TRUE' )
 ```
 
-The shipped schema declares `member`, `owner`, `seeAlso`, `roleOccupant` and `pwdPolicySubentry` this way. The point
-is that a group no longer has to be rewritten to add one member, and that a reference cannot outlive the entry it
-names.
+The shipped schema declares `member`, `uniqueMember`, `owner`, `seeAlso`, `roleOccupant` and `pwdPolicySubentry` this
+way. The point is that a group no longer has to be rewritten to add one member, and that a reference cannot outlive the
+entry it names.
 
 An object class may not require a linked attribute. Removing an entry takes every reference to it along, which would
 leave such a class without an attribute it requires, so the server refuses to start on a schema that does this.
@@ -358,11 +358,14 @@ leave such a class without an attribute it requires, so the server refuses to st
 |---|---|
 | A value naming an entry that is not stored | Refused with `constraintViolation`. |
 | Reading a value back | The target's current stored DN, not the spelling that was written. |
+| A UID after the DN, as `uniqueMember` allows | Kept, and returned after the target's current DN. One longer than 1,023 bits is refused with `adminLimitExceeded`. |
 | Renaming the target | The new DN appears, with no write to the referring entry and no change to its `modifyTimestamp`. |
 | Deleting the target | The reference goes with it, again with no write to the referring entry. |
 | Naming an entry by it | Refused with `namingViolation`. The value follows its target, and an RDN value may not change on its own. |
-| Value order | The order the references were created in, which RFC 4511 leaves unconstrained. |
+| Value order | Not necessarily the order written. RFC 4511 leaves it unconstrained. |
 | An option-bearing form such as `member;lang-en` | Not linked, and kept on the entry as an ordinary value. |
+
+A replica refuses a UID over that length too, and stops replicating at that entry until the provider's value changes.
 
 Because a delete or rename never writes the referring entry, neither produces a change record for it. A sync consumer
 receives the deleted or renamed entry, but nothing for the entries that named it. It has to drop or follow those

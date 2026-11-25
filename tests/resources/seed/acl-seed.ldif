@@ -36,6 +36,13 @@ sn: Smith
 userPassword: {SHA}Ib9wL039Cd3QkElouncuPd0/kag=
 secretCode: S3CR3T-alice
 
+# A uniqueMember a test renames, to show its group still names it under the new DN.
+dn: cn=unique-renamee,ou=people,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: unique-renamee
+sn: Renamee
+userPassword: {SHA}9paKbgGEIBfGxbmddIEhMminlmg=
+
 # RDN is uid, which is not writable under ou=people, so a rename that touches it must be refused.
 dn: uid=bob,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson
@@ -77,6 +84,7 @@ description: desc-secret
 title: title-secret
 street: street-secret
 postalCode: postal-secret
+l: locality-secret
 
 # Carries one attribute per rule whose configured names are spelled another way: postalCode and st are allowed only to
 # cn=user's group, the rest are denied to cn=user.
@@ -110,11 +118,16 @@ objectClass: groupOfNames
 cn: blocked-alias
 member: commonName=user,dc=foo,dc=bar
 
-# Names cn=user by the numeric OID of cn through uniqueMember, which is not held as a link.
+# Names cn=user by the numeric OID of cn through uniqueMember.
 dn: cn=blocked-unique,dc=foo,dc=bar
 objectClass: groupOfUniqueNames
 cn: blocked-unique
 uniqueMember: 2.5.4.3=user,dc=foo,dc=bar
+
+dn: cn=blocked-unique-renamed,dc=foo,dc=bar
+objectClass: groupOfUniqueNames
+cn: blocked-unique-renamed
+uniqueMember: cn=unique-renamee,ou=people,dc=foo,dc=bar
 
 # Seeded without cn=user, so a test can add it over the wire.
 dn: cn=blocked-late,dc=foo,dc=bar
