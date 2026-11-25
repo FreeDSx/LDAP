@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\AccessControl\Subject\GroupSubjectMatcher;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -98,6 +99,80 @@ final class GroupSubjectMatcherTest extends TestCase
         self::assertSame(
             $subject,
             $subject->spelledBy($this->spelling),
+        );
+    }
+
+    #[DataProvider('otherMemberAttributeProvider')]
+    public function test_a_member_attribute_named_by_its_oid_is_read_once_spelled_by_its_primary_name(
+        string $memberAttribute,
+        string $primaryName,
+    ): void {
+        $this->mockBackend
+            ->method('get')
+            ->willReturnCallback(static fn(
+                Dn $dn,
+                EntryProjection $projection,
+            ): ?Entry => isset($projection->allowed()[strtolower($primaryName)])
+                ? Entry::create(
+                    'cn=admins,dc=foo,dc=bar',
+                    [$primaryName => ['cn=admin,dc=foo,dc=bar']],
+                )
+                : null);
+
+        $subject = (new GroupSubjectMatcher(
+            'cn=admins,dc=foo,dc=bar',
+            $memberAttribute,
+        ))->spelledBy($this->spelling);
+        $subject->setBackend($this->mockBackend);
+
+        self::assertTrue($subject->matches(
+            BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
+            $this->targetDn,
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function otherMemberAttributeProvider(): iterable
+    {
+        yield 'member' => ['2.5.4.31', 'member'];
+        yield 'uniqueMember' => ['2.5.4.50', 'uniqueMember'];
+    }
+
+    public function test_a_respelled_group_keeps_its_cache_lifetime_and_clock(): void
+    {
+        $clock = FrozenClock::fromString('2026-01-01 00:00:00');
+        $this->mockBackend
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->willReturn(Entry::create(
+                'cn=admins,dc=foo,dc=bar',
+                ['member' => ['cn=admin,dc=foo,dc=bar']],
+            ));
+
+        $subject = (new GroupSubjectMatcher(
+            'commonName=admins,dc=foo,dc=bar',
+            'member',
+            60,
+            $clock,
+        ))->spelledBy($this->spelling);
+        $subject->setBackend($this->mockBackend);
+        $token = BindToken::fromDn('cn=admin,dc=foo,dc=bar');
+
+        $subject->matches(
+            $token,
+            $this->targetDn,
+        );
+        $clock->setTo(new DateTimeImmutable('2026-01-01 00:00:30'));
+        $subject->matches(
+            $token,
+            $this->targetDn,
+        );
+        $clock->setTo(new DateTimeImmutable('2026-01-01 00:01:00'));
+        $subject->matches(
+            $token,
+            $this->targetDn,
         );
     }
 

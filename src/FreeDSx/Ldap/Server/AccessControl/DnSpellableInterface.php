@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\AccessControl;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 
 /**
- * A matcher naming a DN, which it gives again with that DN's attribute types spelled by their primary names.
+ * A matcher naming a DN, which it gives again with the attribute types it names spelled by their primary names.
  *
  * @internal
  *
@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 interface DnSpellableInterface
 {
     /**
-     * This matcher when its DN already uses primary names, otherwise a copy naming the respelled DN.
+     * This matcher when the types it names already use primary names, otherwise a respelled copy.
      */
     public function spelledBy(AttributeTypeSpelling $spelling): static;
 }
