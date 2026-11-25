@@ -411,6 +411,9 @@ Attribute rules are enforced in three places:
 A read deny strips the value, but does not stop the attribute being named in a filter. To also stop that, pair it
 with a [Filter Rule](#filter-rules), or mark the attribute [confidential](#confidential-attributes), which does both.
 
+The same goes for a server-side sort. A read deny does not stop a sort key ordering results by the attribute's value,
+while a filter rule or confidentiality drops the key.
+
 ```php
 AclRules::fromEmpty()->replaceAttributeRules(
     // Only admins can see or write userPassword.
