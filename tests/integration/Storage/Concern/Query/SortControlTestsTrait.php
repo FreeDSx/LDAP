@@ -546,6 +546,38 @@ trait SortControlTestsTrait
         }
     }
 
+    public function testSortControlOrdersAnAbsentUidBeforeAnEmptyOne(): void
+    {
+        $this->seedLinkedSortEntries();
+
+        try {
+            self::assertSame(
+                [
+                    ['u1', 'u2', 'u3'],
+                    ['u3', 'u2', 'u1'],
+                ],
+                [
+                    $this->linkedSortOrder(
+                        'groupOfUniqueNames',
+                        SortKey::ascending(
+                            'uniqueMember',
+                            'uniqueMemberMatch',
+                        ),
+                    ),
+                    $this->linkedSortOrder(
+                        'groupOfUniqueNames',
+                        SortKey::descending(
+                            'uniqueMember',
+                            'uniqueMemberMatch',
+                        ),
+                    ),
+                ],
+            );
+        } finally {
+            $this->removeLinkedSortEntries();
+        }
+    }
+
     public function testSortControlPlacesMissingAttributeLastWhenAscending(): void
     {
         $this->authenticateUser();
@@ -622,7 +654,7 @@ trait SortControlTestsTrait
     }
 
     /**
-     * People and groups created in an order that differs from the one their linked DNs sort in; cn=m4 is in no group.
+     * People and groups created in an order that differs from the one their member values sort in; cn=m4 is in no group.
      */
     private function seedLinkedSortEntries(): void
     {
@@ -644,13 +676,19 @@ trait SortControlTestsTrait
                     ['objectClass' => 'groupOfNames', 'cn' => $group, 'member' => "cn=$member,ou=linkedsort,dc=foo,dc=bar"],
                 ));
             }
+            foreach (['u2' => "#''B", 'u1' => '', 'u3' => "#'0'B"] as $group => $uid) {
+                $admin->create(Entry::fromArray(
+                    "cn=$group,ou=linkedsort,dc=foo,dc=bar",
+                    ['objectClass' => 'groupOfUniqueNames', 'cn' => $group, 'uniqueMember' => "cn=m1,ou=linkedsort,dc=foo,dc=bar$uid"],
+                ));
+            }
         });
     }
 
     private function removeLinkedSortEntries(): void
     {
         $this->asAdmin(function (LdapClient $admin): void {
-            foreach (['g1', 'g2', 'g3', 'm1', 'm2', 'm3', 'm4'] as $cn) {
+            foreach (['g1', 'g2', 'g3', 'u1', 'u2', 'u3', 'm1', 'm2', 'm3', 'm4'] as $cn) {
                 $admin->delete("cn=$cn,ou=linkedsort,dc=foo,dc=bar");
             }
             $admin->delete('ou=linkedsort,dc=foo,dc=bar');

@@ -16,6 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching\Comparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\NameAndOptionalUidComparator;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class NameAndOptionalUidComparatorTest extends TestCase
@@ -65,6 +67,72 @@ final class NameAndOptionalUidComparatorTest extends TestCase
         );
 
         self::assertFalse($result);
+    }
+
+    #[DataProvider('ascendingPairProvider')]
+    public function test_compare_orders_the_lower_value_first(
+        string $lower,
+        string $higher,
+    ): void {
+        self::assertLessThan(
+            0,
+            $this->subject->compare(
+                $lower,
+                $higher,
+            ),
+        );
+        self::assertGreaterThan(
+            0,
+            $this->subject->compare(
+                $higher,
+                $lower,
+            ),
+        );
+    }
+
+    #[DataProvider('ascendingPairProvider')]
+    public function test_index_keys_sort_in_the_order_compare_gives(
+        string $lower,
+        string $higher,
+    ): void {
+        self::assertLessThan(
+            0,
+            strcmp(
+                (string) $this->subject->indexKey($lower),
+                (string) $this->subject->indexKey($higher),
+            ),
+        );
+    }
+
+    public function test_compare_orders_an_absent_identifier_first_when_a_part_gives_no_key(): void
+    {
+        $subject = new NameAndOptionalUidComparator(uid: new IntegerComparator());
+
+        self::assertLessThan(
+            0,
+            $subject->compare(
+                'cn=admin,dc=foo',
+                "cn=admin,dc=foo#''B",
+            ),
+        );
+        self::assertGreaterThan(
+            0,
+            $subject->compare(
+                "cn=admin,dc=foo#''B",
+                'cn=admin,dc=foo',
+            ),
+        );
+    }
+
+    public function test_compare_is_zero_for_values_the_rule_calls_equal(): void
+    {
+        self::assertSame(
+            0,
+            $this->subject->compare(
+                "CN=Admin, DC=Foo#'0101'B",
+                "cn=admin,dc=foo#'0101'B",
+            ),
+        );
     }
 
     public function test_substring_always_returns_false(): void
@@ -119,5 +187,36 @@ final class NameAndOptionalUidComparatorTest extends TestCase
     public function test_index_fragment_is_null_because_the_rule_matches_over_parsed_parts(): void
     {
         self::assertNull($this->subject->indexFragment('cn=admin'));
+    }
+
+    /**
+     * @return Generator<string, array{string, string}>
+     */
+    public static function ascendingPairProvider(): Generator
+    {
+        yield 'no identifier before an empty one' => [
+            'cn=admin,dc=foo',
+            "cn=admin,dc=foo#''B",
+        ];
+        yield 'no identifier before a set one' => [
+            'cn=admin,dc=foo',
+            "cn=admin,dc=foo#'0'B",
+        ];
+        yield 'an empty identifier before a set one' => [
+            "cn=admin,dc=foo#''B",
+            "cn=admin,dc=foo#'0'B",
+        ];
+        yield 'identifiers in bit order' => [
+            "cn=admin,dc=foo#'0'B",
+            "cn=admin,dc=foo#'1'B",
+        ];
+        yield 'the name before the identifier' => [
+            "cn=a,dc=foo#'1'B",
+            'cn=b,dc=foo',
+        ];
+        yield 'a name running on past another' => [
+            'cn=x,dc=a b',
+            "cn=x,dc=a#'1'B",
+        ];
     }
 }
