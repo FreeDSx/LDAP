@@ -800,6 +800,32 @@ final class AclIntegrationTest extends ServerTestCase
         ));
     }
 
+    public function testAReadAllowAppliesWhenItsGroupNamesTheMemberAttributeByOid(): void
+    {
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        self::assertSame(
+            'member-attribute-secret',
+            $this->readSpelledTarget(
+                'st',
+                LdapAclCommand::CONFIGURED_SPELLING_DN,
+            ),
+        );
+    }
+
+    public function testTheMemberAttributeGroupAllowDoesNotReachANonMember(): void
+    {
+        $this->bindDelegate();
+
+        self::assertNull($this->readSpelledTarget(
+            'st',
+            LdapAclCommand::CONFIGURED_SPELLING_DN,
+        ));
+    }
+
     public function testAnOperationDenyAppliesWhenItsConfiguredDnsNameTypesByAnAliasAndOid(): void
     {
         $this->ldapClient()->bind(

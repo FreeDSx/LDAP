@@ -19,10 +19,10 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\DnSpellableInterface;
-use FreeDSx\Ldap\Server\AccessControl\DnSpellableTrait;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -41,8 +41,6 @@ use LogicException;
  */
 final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAwareInterface, DnSpellableInterface
 {
-    use DnSpellableTrait;
-
     private readonly Dn $groupDn;
 
     private ?ReadBackendInterface $backend = null;
@@ -66,6 +64,26 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         private readonly ClockInterface $clock = new SystemClock(),
     ) {
         $this->groupDn = new Dn($groupDn);
+    }
+
+    /**
+     * The member attribute is respelled along with the group DN, and a copy starts without a backend.
+     */
+    public function spelledBy(AttributeTypeSpelling $spelling): static
+    {
+        $groupDn = $spelling->dn($this->groupDn);
+        $memberAttribute = $spelling->description($this->memberAttribute);
+
+        if ($groupDn === $this->groupDn && $memberAttribute === $this->memberAttribute) {
+            return $this;
+        }
+
+        return new self(
+            $groupDn->toString(),
+            $memberAttribute,
+            $this->cacheTtl,
+            $this->clock,
+        );
     }
 
     public function setBackend(ReadBackendInterface $backend): void
@@ -176,23 +194,5 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         }
 
         return $this->backend;
-    }
-
-    private function spellableDn(): Dn
-    {
-        return $this->groupDn;
-    }
-
-    /**
-     * A copy starts without a backend.
-     */
-    private function withSpellableDn(Dn $dn): static
-    {
-        return new self(
-            $dn->toString(),
-            $this->memberAttribute,
-            $this->cacheTtl,
-            $this->clock,
-        );
     }
 }

@@ -269,6 +269,20 @@ class LdapAclCommand extends Command
                                 Target::dn(self::CONFIGURED_SPELLING_DN),
                                 'postalCode',
                             )->forRead(),
+                            // Only lets the group in if its member attribute, named by OID, is respelled.
+                            AttributeRule::allow(
+                                Subject::group(
+                                    self::OID_MEMBER_GROUP_DN,
+                                    '2.5.4.31',
+                                ),
+                                Target::dn(self::CONFIGURED_SPELLING_DN),
+                                'st',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::anyone(),
+                                Target::dn(self::CONFIGURED_SPELLING_DN),
+                                'st',
+                            )->forRead(),
                             AttributeRule::deny(
                                 Subject::dnSubtree('2.5.4.3=user,dc=foo,dc=bar'),
                                 Target::dn(self::CONFIGURED_SPELLING_DN),

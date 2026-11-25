@@ -78,7 +78,7 @@ title: title-secret
 street: street-secret
 postalCode: postal-secret
 
-# Carries one attribute per rule whose configured DNs are spelled another way: postalCode is allowed only to
+# Carries one attribute per rule whose configured names are spelled another way: postalCode and st are allowed only to
 # cn=user's group, the rest are denied to cn=user.
 dn: cn=configured-spelling,dc=foo,dc=bar
 objectClass: inetOrgPerson
@@ -89,6 +89,7 @@ title: target-dn-secret
 street: target-subtree-secret
 postalCode: group-dn-secret
 l: subject-subtree-secret
+st: member-attribute-secret
 
 # Held to one entry per search by a limit rule naming it commonName=limited.
 dn: cn=limited,dc=foo,dc=bar
