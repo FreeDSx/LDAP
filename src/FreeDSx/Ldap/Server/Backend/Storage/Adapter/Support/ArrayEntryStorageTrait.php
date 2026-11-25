@@ -71,13 +71,28 @@ trait ArrayEntryStorageTrait
                 $this->backlinksIn($entries, $backlinks),
             );
         }
-        if ($options->projection->windows !== []) {
-            $scoped = $this->slicing($scoped, $options->projection);
-        }
         if ($options->projection->withHasSubordinates) {
             $scoped = $this->withChildFlag(
                 $scoped,
                 $childrenOf,
+            );
+        }
+        if ($options->sortKeys !== []) {
+            /** @var list<Entry> $collected */
+            $collected = iterator_to_array(
+                $scoped,
+                preserve_keys: false,
+            );
+            $scoped = $this->sortKeyComparator->sort(
+                $collected,
+                $options->sortKeys,
+            );
+        }
+        // A range cuts an attribute down only after the sort has ordered by every value it holds.
+        if ($options->projection->windows !== []) {
+            $scoped = $this->slicing(
+                $scoped,
+                $options->projection,
             );
         }
         if ($options->sortKeys === []) {
@@ -88,14 +103,8 @@ trait ArrayEntryStorageTrait
             ));
         }
 
-        /** @var list<Entry> $collected */
-        $collected = iterator_to_array(
-            $scoped,
-            preserve_keys: false,
-        );
-
         return EntryStream::positioned($this->pageByCount(
-            $this->sortKeyComparator->sort($collected, $options->sortKeys),
+            $scoped,
             $options,
         ));
     }

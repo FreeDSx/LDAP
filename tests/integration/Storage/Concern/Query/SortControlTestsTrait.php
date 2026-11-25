@@ -546,6 +546,40 @@ trait SortControlTestsTrait
         }
     }
 
+    public function testSortControlOrdersARangedAttributeByEveryValue(): void
+    {
+        $this->seedLinkedSortEntries();
+
+        try {
+            self::assertSame(
+                [
+                    ['g2', 'g3', 'g1'],
+                    ['g1', 'g3', 'g2'],
+                ],
+                [
+                    $this->linkedSortOrder(
+                        'groupOfNames',
+                        SortKey::ascending(
+                            'member',
+                            'distinguishedNameMatch',
+                        ),
+                        'member;range=0-0',
+                    ),
+                    $this->linkedSortOrder(
+                        'groupOfNames',
+                        SortKey::descending(
+                            'member',
+                            'distinguishedNameMatch',
+                        ),
+                        'member;range=0-0',
+                    ),
+                ],
+            );
+        } finally {
+            $this->removeLinkedSortEntries();
+        }
+    }
+
     public function testSortControlOrdersAnAbsentUidBeforeAnEmptyOne(): void
     {
         $this->seedLinkedSortEntries();
@@ -654,7 +688,8 @@ trait SortControlTestsTrait
     }
 
     /**
-     * People and groups created in an order that differs from the one their member values sort in; cn=m4 is in no group.
+     * People and groups created in an order that differs from the one their member values sort in, some holding more
+     * than one; cn=m4 is in no group.
      */
     private function seedLinkedSortEntries(): void
     {
@@ -670,10 +705,14 @@ trait SortControlTestsTrait
                     ['objectClass' => 'person', 'cn' => $person, 'sn' => $person],
                 ));
             }
-            foreach (['g1' => 'm3', 'g2' => 'm1', 'g3' => 'm2'] as $group => $member) {
+            foreach ([
+                'g1' => ['cn=m3,ou=linkedsort,dc=foo,dc=bar'],
+                'g2' => ['ou=linkedsort,dc=foo,dc=bar', 'cn=m1,ou=linkedsort,dc=foo,dc=bar'],
+                'g3' => ['cn=m2,ou=linkedsort,dc=foo,dc=bar', 'cn=m3,ou=linkedsort,dc=foo,dc=bar'],
+            ] as $group => $members) {
                 $admin->create(Entry::fromArray(
                     "cn=$group,ou=linkedsort,dc=foo,dc=bar",
-                    ['objectClass' => 'groupOfNames', 'cn' => $group, 'member' => "cn=$member,ou=linkedsort,dc=foo,dc=bar"],
+                    ['objectClass' => 'groupOfNames', 'cn' => $group, 'member' => $members],
                 ));
             }
             foreach (['u2' => "#''B", 'u1' => '', 'u3' => "#'0'B"] as $group => $uid) {
@@ -703,6 +742,7 @@ trait SortControlTestsTrait
     private function linkedSortOrder(
         string $objectClass,
         SortKey $sortKey,
+        string ...$alsoRequested,
     ): array {
         $response = $this->ldapClient()->send(
             Operations::search(
@@ -711,6 +751,7 @@ trait SortControlTestsTrait
                     $objectClass,
                 ),
                 'cn',
+                ...$alsoRequested,
             )
                 ->base('ou=linkedsort,dc=foo,dc=bar')
                 ->useSingleLevelScope(),
