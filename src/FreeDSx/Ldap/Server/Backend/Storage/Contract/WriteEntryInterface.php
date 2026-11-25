@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Contract;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryUuidTakenException;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
@@ -34,6 +35,7 @@ interface WriteEntryInterface
      * @param bool $rebuildIndexes Rewrite every secondary-index row rather than only those whose values changed.
      * @param LinkDelta $links Linked values to add and remove, for an attribute the entry no longer carries whole.
      * @throws EntryUuidTakenException when an entry at another DN holds the entryUUID.
+     * @throws OperationException when a linked value carries a uid longer than a store keeps.
      */
     public function store(
         Entry $entry,

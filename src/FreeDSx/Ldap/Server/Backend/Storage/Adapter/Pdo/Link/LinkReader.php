@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\Backlinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
@@ -174,7 +175,7 @@ final readonly class LinkReader
         ));
 
         foreach ($rows as $row) {
-            $values[] = $this->stringColumn($row['dn'] ?? null);
+            $values[] = $this->valueOf($row);
         }
 
         return $values;
@@ -332,10 +333,10 @@ final readonly class LinkReader
         foreach ($rows as $row) {
             $stored = $this->stringColumn($row['attr_name_lower'] ?? null);
             $entryId = $this->intColumn($row['key_entry_id'] ?? null);
-            $dn = $this->stringColumn($row['dn'] ?? null);
+            $value = $this->valueOf($row);
 
             foreach ($this->returnedAs[$stored] ?? [$stored] as $name) {
-                $links[$entryId][$name][] = $dn;
+                $links[$entryId][$name][] = $value;
             }
         }
 
@@ -401,6 +402,19 @@ final readonly class LinkReader
         }
 
         return $returnedAs;
+    }
+
+    /**
+     * The value a row gives back: the DN it names, then any uid a forward link was written with.
+     *
+     * @param array<array-key, mixed> $row
+     */
+    private function valueOf(array $row): string
+    {
+        return LinkTarget::valueOf(
+            $this->stringColumn($row['dn'] ?? null),
+            $this->stringColumn($row['target_uid'] ?? null),
+        );
     }
 
     /**

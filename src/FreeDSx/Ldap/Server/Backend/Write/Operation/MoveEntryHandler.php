@@ -85,6 +85,7 @@ readonly class MoveEntryHandler
                     links: LinkDelta::between(
                         $this->linked->valuesOf($current),
                         $this->linked->valuesOf($newEntry),
+                        $this->linked,
                     ),
                 );
                 $this->capturePostRead(

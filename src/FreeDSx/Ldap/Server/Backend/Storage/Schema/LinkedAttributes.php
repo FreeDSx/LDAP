@@ -16,7 +16,9 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 
 use function array_keys;
 use function array_values;
@@ -32,7 +34,11 @@ use function sprintf;
 final class LinkedAttributes
 {
     /**
-     * @var array<string, true>|null Lowercased names, resolved on first use since the schema is fixed after startup.
+     * Lowercased names, each mapped to whether its values carry an optional uid.
+     *
+     * Note: resolved on first use since the schema is fixed after startup.
+     *
+     * @var array<string, bool>|null
      */
     private ?array $names = null;
 
@@ -97,6 +103,27 @@ final class LinkedAttributes
     }
 
     /**
+     * Whether a linked attribute's values may carry a uid after the name they link, as Name and Optional UID values do.
+     */
+    public function carriesUid(string $name): bool
+    {
+        return $this->resolved()[Attribute::normalizeName($name)] ?? false;
+    }
+
+    /**
+     * The entry a value of the attribute names, with any uid its values carry split off.
+     */
+    public function targetOf(
+        string $name,
+        string $value,
+    ): LinkTarget {
+        return LinkTarget::of(
+            $value,
+            $this->carriesUid($name),
+        );
+    }
+
+    /**
      * Whether values live in the link table rather than on the entry.
      */
     public function heldApart(Attribute $attribute): bool
@@ -155,6 +182,14 @@ final class LinkedAttributes
                 throw new RuntimeException(sprintf(
                     'The attribute "%s" is stored as links and cannot also reverse one.',
                     $name,
+                ));
+            }
+
+            if ($this->carriesUid($forward)) {
+                throw new RuntimeException(sprintf(
+                    'The attribute "%s" cannot reverse "%s" because its values carry a uid.',
+                    $name,
+                    $forward,
                 ));
             }
 
@@ -257,7 +292,7 @@ final class LinkedAttributes
     }
 
     /**
-     * @return array<string, true>
+     * @return array<string, bool>
      */
     private function resolved(): array
     {
@@ -270,9 +305,11 @@ final class LinkedAttributes
             if (!$type->isLinked()) {
                 continue;
             }
+            // Resolved through the supertype, since a type declaring no syntax inherits it.
+            $carriesUid = $this->schema->getSyntaxOid($type->oid) === SyntaxOid::OID_NAME_AND_OPTIONAL_UID;
 
             foreach ($type->names as $name) {
-                $names[Attribute::normalizeName($name)] = true;
+                $names[Attribute::normalizeName($name)] = $carriesUid;
             }
         }
 

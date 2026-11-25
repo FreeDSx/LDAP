@@ -35,8 +35,6 @@ CREATE TABLE IF NOT EXISTS entry_attribute_links (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_link ON entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id, target_uid);
 
-CREATE INDEX IF NOT EXISTS idx_link_owner ON entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id);
-
 CREATE INDEX IF NOT EXISTS idx_link_target ON entry_attribute_links (target_entry_id, attr_name_lower, owner_entry_id);
 
 -- Values naming an entry that is not stored yet: invisible to reads until the target arrives.

@@ -29,9 +29,8 @@ CREATE TABLE IF NOT EXISTS entry_attribute_links (
     owner_entry_id   BIGINT NOT NULL,
     attr_name_lower  VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     target_entry_id  BIGINT NOT NULL,
-    target_uid       VARCHAR(255) NOT NULL DEFAULT '',
+    target_uid       VARCHAR(1024) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',
     UNIQUE KEY uq_link (owner_entry_id, attr_name_lower, target_entry_id, target_uid),
-    INDEX idx_link_owner (owner_entry_id, attr_name_lower, target_entry_id),
     INDEX idx_link_target (target_entry_id, attr_name_lower, owner_entry_id),
     CONSTRAINT fk_link_owner FOREIGN KEY (owner_entry_id)
         REFERENCES entries(entry_id) ON DELETE CASCADE,
@@ -45,7 +44,7 @@ CREATE TABLE IF NOT EXISTS entry_link_pending (
     attr_name_lower  VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     target_lc_dn     VARBINARY(3072) NOT NULL,
     target_value     TEXT COLLATE utf8mb4_bin NOT NULL,
-    target_uid       VARCHAR(255) NOT NULL DEFAULT '',
+    target_uid       VARCHAR(1024) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '',
     INDEX idx_pending_target (target_lc_dn),
     INDEX idx_pending_owner (owner_entry_id, attr_name_lower),
     CONSTRAINT fk_pending_owner FOREIGN KEY (owner_entry_id)

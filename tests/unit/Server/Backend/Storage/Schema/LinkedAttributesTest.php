@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Storage\UidLinkSchema;
 
 final class LinkedAttributesTest extends TestCase
 {
@@ -351,6 +352,37 @@ final class LinkedAttributesTest extends TestCase
             'owner',
             noUserModification: false,
         );
+    }
+
+    public function test_a_backlink_reversing_an_attribute_whose_values_carry_a_uid_is_refused(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('carry a uid');
+
+        (new LinkedAttributes(UidLinkSchema::load()->addAttributeType(new AttributeType(
+            '1.600',
+            ['uidLinkedBy'],
+            noUserModification: true,
+            extensions: [AttributeType::EXTENSION_LINKED_BY => [UidLinkSchema::ATTRIBUTE]],
+        ))))->assertBacklinksAreDerivable();
+    }
+
+    public function test_a_linked_type_inheriting_the_name_and_optional_uid_syntax_carries_a_uid(): void
+    {
+        $subject = new LinkedAttributes(UidLinkSchema::load());
+
+        self::assertSame(
+            [true, false],
+            [
+                $subject->carriesUid(UidLinkSchema::ATTRIBUTE),
+                $subject->carriesUid('member'),
+            ],
+        );
+    }
+
+    public function test_a_type_that_is_not_linked_carries_no_uid(): void
+    {
+        self::assertFalse($this->subject->carriesUid('uniqueMember'));
     }
 
     public function test_a_schema_declaring_none_is_empty(): void

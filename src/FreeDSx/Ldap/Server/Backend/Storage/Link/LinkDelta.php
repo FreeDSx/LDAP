@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Link;
 
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 
 use function array_diff_key;
 use function array_keys;
@@ -68,6 +68,7 @@ final readonly class LinkDelta
     public static function between(
         array $before,
         array $after,
+        LinkedAttributes $linked,
     ): self {
         $added = [];
         $removed = [];
@@ -76,8 +77,16 @@ final readonly class LinkDelta
             if (($before[$name] ?? []) === ($after[$name] ?? [])) {
                 continue;
             }
-            $held = self::byTarget($before[$name] ?? []);
-            $wanted = self::byTarget($after[$name] ?? []);
+            $held = self::byTarget(
+                $name,
+                $before[$name] ?? [],
+                $linked,
+            );
+            $wanted = self::byTarget(
+                $name,
+                $after[$name] ?? [],
+                $linked,
+            );
 
             $added[$name] = array_values(array_diff_key(
                 $wanted,
@@ -164,18 +173,24 @@ final readonly class LinkDelta
     }
 
     /**
-     * Keyed by the entry each value names, so two spellings of one target compare equal.
+     * Keyed by the entry each value names and the uid it carries, so two spellings of one link compare equal.
      *
      * @param list<string> $values
      *
      * @return array<string, string>
      */
-    private static function byTarget(array $values): array
-    {
+    private static function byTarget(
+        string $name,
+        array $values,
+        LinkedAttributes $linked,
+    ): array {
         $keyed = [];
 
         foreach ($values as $value) {
-            $keyed[Dn::normalized($value)] = $value;
+            $keyed[$linked->targetOf(
+                $name,
+                $value,
+            )->identity()] = $value;
         }
 
         return $keyed;

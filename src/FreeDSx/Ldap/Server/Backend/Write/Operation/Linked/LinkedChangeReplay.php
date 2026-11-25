@@ -18,8 +18,9 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\HeldLinkLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
 use function array_diff_key;
@@ -35,7 +36,10 @@ use function sprintf;
  */
 readonly class LinkedChangeReplay
 {
-    public function __construct(private LinkedValueLookupInterface $lookup) {}
+    public function __construct(
+        private HeldLinkLookupInterface $lookup,
+        private LinkedAttributes $linked,
+    ) {}
 
     /**
      * What of the target the modify needs loaded: none of its links when changes are applied apart, all otherwise.
@@ -126,7 +130,10 @@ readonly class LinkedChangeReplay
             $name = Attribute::normalizeName($change->getAttribute()->getName());
 
             foreach ($change->getAttribute()->getValues() as $value) {
-                $named[$name][self::keyOf($value)] = $value;
+                $named[$name][$this->keyOf(
+                    $name,
+                    $value,
+                )] = $value;
             }
         }
         $held = [];
@@ -139,7 +146,10 @@ readonly class LinkedChangeReplay
             );
 
             foreach ($heldValues as $value) {
-                $held[$name][self::keyOf($value)] = $value;
+                $held[$name][$this->keyOf(
+                    $name,
+                    $value,
+                )] = $value;
             }
         }
 
@@ -162,7 +172,10 @@ readonly class LinkedChangeReplay
         $adding = [];
 
         foreach ($values as $value) {
-            $key = self::keyOf($value);
+            $key = $this->keyOf(
+                $name,
+                $value,
+            );
 
             if (isset($adding[$key])) {
                 throw new OperationException(
@@ -207,7 +220,10 @@ readonly class LinkedChangeReplay
         $removing = [];
 
         foreach ($values as $value) {
-            $key = self::keyOf($value);
+            $key = $this->keyOf(
+                $name,
+                $value,
+            );
 
             if (!isset($current[$key])) {
                 throw new OperationException(
@@ -269,8 +285,16 @@ readonly class LinkedChangeReplay
             );
     }
 
-    private static function keyOf(string $value): string
-    {
-        return Dn::normalized($value);
+    /**
+     * Two spellings of one link share a key, and a value carrying another uid does not.
+     */
+    private function keyOf(
+        string $name,
+        string $value,
+    ): string {
+        return $this->linked->targetOf(
+            $name,
+            $value,
+        )->identity();
     }
 }

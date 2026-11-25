@@ -409,7 +409,9 @@ Writing one is refused with `constraintViolation`, and the server never stores a
 raised itself.
 
 The server refuses to start when a back-link reverses an attribute that is not itself linked, is itself linked, or is
-not declared `NO-USER-MODIFICATION`. Each would leave an attribute nothing can maintain.
+not declared `NO-USER-MODIFICATION`. Each would leave an attribute nothing can maintain. It also refuses a back-link
+onto an attribute of the Name and Optional UID syntax. Its values can name one entry several times under different
+UIDs, and the back-link would list that entry once for each.
 
 Membership is direct only. A back-link reports the entries that name this one, not the ones that name those in turn.
 

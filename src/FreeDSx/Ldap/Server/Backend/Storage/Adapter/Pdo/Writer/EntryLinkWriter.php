@@ -16,29 +16,31 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\HeldLinkLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
 
 use function array_chunk;
-use function array_filter;
-use function array_intersect_key;
+use function array_keys;
+use function array_merge;
+use function array_values;
 use function count;
 use function is_array;
 use function ksort;
 
 /**
- * Keeps an entry's linked values in the table they are stored in, and answers what it links there.
+ * Keeps an entry's linked values in the table they are stored in, and answers which of them it links there.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EntryLinkWriter implements LinkedValueLookupInterface
+final readonly class EntryLinkWriter implements HeldLinkLookupInterface
 {
     use PdoColumnCastTrait;
 
@@ -61,6 +63,8 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
 
     /**
      * Brings the entry's links to what it now holds, touching only the rows that differ.
+     *
+     * @throws OperationException when a value carries a uid longer than can be stored
      */
     public function write(
         int $ownerId,
@@ -80,13 +84,19 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
      * Brings the owner's links to exactly the values given, touching only the rows that differ.
      *
      * @param array<string, list<string>> $values Values keyed by lowercased attribute name.
+     *
+     * @throws OperationException when a value carries a uid longer than can be stored
      */
     public function restate(
         int $ownerId,
         array $values,
     ): void {
-        $resolved = $this->resolve($values);
-        $wanted = $this->wantedLinks($values, $resolved);
+        $targets = $this->storableTargetsOf($values);
+        $resolved = $this->resolve(self::flattened($targets));
+        $wanted = $this->wantedLinks(
+            $targets,
+            $resolved,
+        );
         $held = $this->heldLinks($ownerId);
 
         $this->deleteLinks(
@@ -100,13 +110,15 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         $this->pending->clearFor($ownerId);
         $this->pending->park(
             $ownerId,
-            $values,
+            $targets,
             $resolved,
         );
     }
 
     /**
      * The links of an entry that was just created, which holds nothing yet to diff against or clear.
+     *
+     * @throws OperationException when a value carries a uid longer than can be stored
      */
     public function writeNew(
         int $ownerId,
@@ -120,50 +132,65 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         if ($values === []) {
             return;
         }
-        $resolved = $this->resolve($values);
+        $targets = $this->storableTargetsOf($values);
+        $resolved = $this->resolve(self::flattened($targets));
 
         $this->insertLinks(
             $ownerId,
-            $this->wantedLinks($values, $resolved),
+            $this->wantedLinks(
+                $targets,
+                $resolved,
+            ),
         );
         $this->pending->park(
             $ownerId,
-            $values,
+            $targets,
             $resolved,
         );
     }
 
     /**
      * Applies only the values the delta names, leaving whatever else the attribute links untouched.
+     *
+     * @throws OperationException when an added value carries a uid longer than can be stored
      */
     public function apply(
         int $ownerId,
         LinkDelta $delta,
     ): void {
-        $values = [];
+        $added = [];
+        $removed = [];
 
         foreach ($delta->names() as $name) {
-            $values[$name] = [
-                ...$delta->added($name),
-                ...$delta->removed($name),
-            ];
+            $added[$name] = $delta->added($name);
+            $removed[$name] = $delta->removed($name);
         }
-        $resolved = $this->resolve($values);
-        $remove = [];
-        $add = [];
+        $added = $this->storableTargetsOf($added);
+        $removed = $this->targetsOf($removed);
+        $resolved = $this->resolve(array_merge(
+            self::flattened($added),
+            self::flattened($removed),
+        ));
 
         // Gathered across every attribute first, since a statement per attribute takes index locks in an order that
         // differs between writers, which concurrent writers deadlock on.
-        foreach ($delta->names() as $name) {
-            $remove += $this->linksFor($name, $delta->removed($name), $resolved);
-            $add += $this->linksFor($name, $delta->added($name), $resolved);
-        }
-
-        $this->deleteLinks($ownerId, $remove);
-        $this->insertLinks($ownerId, $add);
+        $this->deleteLinks(
+            $ownerId,
+            $this->wantedLinks(
+                $removed,
+                $resolved,
+            ),
+        );
+        $this->insertLinks(
+            $ownerId,
+            $this->wantedLinks(
+                $added,
+                $resolved,
+            ),
+        );
         $this->pending->park(
             $ownerId,
-            $this->unresolvedOf($delta, $resolved),
+            $added,
             $resolved,
         );
     }
@@ -177,146 +204,104 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         array $values,
     ): array {
         $asked = [];
+        $targets = [];
 
         foreach ($values as $value) {
-            $asked[Dn::normalized($value)] = $value;
+            $target = $this->linked->targetOf(
+                $attribute,
+                $value,
+            );
+            $asked[$target->identity()] = $value;
+            $targets[$target->identity()] = $target;
         }
         // Compared by target id rather than by DN, which a rename committing in between could change.
-        $resolved = $this->resolve([$attribute => array_values($asked)]);
+        $resolved = $this->resolve(array_values($targets));
 
         if ($resolved === []) {
             return [];
         }
-
-        return array_values(array_intersect_key(
-            $asked,
-            $this->heldTargets(
-                $owner,
-                $attribute,
-                $resolved,
-            ),
-        ));
-    }
-
-    /**
-     * One value the owner links, which is all that answering whether it holds the attribute takes.
-     */
-    public function anyLinkValue(
-        Dn $owner,
-        string $attribute,
-    ): ?string {
-        $row = $this->valueRows(
+        $held = $this->heldTargets(
             $owner,
             $attribute,
-            $this->dialect->queryAnyLinkValue(),
-        )->fetch();
-
-        return is_array($row)
-            ? $this->stringColumn($row['dn'] ?? null)
-            : null;
-    }
-
-    /**
-     * Every value the owner links.
-     */
-    public function linkValues(
-        Dn $owner,
-        string $attribute,
-    ): array {
-        $values = [];
-
-        $rows = $this->valueRows(
-            $owner,
-            $attribute,
-            $this->dialect->queryLinkValues(),
-        );
-        while (($row = $rows->fetch()) !== false) {
-            if (is_array($row)) {
-                $values[] = $this->stringColumn($row['dn'] ?? null);
-            }
-        }
-
-        return $values;
-    }
-
-    private function valueRows(
-        Dn $owner,
-        string $attribute,
-        string $query,
-    ): PooledStatement {
-        return $this->connection->execute(
-            $query,
-            [
-                $owner->normalizedString(),
-                Attribute::normalizeName($attribute),
-            ],
-        );
-    }
-
-    /**
-     * The links the named values stand for, skipping any naming an entry that is not stored.
-     *
-     * @param list<string> $values
-     * @param array<string, int> $resolved
-     *
-     * @return array<string, array{string, int, string}>
-     */
-    private function linksFor(
-        string $name,
-        array $values,
-        array $resolved,
-    ): array {
-        return $this->wantedLinks(
-            [$name => $values],
             $resolved,
         );
-    }
+        $found = [];
 
-    /**
-     * The added values naming an entry that is not stored, which are parked rather than refused.
-     *
-     * @param array<string, int> $resolved
-     *
-     * @return array<string, list<string>>
-     */
-    private function unresolvedOf(
-        LinkDelta $delta,
-        array $resolved,
-    ): array {
-        $pending = [];
-
-        foreach ($delta->names() as $name) {
-            $unresolved = [];
-
-            foreach ($delta->added($name) as $value) {
-                if (!isset($resolved[Dn::normalized($value)])) {
-                    $unresolved[] = $value;
-                }
-            }
-
-            if ($unresolved !== []) {
-                $pending[$name] = $unresolved;
+        foreach ($targets as $identity => $target) {
+            if (isset($held[self::linkOf($resolved[$target->lcDn] ?? 0, $target->uid)])) {
+                $found[] = $asked[$identity];
             }
         }
 
-        return $pending;
+        return $found;
     }
 
     /**
-     * The ids of the DNs the entry names, keyed by their normalised form.
+     * Each attribute's values split into the entries they name and the uids they carry.
      *
      * @param array<string, list<string>> $values
      *
+     * @return array<string, list<LinkTarget>>
+     */
+    private function targetsOf(array $values): array
+    {
+        $targets = [];
+
+        foreach ($values as $name => $attributeValues) {
+            foreach ($attributeValues as $value) {
+                $targets[$name][] = $this->linked->targetOf(
+                    $name,
+                    $value,
+                );
+            }
+        }
+
+        return $targets;
+    }
+
+    /**
+     * The targets of values about to be stored, refused when a uid is longer than the table keeps.
+     *
+     * @param array<string, list<string>> $values
+     *
+     * @return array<string, list<LinkTarget>>
+     *
+     * @throws OperationException
+     */
+    private function storableTargetsOf(array $values): array
+    {
+        $targets = $this->targetsOf($values);
+
+        foreach (self::flattened($targets) as $target) {
+            $target->assertStorable();
+        }
+
+        return $targets;
+    }
+
+    /**
+     * @param array<string, list<LinkTarget>> $targets
+     *
+     * @return list<LinkTarget>
+     */
+    private static function flattened(array $targets): array
+    {
+        return array_merge(...array_values($targets));
+    }
+
+    /**
+     * The ids of the DNs the targets name, keyed by their normalized form.
+     *
+     * @param list<LinkTarget> $targets
+     *
      * @return array<string, int>
      */
-    private function resolve(array $values): array
+    private function resolve(array $targets): array
     {
         $wanted = [];
 
-        foreach ($values as $attributeValues) {
-            foreach ($attributeValues as $value) {
-                $wanted[Dn::normalized($value)] = true;
-            }
+        foreach ($targets as $target) {
+            $wanted[$target->lcDn] = true;
         }
 
         if ($wanted === []) {
@@ -334,11 +319,11 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
     }
 
     /**
-     * The resolved targets the owner links under the attribute.
+     * The links the owner holds under the attribute to any of the resolved targets, each keyed by target and uid.
      *
      * @param array<string, int> $resolved
      *
-     * @return array<string, int>
+     * @return array<string, true>
      */
     private function heldTargets(
         Dn $owner,
@@ -362,39 +347,44 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
             );
 
             foreach ($rows as $row) {
-                $held[$this->intColumn($row['target_entry_id'] ?? null)] = true;
+                $held[self::linkOf(
+                    $this->intColumn($row['target_entry_id'] ?? null),
+                    $this->stringColumn($row['target_uid'] ?? null),
+                )] = true;
             }
         }
 
-        return array_filter(
-            $resolved,
-            static fn(int $id): bool => isset($held[$id]),
-        );
+        return $held;
     }
 
     /**
-     * The links the entry now stands for, keyed so that two spellings of one target collapse to one row.
+     * The links the targets stand for, keyed so that two spellings of one target and uid collapse to one row.
      *
-     * @param array<string, list<string>> $values
+     * @param array<string, list<LinkTarget>> $targets
      * @param array<string, int> $resolved
      *
      * @return array<string, array{string, int, string}>
      */
     private function wantedLinks(
-        array $values,
+        array $targets,
         array $resolved,
     ): array {
         $links = [];
 
-        foreach ($values as $name => $attributeValues) {
-            foreach ($attributeValues as $value) {
-                $targetId = $resolved[Dn::normalized($value)] ?? null;
+        foreach ($targets as $name => $attributeTargets) {
+            foreach ($attributeTargets as $target) {
+                $targetId = $resolved[$target->lcDn] ?? null;
 
                 if ($targetId === null) {
                     continue;
                 }
 
-                $links[$this->keyOf($name, $targetId, '')] = [$name, $targetId, ''];
+                $key = $this->keyOf(
+                    $name,
+                    $targetId,
+                    $target->uid,
+                );
+                $links[$key] = [$name, $targetId, $target->uid];
             }
         }
 
@@ -486,7 +476,17 @@ final readonly class EntryLinkWriter implements LinkedValueLookupInterface
         int $targetId,
         string $uid,
     ): string {
-        return $name . "\0" . $targetId . "\0" . $uid;
+        return $name . "\0" . self::linkOf(
+            $targetId,
+            $uid,
+        );
+    }
+
+    private static function linkOf(
+        int $targetId,
+        string $uid,
+    ): string {
+        return $targetId . "\0" . $uid;
     }
 
     /**

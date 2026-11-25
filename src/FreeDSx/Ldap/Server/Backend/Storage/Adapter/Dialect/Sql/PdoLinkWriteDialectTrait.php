@@ -47,7 +47,7 @@ trait PdoLinkWriteDialectTrait
         $markers = SqlFilterUtility::markers($count);
 
         return <<<SQL
-            SELECT l.target_entry_id
+            SELECT l.target_entry_id, l.target_uid
             FROM entries o
             JOIN entry_attribute_links l ON l.owner_entry_id = o.entry_id
             WHERE o.lc_dn = ?

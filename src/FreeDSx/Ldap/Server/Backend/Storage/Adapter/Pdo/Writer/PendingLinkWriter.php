@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoPendingLinkD
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
 use Generator;
 
 use function array_chunk;
@@ -56,30 +57,27 @@ final readonly class PendingLinkWriter implements ReferenceIntegrityInterface
     }
 
     /**
-     * Parks the values naming an entry that is not stored.
+     * Parks the targets naming an entry that is not stored, with the uid each was written with.
      *
-     * @param array<string, list<string>> $values
+     * @param array<string, list<LinkTarget>> $targets
      * @param array<string, int> $resolved Ids of the DNs that did resolve, keyed by their normalised form.
      */
     public function park(
         int $ownerId,
-        array $values,
+        array $targets,
         array $resolved,
     ): void {
         $pending = [];
 
-        foreach ($values as $name => $attributeValues) {
-            foreach ($attributeValues as $value) {
-                $targetLcDn = (new Dn($value))->normalizedString();
-
-                if (isset($resolved[$targetLcDn])) {
+        foreach ($targets as $name => $attributeTargets) {
+            foreach ($attributeTargets as $target) {
+                if (isset($resolved[$target->lcDn])) {
                     continue;
                 }
 
                 $pending[] = [
                     $name,
-                    $targetLcDn,
-                    $value,
+                    $target,
                 ];
             }
         }
@@ -91,12 +89,12 @@ final readonly class PendingLinkWriter implements ReferenceIntegrityInterface
         foreach (array_chunk($pending, self::VALUES_PER_STATEMENT) as $chunk) {
             $params = [];
 
-            foreach ($chunk as [$name, $targetLcDn, $targetValue]) {
+            foreach ($chunk as [$name, $target]) {
                 $params[] = $ownerId;
                 $params[] = $name;
-                $params[] = $targetLcDn;
-                $params[] = $targetValue;
-                $params[] = '';
+                $params[] = $target->lcDn;
+                $params[] = $target->name;
+                $params[] = $target->uid;
             }
 
             $this->connection->execute(

@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Storage\UidLinkSchema;
 
 final class SqliteFilterTranslatorTest extends TestCase
 {
@@ -1751,6 +1752,50 @@ final class SqliteFilterTranslatorTest extends TestCase
             $result->sql,
         );
         self::assertFalse($result->isExact);
+    }
+
+    #[DataProvider('uidAssertionProvider')]
+    public function test_a_linked_leaf_whose_values_carry_a_uid_matches_the_uid_too(
+        string $value,
+        string $uid,
+    ): void {
+        $result = (new SqliteFilterTranslator(
+            $this->attributeContext(),
+            $this->indexForms,
+            new LinkedAttributes(UidLinkSchema::load()),
+        ))->translate(new EqualityFilter(
+            UidLinkSchema::ATTRIBUTE,
+            $value,
+        ));
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            't.lc_dn = ? AND l.target_uid = ?',
+            $result->sql,
+        );
+        self::assertSame(
+            ['cn=alice,dc=foo,dc=bar', $uid],
+            $result->params,
+        );
+    }
+
+    /**
+     * @return Generator<string, array{string, string}>
+     */
+    public static function uidAssertionProvider(): Generator
+    {
+        yield 'a uid' => [
+            "CN=Alice,DC=foo,DC=bar#'0101'B",
+            '#0101',
+        ];
+        yield 'an empty uid' => [
+            "CN=Alice,DC=foo,DC=bar#''B",
+            '#',
+        ];
+        yield 'no uid' => [
+            'CN=Alice,DC=foo,DC=bar',
+            '',
+        ];
     }
 
     /**
