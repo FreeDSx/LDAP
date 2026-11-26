@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -29,6 +30,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
+use FreeDSx\Ldap\Server\AccessControl\Rule\FilterAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
@@ -226,6 +228,135 @@ final class AclRulesTest extends TestCase
             BindToken::fromDn(self::OTHER_DN),
             $attribute,
         ));
+    }
+
+    #[DataProvider('withheldAttributeProvider')]
+    public function test_withholdAttributes_keeps_the_subject_from_reading_each_attribute_on_any_entry(
+        string $attribute,
+    ): void {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->withheldFromUser()->authorizeAttribute(
+            $this->user(),
+            new Dn(self::OTHER_DN),
+            $attribute,
+            AttributeAccess::Read,
+        );
+    }
+
+    #[DataProvider('withheldAttributeProvider')]
+    public function test_withholdAttributes_keeps_the_subject_from_filtering_on_each_attribute(string $attribute): void
+    {
+        self::assertFalse($this->withheldFromUser()->mayFilterOnAttribute(
+            $this->user(),
+            $attribute,
+        ));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function withheldAttributeProvider(): iterable
+    {
+        yield 'the first named' => ['mail'];
+        yield 'a later one' => ['mobile'];
+    }
+
+    public function test_withholdAttributes_leaves_another_identity_able_to_read_and_filter(): void
+    {
+        $subject = $this->withheldFromUser();
+
+        self::assertSame(
+            [
+                true,
+                true,
+            ],
+            [
+                $subject->isAttributeReadable(
+                    BindToken::fromDn(self::OTHER_DN),
+                    new Dn(self::USER_DN),
+                    'mail',
+                ),
+                $subject->mayFilterOnAttribute(
+                    BindToken::fromDn(self::OTHER_DN),
+                    'mail',
+                ),
+            ],
+        );
+    }
+
+    public function test_withholdAttributes_matches_ahead_of_an_earlier_grant(): void
+    {
+        $subject = new RuleBasedAccessControl(
+            AclRules::fromEmpty()
+                ->appendAttributeRules(AttributeRule::allow(
+                    Subject::dn(self::USER_DN),
+                    Target::any(),
+                    'mail',
+                )->forRead())
+                ->appendFilterAccess(FilterAccessRule::allow(
+                    Subject::dn(self::USER_DN),
+                    'mail',
+                ))
+                ->withholdAttributes(
+                    Subject::dn(self::USER_DN),
+                    'mail',
+                ),
+        );
+
+        self::assertSame(
+            [
+                false,
+                false,
+            ],
+            [
+                $subject->isAttributeReadable(
+                    $this->user(),
+                    new Dn(self::OTHER_DN),
+                    'mail',
+                ),
+                $subject->mayFilterOnAttribute(
+                    $this->user(),
+                    'mail',
+                ),
+            ],
+        );
+    }
+
+    public function test_withholdAttributes_leaves_writes_to_other_rules(): void
+    {
+        $subject = new RuleBasedAccessControl(
+            AclRules::fromEmpty()
+                ->appendAttributeRules(AttributeRule::allow(
+                    Subject::dn(self::USER_DN),
+                    Target::any(),
+                    'mail',
+                )->forWrite())
+                ->withholdAttributes(
+                    Subject::dn(self::USER_DN),
+                    'mail',
+                ),
+        );
+
+        $subject->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'mail',
+            AttributeAccess::Write,
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_withholdAttributes_refuses_a_subject_that_needs_an_entry(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        AclRules::fromEmpty()->withholdAttributes(
+            Subject::self(),
+            'mail',
+        );
     }
 
     /**
@@ -761,6 +892,15 @@ final class AclRulesTest extends TestCase
     private function admin(): TokenInterface
     {
         return BindToken::fromDn(self::ADMIN_DN);
+    }
+
+    private function withheldFromUser(): RuleBasedAccessControl
+    {
+        return new RuleBasedAccessControl(AclRules::secureDefault(Subject::dn(self::ADMIN_DN))->withholdAttributes(
+            Subject::dn(self::USER_DN),
+            'mail',
+            'mobile',
+        ));
     }
 
     private function entry(string $dn): Entry

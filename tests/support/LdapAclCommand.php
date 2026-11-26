@@ -382,6 +382,11 @@ class LdapAclCommand extends Command
                                 Subject::anyone(),
                                 'telephoneNumber',
                             ),
+                        )
+                        // Comes after the filter rules are replaced, or its filter deny would be discarded.
+                        ->withholdAttributes(
+                            Subject::dn('cn=user,dc=foo,dc=bar'),
+                            'employeeNumber',
                         ),
                 );
 
