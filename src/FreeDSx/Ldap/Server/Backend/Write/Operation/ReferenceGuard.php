@@ -49,13 +49,9 @@ final readonly class ReferenceGuard
             return;
         }
 
-        throw new OperationException(
-            sprintf(
-                'The attribute "%s" of entry "%s" names an entry that does not exist.',
-                $unresolved[0],
-                $owner->toString(),
-            ),
-            ResultCode::CONSTRAINT_VIOLATION,
+        $this->refuse(
+            $unresolved[0],
+            $owner,
         );
     }
 
@@ -66,12 +62,31 @@ final readonly class ReferenceGuard
      */
     public function assertNothingPending(): void
     {
-        if (!$this->references->hasUnresolvedReferences()) {
+        $unresolved = $this->references->firstUnresolvedReference();
+
+        if ($unresolved === null) {
             return;
         }
 
+        $this->refuse(
+            $unresolved->attribute,
+            $unresolved->owner,
+        );
+    }
+
+    /**
+     * @throws OperationException always
+     */
+    private function refuse(
+        string $attribute,
+        Dn $owner,
+    ): never {
         throw new OperationException(
-            'An entry names another that the directory does not hold.',
+            sprintf(
+                'The attribute "%s" of entry "%s" names an entry that does not exist.',
+                $attribute,
+                $owner->toString(),
+            ),
             ResultCode::CONSTRAINT_VIOLATION,
         );
     }

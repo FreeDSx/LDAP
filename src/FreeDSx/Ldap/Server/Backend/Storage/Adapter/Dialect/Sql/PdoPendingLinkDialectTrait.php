@@ -89,7 +89,18 @@ trait PdoPendingLinkDialectTrait
         SQL;
     }
 
-    public function queryAnyPending(bool $byDn = false): string
+    public function queryFirstPending(): string
+    {
+        return <<<SQL
+            SELECT e.dn, p.attr_name_lower
+            FROM entry_link_pending p
+            JOIN entries e ON e.entry_id = p.owner_entry_id
+            ORDER BY p.owner_entry_id, p.attr_name_lower
+            LIMIT 1
+        SQL;
+    }
+
+    public function queryAnyPending(bool $byDn): string
     {
         $limit = $byDn
             ? 'WHERE target_lc_dn = ?'
