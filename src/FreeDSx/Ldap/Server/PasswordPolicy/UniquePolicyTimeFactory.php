@@ -14,91 +14,50 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy;
 
 use DateTimeImmutable;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 
-use function crc32;
-use function intdiv;
-
 /**
- * Stamps pwdFailureTime / pwdGraceUseTime values that stay unique within and across replicas, as draft-behera password
- * policy recommends, by packing a replica hash and an intra-second counter into the microsecond field.
+ * Stamps pwdFailureTime / pwdGraceUseTime values with real microseconds, unique for the entry as draft-behera password
+ * policy recommends.
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 readonly class UniquePolicyTimeFactory
 {
-    /**
-     * The high 4 digits of the microsecond field, so cross-replica hash collisions land at about one in ten thousand.
-     */
-    private const BAND_MODULUS = 10000;
+    public function __construct(private ClockInterface $clock) {}
 
     /**
-     * The low 2 digits of the microsecond field; failures stop accruing once an account locks, so it never nears 100.
-     */
-    private const COUNTER_MODULUS = 100;
-
-    /**
-     * The replica's fixed slice of the microsecond field; a hash collision only under-counts by one for a shared
-     * subject in the same second, which is fail-safe and within the spec's "local matter" latitude.
-     */
-    private int $replicaBand;
-
-    public function __construct(
-        private ClockInterface $clock,
-        ReplicaId $replicaId,
-    ) {
-        $this->replicaBand = (int) (crc32((string) $replicaId) % self::BAND_MODULUS);
-    }
-
-    /**
-     * The current time stamped unique against $existing, which the caller must read under the same lock that persists
-     * the result so the counter cannot race.
+     * The current time, or just past the newest of $existing (read under the lock that persists the result) when it
+     * would repeat or precede it.
      *
      * @param list<DateTimeImmutable> $existing
      */
     public function next(array $existing): DateTimeImmutable
     {
-        $whole = $this->clock
-            ->now()
-            ->setTime(
-                (int) $this->clock->now()->format('H'),
-                (int) $this->clock->now()->format('i'),
-                (int) $this->clock->now()->format('s'),
-            );
+        $now = $this->clock->now();
+        $newest = self::newest($existing);
 
-        $microseconds = $this->replicaBand * self::COUNTER_MODULUS
-            + $this->sameBandCount($existing, $whole) % self::COUNTER_MODULUS;
+        if ($newest === null || $now > $newest) {
+            return $now;
+        }
 
-        return $whole->setTime(
-            (int) $whole->format('H'),
-            (int) $whole->format('i'),
-            (int) $whole->format('s'),
-            $microseconds,
-        );
+        return $newest->modify('+1 microsecond');
     }
 
     /**
-     * @param list<DateTimeImmutable> $existing
+     * @param list<DateTimeImmutable> $times
      */
-    private function sameBandCount(
-        array $existing,
-        DateTimeImmutable $whole,
-    ): int {
-        $second = $whole->format('YmdHis');
-        $count = 0;
+    private static function newest(array $times): ?DateTimeImmutable
+    {
+        $newest = null;
 
-        foreach ($existing as $time) {
-            if ($time->format('YmdHis') !== $second) {
-                continue;
-            }
-
-            if (intdiv((int) $time->format('u'), self::COUNTER_MODULUS) === $this->replicaBand) {
-                $count++;
+        foreach ($times as $time) {
+            if ($newest === null || $time > $newest) {
+                $newest = $time;
             }
         }
 
-        return $count;
+        return $newest;
     }
 }

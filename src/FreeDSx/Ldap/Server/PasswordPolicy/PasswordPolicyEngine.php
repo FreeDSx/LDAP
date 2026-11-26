@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
@@ -53,7 +52,7 @@ final readonly class PasswordPolicyEngine
     ) {
         // The Container injects the configured factory; the fallback reuses this engine's clock so tests stay in sync.
         $this->uniqueTimes = $uniqueTimes
-            ?? new UniquePolicyTimeFactory($this->clock, ReplicaId::local());
+            ?? new UniquePolicyTimeFactory($this->clock);
     }
 
     /**
