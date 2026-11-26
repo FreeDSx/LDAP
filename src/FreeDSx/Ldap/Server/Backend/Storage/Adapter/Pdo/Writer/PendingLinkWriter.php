@@ -39,7 +39,7 @@ final readonly class PendingLinkWriter implements ReferenceIntegrityInterface
     /**
      * Parked values per statement. Five placeholders each, inside the 999 bound older SQLite builds compile in.
      */
-    private const VALUES_PER_STATEMENT = 200;
+    private const VALUES_PER_STATEMENT = 199;
 
     public function __construct(
         private PdoPendingLinkDialectInterface&PdoLinkWriteDialectInterface $dialect,
