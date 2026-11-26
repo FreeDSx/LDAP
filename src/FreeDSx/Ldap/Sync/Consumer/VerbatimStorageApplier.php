@@ -61,6 +61,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         private readonly TransactionalWriteInterface $transaction,
         private readonly ReplicaMoves $moves,
         private readonly DeferredLinksInterface $links,
+        private readonly LinkedValueFilter $linkedValues,
     ) {}
 
     public function beginRefresh(): void
@@ -89,10 +90,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             return;
         }
 
-        $entry = $this->identified(
+        $entry = $this->linkedValues->storable($this->identified(
             $result->getEntry(),
             $uuid,
-        );
+        ));
 
         // RFC 4533 §3.6 keys entries by UUID, which makes the same one arriving elsewhere a move rather than a new entry.
         $this->transaction->atomic(function () use ($entry, $uuid, $session): void {

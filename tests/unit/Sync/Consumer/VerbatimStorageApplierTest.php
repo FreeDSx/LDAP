@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoDeferredLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
+use FreeDSx\Ldap\Sync\Consumer\LinkedValueFilter;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use PHPUnit\Framework\TestCase;
@@ -28,7 +29,8 @@ final class VerbatimStorageApplierTest extends TestCase
 
     protected function setUp(): void
     {
-        $storage = new InMemoryStorage(linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()));
+        $linked = new LinkedAttributes(SchemaResource::Core->load());
+        $storage = new InMemoryStorage(linkedAttributes: $linked);
         $this->reader = $storage;
         $this->writer = $storage;
         $this->subject = new VerbatimStorageApplier(
@@ -42,6 +44,7 @@ final class VerbatimStorageApplierTest extends TestCase
                 $storage,
             ),
             new NoDeferredLinks(),
+            new LinkedValueFilter($linked),
         );
     }
 }

@@ -365,7 +365,7 @@ leave such a class without an attribute it requires, so the server refuses to st
 | Value order | Not necessarily the order written. RFC 4511 leaves it unconstrained. |
 | An option-bearing form such as `member;lang-en` | Not linked, and kept on the entry as an ordinary value. |
 
-A replica refuses a UID over that length too, and stops replicating at that entry until the provider's value changes.
+A replica leaves such a value out and logs a warning.
 
 Because a delete or rename never writes the referring entry, neither produces a change record for it. A sync consumer
 receives the deleted or renamed entry, but nothing for the entries that named it. It has to drop or follow those

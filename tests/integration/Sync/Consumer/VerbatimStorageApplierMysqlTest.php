@@ -18,8 +18,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Sync\Consumer\LinkedValueFilter;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use PHPUnit\Framework\TestCase;
@@ -63,6 +65,7 @@ final class VerbatimStorageApplierMysqlTest extends TestCase
                 $this->writer,
             ),
             $this->fromContainer(DeferredLinksInterface::class),
+            new LinkedValueFilter($this->fromContainer(LinkedAttributes::class)),
         );
     }
 

@@ -17,9 +17,7 @@ use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -1209,33 +1207,70 @@ trait VerbatimStorageApplierTests
         );
     }
 
-    public function test_a_refresh_carrying_a_uid_longer_than_the_replica_keeps_is_refused(): void
+    public function test_a_refresh_leaves_out_a_uid_longer_than_the_replica_keeps_and_links_the_rest(): void
     {
-        $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
-
         $this->refresh(
             $this->entry(
                 'cn=alice,dc=example,dc=com',
                 self::UUID_A,
             ),
-            new Entry(
+            $this->entry(
+                'cn=bob,dc=example,dc=com',
+                self::UUID_B,
+            ),
+            $this->uniqueGroup(
                 'cn=team,dc=example,dc=com',
-                new Attribute(
-                    'cn',
-                    'x',
-                ),
-                new Attribute(
+                self::UUID_C,
+                $this->withAUidTooLong('cn=alice,dc=example,dc=com'),
+                'cn=bob,dc=example,dc=com',
+            ),
+            $this->group(
+                'cn=other,dc=example,dc=com',
+                self::UUID_D,
+                'cn=alice,dc=example,dc=com',
+            ),
+        );
+
+        self::assertSame(
+            [
+                ['cn=bob,dc=example,dc=com'],
+                ['cn=alice,dc=example,dc=com'],
+            ],
+            [
+                $this->members(
+                    'cn=team,dc=example,dc=com',
                     'uniqueMember',
-                    "cn=alice,dc=example,dc=com#'" . str_repeat(
-                        '1',
-                        LinkTarget::MAX_UID_BITS + 1,
-                    ) . "'B",
                 ),
-                new Attribute(
-                    'entryUUID',
-                    self::UUID_C,
-                ),
+                $this->members('cn=other,dc=example,dc=com'),
+            ],
+        );
+    }
+
+    public function test_a_change_after_the_refresh_leaves_out_a_uid_longer_than_the_replica_keeps(): void
+    {
+        $this->applyAll(
+            $this->persistSession(),
+            $this->entry(
+                'cn=alice,dc=example,dc=com',
+                self::UUID_A,
+            ),
+            $this->entry(
+                'cn=bob,dc=example,dc=com',
+                self::UUID_B,
+            ),
+            $this->uniqueGroup(
+                'cn=team,dc=example,dc=com',
+                self::UUID_C,
+                $this->withAUidTooLong('cn=alice,dc=example,dc=com'),
+                'cn=bob,dc=example,dc=com',
+            ),
+        );
+
+        self::assertSame(
+            ['cn=bob,dc=example,dc=com'],
+            $this->members(
+                'cn=team,dc=example,dc=com',
+                'uniqueMember',
             ),
         );
     }
@@ -1368,15 +1403,47 @@ trait VerbatimStorageApplierTests
         );
     }
 
+    private function uniqueGroup(
+        string $dn,
+        string $uuid,
+        string ...$uniqueMembers,
+    ): Entry {
+        return new Entry(
+            $dn,
+            new Attribute(
+                'cn',
+                'x',
+            ),
+            new Attribute(
+                'uniqueMember',
+                ...$uniqueMembers,
+            ),
+            new Attribute(
+                'entryUUID',
+                $uuid,
+            ),
+        );
+    }
+
+    private function withAUidTooLong(string $dn): string
+    {
+        return $dn . "#'" . str_repeat(
+            '1',
+            LinkTarget::MAX_UID_BITS + 1,
+        ) . "'B";
+    }
+
     /**
      * @return list<string>
      */
-    private function members(string $dn): array
-    {
+    private function members(
+        string $dn,
+        string $attribute = 'member',
+    ): array {
         $entry = $this->reader->find((new Dn($dn))->normalize());
         self::assertNotNull($entry);
 
-        return array_values($entry->get('member')?->getValues() ?? []);
+        return array_values($entry->get($attribute)?->getValues() ?? []);
     }
 
     /**
