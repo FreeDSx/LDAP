@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
@@ -37,6 +38,10 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
     private const UUID = '3f2b9c1e-7a4d-4e8b-9c6f-1d2e3f4a5b6c';
 
     private const OTHER_UUID = '8a7b6c5d-4e3f-4a2b-9c1d-0e9f8a7b6c5d';
+
+    private const PASSWORD_ONE = '20260101000000.250000Z';
+
+    private const PASSWORD_TWO = '20260102000000.500000Z';
 
     private WriteEntryInterface $storage;
 
@@ -72,6 +77,84 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
                 ->load(self::UUID)
                 ->toUserPasswordState(new Dn(self::DN))
                 ->isLocked(),
+        );
+    }
+
+    public function test_a_write_against_the_same_password_merges_into_the_state(): void
+    {
+        $this->applyChanges(
+            $this->failureAt('20260520120000.100000Z'),
+            GeneralizedTime::parse(self::PASSWORD_ONE),
+        );
+        $this->applyChanges(
+            $this->lockAt('20260520120001Z'),
+            GeneralizedTime::parse(self::PASSWORD_ONE),
+        );
+
+        self::assertEquals(
+            [
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME => ['20260520120000.100000Z'],
+                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME => ['20260520120001Z'],
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME => [self::PASSWORD_ONE],
+            ],
+            $this->subject->load(self::UUID)->toArray(),
+        );
+    }
+
+    public function test_a_write_against_another_password_replaces_the_whole_state(): void
+    {
+        $this->applyChanges(
+            $this->lockAt('20260520120000Z'),
+            GeneralizedTime::parse(self::PASSWORD_ONE),
+        );
+        $this->applyChanges(
+            $this->failureAt('20260520130000.100000Z'),
+            GeneralizedTime::parse(self::PASSWORD_TWO),
+        );
+
+        self::assertEquals(
+            [
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME => ['20260520130000.100000Z'],
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME => [self::PASSWORD_TWO],
+            ],
+            $this->subject->load(self::UUID)->toArray(),
+        );
+    }
+
+    public function test_a_write_against_an_older_password_is_dropped(): void
+    {
+        $this->applyChanges(
+            $this->failureAt('20260520130000.100000Z'),
+            GeneralizedTime::parse(self::PASSWORD_TWO),
+        );
+        $this->applyChanges(
+            $this->failureAt('20260520130001.100000Z'),
+            GeneralizedTime::parse(self::PASSWORD_ONE),
+        );
+
+        self::assertEquals(
+            [
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME => ['20260520130000.100000Z'],
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME => [self::PASSWORD_TWO],
+            ],
+            $this->subject->load(self::UUID)->toArray(),
+        );
+    }
+
+    public function test_a_write_without_a_password_version_is_dropped_once_the_state_has_one(): void
+    {
+        $this->applyChanges(
+            $this->failureAt('20260520130000.100000Z'),
+            GeneralizedTime::parse(self::PASSWORD_ONE),
+        );
+        $this->applyChanges($this->failureAt('20260520130001.100000Z'));
+
+        self::assertEquals(
+            [
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME => ['20260520130000.100000Z'],
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME => [self::PASSWORD_ONE],
+            ],
+            $this->subject->load(self::UUID)->toArray(),
         );
     }
 
@@ -133,6 +216,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
     {
         $this->subject->atomicMutate(
             self::OTHER_UUID,
+            null,
             static fn(): OperationalChanges => OperationalChanges::of(Change::replace(
                 PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
                 '20260520120000Z',
@@ -334,10 +418,29 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         )));
     }
 
-    private function applyChanges(OperationalChanges $changes): void
+    private function failureAt(string $time): OperationalChanges
     {
+        return OperationalChanges::of(Change::replace(
+            PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+            $time,
+        ));
+    }
+
+    private function lockAt(string $time): OperationalChanges
+    {
+        return OperationalChanges::of(Change::replace(
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+            $time,
+        ));
+    }
+
+    private function applyChanges(
+        OperationalChanges $changes,
+        ?DateTimeImmutable $version = null,
+    ): void {
         $this->subject->atomicMutate(
             self::UUID,
+            $version,
             static fn(): OperationalChanges => $changes,
         );
     }

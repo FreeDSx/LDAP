@@ -301,6 +301,7 @@ final class PasswordPolicyForwarderTest extends TestCase
     ): void {
         $this->store->atomicMutate(
             $uuid,
+            null,
             static fn(): OperationalChanges => OperationalChanges::of(Change::replace(
                 PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
                 $time,

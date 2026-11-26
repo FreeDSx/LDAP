@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 
@@ -32,10 +33,13 @@ interface ReplicaPasswordStateStoreInterface
      * Atomically read the subject's current local state, derive changes from it via $merge, and apply them under an
      * exclusive lock so concurrent binds cannot lose an update; a state-changing apply advances the forward watermark.
      *
+     * @param ?DateTimeImmutable $version The entry's pwdChangedTime; state recorded under another is replaced and a
+     *     write under an older one is dropped.
      * @param callable(ReplicaPasswordState): OperationalChanges $merge
      */
     public function atomicMutate(
         string $uuid,
+        ?DateTimeImmutable $version,
         callable $merge,
     ): void;
 

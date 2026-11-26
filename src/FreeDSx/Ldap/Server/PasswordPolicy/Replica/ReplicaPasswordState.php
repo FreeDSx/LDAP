@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 
@@ -121,5 +124,47 @@ final readonly class ReplicaPasswordState
             $dn,
             array_values($this->attributes),
         ));
+    }
+
+    /**
+     * The password this state was recorded against, as the entry's pwdChangedTime then, or null when it had none.
+     */
+    public function version(): ?DateTimeImmutable
+    {
+        return $this->toUserPasswordState(new Dn(''))->changedAt;
+    }
+
+    public function isRecordedAgainst(?DateTimeImmutable $version): bool
+    {
+        return UserPasswordState::isSameVersion(
+            $this->version(),
+            $version,
+        );
+    }
+
+    /**
+     * Whether this state was recorded against a password set after $version, an absent version being the oldest.
+     */
+    public function isNewerThan(?DateTimeImmutable $version): bool
+    {
+        $recorded = $this->version();
+
+        return $recorded !== null
+            && ($version === null || $recorded > $version);
+    }
+
+    public function withVersion(?DateTimeImmutable $version): self
+    {
+        $attributes = $this->attributes;
+        unset($attributes[strtolower(PasswordPolicyOid::NAME_PWD_CHANGED_TIME)]);
+
+        if ($version !== null) {
+            $attributes[] = new Attribute(
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+                GeneralizedTime::formatWithFraction($version),
+            );
+        }
+
+        return new self(array_values($attributes));
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\LockableTable;
@@ -56,22 +57,32 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
      */
     public function atomicMutate(
         string $uuid,
+        ?DateTimeImmutable $version,
         callable $merge,
     ): void {
-        $this->connection->atomic(function () use ($uuid, $merge): void {
+        $this->connection->atomic(function () use ($uuid, $version, $merge): void {
             $this->lockStateRow($uuid);
 
             $record = $this->recordFor($uuid);
-            if ($record === null) {
+
+            if ($record === null || $record->state->isNewerThan($version)) {
                 return;
             }
 
-            $changes = $merge($record->state);
+            // State recorded against another password no longer counts; the merge starts from empty.
+            $base = $record->state->isRecordedAgainst($version)
+                ? $record->state
+                : ReplicaPasswordState::empty();
+            $changes = $merge($base);
+
             if ($changes->isEmpty()) {
                 return;
             }
 
-            $next = $record->state->withChanges($changes);
+            $next = $base
+                ->withChanges($changes)
+                ->withVersion($version);
+
             if ($record->state->equals($next)) {
                 return;
             }

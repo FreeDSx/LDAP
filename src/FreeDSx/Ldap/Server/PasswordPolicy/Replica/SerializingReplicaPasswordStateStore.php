@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica;
 
 use Closure;
+use DateTimeImmutable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
@@ -40,10 +41,12 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
      */
     public function atomicMutate(
         string $uuid,
+        ?DateTimeImmutable $version,
         callable $merge,
     ): void {
         $this->submit(fn() => $this->store->atomicMutate(
             $uuid,
+            $version,
             $merge,
         ));
     }

@@ -85,11 +85,13 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
             ->method('atomicMutate')
             ->with(
                 self::UUID,
+                null,
                 $merge,
             );
 
         $this->subject->atomicMutate(
             self::UUID,
+            null,
             $merge,
         );
 

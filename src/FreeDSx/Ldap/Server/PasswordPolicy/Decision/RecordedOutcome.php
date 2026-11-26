@@ -18,9 +18,26 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy\Decision;
  */
 final readonly class RecordedOutcome
 {
+    /**
+     * @param bool $stored Whether the changes were kept and the state the outcome reports holds.
+     */
     public function __construct(
         public PasswordPolicyOutcome $outcome,
         public OperationalChanges $changes,
         public float $delaySeconds = 0.0,
+        public bool $stored = true,
     ) {}
+
+    /**
+     * The same decision for a bind whose state could not be kept, carrying none of the changes it would have made.
+     */
+    public function unstored(): self
+    {
+        return new self(
+            $this->outcome,
+            OperationalChanges::none(),
+            $this->delaySeconds,
+            false,
+        );
+    }
 }
