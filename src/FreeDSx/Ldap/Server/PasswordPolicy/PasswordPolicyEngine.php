@@ -252,9 +252,11 @@ final readonly class PasswordPolicyEngine
         bool $isSelf = true,
     ): OperationalChanges {
         $now = $this->clock->now();
+
+        // Sub-second precision keeps two changes within one second apart for a replica comparing password versions.
         $changes = [Change::replace(
             PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
-            GeneralizedTime::format($now),
+            GeneralizedTime::formatWithFraction($now),
         )];
 
         $historyChange = $this->buildHistoryChange(

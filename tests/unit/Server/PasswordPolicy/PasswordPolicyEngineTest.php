@@ -797,8 +797,27 @@ final class PasswordPolicyEngineTest extends TestCase
             PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
         );
         self::assertSame(
-            [GeneralizedTime::format($this->clock->now())],
+            [GeneralizedTime::formatWithFraction($this->clock->now())],
             $change->getAttribute()->getValues(),
+        );
+    }
+
+    public function test_recordPasswordChange_stamps_changed_time_to_the_microsecond(): void
+    {
+        $this->clock->setTo(new DateTimeImmutable('2026-05-20T12:00:00.123456Z'));
+
+        $changes = $this->subject->recordPasswordChange(
+            ['{BCRYPT}hashed'],
+            new UserPasswordState(),
+            new PasswordPolicy(),
+        );
+
+        self::assertSame(
+            ['20260520120000.123456Z'],
+            $this->findChange(
+                $changes->changes,
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+            )->getAttribute()->getValues(),
         );
     }
 

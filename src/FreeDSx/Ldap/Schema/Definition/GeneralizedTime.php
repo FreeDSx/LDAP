@@ -88,8 +88,8 @@ final class GeneralizedTime
     }
 
     /**
-     * Render with a fractional-seconds field, for multi-valued attributes that must hold unique values such as
-     * pwdFailureTime and pwdGraceUseTime; {@see format()} stays second-resolution for canonical single-valued stamps.
+     * Render with a fractional-seconds field, for stamps that need more than {@see format()}'s whole seconds, such as
+     * pwdFailureTime, pwdGraceUseTime and pwdChangedTime.
      */
     public static function formatWithFraction(DateTimeImmutable $instant): string
     {
