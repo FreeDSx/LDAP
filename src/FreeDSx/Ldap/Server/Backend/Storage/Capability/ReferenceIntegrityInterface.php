@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Capability;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\UnresolvedReference;
 
 /**
  * What a store has written but could not resolve.
@@ -30,7 +31,7 @@ interface ReferenceIntegrityInterface
     public function unresolvedReferences(Dn $owner): array;
 
     /**
-     * Whether anything at all is unresolved, which a bulk load asks once rather than per entry.
+     * The first reference left unresolved, by the order its entry was stored, or null when there is none.
      */
-    public function hasUnresolvedReferences(): bool;
+    public function firstUnresolvedReference(): ?UnresolvedReference;
 }

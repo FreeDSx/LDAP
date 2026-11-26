@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkTarget;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\UnresolvedReference;
 use Generator;
 
 use function array_chunk;
@@ -152,13 +153,23 @@ final readonly class PendingLinkWriter implements ReferenceIntegrityInterface
     }
 
     /**
-     * Whether anything at all was parked, which is what a batch asks once rather than per entry.
+     * The first value still parked, by the order its owner was stored, or null when nothing is.
      */
-    public function hasUnresolvedReferences(): bool
+    public function firstUnresolvedReference(): ?UnresolvedReference
     {
-        return $this->connection
-            ->execute($this->dialect->queryAnyPending())
-            ->fetch() !== false;
+        $rows = $this->rowsOf(
+            $this->dialect->queryFirstPending(),
+            [],
+        );
+
+        foreach ($rows as $row) {
+            return new UnresolvedReference(
+                new Dn($this->stringColumn($row['dn'] ?? null)),
+                $this->stringColumn($row['attr_name_lower'] ?? null),
+            );
+        }
+
+        return null;
     }
 
     /**

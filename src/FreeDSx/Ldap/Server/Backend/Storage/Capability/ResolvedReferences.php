@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Capability;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\UnresolvedReference;
 
 /**
  * Stands in for storage that keeps values as written rather than as references, so nothing is ever left unresolved.
@@ -31,10 +32,10 @@ final readonly class ResolvedReferences implements ReferenceIntegrityInterface
     }
 
     /**
-     * Never any, since a value kept as written names whatever it says.
+     * None is ever left unresolved by a value kept as written.
      */
-    public function hasUnresolvedReferences(): bool
+    public function firstUnresolvedReference(): ?UnresolvedReference
     {
-        return false;
+        return null;
     }
 }

@@ -882,6 +882,39 @@ final class EntryWriterTest extends TestCase
         );
     }
 
+    public function test_the_first_unresolved_reference_names_the_stored_entry_and_its_attribute(): void
+    {
+        $this->storeAdminsNaming('cn=Ghost,dc=example,dc=com');
+
+        $unresolved = $this->links->firstUnresolvedReference();
+
+        self::assertSame(
+            [
+                'cn=Admins,dc=example,dc=com',
+                'member',
+            ],
+            [
+                $unresolved?->owner->toString(),
+                $unresolved?->attribute,
+            ],
+        );
+    }
+
+    public function test_no_reference_is_unresolved_once_its_target_is_added(): void
+    {
+        $this->storeAdminsNaming('cn=Ghost,dc=example,dc=com');
+
+        $this->subject->insert(EntryFixture::withUuid(new Entry(
+            new Dn('cn=Ghost,dc=example,dc=com'),
+            new Attribute(
+                'cn',
+                'Ghost',
+            ),
+        )));
+
+        self::assertNull($this->links->firstUnresolvedReference());
+    }
+
     public function test_a_parked_value_is_linked_once_a_rename_puts_its_target_there(): void
     {
         $this->storeNamed('Ghoul');
