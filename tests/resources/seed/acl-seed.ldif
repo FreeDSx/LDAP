@@ -44,11 +44,13 @@ sn: Renamee
 userPassword: {SHA}9paKbgGEIBfGxbmddIEhMminlmg=
 
 # RDN is uid, which is not writable under ou=people, so a rename that touches it must be refused.
+# employeeNumber is withheld from cn=user, and a sort on it puts bob2 ahead of bob for anyone else.
 dn: uid=bob,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson
 uid: bob
 cn: bob
 sn: Bob
+employeeNumber: 299
 
 dn: uid=bob2,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson
@@ -56,6 +58,7 @@ uid: bob2
 cn: bob2
 sn: Bob
 telephoneNumber: 555-0100
+employeeNumber: 101
 
 dn: cn=delegate,dc=foo,dc=bar
 objectClass: inetOrgPerson

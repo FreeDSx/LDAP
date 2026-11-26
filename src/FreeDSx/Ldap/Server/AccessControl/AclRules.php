@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\AccessControl;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Server\GeneratedEntry;
@@ -501,6 +502,30 @@ final readonly class AclRules
             $subject,
             ...self::PASSWORD_POLICY_STATE_ATTRIBUTES,
         ));
+    }
+
+    /**
+     * Withhold the attributes from $subject on every entry, in reads, filters and sort keys alike.
+     *
+     * @throws InvalidArgumentException when the subject needs an entry to match, as Subject::self() does
+     */
+    public function withholdAttributes(
+        SubjectMatcherInterface $subject,
+        string $attribute,
+        string ...$attributes,
+    ): self {
+        return $this
+            ->prependAttributeRules(AttributeRule::deny(
+                $subject,
+                new AnyTargetMatcher(),
+                $attribute,
+                ...$attributes,
+            )->forRead())
+            ->prependFilterAccess(FilterAccessRule::deny(
+                $subject,
+                $attribute,
+                ...$attributes,
+            ));
     }
 
     /**

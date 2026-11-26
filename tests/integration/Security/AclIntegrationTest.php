@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Security;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
@@ -1057,6 +1058,84 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    public function testAWithheldAttributeIsStrippedFromAResult(): void
+    {
+        $this->authenticateUser();
+
+        $results = $this->ldapClient()->search(
+            Operations::search(
+                Filters::equal(
+                    'uid',
+                    'bob2',
+                ),
+                'employeeNumber',
+            )
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $results,
+        );
+        self::assertNull($results->first()?->get('employeeNumber'));
+    }
+
+    public function testAFilterOnAWithheldAttributeMatchesNothing(): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            0,
+            $this->countMatching(Filters::equal(
+                'employeeNumber',
+                '101',
+            )),
+        );
+    }
+
+    public function testNegatingAFilterOnAWithheldAttributeCannotTellACorrectGuessFromAWrongOne(): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            $this->countMatching(Filters::not(Filters::equal(
+                'employeeNumber',
+                '199',
+            ))),
+            $this->countMatching(Filters::not(Filters::equal(
+                'employeeNumber',
+                '101',
+            ))),
+        );
+    }
+
+    public function testASortOnAWithheldAttributeDoesNotOrderTheResults(): void
+    {
+        $this->authenticateAdmin();
+        $byAdmin = $this->bobsSortedByEmployeeNumber();
+
+        $this->authenticateUser();
+        $byUser = $this->bobsSortedByEmployeeNumber();
+
+        self::assertSame(
+            [
+                [
+                    'bob2',
+                    'bob',
+                ],
+                [
+                    'bob',
+                    'bob2',
+                ],
+            ],
+            [
+                $byAdmin,
+                $byUser,
+            ],
+        );
+    }
+
     /**
      * @param callable(string): FilterInterface $assertion
      */
@@ -1665,6 +1744,36 @@ final class AclIntegrationTest extends ServerTestCase
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         )->toArray());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function bobsSortedByEmployeeNumber(): array
+    {
+        $uids = [];
+        $entries = $this->ldapClient()->search(
+            Operations::search(
+                Filters::startsWith(
+                    'uid',
+                    'bob',
+                ),
+                'uid',
+            )
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            // The key names an ordering rule because the attribute declares none.
+            Controls::sort(SortKey::ascending(
+                'employeeNumber',
+                'caseIgnoreOrderingMatch',
+            )),
+        );
+
+        foreach ($entries as $entry) {
+            $uids[] = (string) $entry->get('uid')?->firstValue();
+        }
+
+        return $uids;
     }
 
     /**

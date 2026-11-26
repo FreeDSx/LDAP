@@ -408,11 +408,10 @@ Attribute rules are enforced in three places:
 - **Compare**: a Compare request is rejected if the bound user is denied access to the compared attribute.
 - **Add / Modify**: the request is rejected if the bound user is denied access to any attribute being written.
 
-A read deny strips the value, but does not stop the attribute being named in a filter. To also stop that, pair it
-with a [Filter Rule](#filter-rules), or mark the attribute [confidential](#confidential-attributes), which does both.
-
-The same goes for a server-side sort. A read deny does not stop a sort key ordering results by the attribute's value,
-while a filter rule or confidentiality drops the key.
+A read deny strips the value, but does not stop the attribute being named in a filter or a server-side sort key. To
+stop all three on every entry, `withholdAttributes()` pairs the read deny with a [Filter Rule](#filter-rules):
+`->withholdAttributes(Subject::anonymous(), 'mail')`. Like a filter rule, it takes no target. Marking the attribute
+[confidential](#confidential-attributes) also stops all three.
 
 ```php
 AclRules::fromEmpty()->replaceAttributeRules(
@@ -463,8 +462,8 @@ A denied assertion is folded away before the query runs, so the attribute behave
 The search itself still runs as usual. Its base must exist and its controls still apply.
 
 This is what stops a value being recovered a guess at a time. Reads are unaffected: denying the filter does not strip
-the value, and denying the read does not stop the filter. Pair the two to get both. A value-level modify on a
-filter-denied attribute is gated the same way; see [Value-Level Modify](#value-level-modify).
+the value, and denying the read does not stop the filter. Pair the two, or use `withholdAttributes()`, to get both. A
+value-level modify on a filter-denied attribute is gated the same way; see [Value-Level Modify](#value-level-modify).
 
 An extensible match that names no attribute type is refused with `inappropriateMatching`, since it asserts against
 every attribute at once and it's not possible to make attribute level ACL decisions against it.
