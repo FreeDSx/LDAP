@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
 use DateInterval;
+use DateTimeImmutable;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Entry\Dn;
@@ -252,6 +253,29 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         self::assertNull(
             $entry->get(PasswordPolicyOid::NAME_PWD_RESET),
             'pwdReset should be cleared after a successful change.',
+        );
+    }
+
+    public function test_a_password_change_stores_pwd_changed_time_to_the_microsecond(): void
+    {
+        $this->clock->setTo(new DateTimeImmutable('2026-05-20T12:00:00.123456Z'));
+        $handler = $this->handlerFor(new PasswordPolicy());
+
+        $this->handle(
+            $handler,
+            $this->request(
+                self::OLD_PASSWORD,
+                'a-fresh-password',
+            ),
+            $this->selfToken(),
+        );
+
+        self::assertSame(
+            '20260520120000.123456Z',
+            $this->backend
+                ->get(new Dn(self::USER_DN))
+                ?->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME)
+                ?->firstValue(),
         );
     }
 
