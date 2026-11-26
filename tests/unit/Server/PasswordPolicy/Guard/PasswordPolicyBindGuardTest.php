@@ -65,6 +65,8 @@ final class PasswordPolicyBindGuardTest extends TestCase
 
     private PasswordPolicyBindGuard $reportingSubject;
 
+    private PasswordPolicyBindGuard $unstoredSubject;
+
     protected function setUp(): void
     {
         $this->clock = FrozenClock::fromString(self::NOW);
@@ -111,6 +113,33 @@ final class PasswordPolicyBindGuardTest extends TestCase
         $this->reportingSubject = new PasswordPolicyBindGuard(
             $this->engine,
             $strategy,
+            $this->context,
+            new EventLogger(
+                $this->logger,
+                EventLogPolicy::all(),
+            ),
+            $this->sleeper,
+            reportAccountLock: true,
+        );
+
+        $unstoring = $this->createMock(PasswordPolicyBindStrategyInterface::class);
+        $unstoring->method('record')->willReturnCallback(
+            static function (
+                PasswordBindAttempt $attempt,
+                callable $decide,
+            ): RecordedOutcome {
+                $recorded = $decide($attempt->state);
+
+                if (!$recorded instanceof RecordedOutcome) {
+                    throw new LogicException('The decide callback must return a RecordedOutcome.');
+                }
+
+                return $recorded->unstored();
+            },
+        );
+        $this->unstoredSubject = new PasswordPolicyBindGuard(
+            $this->engine,
+            $unstoring,
             $this->context,
             new EventLogger(
                 $this->logger,
@@ -343,6 +372,78 @@ final class PasswordPolicyBindGuardTest extends TestCase
             $this->context->getOutcome()?->errorCode,
         );
         $this->assertEventRecorded(ServerEvent::PasswordPolicyMustChange);
+    }
+
+    public function test_recordFailure_reports_no_lock_its_state_could_not_store(): void
+    {
+        $this->unstoredSubject->recordFailure($this->attemptAtThreshold());
+
+        self::assertNull($this->context->getOutcome());
+        $this->assertNoEventRecorded(ServerEvent::PasswordPolicyAccountLocked);
+    }
+
+    public function test_recordFailure_still_delays_a_bind_its_state_could_not_store(): void
+    {
+        $this->unstoredSubject->recordFailure($this->attempt(
+            new UserPasswordState(),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(
+                    enabled: true,
+                    maxFailure: 5,
+                    minDelay: 2,
+                    maxDelay: 8,
+                ),
+            ),
+        ));
+
+        self::assertSame(
+            [2.0],
+            $this->sleeper->durations,
+        );
+    }
+
+    public function test_recordSuccess_still_refuses_an_expired_password_its_state_could_not_store(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->unstoredSubject->recordSuccess($this->attempt(
+            new UserPasswordState(changedAt: $this->minutesAgo(120)),
+            new PasswordPolicy(
+                expiration: new PasswordExpirationRules(maxAge: 3600),
+            ),
+        ));
+    }
+
+    public function test_recordSuccess_reports_no_grace_login_its_state_could_not_store(): void
+    {
+        $this->unstoredSubject->recordSuccess($this->attempt(
+            new UserPasswordState(changedAt: $this->minutesAgo(120)),
+            new PasswordPolicy(
+                expiration: new PasswordExpirationRules(
+                    maxAge: 3600,
+                    graceAuthnLimit: 3,
+                ),
+            ),
+        ));
+
+        self::assertNull($this->context->getOutcome()?->graceRemaining);
+        $this->assertNoEventRecorded(ServerEvent::PasswordPolicyGraceLogin);
+    }
+
+    public function test_recordSuccess_reports_no_unlock_its_state_could_not_store(): void
+    {
+        $this->unstoredSubject->recordSuccess($this->attempt(
+            new UserPasswordState(accountLockedAt: $this->minutesAgo(120)),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(
+                    enabled: true,
+                    duration: 3600,
+                ),
+            ),
+        ));
+
+        $this->assertNoEventRecorded(ServerEvent::PasswordPolicyAccountUnlocked);
     }
 
     private function attempt(

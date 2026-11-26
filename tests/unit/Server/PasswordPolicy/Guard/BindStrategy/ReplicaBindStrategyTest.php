@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
@@ -33,6 +34,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordExpirationRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -52,6 +54,14 @@ final class ReplicaBindStrategyTest extends TestCase
 
     private const UUID = '6c5d4e3f-2a1b-4c0d-9e8f-7a6b5c4d3e2f';
 
+    private const OTHER_UUID = '8a7b6c5d-4e3f-4a2b-9c1d-0e9f8a7b6c5d';
+
+    private const MOVED_DN = 'cn=moved,dc=example,dc=com';
+
+    private const PASSWORD_ONE = '20260101000000.250000Z';
+
+    private const PASSWORD_TWO = '20260102000000.500000Z';
+
     private ReplicaPasswordStateStoreInterface $store;
 
     private ReadBackendInterface&MockObject $backend;
@@ -61,6 +71,8 @@ final class ReplicaBindStrategyTest extends TestCase
     private RecordingSleeper $sleeper;
 
     private PasswordPolicyBindGuard $subject;
+
+    private PasswordPolicyBindGuard $storedEntrySubject;
 
     protected function setUp(): void
     {
@@ -80,20 +92,13 @@ final class ReplicaBindStrategyTest extends TestCase
             clock: FrozenClock::fromString(self::NOW),
             changeConstraints: new PasswordChangeConstraintChain([]),
         );
-        $this->subject = new PasswordPolicyBindGuard(
+        $this->subject = $this->guardOver(
             $engine,
-            new ReplicaBindStrategy(
-                $engine,
-                $this->store,
-                $this->backend,
-            ),
-            $this->context,
-            new EventLogger(
-                new RecordingLogger(),
-                EventLogPolicy::all(),
-            ),
-            $this->sleeper,
-            reportAccountLock: true,
+            $this->backend,
+        );
+        $this->storedEntrySubject = $this->guardOver(
+            $engine,
+            $this->fromContainer(ReadBackendInterface::class),
         );
     }
 
@@ -138,7 +143,14 @@ final class ReplicaBindStrategyTest extends TestCase
             ->method('get')
             ->willReturn(new Entry(
                 new Dn(self::DN),
-                new Attribute('pwdAccountLockedTime', '20260520120000Z'),
+                new Attribute(
+                    'entryUUID',
+                    self::UUID,
+                ),
+                new Attribute(
+                    'pwdAccountLockedTime',
+                    '20260520120000Z',
+                ),
             ));
 
         $this->expectException(OperationException::class);
@@ -150,11 +162,203 @@ final class ReplicaBindStrategyTest extends TestCase
     {
         $this->backend
             ->method('get')
-            ->willReturn(new Entry(new Dn(self::DN)));
+            ->willReturn(new Entry(
+                new Dn(self::DN),
+                new Attribute(
+                    'entryUUID',
+                    self::UUID,
+                ),
+            ));
 
         $this->expectNotToPerformAssertions();
 
         $this->subject->preBind($this->attempt(new UserPasswordState()));
+    }
+
+    public function test_preBind_ignores_a_local_lock_recorded_against_a_password_the_entry_has_since_replaced(): void
+    {
+        $held = $this->entryWithPassword(self::PASSWORD_ONE);
+        $this->serveHeld($held);
+        $policy = $this->lockoutPolicy(2);
+        $before = new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_ONE));
+
+        $this->subject->recordFailure($this->attempt(
+            $before,
+            $policy,
+        ));
+        $this->subject->recordFailure($this->attempt(
+            $before,
+            $policy,
+        ));
+        self::assertTrue($this->localState()->isLocked());
+        $held = $this->entryWithPassword(self::PASSWORD_TWO);
+
+        $this->subject->preBind($this->attempt(
+            $before,
+            $policy,
+        ));
+    }
+
+    public function test_a_success_whose_write_was_dropped_still_refuses_an_expired_password(): void
+    {
+        $held = $this->entryWithPassword(self::PASSWORD_TWO);
+        $this->serveHeld($held);
+        $this->subject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_TWO)),
+            $this->lockoutPolicy(3),
+        ));
+        $held = $this->entryWithPassword(self::PASSWORD_ONE);
+
+        try {
+            $this->subject->recordSuccess($this->attempt(
+                new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_ONE)),
+                new PasswordPolicy(expiration: new PasswordExpirationRules(
+                    maxAge: 86400,
+                    graceAuthnLimit: 0,
+                )),
+            ));
+            self::fail('An expired password must be refused even when its state is not stored.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_CREDENTIALS,
+                $e->getCode(),
+            );
+        }
+
+        self::assertTrue($this->store->load(self::UUID)->isRecordedAgainst(GeneralizedTime::parse(self::PASSWORD_TWO)));
+    }
+
+    public function test_a_failure_whose_write_was_dropped_reports_no_lock(): void
+    {
+        $held = $this->entryWithPassword(self::PASSWORD_TWO);
+        $this->serveHeld($held);
+        $this->subject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_TWO)),
+            $this->lockoutPolicy(3),
+        ));
+        $held = $this->entryWithPassword(self::PASSWORD_ONE);
+
+        $this->subject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_ONE)),
+            $this->lockoutPolicy(1),
+        ));
+
+        self::assertNull($this->context->getOutcome());
+        self::assertFalse($this->localState()->isLocked());
+    }
+
+    public function test_a_failure_is_not_recorded_against_another_entry_now_at_the_dn(): void
+    {
+        $storage = $this->fromContainer(WriteEntryInterface::class);
+        $storage->remove(new Dn(self::DN));
+        $storage->store(new Entry(
+            new Dn(self::MOVED_DN),
+            new Attribute(
+                'cn',
+                'moved',
+            ),
+            new Attribute(
+                'entryUUID',
+                self::UUID,
+            ),
+            new Attribute(
+                'pwdChangedTime',
+                self::PASSWORD_ONE,
+            ),
+        ));
+        $storage->store(new Entry(
+            new Dn(self::DN),
+            new Attribute(
+                'cn',
+                'foo',
+            ),
+            new Attribute(
+                'entryUUID',
+                self::OTHER_UUID,
+            ),
+            new Attribute(
+                'pwdChangedTime',
+                self::PASSWORD_TWO,
+            ),
+        ));
+
+        $this->storedEntrySubject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_ONE)),
+            $this->lockoutPolicy(3),
+        ));
+
+        self::assertTrue($this->store->load(self::UUID)->isRecordedAgainst(GeneralizedTime::parse(self::PASSWORD_ONE)));
+    }
+
+    public function test_a_failure_whose_write_was_dropped_still_delays_the_bind(): void
+    {
+        $held = $this->entryWithPassword(self::PASSWORD_TWO);
+        $this->serveHeld($held);
+        $this->subject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_TWO)),
+            $this->lockoutPolicy(3),
+        ));
+        $held = $this->entryWithPassword(self::PASSWORD_ONE);
+
+        $this->subject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_ONE)),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                maxFailure: 3,
+                minDelay: 2,
+                maxDelay: 8,
+            )),
+        ));
+
+        self::assertSame(
+            [
+                0.0,
+                2.0,
+            ],
+            $this->sleeper->durations,
+        );
+        self::assertTrue($this->store->load(self::UUID)->isRecordedAgainst(GeneralizedTime::parse(self::PASSWORD_TWO)));
+    }
+
+    public function test_a_failure_is_recorded_against_the_version_the_stored_entry_holds(): void
+    {
+        $this->fromContainer(WriteEntryInterface::class)
+            ->store(new Entry(
+                new Dn(self::DN),
+                new Attribute(
+                    'cn',
+                    'foo',
+                ),
+                new Attribute(
+                    'entryUUID',
+                    self::UUID,
+                ),
+                new Attribute(
+                    'pwdChangedTime',
+                    self::PASSWORD_TWO,
+                ),
+            ));
+
+        $this->storedEntrySubject->recordFailure($this->attempt(
+            new UserPasswordState(),
+            $this->lockoutPolicy(3),
+        ));
+
+        self::assertTrue($this->store->load(self::UUID)->isRecordedAgainst(GeneralizedTime::parse(self::PASSWORD_TWO)));
+    }
+
+    public function test_a_failure_is_recorded_against_the_password_the_entry_holds_now(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn($this->entryWithPassword(self::PASSWORD_TWO));
+
+        $this->subject->recordFailure($this->attempt(
+            new UserPasswordState(changedAt: GeneralizedTime::parse(self::PASSWORD_ONE)),
+            $this->lockoutPolicy(3),
+        ));
+
+        self::assertTrue($this->store->load(self::UUID)->isRecordedAgainst(GeneralizedTime::parse(self::PASSWORD_TWO)));
     }
 
     public function test_failure_is_persisted_to_the_local_store(): void
@@ -201,6 +405,54 @@ final class ReplicaBindStrategyTest extends TestCase
     protected function makeServerOptions(): ServerOptions
     {
         return TestServerOptions::sqlite();
+    }
+
+    private function guardOver(
+        PasswordPolicyEngine $engine,
+        ReadBackendInterface $backend,
+    ): PasswordPolicyBindGuard {
+        return new PasswordPolicyBindGuard(
+            $engine,
+            new ReplicaBindStrategy(
+                $engine,
+                $this->store,
+                $backend,
+            ),
+            $this->context,
+            new EventLogger(
+                new RecordingLogger(),
+                EventLogPolicy::all(),
+            ),
+            $this->sleeper,
+            reportAccountLock: true,
+        );
+    }
+
+    /**
+     * Serves whatever entry $held names when the strategy re-reads the subject.
+     */
+    private function serveHeld(Entry &$held): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturnCallback(static function () use (&$held): Entry {
+                return $held;
+            });
+    }
+
+    private function entryWithPassword(string $changedTime): Entry
+    {
+        return new Entry(
+            new Dn(self::DN),
+            new Attribute(
+                'entryUUID',
+                self::UUID,
+            ),
+            new Attribute(
+                'pwdChangedTime',
+                $changedTime,
+            ),
+        );
     }
 
     private function localState(): UserPasswordState

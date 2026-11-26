@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
-use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\RecordedOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
@@ -52,7 +51,7 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
     }
 
     /**
-     * A refused write leaves the bind answered by the decision already made, with the refusal logged.
+     * A refused write leaves the bind answered by the decision already made, marked unstored, with the refusal logged.
      */
     public function record(
         PasswordBindAttempt $attempt,
@@ -81,11 +80,11 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
                 $e,
                 [EventContext::TARGET => [EventContext::DN => $attempt->dn->toString()]],
             );
+
+            return ($recorded ?? $decide($attempt->state))->unstored();
         }
 
-        return $recorded ?? new RecordedOutcome(
-            PasswordPolicyOutcome::allow(),
-            OperationalChanges::none(),
-        );
+        // Nothing is computed when the entry is gone, and the bind still gets its decision.
+        return $recorded ?? $decide($attempt->state)->unstored();
     }
 }

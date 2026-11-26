@@ -92,7 +92,8 @@ final readonly class PasswordPolicyBindGuard
             ),
         );
 
-        if ($recorded->outcome->denied) {
+        // A lock that was not stored is not reported as one.
+        if ($recorded->outcome->denied && $recorded->stored) {
             $this->context->setOutcome($this->lockAsReported($recorded->outcome));
             $this->eventLogger->record(
                 ServerEvent::PasswordPolicyAccountLocked,
@@ -135,11 +136,17 @@ final readonly class PasswordPolicyBindGuard
             );
         }
 
+        // A grace login or unlock that was not stored is not reported as one.
+        if (!$recorded->stored) {
+            $outcome = $outcome->withoutGraceRemaining();
+        }
+
         $this->context->setOutcome($outcome);
         $this->emitSuccessEvents(
             $attempt,
             $state ?? $attempt->state,
             $outcome,
+            $recorded->stored,
         );
     }
 
@@ -147,10 +154,11 @@ final readonly class PasswordPolicyBindGuard
         PasswordBindAttempt $attempt,
         UserPasswordState $state,
         PasswordPolicyOutcome $outcome,
+        bool $stored,
     ): void {
         $subject = $this->subjectFor($attempt);
 
-        if ($state->isLocked() && !$state->permanentlyLocked) {
+        if ($stored && $state->isLocked() && !$state->permanentlyLocked) {
             $this->eventLogger->record(
                 ServerEvent::PasswordPolicyAccountUnlocked,
                 $subject,

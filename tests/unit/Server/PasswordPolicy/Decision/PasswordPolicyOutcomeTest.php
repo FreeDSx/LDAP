@@ -118,4 +118,28 @@ final class PasswordPolicyOutcomeTest extends TestCase
         );
         self::assertFalse($outcome->hasResponseControlPayload());
     }
+
+    public function test_without_grace_remaining_keeps_the_decision_but_drops_the_grace_count(): void
+    {
+        $outcome = new PasswordPolicyOutcome(
+            denied: false,
+            errorCode: PwdPolicyError::CHANGE_AFTER_RESET,
+            graceRemaining: 2,
+        );
+
+        $withoutGrace = $outcome->withoutGraceRemaining();
+
+        self::assertSame(
+            [
+                false,
+                PwdPolicyError::CHANGE_AFTER_RESET,
+                null,
+            ],
+            [
+                $withoutGrace->denied,
+                $withoutGrace->errorCode,
+                $withoutGrace->graceRemaining,
+            ],
+        );
+    }
 }

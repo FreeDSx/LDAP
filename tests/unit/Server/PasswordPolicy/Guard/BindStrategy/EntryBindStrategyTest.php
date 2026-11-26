@@ -78,13 +78,49 @@ final class EntryBindStrategyTest extends TestCase
         );
         $this->refuseWritesAfterDeciding();
 
-        self::assertSame(
-            $locked,
-            $this->subject->record(
-                $this->attempt(),
-                fn(UserPasswordState $state): RecordedOutcome => $locked,
-            ),
+        $recorded = $this->subject->record(
+            $this->attempt(),
+            fn(UserPasswordState $state): RecordedOutcome => $locked,
         );
+
+        self::assertSame(
+            $locked->outcome,
+            $recorded->outcome,
+        );
+        self::assertFalse($recorded->stored);
+    }
+
+    public function test_a_bind_whose_entry_is_gone_is_decided_against_its_own_state_and_not_stored(): void
+    {
+        $expired = new RecordedOutcome(
+            PasswordPolicyOutcome::deny(
+                PwdPolicyError::PASSWORD_EXPIRED,
+                ResultCode::INVALID_CREDENTIALS,
+                'Password has expired.',
+            ),
+            OperationalChanges::none(),
+        );
+        $decidedAgainst = null;
+        $attempt = $this->attempt();
+
+        $recorded = $this->subject->record(
+            $attempt,
+            function (UserPasswordState $state) use ($expired, &$decidedAgainst): RecordedOutcome {
+                $decidedAgainst = $state;
+
+                return $expired;
+            },
+        );
+
+        self::assertSame(
+            $attempt->state,
+            $decidedAgainst,
+        );
+        self::assertSame(
+            $expired->outcome,
+            $recorded->outcome,
+        );
+        self::assertFalse($recorded->stored);
     }
 
     public function test_the_state_is_recorded_without_restamping_the_modify_metadata(): void

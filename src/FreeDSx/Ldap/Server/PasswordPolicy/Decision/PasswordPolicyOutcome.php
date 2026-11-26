@@ -96,6 +96,21 @@ final readonly class PasswordPolicyOutcome
         );
     }
 
+    /**
+     * The same decision without its grace count, for a grace login that was not recorded.
+     */
+    public function withoutGraceRemaining(): self
+    {
+        return new self(
+            $this->denied,
+            $this->ldapResultCode,
+            $this->errorCode,
+            $this->timeBeforeExpiration,
+            null,
+            $this->diagnostic,
+        );
+    }
+
     public function hasResponseControlPayload(): bool
     {
         return $this->errorCode !== null

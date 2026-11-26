@@ -15,11 +15,14 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class UserPasswordStateTest extends TestCase
@@ -103,6 +106,42 @@ final class UserPasswordStateTest extends TestCase
         self::assertSame(
             'cn=default,ou=policies,dc=example,dc=com',
             $state->policySubentry?->toString(),
+        );
+    }
+
+    public function test_its_attribute_list_holds_everything_a_state_is_read_from(): void
+    {
+        $entry = Entry::fromArray(
+            'uid=alice,dc=example,dc=com',
+            [
+                'cn' => 'alice',
+                'pwdChangedTime' => '20250101120000.250000Z',
+                'pwdAccountLockedTime' => '20250105080000Z',
+                'pwdFailureTime' => ['20250105075800Z'],
+                'pwdHistory' => ['20240101000000Z#1.3.6.1.4.1.1466.115.121.1.40#9#{SSHA}old'],
+                'pwdGraceUseTime' => ['20250102000000Z'],
+                'pwdReset' => 'TRUE',
+                'pwdPolicySubentry' => 'cn=default,ou=policies,dc=example,dc=com',
+                'pwdStartTime' => '20240101000000Z',
+                'pwdEndTime' => '20300101000000Z',
+                'pwdLastSuccess' => '20250104000000Z',
+            ],
+        );
+        $projected = new Entry(
+            $entry->getDn(),
+            ...array_values(array_filter(
+                $entry->getAttributes(),
+                static fn(Attribute $attribute): bool => in_array(
+                    $attribute->getName(),
+                    UserPasswordState::ATTRIBUTES,
+                    true,
+                ),
+            )),
+        );
+
+        self::assertEquals(
+            UserPasswordState::fromEntry($entry),
+            UserPasswordState::fromEntry($projected),
         );
     }
 
@@ -194,15 +233,26 @@ final class UserPasswordStateTest extends TestCase
         self::assertTrue($local->isSupersededBy(new UserPasswordState(accountLockedAt: $this->at('20250105080100Z'))));
     }
 
-    public function test_local_lock_is_superseded_by_a_newer_credential_change(): void
+    public function test_local_lock_is_superseded_by_a_password_change(): void
     {
-        // A password reset on the primary (pwdChangedTime past the failures) clears an independent replica-local lock.
         $local = new UserPasswordState(
+            changedAt: $this->at('20250101120000Z'),
             accountLockedAt: $this->at('20250105080000Z'),
             failureTimes: [$this->at('20250105080000Z')],
         );
 
         self::assertTrue($local->isSupersededBy(new UserPasswordState(changedAt: $this->at('20250105090000Z'))));
+    }
+
+    public function test_local_lock_is_superseded_by_a_reset_stamped_earlier_in_the_failures_second(): void
+    {
+        $local = new UserPasswordState(
+            changedAt: $this->at('20250101120000Z'),
+            accountLockedAt: $this->at('20250105080000Z'),
+            failureTimes: [$this->at('20250105080000.500000Z')],
+        );
+
+        self::assertTrue($local->isSupersededBy(new UserPasswordState(changedAt: $this->at('20250105080000.100000Z'))));
     }
 
     public function test_local_lock_is_superseded_by_a_newer_success(): void
@@ -215,15 +265,62 @@ final class UserPasswordStateTest extends TestCase
         self::assertTrue($local->isSupersededBy(new UserPasswordState(lastSuccess: $this->at('20250105090000Z'))));
     }
 
-    public function test_local_lock_is_kept_when_the_entry_reflects_no_reset(): void
+    public function test_local_lock_is_kept_while_the_entry_holds_the_same_password(): void
     {
         $local = new UserPasswordState(
+            changedAt: $this->at('20250101120000Z'),
             accountLockedAt: $this->at('20250105080000Z'),
             failureTimes: [$this->at('20250105080000Z')],
         );
 
-        // Bare pwdChangedTime that predates the failures is not a reset.
         self::assertFalse($local->isSupersededBy(new UserPasswordState(changedAt: $this->at('20250101120000Z'))));
+    }
+
+    /**
+     * @return iterable<string, array{?string, ?string, bool}>
+     */
+    public static function versionProvider(): iterable
+    {
+        yield 'the same instant' => [
+            '20250105080000.250000Z',
+            '20250105080000.250000Z',
+            true,
+        ];
+        yield 'whole seconds against a zero fraction' => [
+            '20250105080000Z',
+            '20250105080000.000000Z',
+            true,
+        ];
+        yield 'a microsecond apart' => [
+            '20250105080000.250000Z',
+            '20250105080000.250001Z',
+            false,
+        ];
+        yield 'both absent' => [
+            null,
+            null,
+            true,
+        ];
+        yield 'one absent' => [
+            '20250105080000Z',
+            null,
+            false,
+        ];
+    }
+
+    #[DataProvider('versionProvider')]
+    public function test_two_password_versions_are_the_same_only_at_the_same_instant(
+        ?string $version,
+        ?string $other,
+        bool $same,
+    ): void {
+        self::assertSame(
+            $same,
+            UserPasswordState::isSameVersion(
+                $version === null ? null : $this->at($version),
+                $other === null ? null : $this->at($other),
+            ),
+        );
     }
 
     public function test_sub_threshold_failures_are_kept_until_reset(): void
@@ -254,9 +351,6 @@ final class UserPasswordStateTest extends TestCase
 
     private function at(string $generalizedTime): DateTimeImmutable
     {
-        return new DateTimeImmutable(
-            $generalizedTime,
-            new DateTimeZone('UTC'),
-        );
+        return GeneralizedTime::parse($generalizedTime);
     }
 }

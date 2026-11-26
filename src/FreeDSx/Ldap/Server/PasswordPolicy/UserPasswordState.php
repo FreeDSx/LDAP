@@ -30,6 +30,22 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 final readonly class UserPasswordState
 {
     /**
+     * The operational attributes a state is read from.
+     */
+    public const ATTRIBUTES = [
+        PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+        PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+        PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+        PasswordPolicyOid::NAME_PWD_HISTORY,
+        PasswordPolicyOid::NAME_PWD_GRACE_USE_TIME,
+        PasswordPolicyOid::NAME_PWD_RESET,
+        PasswordPolicyOid::NAME_PWD_POLICY_SUBENTRY,
+        PasswordPolicyOid::NAME_PWD_START_TIME,
+        PasswordPolicyOid::NAME_PWD_END_TIME,
+        PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
+    ];
+
+    /**
      * @param list<DateTimeImmutable> $failureTimes
      * @param list<HistoryEntry> $history
      * @param list<DateTimeImmutable> $graceUseTimes
@@ -86,8 +102,8 @@ final readonly class UserPasswordState
      * dropped, which holds when the entry:
      *
      *   - is authoritatively locked, or
-     *   - records a success past our newest failure, or
-     *   - records a credential change past our newest failure.
+     *   - holds a different password than the one this state was recorded against, or
+     *   - records a success past our newest failure.
      */
     public function isSupersededBy(self $authoritative): bool
     {
@@ -95,21 +111,38 @@ final readonly class UserPasswordState
             return true;
         }
 
+        // A state counts only against the password it was recorded under; a reset since then retires it.
+        if (!self::isSameVersion($this->changedAt, $authoritative->changedAt)) {
+            return true;
+        }
+
         $newestFailure = $this->newestFailureTime();
+
         if ($newestFailure === null) {
-            // No local failures to weigh a reset against
+            // No local failures to weigh a success against
             // Drop only when there is also no local lock left to enforce.
             return !$this->isLocked();
         }
 
-        // A success or credential change past our newest failure means the primary reset the counter and any lock.
+        // A success past our newest failure means the primary reset the counter and any lock.
         return self::isAfter(
             $authoritative->lastSuccess,
             $newestFailure,
-        ) || self::isAfter(
-            $authoritative->changedAt,
-            $newestFailure,
         );
+    }
+
+    /**
+     * Whether two password versions, the pwdChangedTime values a state was recorded against, name the same password.
+     */
+    public static function isSameVersion(
+        ?DateTimeImmutable $version,
+        ?DateTimeImmutable $other,
+    ): bool {
+        if ($version === null || $other === null) {
+            return $version === $other;
+        }
+
+        return $version->format('U.u') === $other->format('U.u');
     }
 
     /**

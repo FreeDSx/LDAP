@@ -13,8 +13,12 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy;
 
+use DateTimeImmutable;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
@@ -52,16 +56,27 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
             return $entryOutcome;
         }
 
-        $localOutcome = $this->engine->evaluateLocalLockout(
-            $this->store->load($attempt->uuid)->toUserPasswordState($attempt->dn),
-            $attempt->policy,
-        );
+        // Local state is read before the entry: applying a replicated entry drops the state it supersedes.
+        $local = $this->store->load($attempt->uuid);
+        $current = $this->currentState($attempt);
 
-        if ($localOutcome->denied) {
-            return $localOutcome;
+        if ($local->isRecordedAgainst(self::versionOf($current, $attempt))) {
+            $localOutcome = $this->engine->evaluateLocalLockout(
+                $local->toUserPasswordState($attempt->dn),
+                $attempt->policy,
+            );
+
+            if ($localOutcome->denied) {
+                return $localOutcome;
+            }
         }
 
-        return $this->reReadEntryOutcome($attempt);
+        return $current === null
+            ? PasswordPolicyOutcome::allow()
+            : $this->engine->evaluatePreBind(
+                $current,
+                $attempt->policy,
+            );
     }
 
     public function record(
@@ -72,6 +87,10 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
 
         $this->store->atomicMutate(
             $attempt->uuid,
+            self::versionOf(
+                $this->currentState($attempt),
+                $attempt,
+            ),
             function (ReplicaPasswordState $local) use ($attempt, $decide, &$recorded): OperationalChanges {
                 $recorded = $decide($this->combine(
                     $attempt->state,
@@ -83,28 +102,59 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
             },
         );
 
-        return $recorded ?? new RecordedOutcome(
-            PasswordPolicyOutcome::allow(),
-            OperationalChanges::none(),
+        // Nothing is merged when the entry is gone or the write was dropped, and the bind still gets its decision.
+        return $recorded ?? $decide($this->combine(
+            $attempt->state,
+            ReplicaPasswordState::empty(),
+            $attempt->dn,
+        ))->unstored();
+    }
+
+    /**
+     * The entry's policy state as it stands now, or null when the entry is gone.
+     */
+    private function currentState(PasswordBindAttempt $attempt): ?UserPasswordState
+    {
+        $entry = $this->backend->get(
+            $attempt->dn,
+            self::stateProjection(),
+        );
+
+        // Another entry now at the DN is not the one being bound; the bound one counts as gone.
+        if ($entry === null || $entry->getUuid() !== strtolower($attempt->uuid)) {
+            return null;
+        }
+
+        return UserPasswordState::fromEntry($entry);
+    }
+
+    /**
+     * Only the policy state and identity, without the linked values a large group would otherwise load.
+     */
+    private static function stateProjection(): EntryProjection
+    {
+        return new EntryProjection(
+            array_map(
+                Attribute::normalizeName(...),
+                [
+                    ...UserPasswordState::ATTRIBUTES,
+                    AttributeTypeOid::NAME_ENTRY_UUID,
+                ],
+            ),
+            0,
         );
     }
 
     /**
-     * The caller's entry state was read before the local one, and applying a replicated entry drops the local state it
-     * supersedes. Both reading clear therefore has to be confirmed against the entry as it stands now.
+     * The password the entry holds now, or the one the attempt read when the entry is gone.
      */
-    private function reReadEntryOutcome(PasswordBindAttempt $attempt): PasswordPolicyOutcome
-    {
-        $entry = $this->backend->get($attempt->dn);
-
-        if ($entry === null) {
-            return PasswordPolicyOutcome::allow();
-        }
-
-        return $this->engine->evaluatePreBind(
-            UserPasswordState::fromEntry($entry),
-            $attempt->policy,
-        );
+    private static function versionOf(
+        ?UserPasswordState $current,
+        PasswordBindAttempt $attempt,
+    ): ?DateTimeImmutable {
+        return $current === null
+            ? $attempt->state->changedAt
+            : $current->changedAt;
     }
 
     /**
