@@ -77,10 +77,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
         return new PasswordPolicyEngine(
             clock: $clock,
             changeConstraints: $chain,
-            uniqueTimes: new UniquePolicyTimeFactory(
-                $clock,
-                $options->getReplicationConfig()->getId(),
-            ),
+            uniqueTimes: new UniquePolicyTimeFactory($clock),
         );
     }
 
