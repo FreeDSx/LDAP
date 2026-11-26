@@ -99,6 +99,16 @@ final class LinkTargetTest extends TestCase
         self::carrying(self::withUidOf(LinkTarget::MAX_UID_BITS))->assertStorable();
     }
 
+    public function test_a_uid_at_the_longest_length_kept_is_reported_storable(): void
+    {
+        self::assertTrue(self::carrying(self::withUidOf(LinkTarget::MAX_UID_BITS))->isStorable());
+    }
+
+    public function test_a_uid_past_the_longest_length_kept_is_reported_unstorable(): void
+    {
+        self::assertFalse(self::carrying(self::withUidOf(LinkTarget::MAX_UID_BITS + 1))->isStorable());
+    }
+
     public function test_a_uid_past_the_longest_length_kept_is_refused(): void
     {
         $this->expectException(OperationException::class);

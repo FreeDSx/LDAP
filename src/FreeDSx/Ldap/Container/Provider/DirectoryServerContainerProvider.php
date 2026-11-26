@@ -162,6 +162,7 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
+use FreeDSx\Ldap\Sync\Consumer\LinkedValueFilter;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
 use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaConsumer;
@@ -969,6 +970,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $container->get(WriteEntryInterface::class),
             ),
             $container->get(DeferredLinksInterface::class),
+            new LinkedValueFilter(
+                $container->get(LinkedAttributes::class),
+                $options->getLogger(),
+            ),
         );
 
         return new LdapReplica(

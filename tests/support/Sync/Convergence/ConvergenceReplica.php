@@ -19,9 +19,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
+use FreeDSx\Ldap\Sync\Consumer\LinkedValueFilter;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaConsumer;
 use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
@@ -43,6 +45,7 @@ final class ConvergenceReplica
         private readonly WriteEntryInterface $writer,
         private readonly TransactionalWriteInterface $transaction,
         private readonly DeferredLinksInterface $links,
+        private readonly LinkedAttributes $linked,
     ) {
         $this->checkpoint = new InMemoryReplicationCheckpoint();
         $this->logger = new RecordingLogger();
@@ -58,6 +61,7 @@ final class ConvergenceReplica
             $container->get(WriteEntryInterface::class),
             $container->get(TransactionalWriteInterface::class),
             $container->get(DeferredLinksInterface::class),
+            $container->get(LinkedAttributes::class),
         );
     }
 
@@ -78,6 +82,10 @@ final class ConvergenceReplica
                     $this->writer,
                 ),
                 $this->links,
+                new LinkedValueFilter(
+                    $this->linked,
+                    $this->logger,
+                ),
             ),
             $this->checkpoint,
             $this->logger,

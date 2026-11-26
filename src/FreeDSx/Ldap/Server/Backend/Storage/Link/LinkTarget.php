@@ -110,11 +110,19 @@ final readonly class LinkTarget
     }
 
     /**
+     * Whether the link table can keep the uid.
+     */
+    public function isStorable(): bool
+    {
+        return strlen($this->uid) <= self::MAX_UID_BITS + 1;
+    }
+
+    /**
      * @throws OperationException when the uid is longer than the link table keeps
      */
     public function assertStorable(): void
     {
-        if (strlen($this->uid) <= self::MAX_UID_BITS + 1) {
+        if ($this->isStorable()) {
             return;
         }
 
