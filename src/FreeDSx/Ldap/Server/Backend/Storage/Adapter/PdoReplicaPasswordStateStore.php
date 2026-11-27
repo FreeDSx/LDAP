@@ -155,7 +155,8 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
             $this->lockStateRow($uuid);
 
             $record = $this->recordFor($uuid);
-            if ($record === null) {
+
+            if ($record === null || $record->state->isEmpty()) {
                 return;
             }
 
@@ -164,7 +165,15 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
                 return;
             }
 
-            $this->deleteRow($uuid);
+            // A fully acknowledged row has nothing left in flight and can go.
+            if ($record->forwarded === $record->sequence) {
+                $this->deleteRow($uuid);
+
+                return;
+            }
+
+            // Otherwise the row stays, or a late acknowledgement could mark the next write as sent.
+            $this->upsert($record->discarded());
         });
     }
 
