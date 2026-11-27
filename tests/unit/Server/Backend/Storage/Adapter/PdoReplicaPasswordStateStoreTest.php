@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaForwardState;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use FreeDSx\Ldap\ServerOptions;
@@ -339,6 +340,69 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         );
 
         self::assertFalse($this->subject->load(self::UUID)->isEmpty());
+    }
+
+    public function test_a_forward_acknowledged_after_a_discard_leaves_the_next_write_pending(): void
+    {
+        $this->applyFailure('20260520120000Z');
+        $this->subject->discardIfSuperseded(
+            self::UUID,
+            new UserPasswordState(accountLockedAt: GeneralizedTime::parse('20260520120500Z')),
+        );
+        $this->applyFailure('20260520120600Z');
+
+        $this->subject->markForwarded(
+            self::UUID,
+            1,
+        );
+        $pending = $this->subject->listUnforwarded();
+
+        self::assertCount(
+            1,
+            $pending,
+        );
+        self::assertSame(
+            ['20260520120600Z'],
+            $pending[0]->state->toArray()[PasswordPolicyOid::NAME_PWD_FAILURE_TIME] ?? [],
+        );
+    }
+
+    public function test_a_discard_after_the_forward_was_acknowledged_lets_the_subject_start_afresh(): void
+    {
+        $this->applyFailure('20260520120000Z');
+        $this->subject->markForwarded(
+            self::UUID,
+            1,
+        );
+        $this->subject->discardIfSuperseded(
+            self::UUID,
+            new UserPasswordState(accountLockedAt: GeneralizedTime::parse('20260520120500Z')),
+        );
+
+        $this->applyFailure('20260520120600Z');
+
+        self::assertSame(
+            [1],
+            array_map(
+                static fn(ReplicaForwardState $pending): int => $pending->sequence,
+                $this->subject->listUnforwarded(),
+            ),
+        );
+    }
+
+    public function test_a_discard_leaves_nothing_to_forward(): void
+    {
+        $this->applyFailure('20260520120000Z');
+
+        $this->subject->discardIfSuperseded(
+            self::UUID,
+            new UserPasswordState(accountLockedAt: GeneralizedTime::parse('20260520120500Z')),
+        );
+
+        self::assertSame(
+            [],
+            $this->subject->listUnforwarded(),
+        );
     }
 
     public function test_discard_is_a_noop_for_an_unknown_subject(): void

@@ -56,4 +56,18 @@ final readonly class ReplicaForwardState
             $this->forwarded,
         );
     }
+
+    /**
+     * Emptied with nothing left to forward, keeping the sequence so a later write still numbers past it.
+     */
+    public function discarded(): self
+    {
+        return new self(
+            $this->uuid,
+            $this->dn,
+            ReplicaPasswordState::empty(),
+            $this->sequence,
+            $this->sequence,
+        );
+    }
 }
