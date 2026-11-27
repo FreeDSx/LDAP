@@ -17,6 +17,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -26,6 +27,7 @@ use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Utility\Uuid;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -252,6 +254,143 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         } finally {
             $this->quietUnbind($client);
         }
+    }
+
+    public function test_a_forward_for_an_entry_outside_the_grant_is_refused_even_when_it_would_write_nothing(): void
+    {
+        $dn = 'cn=outsideforward,dc=other,dc=test';
+        $uuid = $this->createAccountOnProvider($dn);
+        self::assertNotNull($this->changedTimeOnProvider($dn));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->forwardFailuresToProvider(
+            $uuid,
+            null,
+        );
+    }
+
+    public function test_a_forward_observed_under_a_password_since_reset_is_dropped(): void
+    {
+        $dn = 'cn=staleforward,ou=people,dc=foo,dc=bar';
+        $uuid = $this->createAccountOnProvider($dn);
+        $before = $this->changedTimeOnProvider($dn);
+
+        $this->resetPasswordOnProvider(
+            $dn,
+            'newpass',
+        );
+        self::assertNotEquals(
+            $before,
+            $this->changedTimeOnProvider($dn),
+        );
+
+        $this->forwardFailuresToProvider(
+            $uuid,
+            $before,
+        );
+
+        self::assertSame(
+            [],
+            $this->failureTimesOnProvider($dn),
+        );
+        self::assertFalse($this->providerHasLock($dn));
+    }
+
+    public function test_a_forward_observed_under_the_current_password_locks_the_account(): void
+    {
+        $dn = 'cn=currentforward,ou=people,dc=foo,dc=bar';
+        $uuid = $this->createAccountOnProvider($dn);
+
+        $this->resetPasswordOnProvider(
+            $dn,
+            'newpass',
+        );
+        $current = $this->changedTimeOnProvider($dn);
+        self::assertNotNull($current);
+
+        $this->forwardFailuresToProvider(
+            $uuid,
+            $current,
+        );
+
+        self::assertTrue($this->providerHasLock($dn));
+    }
+
+    private function createAccountOnProvider(string $dn): string
+    {
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => (new Dn($dn))->getRdn()->getValue(),
+                    'sn' => 'Forward',
+                    'userPassword' => 'oldpass',
+                ],
+            ));
+        });
+        $uuid = $this->uuidOnProvider($dn);
+        self::assertNotNull($uuid);
+
+        return $uuid;
+    }
+
+    /**
+     * Forward two failures, enough to lock under the provider's policy, as observed under $version.
+     */
+    private function forwardFailuresToProvider(
+        string $uuid,
+        ?DateTimeImmutable $version,
+    ): void {
+        $client = $this->providerClient();
+
+        try {
+            $client->bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            );
+            $client->sendAndReceive(new ForwardPasswordPolicyStateRequest(
+                $uuid,
+                [
+                    new DateTimeImmutable(
+                        '-2 seconds',
+                        new DateTimeZone('UTC'),
+                    ),
+                    new DateTimeImmutable(
+                        '-1 second',
+                        new DateTimeZone('UTC'),
+                    ),
+                ],
+                null,
+                $version,
+            ));
+        } finally {
+            $this->quietUnbind($client);
+        }
+    }
+
+    private function changedTimeOnProvider(string $dn): ?DateTimeImmutable
+    {
+        $manager = $this->providerClient();
+
+        try {
+            $manager->bind(
+                LdapServerCommand::MANAGER_DN,
+                LdapServerCommand::MANAGER_PASSWORD,
+            );
+            $value = $manager->read(
+                $dn,
+                [self::PWD_CHANGED_TIME],
+            )?->get(self::PWD_CHANGED_TIME)?->firstValue();
+        } finally {
+            $this->quietUnbind($manager);
+        }
+
+        return $value === null
+            ? null
+            : GeneralizedTime::parse($value);
     }
 
     /**

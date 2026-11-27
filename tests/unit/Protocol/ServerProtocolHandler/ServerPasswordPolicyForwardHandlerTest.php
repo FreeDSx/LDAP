@@ -25,6 +25,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
@@ -38,6 +40,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
@@ -237,6 +240,76 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         );
     }
 
+    public function test_a_forward_observed_under_a_password_the_locked_entry_has_replaced_writes_nothing(): void
+    {
+        $this->storeTarget(['cn' => ['user']]);
+
+        $changes = $this->captureComputedChanges(
+            new ForwardPasswordPolicyStateRequest(
+                self::UUID,
+                [new DateTimeImmutable(
+                    '2026-05-20 11:59:00',
+                    new DateTimeZone('UTC'),
+                )],
+                new DateTimeImmutable(
+                    '2026-05-20 11:59:30',
+                    new DateTimeZone('UTC'),
+                ),
+                new DateTimeImmutable(
+                    '2026-05-19 00:00:00',
+                    new DateTimeZone('UTC'),
+                ),
+            ),
+            Entry::fromArray(
+                self::DN,
+                [
+                    'cn' => ['user'],
+                    'entryUUID' => [self::UUID],
+                    'pwdChangedTime' => ['20260520115945.250000Z'],
+                ],
+            ),
+        );
+
+        self::assertSame(
+            [],
+            $changes,
+        );
+        self::assertCount(
+            1,
+            [...$this->lastStream->messages],
+        );
+    }
+
+    public function test_a_forward_observed_under_the_password_the_locked_entry_holds_is_applied(): void
+    {
+        $this->storeTarget(['cn' => ['user']]);
+
+        $changes = $this->captureComputedChanges(
+            new ForwardPasswordPolicyStateRequest(
+                self::UUID,
+                [new DateTimeImmutable(
+                    '2026-05-20 11:59:00',
+                    new DateTimeZone('UTC'),
+                )],
+                null,
+                GeneralizedTime::parse('20260520115945.250000Z'),
+            ),
+            Entry::fromArray(
+                self::DN,
+                [
+                    'cn' => ['user'],
+                    'entryUUID' => [self::UUID],
+                    'pwdChangedTime' => ['20260520115945.250000Z'],
+                ],
+            ),
+        );
+
+        self::assertSame(
+            'pwdFailureTime',
+            ($changes[0] ?? null)?->getAttribute()->getName(),
+        );
+    }
+
     /**
      * The grant to forward says nothing about which entries, so each attribute is authorized at the target DN.
      */
@@ -264,7 +337,10 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         );
 
         self::assertSame(
-            [self::DN . '/pwdFailureTime/Write'],
+            [
+                self::DN . '/pwdFailureTime/Write',
+                self::DN . '/pwdFailureTime/Write',
+            ],
             $seen,
         );
     }
@@ -273,10 +349,18 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
     {
         $this->accessControl
             ->method('authorizeAttribute')
-            ->willThrowException(new OperationException(
-                'Access denied.',
-                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
-            ));
+            ->willReturnCallback(static function (
+                TokenInterface $token,
+                Dn $dn,
+                string $attribute,
+            ): void {
+                if ($attribute === PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME) {
+                    throw new OperationException(
+                        'Access denied.',
+                        ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                    );
+                }
+            });
         $target = $this->storeTarget(['cn' => ['user']]);
 
         $compute = null;
@@ -291,7 +375,20 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->subject->handleRequest(
             $this->messageFor(new ForwardPasswordPolicyStateRequest(
                 self::UUID,
-                [new DateTimeImmutable('2026-05-20 11:59:00', new DateTimeZone('UTC'))],
+                [
+                    new DateTimeImmutable(
+                        '2026-05-20 11:57:00',
+                        new DateTimeZone('UTC'),
+                    ),
+                    new DateTimeImmutable(
+                        '2026-05-20 11:58:00',
+                        new DateTimeZone('UTC'),
+                    ),
+                    new DateTimeImmutable(
+                        '2026-05-20 11:59:00',
+                        new DateTimeZone('UTC'),
+                    ),
+                ],
             )),
             $this->createMock(TokenInterface::class),
         );
@@ -301,6 +398,83 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
 
         $compute($target);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, list<string>>, ?PasswordPolicy}>
+     */
+    public static function forwardsThatWriteNothing(): iterable
+    {
+        $policy = new PasswordPolicy(lockout: new PasswordLockoutRules(
+            enabled: true,
+            maxFailure: 3,
+        ));
+
+        yield 'a password the entry has since replaced' => [
+            [
+                'cn' => ['user'],
+                'pwdChangedTime' => ['20260520115945.250000Z'],
+            ],
+            $policy,
+        ];
+        yield 'a permanent lock' => [
+            [
+                'cn' => ['user'],
+                'pwdAccountLockedTime' => [PasswordPolicyOid::PERMANENT_LOCK_SENTINEL],
+            ],
+            $policy,
+        ];
+        yield 'no governing policy' => [
+            ['cn' => ['user']],
+            null,
+        ];
+    }
+
+    /**
+     * @param array<string, list<string>> $attributes
+     */
+    #[DataProvider('forwardsThatWriteNothing')]
+    public function test_a_caller_who_may_not_forward_for_the_entry_is_refused_however_the_entry_stands(
+        array $attributes,
+        ?PasswordPolicy $policy,
+    ): void {
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willThrowException(new OperationException(
+                'Access denied.',
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            ));
+        $target = $this->storeTarget($attributes);
+        $this->writes
+            ->method('handle')
+            ->willReturnCallback(static function (ComputeUpdateCommand $command) use ($target): void {
+                ($command->compute)($target);
+            });
+        $subject = new ServerPasswordPolicyForwardHandler(
+            $this->storage,
+            $this->writes,
+            $this->resolverWith($policy),
+            new PasswordPolicyEngine(
+                FrozenClock::fromString(self::NOW),
+                new PasswordChangeConstraintChain([]),
+            ),
+            $this->accessControl,
+            FrozenClock::fromString(self::NOW),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->handleRequest(
+            $this->messageFor(new ForwardPasswordPolicyStateRequest(
+                self::UUID,
+                [new DateTimeImmutable(
+                    '2026-05-20 11:59:00',
+                    new DateTimeZone('UTC'),
+                )],
+            )),
+            $this->createMock(TokenInterface::class),
+        );
     }
 
     public function test_it_refuses_a_time_from_the_future(): void

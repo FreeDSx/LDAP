@@ -72,6 +72,52 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
         );
     }
 
+    public function test_password_version_defaults_to_null(): void
+    {
+        self::assertNull(
+            (new ForwardPasswordPolicyStateRequest(self::UUID))->getPasswordVersion(),
+        );
+    }
+
+    public function test_it_encodes_the_password_version_to_the_microsecond_after_the_last_success(): void
+    {
+        $encoder = new LdapEncoder();
+        $request = new ForwardPasswordPolicyStateRequest(
+            self::UUID,
+            [$this->time],
+            $this->success,
+            GeneralizedTime::parse('20251201083000.250000Z'),
+        );
+
+        self::assertEquals(
+            Asn1::application(
+                23,
+                Asn1::sequence(
+                    Asn1::context(
+                        0,
+                        Asn1::octetString(ExtendedRequest::OID_PPOLICY_STATE_FORWARD),
+                    ),
+                    Asn1::context(
+                        1,
+                        Asn1::octetString($encoder->encode(Asn1::sequence(
+                            Asn1::octetString(self::UUID),
+                            Asn1::setOf(Asn1::octetString(GeneralizedTime::formatWithFraction($this->time))),
+                            Asn1::context(
+                                0,
+                                Asn1::octetString(GeneralizedTime::format($this->success)),
+                            ),
+                            Asn1::context(
+                                1,
+                                Asn1::octetString('20251201083000.250000Z'),
+                            ),
+                        ))),
+                    ),
+                ),
+            ),
+            $request->toAsn1(),
+        );
+    }
+
     public function test_it_uses_the_forward_oid(): void
     {
         self::assertSame(

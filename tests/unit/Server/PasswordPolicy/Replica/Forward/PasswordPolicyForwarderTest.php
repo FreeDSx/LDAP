@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
@@ -45,6 +46,8 @@ final class PasswordPolicyForwarderTest extends TestCase
     private const UUID_A = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
     private const UUID_B = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+    private const PASSWORD_VERSION = '20260101000000.250000Z';
 
     private ReplicaPasswordStateStoreInterface $store;
 
@@ -114,6 +117,23 @@ final class PasswordPolicyForwarderTest extends TestCase
         self::assertSame(
             [],
             $this->store->listUnforwarded(),
+        );
+    }
+
+    public function test_it_forwards_the_password_version_the_state_was_recorded_against(): void
+    {
+        $this->recordSends();
+        $this->seedFailure(
+            '20260520120000Z',
+            self::UUID,
+            GeneralizedTime::parse(self::PASSWORD_VERSION),
+        );
+
+        $this->subject->forwardOnce();
+
+        self::assertEquals(
+            GeneralizedTime::parse(self::PASSWORD_VERSION),
+            $this->sent[0]->getPasswordVersion(),
         );
     }
 
@@ -298,10 +318,11 @@ final class PasswordPolicyForwarderTest extends TestCase
     private function seedFailure(
         string $time,
         string $uuid = self::UUID,
+        ?DateTimeImmutable $version = null,
     ): void {
         $this->store->atomicMutate(
             $uuid,
-            null,
+            $version,
             static fn(): OperationalChanges => OperationalChanges::of(Change::replace(
                 PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
                 $time,

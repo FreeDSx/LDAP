@@ -941,6 +941,7 @@ final class PasswordPolicyEngineTest extends TestCase
             )),
             [$forwarded],
             null,
+            null,
         );
 
         $byAttribute = $this->changesByAttribute($changes);
@@ -967,6 +968,7 @@ final class PasswordPolicyEngineTest extends TestCase
             new PasswordPolicy(lockout: new PasswordLockoutRules()),
             $forwarded,
             null,
+            null,
         );
 
         self::assertCount(
@@ -985,6 +987,7 @@ final class PasswordPolicyEngineTest extends TestCase
             new UserPasswordState(),
             new PasswordPolicy(lockout: new PasswordLockoutRules(maxRecordedFailure: 1)),
             [$newest, $oldest],
+            null,
             null,
         );
 
@@ -1006,6 +1009,7 @@ final class PasswordPolicyEngineTest extends TestCase
                 maxFailure: 3,
             )),
             [$existing],
+            null,
             null,
         );
 
@@ -1033,6 +1037,7 @@ final class PasswordPolicyEngineTest extends TestCase
             )),
             [],
             $success,
+            null,
         );
 
         $byAttribute = $this->changesByAttribute($changes);
@@ -1060,6 +1065,7 @@ final class PasswordPolicyEngineTest extends TestCase
             )),
             [$afterSuccess],
             $success,
+            null,
         );
 
         $byAttribute = $this->changesByAttribute($changes);
@@ -1089,6 +1095,7 @@ final class PasswordPolicyEngineTest extends TestCase
             )),
             [],
             $success,
+            null,
         );
 
         $byAttribute = $this->changesByAttribute($changes);
@@ -1117,6 +1124,68 @@ final class PasswordPolicyEngineTest extends TestCase
             )),
             [],
             $this->clock->now(),
+            null,
+        );
+
+        self::assertTrue($changes->isEmpty());
+    }
+
+    public function test_a_forward_observed_under_a_replaced_password_is_dropped_with_its_success(): void
+    {
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(
+                changedAt: $this->clock->now(),
+                failureTimes: [$this->clock->now()->modify('-2 minutes')],
+            ),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                maxFailure: 1,
+            )),
+            [$this->clock->now()->modify('-1 minute')],
+            $this->clock->now(),
+            $this->clock->now()->modify('-1 day'),
+        );
+
+        self::assertTrue($changes->isEmpty());
+    }
+
+    public function test_a_forward_observed_under_the_current_password_is_applied(): void
+    {
+        $version = $this->clock->now()->modify('-1 day');
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(changedAt: $version),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                maxFailure: 1,
+            )),
+            [$this->clock->now()->modify('-1 minute')],
+            null,
+            $version,
+        );
+
+        $byAttribute = $this->changesByAttribute($changes);
+
+        self::assertArrayHasKey(
+            'pwdAccountLockedTime',
+            $byAttribute,
+        );
+        self::assertNotSame(
+            [],
+            $byAttribute['pwdAccountLockedTime'],
+        );
+    }
+
+    public function test_a_forward_without_a_password_version_is_dropped_once_the_entry_has_one(): void
+    {
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(changedAt: $this->clock->now()),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                maxFailure: 1,
+            )),
+            [$this->clock->now()->modify('-1 minute')],
+            null,
+            null,
         );
 
         self::assertTrue($changes->isEmpty());
