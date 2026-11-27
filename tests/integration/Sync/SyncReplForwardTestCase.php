@@ -51,6 +51,8 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
      */
     private const RETAINED_FAILURES = 16;
 
+    private const BRIEF_FAILURE_COUNT_INTERVAL = 3;
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-replica');
@@ -318,6 +320,67 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         self::assertTrue($this->providerHasLock($dn));
     }
 
+    public function test_a_forward_after_the_failure_count_interval_leaves_the_lock_in_force(): void
+    {
+        $dn = 'cn=brieflock,ou=brief,ou=people,dc=foo,dc=bar';
+        $this->createBriefIntervalPolicyOnProvider();
+        $uuid = $this->createAccountOnProvider($dn);
+        $version = $this->changedTimeOnProvider($dn);
+
+        $this->forwardFailuresToProvider(
+            $uuid,
+            $version,
+        );
+        self::assertTrue($this->providerHasLock($dn));
+
+        usleep((self::BRIEF_FAILURE_COUNT_INTERVAL + 1) * 1_000_000);
+        $this->forwardFailuresToProvider(
+            $uuid,
+            $version,
+            1,
+        );
+
+        self::assertCount(
+            1,
+            $this->failureTimesOnProvider($dn),
+        );
+        self::assertTrue($this->providerHasLock($dn));
+    }
+
+    /**
+     * A policy whose failure count interval is far shorter than its lockout, governing everything below ou=brief.
+     */
+    private function createBriefIntervalPolicyOnProvider(): void
+    {
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->create(Entry::fromArray(
+                'ou=brief,ou=people,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => 'brief',
+                    'administrativeRole' => '2.5.23.4',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                'cn=brief-policy,ou=brief,ou=people,dc=foo,dc=bar',
+                [
+                    'objectClass' => [
+                        'top',
+                        'subentry',
+                        'pwdPolicy',
+                    ],
+                    'cn' => 'brief-policy',
+                    'subtreeSpecification' => '{}',
+                    'pwdAttribute' => 'userPassword',
+                    'pwdLockout' => 'TRUE',
+                    'pwdMaxFailure' => '2',
+                    'pwdFailureCountInterval' => (string) self::BRIEF_FAILURE_COUNT_INTERVAL,
+                    'pwdLockoutDuration' => '300',
+                ],
+            ));
+        });
+    }
+
     private function createAccountOnProvider(string $dn): string
     {
         $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
@@ -338,12 +401,26 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
     }
 
     /**
-     * Forward two failures, enough to lock under the provider's policy, as observed under $version.
+     * Forward $count failures from the last second as observed under $version, where two lock under either test policy.
      */
     private function forwardFailuresToProvider(
         string $uuid,
         ?DateTimeImmutable $version,
+        int $count = 2,
     ): void {
+        $now = new DateTimeImmutable(
+            'now',
+            new DateTimeZone('UTC'),
+        );
+        $failures = [];
+
+        for ($i = $count - 1; $i >= 0; $i--) {
+            $failures[] = $now->modify(sprintf(
+                '-%d microseconds',
+                $i * 200_000,
+            ));
+        }
+
         $client = $this->providerClient();
 
         try {
@@ -353,16 +430,7 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
             );
             $client->sendAndReceive(new ForwardPasswordPolicyStateRequest(
                 $uuid,
-                [
-                    new DateTimeImmutable(
-                        '-2 seconds',
-                        new DateTimeZone('UTC'),
-                    ),
-                    new DateTimeImmutable(
-                        '-1 second',
-                        new DateTimeZone('UTC'),
-                    ),
-                ],
+                $failures,
                 null,
                 $version,
             ));

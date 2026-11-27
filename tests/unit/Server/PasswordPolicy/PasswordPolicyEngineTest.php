@@ -1110,6 +1110,88 @@ final class PasswordPolicyEngineTest extends TestCase
         );
     }
 
+    public function test_a_forward_keeps_a_lock_whose_failures_aged_out_of_the_count_interval(): void
+    {
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(
+                accountLockedAt: $this->clock->now()->modify('-10 seconds'),
+                failureTimes: [
+                    $this->clock->now()->modify('-12 seconds'),
+                    $this->clock->now()->modify('-11 seconds'),
+                    $this->clock->now()->modify('-10 seconds'),
+                ],
+            ),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                duration: 300,
+                maxFailure: 3,
+                failureCountInterval: 5,
+            )),
+            [$this->clock->now()],
+            null,
+            null,
+        );
+
+        self::assertArrayNotHasKey(
+            'pwdAccountLockedTime',
+            $this->changesByAttribute($changes),
+        );
+    }
+
+    public function test_a_forwarded_success_from_before_the_lock_keeps_it(): void
+    {
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(
+                accountLockedAt: $this->clock->now()->modify('-30 seconds'),
+                failureTimes: [
+                    $this->clock->now()->modify('-50 seconds'),
+                    $this->clock->now()->modify('-40 seconds'),
+                    $this->clock->now()->modify('-30 seconds'),
+                ],
+            ),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                duration: 300,
+                maxFailure: 3,
+            )),
+            [],
+            $this->clock->now()->modify('-35 seconds'),
+            null,
+        );
+
+        self::assertArrayNotHasKey(
+            'pwdAccountLockedTime',
+            $this->changesByAttribute($changes),
+        );
+    }
+
+    public function test_a_forward_clears_a_lock_whose_duration_has_lapsed(): void
+    {
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(
+                accountLockedAt: $this->clock->now()->modify('-400 seconds'),
+                failureTimes: [
+                    $this->clock->now()->modify('-402 seconds'),
+                    $this->clock->now()->modify('-401 seconds'),
+                    $this->clock->now()->modify('-400 seconds'),
+                ],
+            ),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(
+                enabled: true,
+                duration: 300,
+                maxFailure: 3,
+            )),
+            [$this->clock->now()],
+            null,
+            null,
+        );
+
+        self::assertSame(
+            [],
+            $this->changesByAttribute($changes)['pwdAccountLockedTime'] ?? null,
+        );
+    }
+
     public function test_a_permanent_lock_is_never_cleared_by_a_forward(): void
     {
         $changes = $this->subject->recordForwardedState(

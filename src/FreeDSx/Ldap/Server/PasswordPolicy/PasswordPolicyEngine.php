@@ -226,6 +226,7 @@ final readonly class PasswordPolicyEngine
             $state,
             $policy,
             $retained,
+            $observedSuccess,
         );
         if ($lastSuccess !== null && ($state->lastSuccess === null || $lastSuccess > $state->lastSuccess)) {
             $changes[] = Change::replace(
@@ -350,7 +351,7 @@ final readonly class PasswordPolicyEngine
 
     /**
      * Set a fresh failure-driven lock when the retained failures newly meet the threshold, or clear a failure-driven
-     * lock the retained failures no longer justify.
+     * lock the retained failures no longer justify and a forward is allowed to end.
      *
      * @param list<Change> $changes
      * @param list<DateTimeImmutable> $retained
@@ -361,6 +362,7 @@ final readonly class PasswordPolicyEngine
         UserPasswordState $state,
         PasswordPolicy $policy,
         array $retained,
+        ?DateTimeImmutable $observedSuccess,
     ): array {
         $meetsThreshold = $this->meetsLockoutThreshold($policy, $retained);
 
@@ -369,11 +371,31 @@ final readonly class PasswordPolicyEngine
                 PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
                 GeneralizedTime::format($this->clock->now()),
             );
-        } elseif (!$meetsThreshold && $state->accountLockedAt !== null) {
+        } elseif (!$meetsThreshold && $this->forwardMayEndLock($state, $policy, $observedSuccess)) {
             $changes[] = Change::reset(PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME);
         }
 
         return $changes;
+    }
+
+    /**
+     * A forward ends a lock that has lapsed or that a successful bind has since followed, never one still in force
+     * only because its failures aged out of pwdFailureCountInterval.
+     */
+    private function forwardMayEndLock(
+        UserPasswordState $state,
+        PasswordPolicy $policy,
+        ?DateTimeImmutable $observedSuccess,
+    ): bool {
+        if ($state->accountLockedAt === null) {
+            return false;
+        }
+        if (!$this->isLockoutEffective($state, $policy)) {
+            return true;
+        }
+
+        return $observedSuccess !== null
+            && $observedSuccess > $state->accountLockedAt;
     }
 
     /**
