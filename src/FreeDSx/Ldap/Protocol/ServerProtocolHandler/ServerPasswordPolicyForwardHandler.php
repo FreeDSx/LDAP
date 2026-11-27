@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
@@ -131,6 +132,14 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
             return;
         }
 
+        // The caller must be able to forward for this entry before anything about it shapes the answer.
+        $this->accessControl->authorizeAttribute(
+            $token,
+            $target->getDn(),
+            PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+            AttributeAccess::Write,
+        );
+
         // Resolved before the transaction opens to avoid potential write locks in atomic.
         $policy = $this->policyResolver->resolveFor($target);
         if ($policy === null) {
@@ -151,6 +160,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
                         $policy,
                         $request->getFailureTimes(),
                         $request->getLastSuccess(),
+                        $request->getPasswordVersion(),
                     )->changes;
 
                     $this->authorizeChanges(

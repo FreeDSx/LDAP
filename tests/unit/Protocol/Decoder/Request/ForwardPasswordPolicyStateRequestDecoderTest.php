@@ -34,6 +34,10 @@ final class ForwardPasswordPolicyStateRequestDecoderTest extends TestCase
 
     private const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
+    private const SUCCESS = '20260102000000Z';
+
+    private const VERSION = '20251201083000.250000Z';
+
     private ForwardPasswordPolicyStateRequestDecoder $subject;
 
     private DecodeContext $context;
@@ -94,6 +98,47 @@ final class ForwardPasswordPolicyStateRequestDecoderTest extends TestCase
         );
     }
 
+    public function testItDecodesAPasswordVersionWithoutALastSuccess(): void
+    {
+        $request = new ForwardPasswordPolicyStateRequest(
+            self::UUID,
+            [$this->time],
+            null,
+            GeneralizedTime::parse('20251201083000.250000Z'),
+        );
+
+        $result = $this->subject->decode(
+            self::valueOf($request),
+            $this->context,
+        );
+
+        self::assertNull($result->getLastSuccess());
+        self::assertEquals(
+            $request->setValue(null),
+            $result->setValue(null),
+        );
+    }
+
+    public function testItDecodesALastSuccessAndAPasswordVersion(): void
+    {
+        $request = new ForwardPasswordPolicyStateRequest(
+            self::UUID,
+            [$this->time],
+            $this->success,
+            GeneralizedTime::parse('20251201083000.250000Z'),
+        );
+
+        $result = $this->subject->decode(
+            self::valueOf($request),
+            $this->context,
+        );
+
+        self::assertEquals(
+            $request->setValue(null),
+            $result->setValue(null),
+        );
+    }
+
     public function testItRefusesAMalformedEntryUuid(): void
     {
         $this->expectException(ProtocolException::class);
@@ -140,18 +185,72 @@ final class ForwardPasswordPolicyStateRequestDecoderTest extends TestCase
                     Asn1::octetString('not-a-time'),
                 ),
             )],
+            'an invalid password version' => [Asn1::sequence(
+                Asn1::octetString(self::UUID),
+                Asn1::setOf(),
+                Asn1::context(
+                    1,
+                    Asn1::octetString('not-a-time'),
+                ),
+            )],
             'too few components' => [Asn1::sequence(Asn1::octetString(self::UUID))],
             'too many components' => [Asn1::sequence(
                 Asn1::octetString(self::UUID),
                 Asn1::setOf(),
                 Asn1::context(
                     0,
-                    Asn1::octetString(GeneralizedTime::format(new DateTimeImmutable(
-                        '2026-01-02 00:00:00',
-                        new DateTimeZone('UTC'),
-                    ))),
+                    Asn1::octetString(self::SUCCESS),
+                ),
+                Asn1::context(
+                    1,
+                    Asn1::octetString(self::VERSION),
                 ),
                 Asn1::octetString('extra'),
+            )],
+            'an untagged optional component' => [Asn1::sequence(
+                Asn1::octetString(self::UUID),
+                Asn1::setOf(),
+                Asn1::octetString(self::SUCCESS),
+            )],
+            'a private-tagged optional component' => [Asn1::sequence(
+                Asn1::octetString(self::UUID),
+                Asn1::setOf(),
+                Asn1::private(
+                    1,
+                    Asn1::octetString(self::VERSION),
+                ),
+            )],
+            'the password version before the last success' => [Asn1::sequence(
+                Asn1::octetString(self::UUID),
+                Asn1::setOf(),
+                Asn1::context(
+                    1,
+                    Asn1::octetString(self::VERSION),
+                ),
+                Asn1::context(
+                    0,
+                    Asn1::octetString(self::SUCCESS),
+                ),
+            )],
+            'a repeated last success' => [Asn1::sequence(
+                Asn1::octetString(self::UUID),
+                Asn1::setOf(),
+                Asn1::context(
+                    0,
+                    Asn1::octetString(self::SUCCESS),
+                ),
+                Asn1::context(
+                    0,
+                    Asn1::octetString(self::SUCCESS),
+                ),
+            )],
+            'an unknown optional tag' => [Asn1::sequence(
+                Asn1::octetString(self::UUID),
+                Asn1::setOf(),
+                Asn1::context(
+                    2,
+                    Asn1::octetString(self::SUCCESS),
+                ),
             )],
             'not a sequence' => [Asn1::set()],
         ];

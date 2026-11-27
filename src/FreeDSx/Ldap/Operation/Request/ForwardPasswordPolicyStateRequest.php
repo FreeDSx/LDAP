@@ -28,9 +28,10 @@ use function array_values;
  * carries nothing but bind state, so it cannot express any other modification.
  *
  * ForwardPasswordPolicyStateValue ::= SEQUENCE {
- *     entryUuid     OCTET STRING,
- *     failureTimes  SET OF OCTET STRING,
- *     lastSuccess   [0] OCTET STRING OPTIONAL }
+ *     entryUuid        OCTET STRING,
+ *     failureTimes     SET OF OCTET STRING,
+ *     lastSuccess      [0] OCTET STRING OPTIONAL,
+ *     passwordVersion  [1] OCTET STRING OPTIONAL }
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -44,11 +45,13 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
     /**
      * @param list<DateTimeImmutable> $failureTimes Values the primary unions into the entry.
      * @param DateTimeImmutable|null $lastSuccess Latest observed successful bind, bounding which failures it clears.
+     * @param DateTimeImmutable|null $passwordVersion The entry's pwdChangedTime the state was observed under, if any.
      */
     public function __construct(
         private readonly string $entryUuid,
         array $failureTimes = [],
         private readonly ?DateTimeImmutable $lastSuccess = null,
+        private readonly ?DateTimeImmutable $passwordVersion = null,
     ) {
         $this->failureTimes = array_values($failureTimes);
         parent::__construct(ExtendedRequest::OID_PPOLICY_STATE_FORWARD);
@@ -72,6 +75,11 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
         return $this->lastSuccess;
     }
 
+    public function getPasswordVersion(): ?DateTimeImmutable
+    {
+        return $this->passwordVersion;
+    }
+
     public function toAsn1(): SequenceType
     {
         $failureTimes = [];
@@ -88,6 +96,13 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
             $sequence->addChild(Asn1::context(
                 0,
                 Asn1::octetString(GeneralizedTime::format($this->lastSuccess)),
+            ));
+        }
+
+        if ($this->passwordVersion !== null) {
+            $sequence->addChild(Asn1::context(
+                1,
+                Asn1::octetString(GeneralizedTime::formatWithFraction($this->passwordVersion)),
             ));
         }
 

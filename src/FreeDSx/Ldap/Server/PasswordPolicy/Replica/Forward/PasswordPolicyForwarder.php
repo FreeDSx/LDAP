@@ -140,6 +140,7 @@ class PasswordPolicyForwarder
             $pending->uuid,
             failureTimes: $state->failureTimes,
             lastSuccess: $state->lastSuccess,
+            passwordVersion: $state->changedAt,
         );
     }
 }

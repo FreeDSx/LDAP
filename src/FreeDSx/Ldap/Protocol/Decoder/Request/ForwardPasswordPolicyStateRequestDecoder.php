@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Validation\Syntax\UuidSyntaxValidator;
 use Throwable;
 
+use function array_slice;
 use function count;
 use function is_string;
 
@@ -39,6 +40,10 @@ use function is_string;
 readonly class ForwardPasswordPolicyStateRequestDecoder extends ExtendedRequestValueDecoder
 {
     private const MALFORMED = 'The password policy forward request is malformed.';
+
+    private const TAG_LAST_SUCCESS = 0;
+
+    private const TAG_PASSWORD_VERSION = 1;
 
     public function __construct(private UuidSyntaxValidator $uuids) {}
 
@@ -53,7 +58,7 @@ readonly class ForwardPasswordPolicyStateRequestDecoder extends ExtendedRequestV
         $childCount = $request instanceof SequenceType
             ? count($request->getChildren())
             : 0;
-        if (!($request instanceof SequenceType) || $childCount < 2 || $childCount > 3) {
+        if (!($request instanceof SequenceType) || $childCount < 2 || $childCount > 4) {
             throw new ProtocolException(self::MALFORMED);
         }
 
@@ -66,13 +71,19 @@ readonly class ForwardPasswordPolicyStateRequestDecoder extends ExtendedRequestV
             throw new ProtocolException('The password policy forward request has an invalid entry UUID.');
         }
 
+        $optional = $this->optionalTimes(
+            array_slice(
+                $request->getChildren(),
+                2,
+            ),
+            $context,
+        );
+
         return new ForwardPasswordPolicyStateRequest(
             $entryUuid->getValue(),
             $this->failureTimes($failureTimes),
-            $this->lastSuccess(
-                $request->getChild(2),
-                $context,
-            ),
+            $optional[self::TAG_LAST_SUCCESS] ?? null,
+            $optional[self::TAG_PASSWORD_VERSION] ?? null,
         );
     }
 
@@ -96,38 +107,72 @@ readonly class ForwardPasswordPolicyStateRequestDecoder extends ExtendedRequestV
     }
 
     /**
-     * @param AbstractType<mixed>|null $lastSuccess
+     * The optional components keyed by context tag, each known tag at most once and in the order the sequence defines.
+     *
+     * @param array<AbstractType<mixed>> $components
+     * @return array<int, DateTimeImmutable>
      * @throws EncoderException
      * @throws ProtocolException
      */
-    private function lastSuccess(
-        ?AbstractType $lastSuccess,
+    private function optionalTimes(
+        array $components,
         DecodeContext $context,
-    ): ?DateTimeImmutable {
-        if ($lastSuccess === null) {
-            return null;
-        }
-        if (!$this->isLastSuccess($lastSuccess)) {
-            throw new ProtocolException(self::MALFORMED);
+    ): array {
+        $times = [];
+        $previous = -1;
+
+        foreach ($components as $component) {
+            $tag = $this->optionalTagOf(
+                $component,
+                $previous,
+            );
+            $times[$tag] = $this->contextTime(
+                $component,
+                $context,
+            );
+            $previous = $tag;
         }
 
-        $value = $lastSuccess instanceof IncompleteType
-            ? $context->complete(
-                $lastSuccess,
-                AbstractType::TAG_TYPE_OCTET_STRING,
-            )
-            : $lastSuccess;
-
-        return $this->time($value->getValue());
+        return $times;
     }
 
     /**
      * @param AbstractType<mixed> $component
+     * @throws ProtocolException when the component is not a known optional one following $previous.
      */
-    private function isLastSuccess(AbstractType $component): bool
-    {
-        return $component->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC
-            && $component->getTagNumber() === 0;
+    private function optionalTagOf(
+        AbstractType $component,
+        int $previous,
+    ): int {
+        $tag = $component->getTagNumber();
+
+        if ($component->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
+            throw new ProtocolException(self::MALFORMED);
+        }
+        if (!is_int($tag) || $tag <= $previous || $tag > self::TAG_PASSWORD_VERSION) {
+            throw new ProtocolException(self::MALFORMED);
+        }
+
+        return $tag;
+    }
+
+    /**
+     * @param AbstractType<mixed> $component
+     * @throws EncoderException
+     * @throws ProtocolException
+     */
+    private function contextTime(
+        AbstractType $component,
+        DecodeContext $context,
+    ): DateTimeImmutable {
+        $value = $component instanceof IncompleteType
+            ? $context->complete(
+                $component,
+                AbstractType::TAG_TYPE_OCTET_STRING,
+            )
+            : $component;
+
+        return $this->time($value->getValue());
     }
 
     /**

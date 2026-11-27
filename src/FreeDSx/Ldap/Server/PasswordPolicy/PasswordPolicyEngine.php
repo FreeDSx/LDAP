@@ -180,14 +180,21 @@ final readonly class PasswordPolicyEngine
      * failures at or before its instant. Permanent (administrative) locks are never cleared by a forward.
      *
      * @param list<DateTimeImmutable> $forwardedFailures
+     * @param ?DateTimeImmutable $passwordVersion The pwdChangedTime the replica observed the state under, if any.
      */
     public function recordForwardedState(
         UserPasswordState $state,
         PasswordPolicy $policy,
         array $forwardedFailures,
         ?DateTimeImmutable $lastSuccess,
+        ?DateTimeImmutable $passwordVersion,
     ): OperationalChanges {
         if ($state->permanentlyLocked) {
+            return OperationalChanges::none();
+        }
+
+        // State observed under a password since replaced says nothing about the current one, its success included.
+        if (!UserPasswordState::isSameVersion($passwordVersion, $state->changedAt)) {
             return OperationalChanges::none();
         }
 
